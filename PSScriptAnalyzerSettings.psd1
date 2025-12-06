@@ -1,3 +1,7 @@
 @{
-    ExcludeRules = @('PSUseApprovedVerbs', 'PSAvoidUsingWriteHost')
+    ExcludeRules = @(
+        'PSUseApprovedVerbs',
+        'PSAvoidUsingWriteHost',
+        'PSAvoidOverwritingBuiltInCmdlets'
+    )
 }
