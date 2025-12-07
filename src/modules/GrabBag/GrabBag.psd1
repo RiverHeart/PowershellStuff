@@ -74,8 +74,10 @@ FunctionsToExport = @(
     'ConvertFom-Json'
     'Format-Flat'
     'Format-TimeAsHumanString'
+    'Get-Property'
     'Get-Password'
     'Import-Env'
+    'New-Tuple'
     'Reduce-Object'
     'Sync-ModulePreference'
 )
@@ -101,8 +103,10 @@ FileList = @(
     'Public/ConvertFom-Json.ps1'
     'Public/Format-Flat.ps1'
     'Public/Format-TimeAsHumanString.ps1'
+    'Public/Get-Property'
     'Public/Get-Password.ps1'
     'Public/Import-Env.ps1'
+    'Public/New-Tuple.ps1'
     'Public/Reduce-Object.ps1'
     'Public/Sync-ModulePreference.ps1'
 )
