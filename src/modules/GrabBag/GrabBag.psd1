@@ -72,6 +72,9 @@ Copyright = '2025'
 FunctionsToExport = @(
     'Convert-PSObjectToHashtable'
     'ConvertFom-Json'
+    'Deindent-String'
+    'Expand-Tab'
+    'Format-Column'
     'Format-Flat'
     'Format-TimeAsHumanString'
     'Get-Property'
@@ -79,7 +82,10 @@ FunctionsToExport = @(
     'Import-Env'
     'New-Tuple'
     'Reduce-Object'
+    'Split-Array'
+    'Split-String'
     'Sync-ModulePreference'
+    'Test-Any'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -101,6 +107,9 @@ AliasesToExport = '*'
 FileList = @(
     'Public/Convert-PSObjectToHashtable.ps1'
     'Public/ConvertFom-Json.ps1'
+    'Public/Deindent-String.ps1'
+    'Public/Expand-Tab.ps1'
+    'Public/Format-Column.ps1'
     'Public/Format-Flat.ps1'
     'Public/Format-TimeAsHumanString.ps1'
     'Public/Get-Property'
@@ -108,7 +117,10 @@ FileList = @(
     'Public/Import-Env.ps1'
     'Public/New-Tuple.ps1'
     'Public/Reduce-Object.ps1'
+    'Public/Split-Array.ps1'
+    'Public/Split-String.ps1'
     'Public/Sync-ModulePreference.ps1'
+    'Public/Test-Any.ps1'
 )
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
