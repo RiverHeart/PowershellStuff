@@ -218,6 +218,14 @@ function Scratchpad {
 }
 
 # Ignore scratchpad if sourcing
-if ($MyInvocation.InvocationName -ne '.') {
+$TopLevelScript =  Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1
+$IsTopLevelScript = $TopLevelScript.Command -eq $MyInvocation.MyCommand.Name
+$IsMain = $IsTopLevelScript -and $MyInvocation.InvocationName -ne '.'
+$IsMainInVSCode = (
+    $IsTopLevelScript -and
+    $Host.Name -eq 'Visual Studio Code Host' -and
+    $MyInvocation.CommandOrigin -eq 'Internal'
+)
+if ($IsMain -or $IsMainInVSCode) {
     Scratchpad
 }

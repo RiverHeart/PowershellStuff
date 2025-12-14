@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 # MARK: SYS PRIORITY
-enum SystemPriority {
+enum EventPriority {
     LOW
     MEDIUM
     HIGH
@@ -11,112 +11,192 @@ enum SystemPriority {
 
 # MARK: SYS EVENT
 class SystemEvent {
+
+    [guid] $Id = [guid]::NewGuid()
     [object] $Source
     [object] $Context
     [hashtable] $EventData
     [object] $Status
-    [int] $Id
-    [int] $Priority = [SystemPriority]::LOW
+    [int] $Priority = [EventPriority]::LOW
+    [object] $Topic
+    [object] $Subscription
 
     SystemEvent(
-        [object] $EventGroup,
-        [object] $EventType,
-        [hashtable] $EventData,
+        [object] $Topic,
+        [object] $Subscription,
+        [hashtable] $Data,
         [object] $Source
     ) {
         $this.Source = $Source
-        $this.EventData = @{
-            Group = $EventGroup
-            Type = $EventType
-            Args = $EventData
-        }
-        $this.Id = [System.Tuple]::Create($EventGroup, $EventType).GetHashCode()
+        $this.Topic = $Topic
+        $this.Subscription = $Subscription
+        $this.EventData = $Data
     }
 }
 
 
 # MARK: EVENT BUS
 class EventBus: System.IDisposable {
-    [int] $Id
+    [guid] $Id = [guid]::NewGuid()
     [string] $Name
-    [hashtable] $Listeners = @{}
-    [hashtable] $Subscriptions = @{
-        Groups = @()
-        Events = @()
-    }
-    [SystemPriority] $Priority = [SystemPriority]::LOW
+
+    # Two level hashtable hierachy of topics
+    # and subscriptions below those.
+    [hashtable] $Topics = @{}
+    [EventPriority] $Priority = [EventPriority]::LOW
     $EventQueue = [System.Collections.Generic.Queue[SystemEvent]]::new()
 
     EventBus(
         [string] $Name,
-        [SystemPriority] $Priority
+        [EventPriority] $Priority
     ) {
         $this.Name = $Name
         $this.Priority = $Priority
-        $this.Id = [System.Tuple]::Create($Name, $Priority).GetHashCode()
     }
 
     Dispose() {
         $this.EventQueue.Dipose()
     }
 
+    [string] ToString() {
+        return "$($this.Name) ($($this.Id))"
+    }
+
     # STATIC PROPS/METHODS
     #=======================
 
-    static [hashtable] $EventBuses = @{}
+    # Contains all EventBuses
+    static [hashtable] $Pool = @{}
 
-    # Create and add EventBus
+    static [void] AddTopic(
+        [EventBus[]] $EventBus,
+        $Topic
+    ) {
+        foreach($Bus in $EventBus) {
+            if ($Bus.Topics.ContainsKey($Topic)) {
+                Write-Verbose "Topic '$Topic' already exists on bus '$Bus'"
+            } else {
+                Write-Verbose "Adding topic '$Topic' to bus '$Bus'"
+                $Bus.Topics.Add($Topic, @{})
+            }
+        }
+    }
+
+    static [void] RemoveTopic(
+        [EventBus[]] $EventBus,
+        $Topic
+    ) {
+        foreach ($Bus in $EventBus) {
+            if ($Bus.Topics.ContainsKey($Topic)) {
+                Write-Verbose "Removing topic '$Topic' from bus '$Bus'"
+                $Bus.Topics.Remove($Topic)
+            } else {
+                Write-Verbose "Topic '$Topic' already removed from bus '$Bus'"
+            }
+        }
+    }
+
+    static [void] AddSubscription(
+        [EventBus[]] $EventBus,
+        $Topic,
+        $Subscription,
+        [scriptblock] $Handler
+    ) {
+        foreach($Bus in $EventBus) {
+            [EventBus]::AddTopic($Bus, $Topic)
+
+            if ($Bus.Topics[$Topic].ContainsKey($Subscription)) {
+                Write-Verbose "Subscription '$Topic/$Subscription' already exists on event bus '$Bus'"
+            } else {
+                Write-Verbose "Adding subscription '$Topic/$Subscription' to event bus '$Bus'"
+                $Bus.Topics[$Topic].Add(
+                    $Subscription,
+                    [System.Collections.Generic.List[scriptblock]]::new()
+                )
+
+                $Bus.Topics[$Topic][$Subscription].Add($Handler)
+            }
+        }
+    }
+
+    static [void] RemoveSubscription(
+        [EventBus[]] $EventBus,
+        $Topic,
+        $Subscription
+    ) {
+        foreach($Bus in $EventBus) {
+            if ([EventBus]::HasTopic($Bus, $Topic)) {
+                Write-Verbose "Removing Subscription '$Topic/$Subscription' from bus '$Bus'"
+                $Bus.Topics[$Topic].Remove($Subscription)
+            } else {
+                Write-Verbose "Subscription '$Topic/$Subscription' already removed from bus '$Bus'"
+            }
+        }
+    }
+
+    static [bool] HasTopic(
+        [EventBus] $EventBus,
+        $Topic
+    ) {
+        if ($null -eq $Topic) {
+            return $false
+        }
+        return $EventBus.Topics.ContainsKey($Topic)
+    }
+
+    static [bool] HasSubscription(
+        [EventBus] $EventBus,
+        $Topic,
+        $Subscription
+    ) {
+        if ($null -eq $Topic -or
+            $null -eq $EventBus.Topics.ContainsKey($Topic) -or
+            $null -eq $Subscription
+        ) {
+            return $false
+        }
+        return $EventBus.Topics[$Topic].ContainsKey($Subscription)
+    }
+
+    # Create EventBus and add it to the pool
     static [EventBus] CreateBus(
         [string] $Name,
-        [SystemPriority] $Priority
+        [EventPriority] $Priority
     ) {
         $EventBus = [EventBus]::new($Name, $Priority)
         [EventBus]::AddBus($EventBus)
         return $EventBus
     }
 
-    # Create and add EventBus with listeners
-    static [EventBus] CreateBus(
-        [string] $Name,
-        [SystemPriority] $Priority,
-        [hashtable] $Listeners
-    ) {
-        $EventBus = [EventBus]::new($Name, $Priority)
-        $EventBus.Listeners = $Listeners
-        [EventBus]::AddBus($EventBus)
-        return $EventBus
+    # Add EventBus to the pool.
+    static [void] AddBus([EventBus[]] $EventBus) {
+        foreach($Bus in $EventBus) {
+            [EventBus]::Pool.Add($Bus.Id, $Bus)
+        }
     }
 
-    # Add existing EventBus
-    static [void] AddBus([EventBus] $EventBus) {
-        [EventBus]::EventBuses.Add($EventBus.Id, $EventBus)
-    }
-
+    # Remove EventBus from the pool.
     static [void] RemoveBus([EventBus] $EventBus) {
-        [EventBus]::EventBuses.Remove($EventBus.Id)
+        foreach($Bus in $EventBus) {
+            [EventBus]::Pool.Remove($Bus.Id)
+        }
+    }
+
+    static [EventBus[]] GetBusByTopic(
+        $Topic
+    ) {
+        if ($null -eq $Topic) {
+            return @()
+        }
+
+        return [EventBus]::Pool.Values | Where-Object { [EventBus]::HasTopic($_, $Topic) }
     }
 
     static [EventBus[]] GetBusBySubscription(
-        [string] $EventGroup,
-        [string] $EventType
+        $Topic,
+        $Subscription
     ) {
-        $GroupIsNull = [string]::IsNullOrEmpty($EventGroup)
-        $TypeIsNull = [string]::IsNullOrEmpty($EventType)
-        if ($GroupIsNull -and $TypeIsNull) {
-            return [EventBus[]]::Empty()
-        }
-
-        $UsePartialMatch = $GroupIsNull -or $TypeIsNull
-
-        return [EventBus]::EventBuses.Values | Where-Object {
-            $ContainsGroup = $_.Subscriptions.Groups -contains $EventGroup
-            $ContainsEvent = $_.Subscriptions.Events -contains $EventType
-            if ($UsePartialMatch) {
-                $ContainsGroup -or $ContainsEvent
-            } else {
-                $ContainsGroup -and $ContainsEvent
-            }
-        }
+        return [EventBus]::Pool.Values | Where-Object { [EventBus]::HasSubscription($_, $Topic, $Subscription) }
     }
 
     # For complex events that have extra data
@@ -124,141 +204,126 @@ class EventBus: System.IDisposable {
         [SystemEvent] $SystemEvent
     ) {
         # Queue event for appropriate subscribers
-        foreach ($EventBus in [EventBus]::GetBusBySubscription($SystemEvent.EventData.Group, $SystemEvent.EventData.Type)) {
+        foreach ($EventBus in [EventBus]::GetBusBySubscription($SystemEvent.Topic, $SystemEvent.Subscription)) {
+            Write-Debug "Queuing event for '$($SystemEvent.Topic)/$($SystemEvent.Subscription)'"
             $EventBus.EventQueue.Enqueue($SystemEvent)
         }
     }
 
     # For simple events that need no extra data
     static [void] EmitEvent(
-        [object] $EventGroup,
-        [string] $EventType,
+        [object] $Topic,
+        [string] $Subscription,
         [hashtable] $EventData,
         [object] $Source
     ) {
         [EventBus]::EmitEvent(
-            [SystemEvent]::new($EventGroup, $EventType, $EventData, $Source)
+            [SystemEvent]::new($Topic, $Subscription, $EventData, $Source)
         )
     }
 
     static [EventBus[]] GetBus() {
-        return [EventBus]::EventBuses.Values
+        return [EventBus]::Pool.Values
     }
 
-    static [void] ClearBus() {
-        [EventBus]::EventBuses.Clear()
+    static [void] ClearPool() {
+        [EventBus]::Pool.Clear()
     }
 
-    static [void] ProcessEvents() {
-        foreach($EventBus in [EventBus]::GetBus() | Sort-Object -Property Priority -Descending) {
-            if ($EventBus.EventQueue.Count -le 0) {
-                Write-Host "No events to process."
-                return
-            }
-
-            Write-Host "Processing events"
-            while ($EventBus.EventQueue.Count -gt 0) {
-                [EventBus]::ProcessEvent($EventBus)
-            }
-        }
+    # Process all events for all buses in pool
+    static [void] ProcessEvent() {
+        [EventBus]::ProcessEvent([EventBus]::GetBus())
     }
 
-    # Implicitly process the next event in the queue
-    static [void] ProcessEvent([EventBus] $EventBus) {
-        if ($EventBus.EventQueue.Count -le 0) {
-            return
-        }
-        [EventBus]::ProcessEvent($EventBus, $EventBus.EventQueue.Dequeue())
-    }
+    # Process all queued events for each given bus
+    # static [void] ProcessNextEvent([EventBus[]] $EventBus) {
+    #     [EventBus]::ProcessEvent(
+    #         ($EventBus | Where-Object { $_.EventQueue.Count -gt 0}),
+    #         $EventBus.EventQueue.Dequeue()
+    #     )
+    # }
 
     # This returns [void] but maybe it should return $false.
     # It would make sense for there to be a ProcessEvent() that just
     # dequeues events from the bus itself and returns a bool if the
     # there are more to process
     static [void] ProcessEvent(
-        [EventBus] $EventBus,
-        [SystemEvent] $SystemEvent
+        [EventBus[]] $EventBus
     ) {
-        foreach($Listener in $EventBus.Listeners[$SystemEvent.Id]) {
-            try {
-                $Listener.Invoke(
-                    $SystemEvent.Source,
-                    $SystemEvent.EventData,
-                    $SystemEvent.Context
-                )
-            } catch {
-                Write-Host "Handler failed with error: $_"
-            }
-        }
-    }
-
-    # Automatically resolve EventBus to add listener to
-    static [void] AddListener(
-        [object] $EventGroup,
-        [string] $EventType,
-        [object] $Source,
-        [scriptblock] $Callback
-    ) {
-        [EventBus]::AddListener(
-            [EventBus]::GetBusBySubscription($EventGroup, $EventType),
-            $EventGroup,
-            $EventType,
-            $Source,
-            $Callback
-        )
-    }
-
-    static [void] AddListener(
-        [EventBus[]] $EventBuses,
-        [object] $EventGroup,
-        [string] $EventType,
-        [object] $Source,
-        [scriptblock] $Callback
-    ) {
-        $Key = [System.Tuple]::Create($EventGroup, $EventType).GetHashCode()
-
-        foreach($Bus in $EventBuses) {
-            # Initialize handler group container
-            if (-not $Bus.Listeners.ContainsKey($Key)) {
-                $Bus.Listeners.Add(
-                    $Key,
-                    [System.Collections.Generic.List[scriptblock]]::new()
-                )
+        foreach($Bus in $EventBus | Sort-Object -Property Priority -Descending) {
+            if ($Bus.EventQueue.Count -le 0) {
+                Write-Host "No events to process."
+                return
             }
 
-            $Bus.Listeners[$Key].Add($Callback)
-        }
-    }
+            Write-Host "Processing events"
+            while ($Bus.EventQueue.Count -gt 0) {
+                $SystemEvent = $Bus.EventQueue.Dequeue()
 
-    static [void] RemoveListener(
-        [EventBus] $EventBus,
-        [object] $EventGroup,
-        [string] $EventType,
-        [object] $Source
-    ) {
-        $Key = [System.Tuple]::Create($EventGroup, $EventType).GetHashCode()
-        if (-not $EventBus.Listeners.ContainsKey($Key)) {
-            Write-Host "Handler '$Key' not found."
-            return
-        }
+                # Validate that the topic and/or subscription have no been unsubscribed since
+                # this event was posted.
+                if (-not [EventBus]::HasSubscription($Bus, $SystemEvent.Topic, $SystemEvent.Subscription)) {
+                    Write-Verbose "Bus '$Bus' no longer subcribed to '$($SystemEvent.Topic)/$($SystemEvent.Subscription). Discarding event..."
+                    continue
+                }
 
-        $ListenersToRemove = $EventBus.Listeners[$Key] |
-            ForEach-Object {
-                if ($_.Source -eq $Source) {
-                    $_
+                # Call each handler for topic/subscription
+                foreach($Handler in $Bus.Topics[$SystemEvent.Topic][$SystemEvent.Subscription]) {
+                    try {
+                        $Handler.Invoke(
+                            $SystemEvent.Source,
+                            $SystemEvent.EventData,
+                            $SystemEvent.Context
+                        )
+                    } catch {
+                        Write-Host "Handler failed with error: $_"
+                    }
                 }
             }
-
-        foreach($Listener in $ListenersToRemove) {
-            Write-Host "Removing handler '$Key'."
-            $EventBus.Listeners.Remove($Key)
         }
+    }
+
+    # Returns a specific topic
+    static [hashtable] GetTopic(
+        $EventBus,
+        $Topic
+    ) {
+        return $EventBus.Topics[$Topic]
+    }
+
+    # Returns all topics
+    static [hashtable] GetTopic(
+        $EventBus
+    ) {
+        return $EventBus.Topics
+    }
+
+    # Returns a specific subscription
+    static [array] GetSubscription(
+        $EventBus,
+        $Topic,
+        $Subscription
+    ) {
+        return $EventBus.Topics[$Topic][$Subscription]
+    }
+
+    # Return all subscriptions
+    static [hashtable] GetSubscription(
+        $EventBus,
+        $Topic
+    ) {
+        return $EventBus.Topics[$Topic]
     }
 }
 
 
 # MARK: SCRATCHPAD
 function Scratchpad {
+
+    $VerbosePreference = 'Continue'
+
+    # Create object whose methods emit events
+    # of different priorities when called.
     class Test {
         [void] DoFoo() {
             [EventBus]::EmitEvent('category', 'foo', @{}, $this)
@@ -266,27 +331,19 @@ function Scratchpad {
 
         [void] Important() {
             $SysEvent = [SystemEvent]::new('category', 'bar', @{}, $this)
-            $SysEvent.Priority = [SystemPriority]::HIGH
+            $SysEvent.Priority = [EventPriority]::HIGH
             [EventBus]::EmitEvent($SysEvent)
         }
     }
 
-    $Subscriptions = @{
-        Groups = 'category'
-        Events = @('foo', 'bar')
-    }
+    [EventBus]::ClearPool()
+    $EventBusOne = [EventBus]::CreateBus('test_bus1', [EventPriority]::HIGH)
+    $EventBusTwo = [EventBus]::CreateBus('test_bus2', [EventPriority]::LOW)
 
-    [EventBus]::ClearBus()
-    $EventBusOne = [EventBus]::CreateBus('test_bus1', [SystemPriority]::HIGH)
-    $EventBusTwo = [EventBus]::CreateBus('test_bus2', [SystemPriority]::LOW)
-    $EventBusOne.Subscriptions = $Subscriptions
-    $EventBusTwo.Subscriptions = $Subscriptions
-
-    [EventBus]::AddListener(
-        #$EventBusOne,
+    [EventBus]::AddSubscription(
+        $EventBusOne,
         'category',
         'foo',
-        $this,
         {
             param(
                 $Source,
@@ -300,11 +357,10 @@ function Scratchpad {
         }
     )
 
-    [EventBus]::AddListener(
-        #$EventBusTwo,
+    [EventBus]::AddSubscription(
+        $EventBusTwo,
         'category',
         'bar',
-        $this,
         {
             Write-Host "Barfu"
         }
@@ -313,10 +369,26 @@ function Scratchpad {
     $Test = [Test]::new()
     $Test.DoFoo()
     $Test.Important()
-    [EventBus]::ProcessEvents()
+    [EventBus]::ProcessEvent()
+
+    [EventBus]::RemoveSubscription(
+        $EventBusOne,
+        'category',
+        'foo'
+    )
 }
 
-# Ignore scratchpad if sourcing
-if ($MyInvocation.InvocationName -ne '.') {
+
+# Boilerplate to detect if this script is being
+# sourced or run.
+$TopLevelScript = Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1
+$IsTopLevelScript = $TopLevelScript.Command -eq $MyInvocation.MyCommand.Name
+$IsMain = $IsTopLevelScript -and $MyInvocation.InvocationName -ne '.'
+$IsMainInVSCode = (
+    $IsTopLevelScript -and
+    $Host.Name -eq 'Visual Studio Code Host' -and
+    $MyInvocation.CommandOrigin -eq 'Internal'
+)
+if ($IsMain -or $IsMainInVSCode) {
     Scratchpad
 }
