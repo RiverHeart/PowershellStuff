@@ -70,8 +70,8 @@ Description = 'Module for interacting with barcodes'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
-    'Read-BC128'
-    'Test-BC128Value'
+    'Get-BcBarcode128'
+    'Test-BcBarcode128Value'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -91,8 +91,8 @@ AliasesToExport = '*'
 
 # List of all files packaged with this module
 FileList = @(
-    'Public/Read-BC128.ps1'
-    'Public/Test-BC128Value.ps1'
+    'Public/Get-BcBarcode128.ps1'
+    'Public/Test-BcBarcode128Value.ps1'
     'Barcode.psd1'
     'Barcode.psm1'
 )

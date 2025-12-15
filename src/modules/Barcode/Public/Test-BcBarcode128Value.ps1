@@ -3,10 +3,10 @@
     Checks whether a given value is valid for a given code set.
 
 .EXAMPLE
-    Test-BC128Value 'P' -Type 'A'  # returns $True
-    Test-BC128Value 'p' -Type 'A'  # returns $False
+    Test-BcBarcode128Value 'P' -Type 'A'  # returns $True
+    Test-BcBarcode128Value 'p' -Type 'A'  # returns $False
 #>
-function Test-BC128Value {
+function Test-BcBarcode128Value {
     [CmdletBinding()]
     [OutputType([bool])]
     param (

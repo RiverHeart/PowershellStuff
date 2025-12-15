@@ -6,16 +6,16 @@
 .EXAMPLE
     Get type A barcode. Based on wikipedia's example.
 
-    Read-BC128 "PJJ123C" -Type 'A' -Debug
+    Get-BcBarcode128 "PJJ123C" -Type 'A' -Debug
 
     > ËPJJ123CVÎ
 
 .EXAMPLE
     Pipeline usage plus debug
 
-    PJJ123C" | Read-BC128 -Type 'A'
+    PJJ123C" | Get-BcBarcode128 -Type 'A'
 #>
-function Read-BC128 {
+function Get-BcBarcode128 {
     [CmdletBinding()]
     [OutputType([string])]
     param (
@@ -46,7 +46,7 @@ function Read-BC128 {
             $Output += $Char = $Text[$i]
 
             # Ensure our input is allowed in this codeset.
-            if (-not (Test-BC128Value $Char -Type $Type)) {
+            if (-not (Test-BcBarcode128Value $Char -Type $Type)) {
                 throw "Value `"$Char`" not allowed in Codeset $Type"
             }
 
