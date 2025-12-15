@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 # MARK: TRAN WINDOW
-enum TransitionWindow {
+enum StateTransitionWindow {
     BEFORE_TRANSITION
     ON_TRANSITION
     AFTER_TRANSITION
@@ -13,164 +13,347 @@ enum TransitionWindow {
 class StateMachine {
     [string] $ActiveState
     [string] $PreviousState
-    [hashtable] $TransitionTable
+    [hashtable] $Transitions
     [System.Diagnostics.Stopwatch] $Timer = [System.Diagnostics.Stopwatch]::new()
-    # Hashtable of tuple, hashtable[] values corresponding the the TransitionWindow values
+    # Hashtable of tuple, hashtable[] values corresponding the the StateTransitionWindow values
     [hashtable] $Handlers = @{}
 
     StateMachine(
         [string] $InitialState,
-        [hashtable] $TransitionTable
+        [hashtable] $Transitions
     ) {
         $this.ActiveState = $InitialState
-        $this.TransitionTable = $TransitionTable
+        $this.Transitions = $Transitions
         $this.Timer.Start()
     }
 }
 
-class TransitionEvent {
+# MARK: TRAN EVENT
+class StateTransitionEvent {
     [string] $EventType
     [StateMachine] $StateMachine
-    [TransitionWindow] $TransitionWindow = [TransitionWindow]::ON_TRANSITION
+    [StateTransitionWindow] $StateTransitionWindow = [StateTransitionWindow]::ON_TRANSITION
 
-    TransitionEvent(
-        [string] $EventType,
-        [StateMachine] $StateMachine
+    StateTransitionEvent(
+        [StateMachine] $StateMachine,
+        [string] $EventType
     ) {
         $this.EventType = $EventType
         $this.StateMachine = $StateMachine
     }
 
-    TransitionEvent(
-        [string] $EventType,
+    StateTransitionEvent(
         [StateMachine] $StateMachine,
-        [TransitionWindow] $TransitionWindow
+        [string] $EventType,
+        [StateTransitionWindow] $StateTransitionWindow
     ) {
         $this.EventType = $EventType
         $this.StateMachine = $StateMachine
-        $this.TransitionWindow = $TransitionWindow
+        $this.StateTransitionWindow = $StateTransitionWindow
     }
 }
 
+# MARK: STATE MAN
 class StateManagement {
-    # Process array of events
-    static [void] ProcessEvents([TransitionEvent[]] $TransitionEvents) {
-        foreach ($TransitionEvent in $TransitionEvents) {
-            [StateManagement]::Transition($TransitionEvent.EventType, $TransitionEvent.StateMachine)
+    # This should be reading from a queue or something
+    static [void] ProcessEvent([StateTransitionEvent[]] $StateTransitionEvents) {
+        foreach ($StateTransitionEvent in $StateTransitionEvents) {
+            [StateManagement]::Transition($StateTransitionEvent.StateMachine, $StateTransitionEvent.EventType)
         }
     }
 
-    # Process an individual event
-    static [void] ProcessEvent([TransitionEvent] $TransitionEvent) {
-        # Transition
-        [StateManagement]::Transition($TransitionEvent.EventType, $TransitionEvent.StateMachine)
-    }
-
-    static [void] ProcessEvent([string] $EventType, [StateMachine] $StateMachine) {
-        [StateManagement]::Transition($EventType, $StateMachine)
-    }
-
-	static [bool] CanTransition([string] $EventType, [StateMachine] $StateMachine)
+	static [bool] CanTransition([StateMachine] $StateMachine, [string] $EventType)
 	{
         $Key = [System.Tuple]::Create($StateMachine.ActiveState, $EventType)
-        return $StateMachine.TransitionTable.ContainsKey($Key)
+        return $StateMachine.Transitions.ContainsKey($Key)
 	}
 
-    static [hashtable] GetTransition([string] $EventType, [StateMachine] $StateMachine)
+    static [hashtable] GetTransition([StateMachine] $StateMachine, [string] $EventType)
 	{
         $Key = [System.Tuple]::Create($StateMachine.ActiveState, $EventType)
-        if ($StateMachine.TransitionTable.ContainsKey($Key)) {
-            return $StateMachine.TransitionTable[$Key]
+        if ($StateMachine.Transitions.ContainsKey($Key)) {
+            return $StateMachine.Transitions[$Key]
         }
         return @{}
 	}
-	
-	static [StateMachine] Transition([string] $EventType, [StateMachine] $StateMachine)
+
+	static [void] Transition([StateMachine[]] $StateMachine, [string] $EventType)
     {
-        # Process TransitionWindow::BEFORE_TRANSITION handlers
-        [StateManagement]::InvokeHandlers([TransitionWindow]::BEFORE_TRANSITION, $EventType, $StateMachine)
+        foreach($Machine in $StateMachine) {
+            # Process StateTransitionWindow::BEFORE_TRANSITION handlers
+            [StateManagement]::InvokeHandlers($Machine, [StateTransitionWindow]::BEFORE_TRANSITION, $EventType)
 
-        # Validate transition can occur
-        $Key = [System.Tuple]::Create($StateMachine.ActiveState, $EventType)
-        if (-not $StateMachine.TransitionTable.ContainsKey($Key)) {
-            Write-Host "Invalid transition from '$($StateMachine.ActiveState)' with event '$EventType'"
-            return $StateMachine
+            # Validate transition can occur
+            $Key = [System.Tuple]::Create($Machine.ActiveState, $EventType)
+            if (-not $Machine.Transitions.ContainsKey($Key)) {
+                Write-Warning "Invalid transition from '$($Machine.ActiveState)' with event '$EventType'"
+                return
+            }
+
+            $Machine.PreviousState = $Machine.ActiveState
+            $Machine.ActiveState = $Machine.Transitions[$Key]
+            $Machine.Timer.Restart()
+            Write-Verbose "Transitioned to state: $($Machine.ActiveState)"
+
+            # Process StateTransitionWindow::AFTER_TRANSITION handlers
+            [StateManagement]::InvokeHandlers($Machine, [StateTransitionWindow]::AFTER_TRANSITION, $EventType)
+
+            # Process on_exit for the old state
+            [StateManagement]::InvokeHandlers($Machine, [StateTransitionWindow]::ON_EXIT, $EventType)
+
+            # Process on_enter for the new state
+            [StateManagement]::InvokeHandlers($Machine, [StateTransitionWindow]::ON_ENTER, $EventType)
         }
-
-        $StateMachine.PreviousState = $StateMachine.ActiveState
-        $StateMachine.ActiveState = $StateMachine.TransitionTable[$Key]
-        $StateMachine.Timer.Restart()
-        Write-Host "Transitioned to state: $($StateMachine.ActiveState)"
-
-        # Process TransitionWindow::AFTER_TRANSITION handlers
-        [StateManagement]::InvokeHandlers([TransitionWindow]::AFTER_TRANSITION, $EventType, $StateMachine)
-
-        # Process on_exit for the old state
-        [StateManagement]::InvokeHandlers([TransitionWindow]::ON_EXIT, $EventType, $StateMachine)
-
-        # Process on_enter for the new state
-        [StateManagement]::InvokeHandlers([TransitionWindow]::ON_ENTER, $EventType, $StateMachine)
-
-        return $StateMachine
     }
 
     static [void] InvokeHandlers(
-        [TransitionWindow] $TransitionWindow,
-        [string] $EventType,
-        [StateMachine] $StateMachine
+        [StateMachine[]] $StateMachine,
+        [StateTransitionWindow] $StateTransitionWindow,
+        [string] $EventType
     ) {
-        $Key = [System.Tuple]::Create($TransitionWindow, $EventType)
-        if ($StateMachine.Handlers.ContainsKey($Key)) {
-            Write-Host "Processing handlers for '$Key'"
-            foreach($Handler in $StateMachine.Handlers[$Key]) {
-                try {
-                    $Handler.Invoke()
-                } catch {
-                    Write-Host "Handler failed with error: $_"
+        $Key = [System.Tuple]::Create($StateTransitionWindow, $EventType)
+
+        foreach($Machine in $StateMachine) {
+            if ($Machine.Handlers.ContainsKey($Key)) {
+                Write-Verbose "Processing handlers for '$Key'"
+                foreach($Handler in $Machine.Handlers[$Key]) {
+                    try {
+                        $Handler.Invoke()
+                    } catch {
+                        Write-Warning "Handler failed with error: $_"
+                    }
                 }
             }
         }
     }
 
-    static [void] AddTransitions([hashtable[]] $Transitions, [StateMachine] $StateMachine) {
-        foreach($Transition in $Transitions) {
-            [StateManagement]::AddTransition($Transition.ActiveState, $Transition.Event, $Transition.TargetState, $StateMachine)
+    static [void] AddTransition(
+        [StateMachine[]] $StateMachine,
+        [hashtable[]] $Transitions
+    ) {
+        foreach($Machine in $StateMachine) {
+            foreach($Transition in $Transitions) {
+                [StateManagement]::AddTransition(
+                    $Machine,
+                    $Transition.From,
+                    $Transition.Event,
+                    $Transition.To
+                )
+            }
         }
     }
 
-    static [void] AddTransition([string] $ActiveState, [string] $EventType, [string] $TargetState, [StateMachine] $StateMachine)
-    {
-        $Key = [System.Tuple]::Create($ActiveState, $EventType)
-        if ($StateMachine.TransitionTable.ContainsKey($Key)) {
-            Write-Host "Transition '$Key' -> '$TargetState' already exits."
-        } else {
-            Write-Host "Adding transition '$Key' -> '$TargetState'"
-            $StateMachine.TransitionTable.Add($Key, $TargetState)
+    static [void] AddTransition(
+        [StateMachine[]] $StateMachine,
+        [string] $From,
+        [string] $EventType,
+        [string] $To
+    ) {
+        $Key = [System.Tuple]::Create($From, $EventType)
+
+        foreach($Machine in $StateMachine) {
+            if ($Machine.Transitions.ContainsKey($Key)) {
+                Write-Verbose "Transition '$Key' -> '$To' already exits."
+            } else {
+                Write-Verbose "Adding transition '$Key' -> '$To'"
+                $Machine.Transitions.Add($Key, $To)
+            }
         }
     }
 
-    static [void] RemoveTransitions([hashtable[]] $Transitions, [StateMachine] $StateMachine) {
-        foreach($Transition in $Transitions) {
-            [StateManagement]::RemoveTransition($Transition.ActiveState, $Transition.Event, $StateMachine)
+    static [void] RemoveTransition(
+        [StateMachine[]] $StateMachine,
+        [hashtable[]] $Transitions
+    ) {
+        foreach($Machine in $StateMachine) {
+            foreach($Transition in $Transitions) {
+                [StateManagement]::RemoveTransition($Machine, $Transition.From, $Transition.Event)
+            }
         }
     }
 
-    static [void] RemoveTransition([string] $State, [string] $EventType, [StateMachine] $StateMachine)
-    {
+    static [void] RemoveTransition(
+        [StateMachine[]] $StateMachine,
+        [string] $State,
+        [string] $EventType
+    ) {
         $Key = [System.Tuple]::Create($State, $EventType)
-        if ($StateMachine.TransitionTable.ContainsKey($Key)) {
-            Write-Host "Removing transition '$Key'"
-            $StateMachine.TransitionTable.Remove($Key)
+
+        foreach($Machine in $StateMachine) {
+            if ($Machine.Transitions.ContainsKey($Key)) {
+                Write-Verbose "Removing transition '$Key'"
+                $Machine.Transitions.Remove($Key)
+            } else {
+                Write-Verbose "Transition '$Key' not found"
+            }
+        }
+    }
+}
+
+# MARK: NEW-SM
+function New-FSMStateMachine {
+    [CmdletBinding()]
+    [OutputType([StateTransitionEvent])]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $InitialState,
+
+        [hashtable] $Transitions = @{}
+    )
+
+    return [StateMachine]::new($InitialState, $Transitions)
+}
+
+# MARK: NEW-SMT
+function New-FSMTransitionEvent {
+    [CmdletBinding()]
+    [OutputType([StateTransitionEvent])]
+    param (
+        [Parameter(Mandatory)]
+        [StateMachine] $StateMachine,
+
+        [Parameter(Mandatory)]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $EventType
+    )
+
+    return [StateTransitionEvent]::new($StateMachine, $EventType)
+}
+
+# MARK: ADD-ST
+function Add-FSMTransition {
+    [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='ByProperty')]
+    param(
+        [Parameter(Mandatory,ParameterSetName='ByProperty',ValueFromPipeline)]
+        [Parameter(Mandatory,ParameterSetName='ByHashtable',ValueFromPipeline)]
+        [StateMachine] $StateMachine,
+
+        [Parameter(Mandatory,ParameterSetName='ByProperty')]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $From,
+
+        [Parameter(Mandatory,ParameterSetName='ByProperty')]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $OnEvent,
+
+        [Parameter(Mandatory,ParameterSetName='ByProperty')]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $To,
+
+        [Parameter(ParameterSetName='ByHashtable')]
+        [hashtable] $Transitions
+    )
+
+    process {
+        if ($PSCmdlet.ParameterSetName -eq 'ByHashtable') {
+            # Parameter validation attributes are still in effect
+            $From = $Transition.From
+            $OnEvent = $Transition.EventType
+            $To = $Transitions.To
+        }
+
+        if ($PSCmdlet.ShouldProcess($StateMachine, "Adding transition '$From' -> '$To' on '$OnEvent'")) {
+            [StateManagement]::AddTransition($StateMachine, $From, $OnEvent, $To)
+        }
+    }
+}
+
+# MARK: REM-ST
+function Remove-FSMTransition {
+    [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='ByProperty')]
+    param(
+        [Parameter(Mandatory,ParameterSetName='ByProperty',ValueFromPipeline)]
+        [Parameter(Mandatory,ParameterSetName='ByHashtable',ValueFromPipeline)]
+        [StateMachine] $StateMachine,
+
+        [Parameter(Mandatory,ParameterSetName='ByProperty')]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $From,
+
+        [Parameter(Mandatory,ParameterSetName='ByProperty')]
+        [ValidateScript({ -not [String]::IsNullOrEmpty($_.Trim()) })]
+        [string] $EventType,
+
+        [Parameter(Mandatory,ParameterSetName='ByHashtable')]
+        [hashtable] $Transitions
+    )
+
+    process {
+        if ($PSCmdlet.ParameterSetName -eq 'ByHashtable') {
+            # Parameter validation attributes are still in effect
+            $From = $Transitions.From
+            $EventType = $Transitions.EventType
+        }
+
+        if ($PSCmdlet.ShouldProcess($StateMachine, "Removing transition '$From' for event '$EventType'")) {
+            [StateManagement]::RemoveTransition($StateMachine, $From, $EventType)
+        }
+    }
+}
+
+# MARK: START-PROCEVT
+function Set-FSMState {
+    [CmdletBinding(DefaultParameterSetName='ByStateMachine')]
+    [OutputType([void])]
+    param(
+        [Parameter(Mandatory,ParameterSetName='ByStateMachine',ValueFromPipeline)]
+        [StateMachine[]] $StateMachine,
+
+        [Parameter(Mandatory,ParameterSetName='ByStateMachine',Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $OnEvent,
+
+        [Parameter(Mandatory,ParameterSetName='ByTransitionEvent')]
+        [StateTransitionEvent[]] $TransitionEvent
+    )
+
+    process {
+        if ($PScmdlet.ParameterSetName -eq 'ByTransitionEvent') {
+            [StateManagement]::Transition($TransitionEvent.StateMachine, $TransitionEvent.EventType)
         } else {
-            Write-Host "Transition '$Key' not found"
+            [StateManagement]::Transition($StateMachine, $OnEvent)
         }
     }
 }
 
 
-# MARK: NEW TUPLE
+# MARK: NEW-TRANTABLE
+function New-FSMTransitionTable {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]
+        [Array[]] $Transitions
+    )
+
+    begin {
+        $TransitionTable = @{}
+        $ErrorsFound = $False
+    }
+
+    process {
+        foreach($Transition in $Transitions) {
+            if ($Transition.Count -lt 3 -or $Transition.Count -gt 3) {
+                Write-Error "Transitions can only contain 3 elements."
+                $ErrorsFound = $true
+                return
+            }
+            $Key = [System.Tuple]::Create($Transition[0], $Transition[1])
+            $TransitionTable.Add($Key, $Transition[2])
+        }
+    }
+
+    end {
+        if ($ErrorsFound) {
+            return @{}
+        }
+        return $TransitionTable
+    }
+}
+
+# MARK: NEW-TUPLE
 function New-Tuple {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not alter system state.')]
     [Alias('tuple')]
     [Alias('~')]
     param()
@@ -180,45 +363,39 @@ function New-Tuple {
     return $Tuple
 }
 
-
 # MARK: SCRATCHPAD
 function Scratchpad {
+    #=================
+    # Example usage
+    #=================
 
-    # Using a dictionary where keys are (ActiveState, EventType) tuples
-    # and values are the next_state.
-    $TransitionTableDict = @{
-        (tuple 'idle' 'start') = 'running'
-        (tuple 'running' 'stop') = 'idle'
-        (tuple 'running' 'pause') = 'paused'
-        (tuple 'paused' 'resume') = 'running'
-        (tuple 'paused' 'stop') = 'idle'
-    }
+    $VerbosePreference = 'Continue'
 
     # Using a list of dictionaries, where each dictionary represents a transition rule.
-    $TransitionTableList = @(
-        @{ ActiveState = 'idle'; Event = 'start'; TargetState = 'running'},
-        @{ ActiveState = 'running'; Event = 'stop'; TargetState = 'idle'},
-        @{ ActiveState = 'running'; Event = 'pause'; TargetState = 'paused'},
-        @{ ActiveState = 'paused'; Event = 'resume'; TargetState = 'running'},
-        @{ ActiveState = 'paused'; Event = 'stop'; TargetState = 'idle'}
+    $TransitionsTable = New-FSMTransitionTable @(
+        @('idle', 'start', 'running'),
+        @('running', 'stop', 'idle'),
+        @('running',  'pause', 'paused'),
+        @('paused', 'resume', 'running'),
+        @('paused', 'stop', 'idle')
     )
 
-    # Example usage
-    $MobilityFSM = [StateMachine]::new('idle', $TransitionTableDict)
-    $StanceFSM = [StateMachine]::new('standing', @{})
+    $MobilityFSM = New-FSMStateMachine 'idle' $TransitionsTable
+    $StanceFSM = New-FSMStateMachine 'standing'
 
-    [StateManagement]::ProcessEvent('start', $MobilityFSM)    # Output: Transitioned to state: running
-    [StateManagement]::ProcessEvent('pause', $MobilityFSM)    # Output: Transitioned to state: paused
-    [StateManagement]::ProcessEvent('resume', $MobilityFSM)   # Output: Transitioned to state: running
-    [StateManagement]::ProcessEvent('stop', $MobilityFSM)     # Output: Transitioned to state: idle
-    [StateManagement]::ProcessEvent('invalid', $MobilityFSM)  # Output: Invalid transition from idle with event invalid
+    $MobilityFSM | Set-FSMState 'start'  # Output: Transitioned to state: running
+    $MobilityFSM | Set-FSMState 'pause'  # Output: Transitioned to state: paused
+    $MobilityFSM | Set-FSMState 'resume' # Output: Transitioned to state: running
+    $MobilityFSM | Set-FSMState 'stop'   # Output: Transitioned to state: idle
+    $MobilityFSM | Set-FSMState 'invalid'  # Output: Invalid transition from idle with event invalid
 
-    [StateManagement]::AddTransition('standing', 'crouch', 'crouching', $StanceFSM)
-    [StateManagement]::AddTransition('crouching', 'stand', 'standing', $StanceFSM)
+    $StanceFSM | Add-FSMTransition -From 'standing' -OnEvent 'crouch' -To 'crouching'
+    $StanceFSM | Add-FSMTransition -From 'crouching' -OnEvent 'crouch' -To 'standing'
 }
 
-# Ignore scratchpad if sourcing
-$TopLevelScript =  Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1
+# Boilerplate to detect if this script is being
+# sourced or run.
+$TopLevelScript = Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1
 $IsTopLevelScript = $TopLevelScript.Command -eq $MyInvocation.MyCommand.Name
 $IsMain = $IsTopLevelScript -and $MyInvocation.InvocationName -ne '.'
 $IsMainInVSCode = (
