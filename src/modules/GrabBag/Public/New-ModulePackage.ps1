@@ -96,7 +96,6 @@ function New-ModulePackage {
         if ($ModuleManifest.PrivateData.PSData.Tags) {
             $Tags += $ModuleManifest.PrivateData.PSData.Tags
         }
-        $TagString -join ' '
 
         # Create .nuspec content
         $NuspecTemplate = [xml] @"
@@ -111,7 +110,7 @@ function New-ModulePackage {
         <releaseNotes>$($ModuleManifest.PrivateData.PSData.ReleaseNotes)</releaseNotes>
         <projectUrl>$($ModuleManifest.PrivateData.PSData.ProjectUri)</projectUrl>
         <licenseUrl>$($ModuleManifest.PrivateData.PSData.LicenseUri)</licenseUrl>
-        <tags>$TagString</tags>
+        <tags>$($Tags -join ' ')</tags>
         <owners>$Owners</owners>
     </metadata>
 </package>
