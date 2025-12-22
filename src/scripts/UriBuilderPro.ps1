@@ -1,10 +1,7 @@
-# Source - https://stackoverflow.com/a/78219857
-# Posted by RiverHeart, modified by community. See post 'Timeline' for change history
-# Retrieved 2025-12-06, License - CC BY-SA 4.0
-
 <#
 .SYNOPSIS
     Updated version of the System.UriBuilder class with improved support for query params.
+
 .DESCRIPTION
     Version of the UriBuilder class with improved support for Query Params.
 
@@ -19,9 +16,11 @@
         by choice of char/string, for value part of the key/value pair.
 
       * Enables addition of parameters only when a given constant/scriptblock evaluates to true.
+
 .NOTES
     Like the base class, removing the port from ToString() output requires setting the
     port to -1. I don't care for the default behaviour but we'll stick with it for compatibility.
+
 .EXAMPLE
     Add simple key/value pair.
 
