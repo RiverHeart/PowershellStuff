@@ -12,7 +12,7 @@ Create a window with a couple of buttons. Mandatory arguments get passed as regu
 ```powershell
 Import-Module ./WPF
 
-$Window = Window "Title" 640 480 {
+Window "Title" 640 480 {
     StackPanel "Buttons" {
         Button "TestButton" "Hello World"
         Button "TestButton2" "Konichiwa Sekai" {
@@ -25,9 +25,7 @@ $Window = Window "Title" 640 480 {
             }
         }
     }
-}
-
-Show-WPFWindow $Window
+} | Show-WPFWindow
 ```
 
 ## Resources

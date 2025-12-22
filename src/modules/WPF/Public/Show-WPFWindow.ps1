@@ -10,15 +10,17 @@ function Show-WPFWindow {
     [CmdletBinding()]
     [OutputType([void])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ValueFromPipeline)]
         [System.Windows.Window] $Window
     )
 
-    try {
-        $Window.ShowDialog()
-    } catch [Exception] {
-        Write-Error "Window closed with error: $_"
-    } finally {
-        $Window.Close()
+    process {
+        try {
+            $Window.ShowDialog()
+        } catch [Exception] {
+            Write-Error "Window closed with error: $_"
+        } finally {
+            $Window.Close()
+        }
     }
 }
