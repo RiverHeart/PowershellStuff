@@ -1,6 +1,7 @@
-# Overview
+> [!WARNING]
+> Work in progress. Nothing is guaranteed to work as intended.
 
-> [!WARNING] Work in progress
+# Overview
 
 Experimental DSL for building WPF applications in Powershell.
 
