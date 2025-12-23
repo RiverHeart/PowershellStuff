@@ -71,7 +71,8 @@ Copyright = '2025'
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
     'Convert-PSObjectToHashtable'
-    'ConvertFom-Json'
+    'ConvertFrom-Json'
+    'ConvertFrom-StringTable'
     'Deindent-String'
     'Expand-Tab'
     'Format-Column'
@@ -111,6 +112,7 @@ AliasesToExport = '*'
 FileList = @(
     'Public/Convert-PSObjectToHashtable.ps1'
     'Public/ConvertFom-Json.ps1'
+    'Public/ConvertFom-StringTable.ps1'
     'Public/Deindent-String.ps1'
     'Public/Expand-Tab.ps1'
     'Public/Format-Column.ps1'
