@@ -34,11 +34,11 @@ function ConvertFrom-StringTable {
 
     process {
         foreach($Line in $String -Split "`n") {
-            $LineResult = [ordered] @{}
-
             if ($LineIndex -in $SkipLines) {
                 continue
             }
+
+            $LineResult = [ordered] @{}
 
             # Assume first line is headers. Figure out column start/end
             # based on the start index of each column. We also assume that
