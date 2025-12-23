@@ -41,9 +41,9 @@ function ConvertFrom-StringTable {
             $LineResult = [ordered] @{}
 
             # Assume first line is headers. Figure out column start/end
-            # based on the start index of each column. We also assume that
+            # based on the start index of each header. We also assume that
             # all values are left-oriented. This would not work if column values
-            # were center-oriented.
+            # were center or right oriented.
             if ($LineIndex -eq 0) {
                 $Headers =[regex]::Matches($Line,'(^|\s)\S+')
                 $ColumnCount = $Headers.Count
