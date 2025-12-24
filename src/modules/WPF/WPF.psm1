@@ -1,6 +1,7 @@
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
 $Paths = @(
+    'Private'
     'Public'
 )
 

@@ -21,8 +21,7 @@ function New-WPFWindow {
         Height = $Height
         Width = $Width
     }
-    foreach ($Control in $ScriptBlock.Invoke()) {
-        $Window.AddChild($Control)
-    }
+    Update-WPFObject $Window $ScriptBlock
+    Set-WPFObjectType $Window 'Control'
     return $Window
 }

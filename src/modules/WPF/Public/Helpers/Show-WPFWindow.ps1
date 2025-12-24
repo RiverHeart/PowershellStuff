@@ -1,7 +1,13 @@
 <#
 .SYNOPSIS
    Reads in a string from a XAML generator script and converts
-   it to XML
+   it to XML.
+
+.DESCRIPTION
+   Reads in a string from a XAML generator script and converts
+   it to XML.
+
+   Provides basic error handling and resource cleanup.
 
 .EXAMPLE
    New-WPFApp -Path $PSScriptRoot -Name Main

@@ -1,7 +1,7 @@
 
 function New-WPFGrid {
     [Alias('Grid')]
-    [OutputType([string])]
+    [OutputType([System.Windows.Controls.Grid])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -10,10 +10,10 @@ function New-WPFGrid {
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
-    @"
-    <Grid>
-    $(if ($Name) { "Name=`"$Name`"" })
-    $($ScriptBlock.Invoke())
-    </Grid>
-"@
+
+    $Grid = [System.Windows.Controls.Grid]::new()
+    $Grid.Name = $Name
+    Update-WPFObject $Grid $ScriptBlock
+    Set-WPFObjectType $Grid 'Control'
+    return $Grid
 }

@@ -40,6 +40,8 @@ function Convert-WPFObjectToXaml {
             if ($OutputAs -eq 'xml') {
                 [xml] [System.Windows.Markup.XamlWriter]::Save($Item)
             } else {
+                # TODO: Investigate XamlXmlWriter. See if pretty printing xml
+                # is possible.
                 [System.Windows.Markup.XamlWriter]::Save($Item)
             }
         }
