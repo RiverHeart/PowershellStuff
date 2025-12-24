@@ -1,3 +1,20 @@
+using namespace System.Windows
+using namespace System.Windows.Controls
+
+<#
+.SYNOPSIS
+    Creates a custom input box.
+
+.DESCRIPTION
+    Creates a custom input box.
+
+    Reimplementation of the Microsoft WinForm example.
+
+.LINK
+    https://learn.microsoft.com/en-us/powershell/scripting/samples/creating-a-custom-input-box?view=powershell-7.5
+#>
+
+# Change to the script directory if we're not in it.
 if (-not $PSScriptRoot -ne $PWD) {
     Set-Location $PSScriptRoot
 }
@@ -6,44 +23,61 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module ../ -Force
 
-$Result = Window "Data Entry Form" 300 200 {
+Window 'Window' "Data Entry Form" {
     Properties @{
-        WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen
+        WindowStartupLocation = [WindowStartupLocation]::CenterScreen
         TopMost = $True
+        Height = 300
+        Width = 300
     }
     StackPanel "MainStackPanel" {
-        Button "OKButton" "OK" {
-            Properties @{
-                Width = 75
-                Height = 23
-            }
-            Handler "Click" {
-                # NOTE: GetWindow() doesn't exist. Need to find another way
-                $this.GetWindow().DialogResult = $True
-            }
-        }
-        Button "CancelButton" "Cancel" {
-            Properties @{
-                Width = 75
-                Height = 23
-            }
-            Handler "Click" {
-                # NOTE: GetWindow() doesn't exist. Need to find another way
-                $this.GetWindow().DialogResult = $False
-            }
+        Properties @{
+            Margin = 5
         }
         Label 'DataEntryLabel' {
             Properties @{
-                Width = 280
-                Height = 20
-                Text = 'Please enter the information in the space below:'
+                Content = 'Please enter the information in the space below:'
             }
         }
         TextBox "DataEntryBox" {
             Properties @{
+                HorizontalAlignment = [HorizontalAlignment]::Left
                 Width = 260
                 Height = 20
             }
         }
+        StackPanel 'ButtonPanel' {
+            Properties @{
+                Orientation = [Orientation]::Horizontal
+            }
+            Button "OKButton" "OK" {
+                Properties @{
+                    Width = 75
+                    Margin = 5
+                }
+                Handler "Click" {
+                    $Window = Reference 'Window'
+                    $Window.DialogResult = $True
+                }
+            }
+            Button "CancelButton" "Cancel" {
+                Properties @{
+                    Width = 75
+                    Margin = 5
+                }
+                Handler "Click" {
+                    $Window = Reference 'Window'
+                    $Window.DialogResult = $False
+                }
+            }
+        }
     }
 } | Show-WPFWindow
+
+if ($LastDialogResult) {
+    Write-Host "Received user input."
+    $Result = Select-WPFObject 'DataEntryBox' -Property Text
+    $Result
+} else {
+    Write-Host "User cancelled operation."
+}

@@ -15,6 +15,7 @@ function New-WPFButton {
         Name = $Name
         Content = $Content
     }
+    Register-WPFObject $Name $Button
     if ($ScriptBlock) {
         Update-WPFObject $Button $ScriptBlock
     }

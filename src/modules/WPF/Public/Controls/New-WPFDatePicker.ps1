@@ -13,6 +13,7 @@ function New-WPFDatePicker {
 
     $DatePicker = [System.Windows.Controls.DatePicker]::new()
     $DatePicker.Name = $Name
+    Register-WPFObject $Name $DatePicker
     Update-WPFObject $DatePicker $ScriptBlock
     Set-WPFObjectType $DatePicker 'Control'
     return $DatePicker

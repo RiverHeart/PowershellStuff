@@ -31,24 +31,26 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    # NOTE: Should probably add Name to Window object so this isn't necessary. Besides,
-    # title isn't a good fit here anyway.
-    $Name = if ($InputObject.GetType().Name -eq 'Window') { $InputObject.Title } else { $InputObject.Name }
+    $Name = $InputObject.Name
 
     try {
         foreach ($Result in $ScriptBlock.Invoke()) {
             switch ($Result.WPF_TYPE) {
                 'Properties' {
                     foreach($KVP in $Result.GetEnumerator()) {
+                        Write-Debug "Updating property $($KVP.Name) with $($KVP.Value)"
                         $InputObject.($KVP.Name) = $KVP.Value
                     }
                     break
                 }
                 'Handler' {
+                    # TODO: Wrap the scriptblock to catch errors and report them properly.
+                    Write-Debug "Adding handler for event '$($Result.event)' to object '$($InputObject.Name)'"
                     $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
                     break
                 }
                 'Control' {
+                    Write-Debug "Adding child object '$($Result.Name)' to '$($InputObject.Name)'"
                     $InputObject.AddChild($Result)
                     break
                 }

@@ -13,6 +13,7 @@ function New-WPFGrid {
 
     $Grid = [System.Windows.Controls.Grid]::new()
     $Grid.Name = $Name
+    Register-WPFObject $Name $Grid
     Update-WPFObject $Grid $ScriptBlock
     Set-WPFObjectType $Grid 'Control'
     return $Grid

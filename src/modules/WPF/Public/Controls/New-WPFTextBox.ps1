@@ -11,6 +11,7 @@ function New-WPFTextBox {
     $TextBox = [System.Windows.Controls.TextBox] @{
         Name = $Name
     }
+    Register-WPFObject $Name $TextBox
     if ($ScriptBlock) {
         Update-WPFObject $TextBox $ScriptBlock
     }

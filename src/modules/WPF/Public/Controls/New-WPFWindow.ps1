@@ -4,23 +4,21 @@ function New-WPFWindow {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
         [string] $Title,
-
-        [Parameter(Mandatory)]
-        [uint32] $Width,
-
-        [Parameter(Mandatory)]
-        [uint32] $Height,
 
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
 
     $Window = [System.Windows.Window] @{
+        Name = $Name
         Title = $Title
-        Height = $Height
-        Width = $Width
     }
+    Register-WPFObject $Name $Window
     Update-WPFObject $Window $ScriptBlock
     Set-WPFObjectType $Window 'Control'
     return $Window

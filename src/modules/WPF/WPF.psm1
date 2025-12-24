@@ -1,5 +1,10 @@
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
+$script:LastDialogResult = $false
+if (-not $Script:WPFControlTable) {
+    $Script:WPFControlTable = @{}
+}
+
 $Paths = @(
     'Private'
     'Public'

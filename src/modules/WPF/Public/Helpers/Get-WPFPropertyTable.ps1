@@ -35,7 +35,7 @@
         }
     }
 #>
-function Get-WPFProperties {
+function Get-WPFPropertyTable {
     [OutputType([hashtable])]
     [Alias('Properties')]
     param(

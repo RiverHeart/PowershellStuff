@@ -15,6 +15,7 @@
 function Show-WPFWindow {
     [CmdletBinding()]
     [OutputType([System.Nullable[bool]])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Because')]
     param(
         [Parameter(Mandatory,ValueFromPipeline)]
         [System.Windows.Window] $Window
@@ -22,7 +23,8 @@ function Show-WPFWindow {
 
     process {
         try {
-            $Window.ShowDialog()
+            # Set globally so you can reference `$LastDialogResult` plainly from the main script.
+            $global:LastDialogResult = $Window.ShowDialog()
         } catch [Exception] {
             Write-Error "Window closed with error: $_"
         } finally {
