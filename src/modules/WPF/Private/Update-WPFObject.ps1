@@ -31,29 +31,38 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    foreach ($Result in $ScriptBlock.Invoke()) {
-        switch ($Result.WPF_TYPE) {
-            'Properties' {
-                foreach($KVP in $Result.GetEnumerator()) {
-                    $InputObject.($KVP.Name) = $KVP.Value
-                }
-                break
-            }
-            'Handler' {
-                $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
-                break
-            }
-            'Control' {
-                $InputObject.AddChild($Result)
-                break
-            }
-            default {
-                Write-Error "Unsupported object returned for '$($InputObject.Name)'"
-            }
-        }
+    # NOTE: Should probably add Name to Window object so this isn't necessary. Besides,
+    # title isn't a good fit here anyway.
+    $Name = if ($InputObject.GetType().Name -eq 'Window') { $InputObject.Title } else { $InputObject.Name }
 
-        if ($PassThru) {
-            Write-Output $Result
+    try {
+        foreach ($Result in $ScriptBlock.Invoke()) {
+            switch ($Result.WPF_TYPE) {
+                'Properties' {
+                    foreach($KVP in $Result.GetEnumerator()) {
+                        $InputObject.($KVP.Name) = $KVP.Value
+                    }
+                    break
+                }
+                'Handler' {
+                    $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
+                    break
+                }
+                'Control' {
+                    $InputObject.AddChild($Result)
+                    break
+                }
+                default {
+                    Write-Error "Unsupported object returned for '$Name'"
+                }
+            }
+
+            if ($PassThru) {
+                Write-Output $Result
+            }
         }
+    } catch {
+        Write-Error "Failed to update '$Name' with error: $_"
+        return
     }
 }

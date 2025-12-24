@@ -14,7 +14,7 @@
 #>
 function Show-WPFWindow {
     [CmdletBinding()]
-    [OutputType([void])]
+    [OutputType([System.Nullable[bool]])]
     param(
         [Parameter(Mandatory,ValueFromPipeline)]
         [System.Windows.Window] $Window
