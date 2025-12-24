@@ -16,16 +16,26 @@ Create a window with a couple of buttons. Mandatory arguments get passed as regu
 ```powershell
 Import-Module ./WPF
 
-Window "Title" 640 480 {
+Window 'Window' 'Button Example' {
+    Properties @{
+        Width = 400
+        Height = 200
+    }
     StackPanel "Buttons" {
-        Button "TestButton" "Hello World"
-        Button "TestButton2" "Konichiwa Sekai" {
-            Properties {
+        Button "EnglishButton" "English" {
+            Properties @{
                 Width = 100
-                Height = 30
             }
             Handler "Click" {
-                Write-Host "Foo"
+                Write-Host "Hello World"
+            }
+        }
+        Button "JapaneseButton" "Japanese" {
+            Properties @{
+                Width = 100
+            }
+            Handler "Click" {
+                Write-Host "Konichiwa Sekai"
             }
         }
     }
