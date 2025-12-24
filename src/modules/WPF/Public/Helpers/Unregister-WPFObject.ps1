@@ -2,10 +2,14 @@ function Unregister-WPFObject {
     [CmdletBinding()]
     [Alias('Unregister')]
     param(
-        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string] $Name
     )
+
+    if (-not $Name) {
+        Write-Debug "Unregistering all objects (total $($Script:WPFControlTable.Count))."
+        $Script:WPFControlTable = @{}
+    }
 
     $KeyExists = $Script:WPFControlTable.ContainsKey($Name)
     if ($KeyExists) {
