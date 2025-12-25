@@ -15,8 +15,9 @@
             Line 5
 "@ | Deindent-String
 #>
-function Deindent-String {
+function Dedent-String {
     [CmdletBinding()]
+    [Alias('Deindent-String')]
     param(
         [Parameter(ValueFromPipeline)]
         [string[]] $String
