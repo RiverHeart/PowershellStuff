@@ -21,7 +21,7 @@ if (-not $PSScriptRoot -ne $PWD) {
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module ../ -Force
+Import-Module ../.. -Force
 
 Window 'Window' "Data Entry Form" {
     Properties @{

@@ -40,6 +40,10 @@ Window 'Window' 'Button Example' {
 } | Show-WPFWindow
 ```
 
+## Todo
+
+* Error handling is atrocious. Really need a stack trace instead of a long list of chained errors.
+
 ## Notes
 
 ### Object References
