@@ -29,7 +29,6 @@ function Show-WPFWindow {
             Write-Error "Window closed with error: $_"
         } finally {
             $Window.Close()
-            Unregister-WPFObject  # Unregister all objects
         }
     }
 }

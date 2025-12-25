@@ -35,6 +35,8 @@ function Update-WPFObject {
 
     try {
         foreach ($Result in $ScriptBlock.Invoke()) {
+            $ChildName = if ($Result.Name) { $Result.Name } else { 'Unknown' }
+
             switch ($Result.WPF_TYPE) {
                 'Properties' {
                     foreach($KVP in $Result.GetEnumerator()) {
@@ -55,7 +57,7 @@ function Update-WPFObject {
                     break
                 }
                 default {
-                    Write-Error "Unsupported object returned for '$Name'"
+                    Write-Error "Unsupported object '$ChildName' of type '$($Result.GetType().Name)' returned for '$Name'"
                 }
             }
 
