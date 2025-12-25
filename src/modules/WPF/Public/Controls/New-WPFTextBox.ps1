@@ -8,14 +8,18 @@ function New-WPFTextBox {
         [scriptblock] $ScriptBlock
     )
 
-    $TextBox = [System.Windows.Controls.TextBox] @{
-        Name = $Name
+    try {
+        $TextBox = [System.Windows.Controls.TextBox] @{
+            Name = $Name
+        }
+        Register-WPFObject $Name $TextBox
+        if ($ScriptBlock) {
+            Update-WPFObject $TextBox $ScriptBlock
+        }
+        Set-WPFObjectType $TextBox 'Control'
+    } catch {
+        Write-Error "Failed to create '$Name' (TextBox) with error: $_"
     }
-    Register-WPFObject $Name $TextBox
-    if ($ScriptBlock) {
-        Update-WPFObject $TextBox $ScriptBlock
-    }
-    Set-WPFObjectType $TextBox 'Control'
 
     return $TextBox
 }

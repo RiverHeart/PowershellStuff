@@ -9,14 +9,18 @@ function New-WPFLabel {
         [scriptblock] $ScriptBlock
     )
 
-    $Label = [System.Windows.Controls.Label] @{
-        Name = $Name
+    try {
+        $Label = [System.Windows.Controls.Label] @{
+            Name = $Name
+        }
+        Register-WPFObject $Name $Label
+        if ($ScriptBlock) {
+            Update-WPFObject $Label $ScriptBlock
+        }
+        Set-WPFObjectType $Label 'Control'
+    } catch {
+        Write-Error "Failed to create '$Name' (Label) with error: $_"
     }
-    Register-WPFObject $Name $Label
-    if ($ScriptBlock) {
-        Update-WPFObject $Label $ScriptBlock
-    }
-    Set-WPFObjectType $Label 'Control'
 
     return $Label
 }

@@ -14,12 +14,16 @@ function New-WPFWindow {
         [ScriptBlock] $ScriptBlock
     )
 
-    $Window = [System.Windows.Window] @{
-        Name = $Name
-        Title = $Title
+    try {
+        $Window = [System.Windows.Window] @{
+            Name = $Name
+            Title = $Title
+        }
+        Register-WPFObject $Name $Window
+        Update-WPFObject $Window $ScriptBlock
+        Set-WPFObjectType $Window 'Control'
+    } catch {
+        Write-Error "Failed to create '$Name' (Window) with error: $_"
     }
-    Register-WPFObject $Name $Window
-    Update-WPFObject $Window $ScriptBlock
-    Set-WPFObjectType $Window 'Control'
     return $Window
 }

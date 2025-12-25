@@ -19,7 +19,7 @@ function New-WPFDatePicker {
         }
         Set-WPFObjectType $DatePicker 'Control'
     } catch {
-        Write-Error "Failed to create DatePicker with error: $_"
+        Write-Error "Failed to create '$Name' (DatePicker) with error: $_"
     }
     return $DatePicker
 }

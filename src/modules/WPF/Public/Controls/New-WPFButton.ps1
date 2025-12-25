@@ -11,15 +11,19 @@ function New-WPFButton {
         [scriptblock] $ScriptBlock
     )
 
-    $Button = [System.Windows.Controls.Button] @{
-        Name = $Name
-        Content = $Content
+    try {
+        $Button = [System.Windows.Controls.Button] @{
+            Name = $Name
+            Content = $Content
+        }
+        Register-WPFObject $Name $Button
+        if ($ScriptBlock) {
+            Update-WPFObject $Button $ScriptBlock
+        }
+        Set-WPFObjectType $Button 'Control'
+    } catch {
+        Write-Error "Failed to create '$Name' (Button) with error: $_"
     }
-    Register-WPFObject $Name $Button
-    if ($ScriptBlock) {
-        Update-WPFObject $Button $ScriptBlock
-    }
-    Set-WPFObjectType $Button 'Control'
 
     return $Button
 }

@@ -10,10 +10,14 @@ function New-WPFStackPanel {
         [ScriptBlock] $ScriptBlock
     )
 
-    $StackPanel = [System.Windows.Controls.StackPanel]::new()
-    $StackPanel.Name = $Name
-    Register-WPFObject $Name $StackPanel
-    Update-WPFObject $StackPanel $ScriptBlock
-    Set-WPFObjectType $StackPanel 'Control'
+    try {
+        $StackPanel = [System.Windows.Controls.StackPanel]::new()
+        $StackPanel.Name = $Name
+        Register-WPFObject $Name $StackPanel
+        Update-WPFObject $StackPanel $ScriptBlock
+        Set-WPFObjectType $StackPanel 'Control'
+    } catch {
+        Write-Error "Failed to create '$Name' (StackPanel) with error: $_"
+    }
     return $StackPanel
 }

@@ -11,10 +11,14 @@ function New-WPFGrid {
         [ScriptBlock] $ScriptBlock
     )
 
-    $Grid = [System.Windows.Controls.Grid]::new()
-    $Grid.Name = $Name
-    Register-WPFObject $Name $Grid
-    Update-WPFObject $Grid $ScriptBlock
-    Set-WPFObjectType $Grid 'Control'
+    try {
+        $Grid = [System.Windows.Controls.Grid]::new()
+        $Grid.Name = $Name
+        Register-WPFObject $Name $Grid
+        Update-WPFObject $Grid $ScriptBlock
+        Set-WPFObjectType $Grid 'Control'
+    } catch {
+        Write-Error "Failed to create '$Name' (Grid) with error: $_"
+    }
     return $Grid
 }
