@@ -36,7 +36,12 @@ Window 'Window' 'Select A Date' {
             Margin = 5
         }
 
-        DatePicker 'DatePicker'
+        DatePicker 'DatePicker' {
+            Handler 'SelectedDateChanged' {
+                $OKButton = Reference 'OKButton'
+                $OKButton.IsEnabled = $True
+            }
+        }
 
         StackPanel 'ButtonPanel' {
             Properties @{
@@ -46,6 +51,7 @@ Window 'Window' 'Select A Date' {
                 Properties @{
                     Width = 75
                     Margin = 5
+                    IsEnabled = $False
                 }
                 Handler "Click" {
                     $Window = Reference 'Window'
