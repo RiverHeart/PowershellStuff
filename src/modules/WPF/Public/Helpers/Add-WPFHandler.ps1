@@ -37,13 +37,22 @@ function Add-WPFHandler {
                 [System.Collections.IDictionary] $FakeBoundParameters
             )
 
-            if (Get-Variable 'Ast' -Scope 1) {
-                Write-Host "Foo"
-            } else {
-                Write-Host "Bar"
+            $Params = Get-FunctionParam TabExpansion2
+            if (-not $Params) {
+                return
             }
 
-            return "Foobar"
+            $ParentNode = $Params.Ast.FindAll({
+                param($AstNode)
+                $AstNode -is [System.Management.Automation.Language.CommandAst] -and
+                $AstNode.Extent.StartOffset -le $Params.PositionOfCursor.Offset -and
+                $Params.PositionOfCursor.Offset -le $AstNode.Extent.EndOffset
+            }, <# recurse #> $True) | Select-Object -Last 2 | Select-Object -First 1
+
+            switch ($ParentNode.CommandElements.Value) {
+                'Button' { [System.Windows.Controls.Button].GetEvents().Name }
+                default {}
+            }
         })]
         [string] $Event,
 

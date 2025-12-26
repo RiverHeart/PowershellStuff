@@ -46,7 +46,11 @@ Window 'Window' {
 
 ### Intellisense
 
-No support for intellisense currently. Turns out that while a `CommandAST` is exposed for argument completion, it is bound by the containing scriptblock so if we're defining a `Handler` for a button, we can't see the `Button` command by travering the `Parent` property because we've defined `Handler` inside a scriptblock.
+TLDR: Yes, in the works.
+
+Auto-complete is tricky. I'm not the sort who's going to mess with VSCode extensions so my only recourse is to use the built-in arg completion provided by Powershell. Unfortunately, it's tricky because while a `CommandAST` object is exposed when defining an `ArgumentCompleterAttribute` it is limited to the immediately surrounding scriptblock. In other words, if we define a `Handler` for a button, we can't see the `Button` command simply by travering the `Parent` property because we've defined `Handler` inside a scriptblock.
+
+Fortunately, I think I found a workaround by getting the invocation args from TabExpansion2 by accessing the callstack. Then I can simply get an unbounded AST object based on our cursor position and use reflection to pass the events back that would apply to the WPF control defined in the parent node.
 
 ### VSCode Snippets
 
