@@ -40,6 +40,10 @@ Window 'Window' 'Button Example' {
 } | Show-WPFWindow
 ```
 
+## Autocomplete
+
+No autocomplete exists for this. As nice as it would be I just don't have the experience to implement that right now. There are some VSCode snippets in [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to improve the ergonomics of the DSL.
+
 ## Todo
 
 * Error handling is atrocious. Really need a stack trace instead of a long list of chained errors.
