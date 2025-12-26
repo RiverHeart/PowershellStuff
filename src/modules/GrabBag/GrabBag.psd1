@@ -92,6 +92,7 @@ FunctionsToExport = @(
     'Split-String'
     'Sync-ModulePreference'
     'Test-Any'
+    'Where-Specified'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -133,6 +134,7 @@ FileList = @(
     'Public/Split-String.ps1'
     'Public/Sync-ModulePreference.ps1'
     'Public/Test-Any.ps1'
+    'Public/Where-Specified.ps1'
 )
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
