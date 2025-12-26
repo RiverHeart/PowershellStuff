@@ -6,8 +6,6 @@ function New-WPFButton {
         [string] $Name,
 
         [Parameter(Mandatory)]
-        [string] $Content,
-
         [scriptblock] $ScriptBlock
     )
 

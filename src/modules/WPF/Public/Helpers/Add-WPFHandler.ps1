@@ -28,6 +28,23 @@ function Add-WPFHandler {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ArgumentCompleter({
+            param(
+                [string] $CommandName,
+                [string] $ParameterName,
+                [string] $WordToComplete,
+                [System.Management.Automation.Language.CommandAst] $CommandAst,
+                [System.Collections.IDictionary] $FakeBoundParameters
+            )
+
+            if (Get-Variable 'Ast' -Scope 1) {
+                Write-Host "Foo"
+            } else {
+                Write-Host "Bar"
+            }
+
+            return "Foobar"
+        })]
         [string] $Event,
 
         [Parameter(Mandatory)]

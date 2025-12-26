@@ -1,5 +1,4 @@
 {
     "files.trimTrailingWhitespace": true,
-    "files.insertFinalNewline": true,
-    "editor.suggest.showSnippets": false
+    "files.insertFinalNewline": true
 }

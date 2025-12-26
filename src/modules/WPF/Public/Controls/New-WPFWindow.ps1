@@ -7,17 +7,12 @@ function New-WPFWindow {
         [string] $Name,
 
         [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Title,
-
-        [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
 
     try {
         $Window = [System.Windows.Window] @{
             Name = $Name
-            Title = $Title
         }
         Register-WPFObject $Name $Window
         Update-WPFObject $Window $ScriptBlock

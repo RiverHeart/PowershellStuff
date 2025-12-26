@@ -24,13 +24,16 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
-Window 'Window' 'Select A Date' {
+Window 'Window' {
     Properties @{
+        Title = 'Select A Date'
         WindowStartupLocation = [WindowStartupLocation]::CenterScreen
         TopMost = $True
-        Height = 300
-        Width = 300
+        SizetoContent = 'WidthAndHeight'
+        Width = 0
+        Height = 0
     }
+
     StackPanel 'RootContainer' {
         Properties @{
             Margin = 5
@@ -47,8 +50,9 @@ Window 'Window' 'Select A Date' {
             Properties @{
                 Orientation = [Orientation]::Horizontal
             }
-            Button "OKButton" "OK" {
+            Button "OKButton" {
                 Properties @{
+                    Content = 'OK'
                     Width = 75
                     Margin = 5
                     IsEnabled = $False
@@ -58,8 +62,9 @@ Window 'Window' 'Select A Date' {
                     $Window.DialogResult = $True
                 }
             }
-            Button "CancelButton" "Cancel" {
+            Button "CancelButton" {
                 Properties @{
+                    Content = 'Cancel'
                     Width = 75
                     Margin = 5
                 }

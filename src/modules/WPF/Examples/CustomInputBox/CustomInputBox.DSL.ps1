@@ -23,8 +23,9 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module ../.. -Force
 
-Window 'Window' "Data Entry Form" {
+Window 'Window' {
     Properties @{
+        Title = 'Data Entry Form'
         WindowStartupLocation = [WindowStartupLocation]::CenterScreen
         TopMost = $True
         Height = 300
@@ -50,22 +51,24 @@ Window 'Window' "Data Entry Form" {
             Properties @{
                 Orientation = [Orientation]::Horizontal
             }
-            Button "OKButton" "OK" {
+            Button 'OKButton' {
                 Properties @{
+                    Content = 'OK'
                     Width = 75
                     Margin = 5
                 }
-                Handler "Click" {
+                Handler 'Click' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $True
                 }
             }
-            Button "CancelButton" "Cancel" {
+            Button 'CancelButton' {
                 Properties @{
+                    Content = 'Cancel'
                     Width = 75
                     Margin = 5
                 }
-                Handler "Click" {
+                Handler 'Click' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $False
                 }

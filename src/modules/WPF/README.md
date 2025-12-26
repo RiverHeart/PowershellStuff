@@ -14,22 +14,24 @@ More examples can be found in the [Examples](./Examples/) directory.
 ```powershell
 Import-Module ./WPF
 
-Window 'Window' 'Button Example' {
+Window 'Window' {
     Properties @{
-        Width = 400
-        Height = 200
+        Title = 'Button Example'
+        SizeToContent = 'WidthAndHeight'
     }
     StackPanel "Buttons" {
-        Button "EnglishButton" "English" {
+        Button "EnglishButton" {
             Properties @{
+                Content = 'English'
                 Width = 100
             }
             Handler "Click" {
                 Write-Host "Hello World"
             }
         }
-        Button "JapaneseButton" "Japanese" {
+        Button "JapaneseButton" {
             Properties @{
+                Content = 'Japanese'
                 Width = 100
             }
             Handler "Click" {
@@ -42,7 +44,15 @@ Window 'Window' 'Button Example' {
 
 ## Autocomplete
 
-No autocomplete exists for this. As nice as it would be I just don't have the experience to implement that right now. There are some VSCode snippets in [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to improve the ergonomics of the DSL.
+### Intellisense
+
+No support for intellisense currently. Turns out that while a `CommandAST` is exposed for argument completion, it is bound by the containing scriptblock so if we're defining a `Handler` for a button, we can't see the `Button` command by travering the `Parent` property because we've defined `Handler` inside a scriptblock.
+
+### VSCode Snippets
+
+See the VSCode snippets in [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to improve the ergonomics of the DSL.
+
+Snippets can be triggered by typing the `wpf-<name of control>` or by pressing `Ctrl+Alt+J`.
 
 ## Todo
 

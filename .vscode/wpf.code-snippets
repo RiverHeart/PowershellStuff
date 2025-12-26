@@ -33,11 +33,12 @@
 			"Window '${1:Name}' {",
 			"\tProperties @{",
 			"\t\tTitle = '${2:Title}'",
-			"\t\tHeight = ${3:Height}",
-			"\t\tWidth = ${4:Width}",
+			"\t\tSizeToContent = ${3|WidthAndHeight,Manual,Width,Height|}",
+			"\t\tHeight = ${4:0}",
+			"\t\tWidth = ${5:0}",
 			"\t\tWindowStartupLocation = [WindowStartupLocation]::CenterScreen",
 			"\t}\n",
-			"\t${5:Control}",
+			"\t${6:Control}",
 			"}"
 		]
 	},
@@ -66,7 +67,7 @@
 			"\t\tHeight = ${4:Height}",
 			"\t\tIsEnabled = ${5|$True,$False|}",
 			"\t}\n",
-			"\tHandler '${6|Click|}' {",
+			"\tHandler '${6|Click,ContextMenuClosing,ContextMenuOpening,DataContextChanged,DragEnter,DragLeave,DragOver,Drop,FocusableChanged,GiveFeedback,GotFocus,GotKeyboardFocus,GotMouseCapture,GotStylusCapture,GotTouchCapture,Initialized,IsEnabledChanged,IsHitTestVisibleChanged,IsKeyboardFocusedChanged,IsKeyboardFocusWithinChanged,IsMouseCapturedChanged,IsMouseCaptureWithinChanged,IsMouseDirectlyOverChanged,IsStylusCapturedChanged,IsStylusCaptureWithinChanged,IsStylusDirectlyOverChanged,IsVisibleChanged,KeyDown,KeyUp,LayoutUpdated,Loaded,LostFocus,LostKeyboardFocus,LostMouseCapture,LostStylusCapture,LostTouchCapture,ManipulationBoundaryFeedback,ManipulationCompleted,ManipulationDelta,ManipulationInertiaStarting,ManipulationStarted,ManipulationStarting,MouseDoubleClick,MouseDown,MouseEnter,MouseLeave,MouseLeftButtonDown,MouseLeftButtonUp,MouseMove,MouseRightButtonDown,MouseRightButtonUp,MouseUp,MouseWheel,PreviewDragEnter,PreviewDragLeave,PreviewDragOver,PreviewDrop,PreviewGiveFeedback,PreviewGotKeyboardFocus,PreviewKeyDown,PreviewKeyUp,PreviewLostKeyboardFocus,PreviewMouseDoubleClick,PreviewMouseDown,PreviewMouseLeftButtonDown,PreviewMouseLeftButtonUp,PreviewMouseMove,PreviewMouseRightButtonDown,PreviewMouseRightButtonUp,PreviewMouseUp,PreviewMouseWheel,PreviewQueryContinueDrag,PreviewStylusButtonDown,PreviewStylusButtonUp,PreviewStylusDown,PreviewStylusInAirMove,PreviewStylusInRange,PreviewStylusMove,PreviewStylusOutOfRange,PreviewStylusSystemGesture,PreviewStylusUp,PreviewTextInput,PreviewTouchDown,PreviewTouchMove,PreviewTouchUp,QueryContinueDrag,QueryCursor,RequestBringIntoView,SizeChanged,SourceUpdated,StylusButtonDown,StylusButtonUp,StylusDown,StylusEnter,StylusInAirMove,StylusInRange,StylusLeave,StylusMove,StylusOutOfRange,StylusSystemGesture,StylusUp,TargetUpdated,TextInput,ToolTipClosing,ToolTipOpening,TouchDown,TouchEnter,TouchLeave,TouchMove,TouchUp,Unloaded|}' {",
 			"\t\t${7:HandlerLogic}",
 			"\t}",
 			"}"

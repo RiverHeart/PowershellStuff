@@ -11,8 +11,9 @@ function New-WPFStackPanel {
     )
 
     try {
-        $StackPanel = [System.Windows.Controls.StackPanel]::new()
-        $StackPanel.Name = $Name
+        $StackPanel = [System.Windows.Controls.StackPanel] @{
+            Name = $Name
+        }
         Register-WPFObject $Name $StackPanel
         Update-WPFObject $StackPanel $ScriptBlock
         Set-WPFObjectType $StackPanel 'Control'
