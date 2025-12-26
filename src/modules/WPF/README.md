@@ -3,7 +3,7 @@
 
 # Overview
 
-Experimental DSL for building WPF applications in Powershell.
+Experimental Domain-Specific Language (DSL) for building WPF applications in Powershell.
 
 ## Example
 
