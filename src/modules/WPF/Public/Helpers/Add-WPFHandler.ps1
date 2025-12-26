@@ -38,18 +38,22 @@ function Add-WPFHandler {
             )
 
             $Params = Get-FunctionParam TabExpansion2
-            if (-not $Params) {
-                return
-            }
 
+            # Confusing. When typing `Handler X` the `Handler` function hasn't become
+            # a CommandAst object yet. Once the Handler has a scriptblock defined
+            # such as `Handler X {}` it becomes one. Therefore we need to get the last
+            # CommandAst that isn't the handler itself to account for the two scenarios.
             $ParentNode = $Params.Ast.FindAll({
                 param($AstNode)
                 $AstNode -is [System.Management.Automation.Language.CommandAst] -and
                 $AstNode.Extent.StartOffset -le $Params.PositionOfCursor.Offset -and
                 $Params.PositionOfCursor.Offset -le $AstNode.Extent.EndOffset
-            }, <# recurse #> $True) | Select-Object -Last 2 | Select-Object -First 1
+            }, <# recurse #> $True) |
+                Where-Object { $_.GetCommandName() -ne 'Handler' } |
+                Select-Object -Last 1
 
-            switch ($ParentNode.CommandElements.Value) {
+            $Control = $ParentNode.GetCommandName()
+            switch ($Control) {
                 'Button' { [System.Windows.Controls.Button].GetEvents().Name }
                 default {}
             }
