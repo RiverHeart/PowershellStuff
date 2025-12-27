@@ -13,6 +13,7 @@ function New-WPFWindow {
     try {
         $Window = [System.Windows.Window] @{
             Name = $Name
+            SizetoContent = 'WidthAndHeight'
         }
         Register-WPFObject $Name $Window
         Update-WPFObject $Window $ScriptBlock
