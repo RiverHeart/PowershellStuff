@@ -56,6 +56,11 @@ function Update-WPFObject {
                     $InputObject.AddChild($Result)
                     break
                 }
+                'Shape' {
+                    if ($InputObject -is [System.Windows.Controls.Button]) {
+                        $InputObject.Content = $Result
+                    }
+                }
                 default {
                     Write-Error "Unsupported object '$ChildName' of type '$($Result.GetType().Name)' returned for '$Name'"
                 }
