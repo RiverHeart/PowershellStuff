@@ -56,6 +56,9 @@ function Update-WPFObject {
                     $InputObject.AddChild($Result)
                     break
                 }
+                # My thinking here is that while a user can assign a Path to a button's content
+                # property other objects are probably assigned differently so it's just be easier
+                # to add them based on the object type so you don't need to remember.
                 'Shape' {
                     if ($InputObject -is [System.Windows.Controls.Button]) {
                         $InputObject.Content = $Result
