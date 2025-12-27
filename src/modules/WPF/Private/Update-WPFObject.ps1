@@ -54,6 +54,16 @@ function Update-WPFObject {
                 'Control' {
                     Write-Debug "Adding child object '$($Result.Name)' to '$($InputObject.Name)'"
                     $InputObject.AddChild($Result)
+
+                    # Hacky but what's a guy to do?
+                    $IsMenuBar =
+                        $InputObject -is [System.Windows.Controls.DockPanel] -and
+                        $Result -is [System.Windows.Controls.Menu]
+
+                    if ($IsMenuBar) {
+                        [System.Windows.Controls.DockPanel]::SetDock($Result, [System.Windows.Controls.Dock]::Top)
+                    }
+
                     break
                 }
                 # My thinking here is that while a user can assign a Path to a button's content

@@ -70,6 +70,7 @@ Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctr
 ## Todo
 
 * Error handling is atrocious. Really need a stack trace instead of a long list of chained errors.
+* Explore calling `InvokeWithContext()` passing the parent node as `$this`. Could allow property setting without `Properties` keyword.
 
 ## Notes
 

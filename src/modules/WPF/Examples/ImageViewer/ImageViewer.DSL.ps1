@@ -54,9 +54,30 @@ Window 'Window' {
         WindowStartupLocation = [WindowStartupLocation]::CenterScreen
         TopMost = $True
     }
-    StackPanel "MainStackPanel" {
+
+    StackPanel "Body" {
         Properties @{
             Margin = 5
+        }
+
+        DockPanel 'MenuPanel' {
+            Menu 'Menu' {
+                Properties @{
+                    Height = 25
+                }
+                MenuItem '_File' {
+                    MenuItem '_Open' {}
+                    MenuItem '_Exit' {
+                        Handler Click {
+                            $Window = Reference 'Window'
+                            $Window.Close()
+                        }
+                    }
+                }
+                MenuItem '_Help' {
+                    MenuItem '_About' {}
+                }
+            }
         }
 
         Image 'Viewer' {
