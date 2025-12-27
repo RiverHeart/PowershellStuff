@@ -1,3 +1,19 @@
+<#
+.SYNOPSIS
+    Provides auto-complete for the Event parameter of the Add-WPFHandler cmdlet.
+
+.DESCRIPTION
+    Provides auto-complete for the Event parameter of the Add-WPFHandler cmdlet.
+
+    Because `ArgumentCompleterAttribute` passes a scriptblock bound `CommandAST`
+    to the completer function we cannot see the type of command the handler needs
+    to provide completion for by traversing the `Parent` property of the AST node.
+
+    To work around this, we use the callstack to get the invocation args passed to TabExpansion2.
+    Among those arguments are the full AST and the cursor position. With those, we can
+    search the AST to get the calling node and find the command value (e.g. `Button`)
+    to determine what values should be returned.
+#>
 function Complete-WPFHandler {
     [CmdletBinding()]
     [OutputType([string[]])]

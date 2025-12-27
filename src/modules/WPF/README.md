@@ -42,21 +42,30 @@ Window 'Window' {
 } | Show-WPFWindow
 ```
 
+## Project Goals
+
+* Convention over configuration (WPF is flexible at the expense of usability)
+* Easy to read (everything is nested like HTML)
+* Simple things should be easy (shouldn't need to be a programmer or need an IDE to make a window with buttons)
+* Composibility (keywords are just functions with aliases)
+* Lots of examples (if this is actually useful/productive then sample projects should demonstrate that)
+* Xaml escape hatch (should be possible to convert objects to their Xaml representation)
+
 ## Autocomplete
+
+TLDR: I can't provide real intellisense but I'm working on some basic stuff using VSCode snippets and Powershell's TabExpansion2.
 
 ### Intellisense
 
-TLDR: Yes, in the works.
+I'm not the type of person to mess around with VSCode extensions so my only option is to use what is natively provided by Powershell. Unfortunately, it's trickier than it should be because while the `ArgumentCompleterAttribute` passes a `CommandAST` to the scriptblock that AST is limited to the scriptblock. In other words, because `Handler` is defined inside a scriptblock passed to `Button`, we can't access the part of the AST where `Button` is defined simply by travering the `Parent` property of the `CommandAST`.
 
-Auto-complete is tricky. I'm not the sort who's going to mess with VSCode extensions so my only recourse is to use the built-in arg completion provided by Powershell. Unfortunately, it's tricky because while a `CommandAST` object is exposed when defining an `ArgumentCompleterAttribute` it is limited to the immediately surrounding scriptblock. In other words, if we define a `Handler` for a button, we can't see the `Button` command simply by travering the `Parent` property because we've defined `Handler` inside a scriptblock.
-
-Fortunately, I think I found a workaround by getting the invocation args from TabExpansion2 by accessing the callstack. Then I can simply get an unbounded AST object based on our cursor position and use reflection to pass the events back that would apply to the WPF control defined in the parent node.
+I've found a workaround that involves accessing the callstack to get invocation args for TabExpansion2. Among those arguments are the full AST and the cursor position. With those, we can search the AST to get the calling node and find the command value (e.g. `Button`) to determine what values should be returned.
 
 ### VSCode Snippets
 
-See the VSCode snippets in [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to improve the ergonomics of the DSL.
+I'm slowly adding VSCode snippets to [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to make scaffolding the DSL easier.
 
-Snippets can be triggered by typing the `wpf-<name of control>` or by pressing `Ctrl+Alt+J`.
+Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctrl+Alt+J`.
 
 ## Todo
 
@@ -70,12 +79,13 @@ Because children are defined by functions and added automatically there is an is
 
 **(2025-12-24)**
 
-I implemented a control lookup system using some helper functions and a hashtable which seems to work. On the other hand, I generally prefer to use native mechanisms and I found out afterwards that WPF supports a name lookup system via the `FindName('name')` method. Like my implementation, it only works if the name has been registered. Unlike my implementation, it's a PITA because it requires instancing a `NameScope` and calling `[NameScope]::SetNameScope($NameScope, $Window)` for `RegisterName('name', $object)` to work. Additionally, this seems to fundamentally alter the WPF app, requiring an `Application` instance to call `$App.Run($Window)`. `$Window.ShowDialog()` simply does nothing when a `Namescope` is set and those might be specific to XAML so it's unclear how to properly use them with programmatically created controls.
+I implemented a control lookup system using some helper functions and a hashtable which seems to work. Users can use the `Reference` keyword to lookup any registered object. I found out afterwards that WPF supports a name lookup system via the `FindName('name')` method. Like my implementation, it only works if the name has been registered. Unlike my implementation, it's a PITA because it requires instancing a `NameScope` and calling `[NameScope]::SetNameScope($NameScope, $Window)` for `RegisterName('name', $object)` to work. Additionally, this seems to fundamentally alter the WPF app, requiring an `Application` instance to call `$App.Run($Window)`. `$Window.ShowDialog()` simply does nothing when a `Namescope` is set and those might be specific to XAML so it's unclear how to properly use them with programmatically created controls.
 
-Attempts to rerun the app now fail with `Cannot create more than one System.Windows.Application instance in the same AppDomain.` even though I've called `$App.Windows.Close()` to close all windows and the app's shutdown mode is set to `OnLastWindowClose`. This may not even be worthwhile as an application doesn't return anything via stdout. Printing to the console using `Write-Host` is possible but returning a string is a no go. Don't think I will use use the built-in mechanism for this.
+Attempts to rerun the app now fail with `Cannot create more than one System.Windows.Application instance in the same AppDomain.` even though I've called `$App.Windows.Close()` to close all windows and the app's shutdown mode is set to `OnLastWindowClose`. This may not even be worthwhile as an application doesn't return anything via stdout. Printing to the console using `Write-Host` is possible but returning a string is a no go.
+
+While I generally prefer to use native mechanisms where possible, I'm either incapable of understanding it or it is too inflexible to behave how I want so I'm going to ignore it for now.
 
 ## Resources
 
 * https://powershellexplained.com/2017-03-04-Powershell-DSL-example-RDCMan/
 * https://app.pluralsight.com/library/courses/powershell-guis-building-wpf-free/table-of-contents
-* https://devblogs.microsoft.com/scripting/proxy-functions-spice-up-your-powershell-core-cmdlets/

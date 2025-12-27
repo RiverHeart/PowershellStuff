@@ -61,7 +61,6 @@ Window 'Window' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $True
                 }
-                #Path 'arrow-left-solid-full.svg'
             }
             Button 'CancelButton' {
                 Properties @{
