@@ -1,7 +1,7 @@
 function Complete-WPFHandler {
     [CmdletBinding()]
     [OutputType([string[]])]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(<#Category#> 'PSReviewUnusedParameter', <#CheckId#> $null, Scope='Function', Justification='My little remaining sanity')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(<#Category#> 'PSReviewUnusedParameter', Scope='Function', Justification='My little remaining sanity')]
     param(
         [string] $CommandName,
         [string] $ParameterName,
