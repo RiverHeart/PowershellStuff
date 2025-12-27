@@ -28,19 +28,20 @@ function Get-WPFFunctionParam {
 
     # Get TabExpansion2 raw arguments
     $Callstack = Get-PSCallStack | Where-Object { $_.Command -eq $Command } | Select-Object -First 1
-    $BoundArgs = $Callstack.InvocationInfo.BoundParameters
+    $BoundParams = $Callstack.InvocationInfo.BoundParameters
 
     # Return if we got nothing
-    if (-not $BoundArgs) {
+    if (-not $BoundParams) {
+        Write-Host "Foo"
         return $null
     }
 
     # Return early if nothing to filter
     if (-not $Include -and -not $Exclude) {
-        return $BoundArgs
+        return $BoundParams
     }
 
-    $BoundArgs.GetEnumerator() | Where-Object {
+    $BoundParams.GetEnumerator() | Where-Object {
         $IsIncluded = if ($Include) { $_.Key -in $Include } else { $True }
         $IsExcluded = if ($Exclude) { $_.Key -in $Exclude } else { $False }
         if ($IsIncluded -and -not $IsExcluded) {

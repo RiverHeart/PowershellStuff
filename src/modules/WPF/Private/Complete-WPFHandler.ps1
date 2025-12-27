@@ -1,6 +1,7 @@
 function Complete-WPFHandler {
     [CmdletBinding()]
     [OutputType([string[]])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(<#Category#> 'PSReviewUnusedParameter', <#CheckId#> $null, Scope='Function', Justification='My little remaining sanity')]
     param(
         [string] $CommandName,
         [string] $ParameterName,
@@ -9,12 +10,18 @@ function Complete-WPFHandler {
         [System.Collections.IDictionary] $FakeBoundParameters
     )
 
-    if (-not $script:WPFHandlerCompleteStore) {
-        $script:WPFHandlerCompleteStore = @{}
+    # Micro-optimization, maybe?
+    if (-not $script:WPFHandlerCache) {
+        $script:WPFHandlerCache = @{
+            Completions = @{}
+        }
     }
 
-    $Params = Get-FunctionParam TabExpansion2
+    # Obtain the raw arguments passed to TabExpansion2 so we can traverse
+    # the AST ourselves.
+    $Params = Get-WPFFunctionParam TabExpansion2
     if (-not $Params) {
+        Write-Host "2"
         Write-Debug 'Failed to find params for TabExpansion2'
         return
     }
@@ -32,59 +39,35 @@ function Complete-WPFHandler {
         Where-Object { $_.GetCommandName() -ne 'Handler' } |
         Select-Object -Last 1
 
+    # Validate parent node exists
     if (-not $ParentNode) {
         Write-Debug 'Failed to find parent node'
         return
     }
 
-    # Filter supported controls and use reflection to get supported events.
-    # Store results from future lookups.
+    # Use reflection to obtain control type and get the list of
+    # supported events. Store in cache for future lookups.
+    # TODO: Could use more validation here
     $Control = $ParentNode.GetCommandName()
-    switch ($Control) {
-        'Button' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Controls.Button].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
+    if (-not $script:WPFHandlerCache.Completions.ContainsKey($Control)) {
+        $Type = Get-WPFType $Control
+
+        if (-not $Type) {
+            Write-Debug "Failed to find type for control '$Control'"
+            return
         }
-        'DatePicker' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Controls.DatePicker].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
-        }
-        'Grid' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Controls.Grid].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
-        }
-        'Label' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Controls.Label].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
-        }
-        'StackPanel' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Controls.StackPanel].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
-        }
-        'TextBox' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Controls.TextBox].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
-        }
-        'Window' {
-            if (-not $script:WPFHandlerCompleteStore.ContainsKey($Control)) {
-                $script:WPFHandlerCompleteStore[$Control] = [System.Windows.Window].GetEvents().Name
-            }
-            return $script:WPFHandlerCompleteStore[$Control]
-        }
-        default {
-            Write-Warning "Unsupported control '$Control'"
-        }
+
+        $script:WPFHandlerCache.Completions[$Control] = $Type.GetEvents().Name
     }
+
+    # If no word to filter on, return all results
+    if ([String]::IsNullOrEmpty($WordToComplete)) {
+        return $script:WPFHandlerCache.Completions[$Control]
+    }
+
+    # Filter on WordToComplete
+    return $script:WPFHandlerCache.Completions[$Control] |
+        Where-Object {
+            $_.StartsWith($WordToComplete, [System.StringComparison]::InvariantCultureIgnoreCase)
+        }
 }
