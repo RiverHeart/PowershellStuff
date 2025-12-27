@@ -1,3 +1,16 @@
+<#
+.SYNOPSIS
+    Creates a proxy function from ConvertFrom-Json for PSv5 (Desktop Edition) to add
+    `-AsHashtable` support.
+
+.DESCRIPTION
+    Creates a proxy function from ConvertFrom-Json for PSv5 (Desktop Edition) to add
+    `-AsHashtable` support.
+
+.LINK
+    https://devblogs.microsoft.com/scripting/proxy-functions-spice-up-your-powershell-core-cmdlets/
+#>
+
 if ($PSEdition -eq 'Core') {
     return
 }
