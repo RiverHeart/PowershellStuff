@@ -13,10 +13,12 @@ function New-WPFWindow {
     try {
         $Window = [System.Windows.Window] @{
             Name = $Name
-            SizetoContent = 'WidthAndHeight'
         }
         Register-WPFObject $Name $Window
         Update-WPFObject $Window $ScriptBlock
+        if (-not $Window.Height -and -not $Window.Width){
+            $Window.SizeToContent = 'WidthAndHeight'
+        }
         Set-WPFObjectType $Window 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Window) with error: $_"
