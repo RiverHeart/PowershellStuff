@@ -37,7 +37,6 @@ function Complete-WPFHandler {
     # the AST ourselves.
     $Params = Get-WPFFunctionParam TabExpansion2
     if (-not $Params) {
-        Write-Host "2"
         Write-Debug 'Failed to find params for TabExpansion2'
         return
     }

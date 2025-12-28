@@ -44,6 +44,7 @@ Window 'Window' {
 
 ## Project Goals
 
+* Make a fun leaky abstraction
 * Convention over configuration (WPF is flexible at the expense of usability)
 * Easy to read (everything is nested like HTML)
 * Simple things should be easy (shouldn't need to be a programmer or need an IDE to make a window with buttons)
@@ -85,6 +86,25 @@ I implemented a control lookup system using some helper functions and a hashtabl
 Attempts to rerun the app now fail with `Cannot create more than one System.Windows.Application instance in the same AppDomain.` even though I've called `$App.Windows.Close()` to close all windows and the app's shutdown mode is set to `OnLastWindowClose`. This may not even be worthwhile as an application doesn't return anything via stdout. Printing to the console using `Write-Host` is possible but returning a string is a no go.
 
 While I generally prefer to use native mechanisms where possible, I'm either incapable of understanding it or it is too inflexible to behave how I want so I'm going to ignore it for now.
+
+### RelayCommand
+
+**(2025-12-27)**
+
+While attempting to implement a menu bar I learned that, although you can setup a simple handler, there is a special `ICommand` class used to share logic around. For instance, you might put `CloseWindow()` code here. So you might think that you'd instance one of these and connect it to a `MenuItem` like "Close" and be done. Haha... hahahaha.... ha... okay I'm fine again. No, `ICommand` can't do anything itself you see, it's just a proxy for another class called `RelayCommand` which implements two private methods which `ICommand`'s own methods `Executed` (for the doing) and `CanExecute` (for the can do, which they cannot by default) call. Not only does `ICommand` and its' target need to be associated with the `MenuItem` but you must also wrap this in a `CommandBinding` instance to add to the target `UIElement`.
+
+Alas, as is typical these days, the `RelayCommand` class which underpins the `ICommand` implementation cannot be easily implemented using dotnet core because the `CommandManager` class was dropped and, seemingly, is only available from a third party module `CommunityToolkit.Mvvm`. I learned this while trying to create the `RelayCommand` class in C# and import into Powershell using `Add-Type -TypeDefinition`. Well, even if that module were Microsoft's own I wouldn't use it here anyway. As a final insult, the built-in `ApplicationCommands` don't implement any logic of their own... why...? You know what, don't answer that.
+
+At the end of the day, frustrated with the inflexibility of what must be the most flexible framework ever designed, I'm left with a simple, functional "Click" event handle. The moral of the story is KISS.
+
+```powershell
+MenuItem '_Exit' {
+    Handler Click {
+        $Window = Reference 'Window'
+        $Window.Close()
+    }
+}
+```
 
 ## Resources
 
