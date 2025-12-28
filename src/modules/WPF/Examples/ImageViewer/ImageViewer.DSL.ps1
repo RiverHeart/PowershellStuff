@@ -49,6 +49,7 @@ Window 'Window' {
                 MenuItem '_File' {
                     MenuItem '_Open' {
                         Handler Click {
+                            # TODO: Abstract some of this stuff.
                             $OpenFileDialog = [Microsoft.Win32.OpenFileDialog]::new()
                             $OpenFileDialog.Filter = @(
                                 'Image Files (*.jpg;*.png;*.bmp;*.ico;*.tiff;*.gif)|*.jpg;*.png;*.bmp;*.ico;*.tiff;*.gif'
@@ -94,11 +95,12 @@ Window 'Window' {
             }
         }
 
-        # This needs to go in a scroll window or something.
+        # TODO: This whole section needs to
+        # * Be centered in the window
+        # * Fill all content between the Menu and Button panels
         ScrollViewer 'ScrollViewer' {
             Image 'Viewer' {
                 Properties @{
-                    Source = $CurrentNode.Value
                     StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
                 }
                 Handler SourceUpdated {
@@ -108,6 +110,11 @@ Window 'Window' {
             }
         }
 
+        # TODO:
+        # * This needs to stick to the bottom of the page. DockPanel didn't
+        # seem to work.
+        # * Needs to support Counter/Clockwise rotation.
+        # * Needs to support "Fit to Window" and "Actual Image Size"
         StackPanel 'ButtonPanel' {
             Properties @{
                 Orientation = [Orientation]::Horizontal
