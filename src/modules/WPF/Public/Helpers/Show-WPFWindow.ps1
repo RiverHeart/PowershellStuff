@@ -25,6 +25,7 @@ function Show-WPFWindow {
         try {
             # Set globally so you can reference `$LastDialogResult` plainly from the main script.
             $global:LastDialogResult = $Window.ShowDialog()
+            $Window.Activate()
         } catch [Exception] {
             Write-Error "Window closed with error: $_"
         } finally {
