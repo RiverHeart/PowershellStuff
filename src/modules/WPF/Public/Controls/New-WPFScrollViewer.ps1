@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF ScrollViewer object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.scrollviewer
+#>
 function New-WPFScrollViewer {
     [Alias('ScrollViewer')]
     [OutputType([System.Windows.Controls.ScrollViewer])]

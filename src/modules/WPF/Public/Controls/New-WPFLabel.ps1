@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF Label object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.label
+#>
 function New-WPFLabel {
     [Alias('Label')]
     [OutputType([string])]

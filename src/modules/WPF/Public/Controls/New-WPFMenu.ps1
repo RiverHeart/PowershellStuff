@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF Menu object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menu
+#>
 function New-WPFMenu {
     [Alias('Menu')]
     [OutputType([System.Windows.Controls.Menu])]

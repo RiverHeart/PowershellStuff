@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF Window object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.window
+#>
 function New-WPFWindow {
     [Alias('Window')]
     [OutputType([System.Windows.Window])]

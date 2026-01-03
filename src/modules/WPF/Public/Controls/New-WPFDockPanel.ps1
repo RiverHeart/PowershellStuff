@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF DockPanel object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.dockpanel
+#>
 function New-WPFDockPanel {
     [Alias('DockPanel')]
     [OutputType([System.Windows.Controls.DockPanel])]

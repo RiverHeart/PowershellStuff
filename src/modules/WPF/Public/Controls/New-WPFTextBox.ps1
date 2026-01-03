@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF TextBox object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.textbox
+#>
 function New-WPFTextBox {
     [Alias('TextBox')]
     [OutputType([string])]

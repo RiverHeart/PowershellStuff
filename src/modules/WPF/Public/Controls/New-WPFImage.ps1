@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF Image object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.image
+#>
 function New-WPFImage {
     [CmdletBinding()]
     [Alias('Image')]

@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF StackPanel object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.stackpanel
+#>
 function New-WPFStackPanel {
     [Alias('StackPanel')]
     [OutputType([System.Windows.Controls.StackPanel])]

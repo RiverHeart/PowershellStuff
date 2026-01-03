@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF MenuItem object.
+
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menuitem
+#>
 function New-WPFMenuItem {
     [Alias('MenuItem')]
     [OutputType([System.Windows.Controls.MenuItem])]

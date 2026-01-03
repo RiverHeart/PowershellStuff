@@ -1,4 +1,10 @@
+<#
+.SYNOPSIS
+    Creates a WPF DatePicker object.
 
+.LINK
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.datepicker
+#>
 function New-WPFDatePicker {
     [Alias('DatePicker')]
     [OutputType([System.Windows.Controls.DatePicker])]
