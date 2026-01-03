@@ -31,28 +31,28 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    $Name = $InputObject.Name
+    $ParentName = $InputObject.Name
+    $ParentType = $InputObject.GetType().Name
 
     try {
-        foreach ($Result in $ScriptBlock.Invoke()) {
+        # Set `$self` as reference to the parent object.
+        # `$this` would be more idiomatic but it might be wise to avoid
+        # issues that might arise from changing automatic variables.
+        $PSVars = @( [psvariable]::new('self', $InputObject) )
+
+        foreach ($Result in $ScriptBlock.InvokeWithContext($null, $PSVars)) {
             $ChildName = if ($Result.Name) { $Result.Name } else { 'Unknown' }
+            $ChildType = $Result.GetType().Name
 
             switch ($Result.WPF_TYPE) {
-                'Properties' {
-                    foreach($KVP in $Result.GetEnumerator()) {
-                        Write-Debug "Updating property $($KVP.Name) with $($KVP.Value)"
-                        $InputObject.($KVP.Name) = $KVP.Value
-                    }
-                    break
-                }
                 'Handler' {
                     # TODO: Wrap the scriptblock to catch errors and report them properly.
-                    Write-Debug "Adding handler for event '$($Result.event)' to object '$($InputObject.Name)'"
+                    Write-Debug "Adding handler for event '$($Result.event)' to object '$ParentName'"
                     $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
                     break
                 }
                 'Control' {
-                    Write-Debug "Adding child object '$($Result.Name)' to '$($InputObject.Name)'"
+                    Write-Debug "Adding child object '$ChildName' to '$ParentName'"
                     $InputObject.AddChild($Result)
 
                     # Hacky but what's a guy to do?
@@ -73,9 +73,10 @@ function Update-WPFObject {
                     if ($InputObject -is [System.Windows.Controls.Button]) {
                         $InputObject.Content = $Result
                     }
+                    break
                 }
                 default {
-                    Write-Error "Unsupported object '$ChildName' of type '$($Result.GetType().Name)' returned for '$Name'"
+                    Write-Error "Cannot add '$ChildName' ($ChildType) to '$ParentName' ($ParentType)"
                 }
             }
 
@@ -84,7 +85,7 @@ function Update-WPFObject {
             }
         }
     } catch {
-        Write-Error "Failed to update '$Name' with error: $_"
+        Write-Error "Failed to update '$ParentName' with error: $_"
         return
     }
 }

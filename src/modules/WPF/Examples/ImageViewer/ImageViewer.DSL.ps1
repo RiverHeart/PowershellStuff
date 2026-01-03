@@ -30,21 +30,15 @@ $CurrentNode = $null
 
 # Define the Image Viewer GUI
 Window 'Window' {
-    Properties @{
-        Title = 'Image Viewer'
-        WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-    }
+    $self.Title = 'Image Viewer'
+    $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
 
     StackPanel "Body" {
-        Properties @{
-            Margin = 5
-        }
+        $self.Margin = 5
 
         DockPanel 'MenuPanel' {
             Menu 'Menu' {
-                Properties @{
-                    Height = 25
-                }
+                $self.Height = 25
 
                 MenuItem '_File' {
                     MenuItem '_Open' {
@@ -100,9 +94,8 @@ Window 'Window' {
         # * Fill all content between the Menu and Button panels
         ScrollViewer 'ScrollViewer' {
             Image 'Viewer' {
-                Properties @{
-                    StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
-                }
+                $self.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
+
                 Handler SourceUpdated {
                     $Viewer = Reference 'Viewer'
                     $Viewer.UpdateLayout()
@@ -116,15 +109,13 @@ Window 'Window' {
         # * Needs to support Counter/Clockwise rotation.
         # * Needs to support "Fit to Window" and "Actual Image Size"
         StackPanel 'ButtonPanel' {
-            Properties @{
-                Orientation = [Orientation]::Horizontal
-                HorizontalAlignment = [HorizontalAlignment]::Center
-            }
+            $self.Orientation = [Orientation]::Horizontal
+            $self.HorizontalAlignment = [HorizontalAlignment]::Center
+
             Button 'BackButton' {
-                Properties @{
-                    Width = 75
-                    Margin = 5
-                }
+                $self.Width = 75
+                $self.Margin = 5
+
                 Handler 'Click' {
                     if (-not $script:CurrentNode) { return }
                     $script:CurrentNode = $script:CurrentNode.Previous
@@ -135,10 +126,9 @@ Window 'Window' {
                 Path 'images/arrow-left-solid-full.svg'
             }
             Button 'ForwardButton' {
-                Properties @{
-                    Width = 75
-                    Margin = 5
-                }
+                $self.Width = 75
+                $self.Margin = 5
+
                 Handler 'Click' {
                     if (-not $script:CurrentNode) { return }
                     $script:CurrentNode = $script:CurrentNode.Next

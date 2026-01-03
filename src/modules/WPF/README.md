@@ -3,7 +3,7 @@
 
 # Overview
 
-Experimental Domain-Specific Language (DSL) for building WPF applications in Powershell.
+Experimental internal Domain-Specific Language (DSL) for building WPF applications in Powershell without having to touch XAML. Because everything in the DSL is Powershell code, you have the full power of the language at your fingertips when developing a GUI.
 
 ## Example
 
@@ -15,25 +15,22 @@ More examples can be found in the [Examples](./Examples/) directory.
 Import-Module ./WPF
 
 Window 'Window' {
-    Properties @{
-        Title = 'Button Example'
-        SizeToContent = 'WidthAndHeight'
-    }
+    $self.Title = 'Button Example'
+    $self.SizeToContent = 'WidthAndHeight'
+
     StackPanel "Buttons" {
         Button "EnglishButton" {
-            Properties @{
-                Content = 'English'
-                Width = 100
-            }
+            $self.Content = 'English'
+            $self.Width = 100
+
             Handler "Click" {
                 Write-Host "Hello World"
             }
         }
         Button "JapaneseButton" {
-            Properties @{
-                Content = 'Japanese'
-                Width = 100
-            }
+            $self.Content = 'Japanese'
+            $self.Width = 100
+
             Handler "Click" {
                 Write-Host "Konichiwa Sekai"
             }

@@ -25,19 +25,15 @@ $DebugPreference = 'Continue'
 Import-Module ../.. -Force
 
 Window 'Window' {
-    Properties @{
-        Title = 'Select A Date'
-        WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-        TopMost = $True
-        SizetoContent = 'WidthAndHeight'
-        Width = 0
-        Height = 0
-    }
+    $self.Title = 'Select A Date'
+    $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $self.TopMost = $True
+    $self.SizetoContent = 'WidthAndHeight'
+    $self.Width = 0
+    $self.Height = 0
 
     StackPanel 'RootContainer' {
-        Properties @{
-            Margin = 5
-        }
+        $self.Margin = 5
 
         DatePicker 'DatePicker' {
             Handler 'SelectedDateChanged' {
@@ -47,27 +43,24 @@ Window 'Window' {
         }
 
         StackPanel 'ButtonPanel' {
-            Properties @{
-                Orientation = [Orientation]::Horizontal
-            }
+            $self.Orientation = [Orientation]::Horizontal
+
             Button "OKButton" {
-                Properties @{
-                    Content = 'OK'
-                    Width = 75
-                    Margin = 5
-                    IsEnabled = $False
-                }
+                $self.Content = 'OK'
+                $self.Width = 75
+                $self.Margin = 5
+                $self.IsEnabled = $False
+
                 Handler "Click" {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $True
                 }
             }
             Button "CancelButton" {
-                Properties @{
-                    Content = 'Cancel'
-                    Width = 75
-                    Margin = 5
-                }
+                $self.Content = 'Cancel'
+                $self.Width = 75
+                $self.Margin = 5
+
                 Handler "Click" {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $False

@@ -24,50 +24,41 @@ $ErrorActionPreference = 'Stop'
 Import-Module ../.. -Force
 
 Window 'Window' {
-    Properties @{
-        Title = 'Data Entry Form'
-        WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-        TopMost = $True
-        Height = 300
-        Width = 300
-    }
+    $self.Title = 'Data Entry Form'
+    $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $self.TopMost = $True
+    $self.Height = 300
+    $self.Width = 300
+
     StackPanel "MainStackPanel" {
-        Properties @{
-            Margin = 5
-        }
+        $self.Margin = 5
+
         Label 'DataEntryLabel' {
-            Properties @{
-                Content = 'Please enter the information in the space below:'
-            }
+            $self.Content = 'Please enter the information in the space below:'
         }
         TextBox "DataEntryBox" {
-            Properties @{
-                HorizontalAlignment = [HorizontalAlignment]::Left
-                Width = 260
-                Height = 20
-            }
+            $self.HorizontalAlignment = [HorizontalAlignment]::Left
+            $self.Width = 260
+            $self.Height = 20
         }
         StackPanel 'ButtonPanel' {
-            Properties @{
-                Orientation = [Orientation]::Horizontal
-            }
+            $self.Orientation = [Orientation]::Horizontal
+
             Button 'OKButton' {
-                Properties @{
-                    Content = 'OK'
-                    Width = 75
-                    Margin = 5
-                }
+                $self.Content = 'OK'
+                $self.Width = 75
+                $self.Margin = 5
+
                 Handler 'Click' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $True
                 }
             }
             Button 'CancelButton' {
-                Properties @{
-                    Content = 'Cancel'
-                    Width = 75
-                    Margin = 5
-                }
+                $self.Content = 'Cancel'
+                $self.Width = 75
+                $self.Margin = 5
+
                 Handler 'Click' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $False
