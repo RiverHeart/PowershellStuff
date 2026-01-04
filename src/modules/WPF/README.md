@@ -1,7 +1,21 @@
+# WPF Powershell
+
 > [!WARNING]
 > Work in progress. Nothing is guaranteed to work as intended.
 
-# Overview
+## Table of Contents
+* [Overview](#overview)
+* [Example](#example)
+* [Why?](#why)
+* [Project Goals](#project-goals)
+* [Autocomplete](#autocomplete)
+  * [Intellisense](#intellisense)
+  * [VSCode Snippets](#vscode-snippets)
+* [Todo](#todo)
+* [Notes](#notes)
+* [Resources](#resources)
+
+## Overview
 
 Experimental internal Domain-Specific Language (DSL) for building WPF applications in Powershell without having to touch XAML. Because everything in the DSL is Powershell code, you have the full power of the language at your fingertips when developing a GUI.
 
@@ -38,6 +52,15 @@ Window 'Window' {
     }
 } | Show-WPFWindow
 ```
+
+## Why?
+
+Many reasons but if I had to name a few big ones:
+* WinForms is too limited and WPF demands too much (XAML, Visual Studio, C#, MVVM)
+* Declarative syntax is good but I just instinctively hate XAML
+* C# requires too much ceremony for my lizard brain
+* Because I wanted to see how difficult this would be
+
 
 ## Project Goals
 
