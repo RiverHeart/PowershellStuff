@@ -1,16 +1,20 @@
 <#
 .SYNOPSIS
-   Reads in a string from a XAML generator script and converts
-   it to XML.
+    Calls `ShowDialog()`, `Activate()` and `Close()` on the given Window object.
 
 .DESCRIPTION
-   Reads in a string from a XAML generator script and converts
-   it to XML.
+    Calls `ShowDialog()`, `Activate()` and `Close()` on the given Window object.
 
-   Provides basic error handling and resource cleanup.
+    A `finally` block ensures that `Close()` gets called if the window closes or crashes.
+
+.NOTES
+    Unsure if I should be handling resource cleanup here.
+    I tried doing that in the `finally` block but forgot that
+    in some instances I was getting a value from an object
+    after the window closes which requires the name to be registered.
 
 .EXAMPLE
-   New-WPFApp -Path $PSScriptRoot -Name Main
+    New-WPFApp -Path $PSScriptRoot -Name Main
 #>
 function Show-WPFWindow {
     [CmdletBinding()]
