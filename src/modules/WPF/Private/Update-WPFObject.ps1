@@ -33,6 +33,8 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
+    # TODO: Need to fix this when Row is attempting to add Column as child.
+
     $SelfName = $InputObject.Name
     $SelfType = $InputObject.GetType().Name
 

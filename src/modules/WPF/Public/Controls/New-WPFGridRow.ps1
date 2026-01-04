@@ -11,8 +11,11 @@ function New-WPFGridRow {
     [Alias('Row', 'New-WPFRowDefinition')]
     [OutputType([System.Windows.Controls.RowDefinition])]
     param(
+        # Using object because you're probably going to pass a string
+        # or int instead of [GridLength] and we need Powershell to recognize
+        # the value to resolve the parameter set.
         [Parameter(ParameterSetName='Explicit',Position=0)]
-        [System.Windows.GridLength] $Height = [System.Windows.GridLength]::Auto,
+        [object] $Height = [System.Windows.GridLength]::Auto,
 
         [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
         [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]

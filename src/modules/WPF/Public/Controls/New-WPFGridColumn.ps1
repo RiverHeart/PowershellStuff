@@ -11,8 +11,11 @@ function New-WPFGridColumn {
     [Alias('Column', 'Cell', 'New-WPFColumnDefinition')]
     [OutputType([System.Windows.Controls.ColumnDefinition])]
     param(
+        # Using object because you're probably going to pass a string
+        # or int instead of [GridLength] and we need Powershell to recognize
+        # the value to resolve the parameter set.
         [Parameter(ParameterSetName='Explicit',Position=0)]
-        [System.Windows.GridLength] $Width = [System.Windows.GridLength]::Auto,
+        [object] $Width = [System.Windows.GridLength]::Auto,
 
         [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
         [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]
