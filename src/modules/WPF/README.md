@@ -54,6 +54,8 @@ Window 'Window' {
 } | Show-WPFWindow
 ```
 
+![Button Example](./Images/ButtonExample.png)
+
 ## How It Works
 
 All UI elements have a function that creates the UI element programmatically and creates an alias to use as the DSL keyword. For instance, `New-WPFStackPanel` returns a StackPanel object and has the alias `StackPanel`. The function parameters typically consist of an initializer such as the name of the object and end with a scriptblock that contain the child items. ParameterSets are used to control the positional parsing of values and so far I've only found use for `Implicit` and `Explicit` sets to make things more obvious. For instance, you can call `Grid 'Name' 4 4 {}` to explicitly create a 4x4 grid or simply `Grid 'Name' {}` to have the layout inferred. Initializer params are typically cosmetic as you can set properties/call code from the the scriptblock but in this case, the code for creating and adding the grid definitions is hidden using the explicit parameters. These parameters can be made mandatory if a value is needed to instantiate the object.
