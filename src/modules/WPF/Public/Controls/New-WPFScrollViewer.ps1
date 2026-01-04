@@ -20,8 +20,6 @@ function New-WPFScrollViewer {
     try {
         $WPFObject = [System.Windows.Controls.ScrollViewer] @{
             Name = $Name
-            HorizontalScrollBarVisibility = [System.Windows.Controls.ScrollBarVisibility]::Visible
-            VerticalScrollBarVisibility = [System.Windows.Controls.ScrollBarVisibility]::Visible
         }
         Register-WPFObject $Name $WPFObject
         Update-WPFObject $WPFObject $ScriptBlock

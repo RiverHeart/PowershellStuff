@@ -99,10 +99,11 @@ Window 'Window' {
         # display the image.
         Row '*' {
             Cell {
-                # In case the image is larger than the window, use the scrollviewer
-                # to inspect the image.
+                # In case the image is larger than the window, use the ScrollViewer
+                # to adjust the view window.
                 ScrollViewer 'ScrollViewer' {
-                    $self.VerticalAlignment = [VerticalAlignment]::Stretch
+                    $self.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $self.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
 
                     Image 'Viewer' {
                         $self.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
