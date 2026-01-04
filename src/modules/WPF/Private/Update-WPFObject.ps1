@@ -33,9 +33,7 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    # TODO: Need to fix this when Row is attempting to add Column as child.
-
-    $SelfName = $InputObject.Name
+    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '<Nameless>' }
     $SelfType = $InputObject.GetType().Name
 
     $RowIndex = 0
@@ -49,7 +47,7 @@ function Update-WPFObject {
 
     try {
         foreach ($Result in $ScriptBlock.InvokeWithContext($null, $PSVars)) {
-            $ChildName = if ($Result.Name) { $Result.Name } else { 'Unknown' }
+            $ChildName = if ($Result.Name) { $Result.Name } else { '<Nameless>' }
             $ChildType = $Result.GetType().Name
 
             # Returning objects early so I don't need to worry about breaking out
@@ -94,10 +92,13 @@ function Update-WPFObject {
                 }
 
             # GridRow
-            } elseif (
-                $InputObject -is [System.Windows.Controls.Grid] -and
-                $Result -is [System.Windows.Controls.RowDefinition]
-            ) {
+            } elseif ($Result.WPF_TYPE -eq 'GridDefinition') {
+
+                if ($InputObject -isnot [System.Windows.Controls.Grid]) {
+                    # Move on. Rows and columns are processed by Grids and nothing else.
+                    continue
+                }
+
                 $ColumnIndex = 0  # Track columns for each row
                 $RowIndex++
 
