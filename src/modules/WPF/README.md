@@ -6,6 +6,7 @@
 ## Table of Contents
 * [Overview](#overview)
 * [Example](#example)
+* [How It Works](#how-it-works)
 * [Why?](#why)
 * [Project Goals](#project-goals)
 * [Autocomplete](#autocomplete)
@@ -53,6 +54,16 @@ Window 'Window' {
 } | Show-WPFWindow
 ```
 
+## How It Works
+
+All UI elements have a function that creates the UI element programmatically and creates an alias to use as the DSL keyword. For instance, `New-WPFStackPanel` returns a StackPanel object and has the alias `StackPanel`. The function parameters typically consist of an initializer such as the name of the object and end with a scriptblock that contain the child items. An initializer param such as `$Name` is typically cosmetic as you can easily set this from the scriptblock.
+
+From top to bottom, each UI element is created, registered (see [object-references](#object-references)), and the scriptblock is processed by `Update-WPFObject`. `$self` is injected into the scriptblock and used for property setting and while objects returned by the scriptblock are processed by type. Controls are added as children, handlers are registered with events, and so on. While `Update-WPFObject` does not call itself, it causes recursion by triggering each scriptblock in the tree of nodes.
+
+Grid elements such as `ColumnDefinition` and `RowDefinition` have special handling. Grid definitions are given a custom `Children` note property to which controls can be added. When a Grid receives a `RowDefinition`, it processes the row and its children. If the user did not define the Grid with rows and columns, the definitions will be added automatically. For columns specifically, definitions are added only if a column at that index doesn't exist. For instance, if you add two rows, the first row containing one column and the second row containing two columns, processing of the second row will ignore the first column definition and add the second.
+
+Finally, after all scriptblocks have been executed, the window object is passed to `Show-WPFDialog` which calls the `ShowDialog()` method and `Close()` when the window closes.
+
 ## Why?
 
 Many reasons but if I had to name a few big ones:
@@ -60,7 +71,6 @@ Many reasons but if I had to name a few big ones:
 * Declarative syntax is good but I just instinctively hate XAML
 * C# requires too much ceremony for my lizard brain
 * Because I wanted to see how difficult this would be
-
 
 ## Project Goals
 
