@@ -32,17 +32,32 @@ function Convert-WPFObjectToXaml {
         [object[]] $InputObject,
 
         [ValidateSet('string', 'xml')]
-        [string] $OutputAs = 'string'
+        [string] $OutputAs = 'string',
+
+        [Parameter(HelpMessage='Override default XmlWriterSettings')]
+        [System.Xml.XmlWriterSettings] $XmlWriterSettings
     )
+
+    begin {
+        if (-not $XmlWriterSettings) {
+            # Add some pretty printing
+            $XmlWriterSettings = [System.Xml.XmlWriterSettings] @{
+                Indent = $true
+                IndentChars = '  '
+                Encoding = [System.Text.Encoding]::UTF8
+            }
+        }
+    }
 
     process {
         foreach($Item in $InputObject) {
             if ($OutputAs -eq 'xml') {
                 [xml] [System.Windows.Markup.XamlWriter]::Save($Item)
             } else {
-                # TODO: Investigate XamlXmlWriter. See if pretty printing xml
-                # is possible.
-                [System.Windows.Markup.XamlWriter]::Save($Item)
+                $StringBuilder = [System.Text.StringBuilder]::new()
+                $XmlWriter = [System.Xml.XmlWriter]::Create($StringBuilder, $XmlWriterSettings)
+                [System.Windows.Markup.XamlWriter]::Save($Item, $XmlWriter)
+                $StringBuilder.ToString()
             }
         }
     }

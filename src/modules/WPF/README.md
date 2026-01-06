@@ -27,11 +27,12 @@ The code below creates a window with a couple of buttons. Mandatory arguments ge
 More examples can be found in the [Examples](./Examples/) directory.
 
 ```powershell
-Import-Module ./WPF
+Import-Module ./WPF -Force
 
 Window 'Window' {
     $self.Title = 'Button Example'
-    $self.SizeToContent = 'WidthAndHeight'
+    $self.Height = 100
+    $self.Width = 250
 
     StackPanel "Buttons" {
         Button "EnglishButton" {
@@ -55,6 +56,19 @@ Window 'Window' {
 ```
 
 ![Button Example](./Images/ButtonExample.png)
+
+If you need or want, you can serialize WPF objects by piping them to `Convert-WPFObjectToXaml`. In the case of the example above, you'll get the following output. Of course, you'll still need to wire everything up in C#.
+
+**Output**
+```xml
+<?xml version="1.0" encoding="utf-16"?>
+<Window ThemeMode="None" Title="Button Example" Name="Window" Width="250" Height="100" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+  <StackPanel Name="Buttons">
+    <Button Name="EnglishButton" Width="100">English</Button>
+    <Button Name="JapaneseButton" Width="100">Japanese</Button>
+  </StackPanel>
+</Window>
+```
 
 ## How It Works
 
