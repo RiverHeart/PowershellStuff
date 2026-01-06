@@ -19,6 +19,7 @@ function Select-WPFObject {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ArgumentCompleter({ Complete-RegisteredObject @args })]
         [string[]] $Name,
 
         [string] $Property

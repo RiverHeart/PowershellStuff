@@ -17,7 +17,6 @@
 function Complete-WPFHandler {
     [CmdletBinding()]
     [OutputType([string[]])]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(<#Category#> 'PSReviewUnusedParameter', Scope='Function', Justification='My little remaining sanity')]
     param(
         [string] $CommandName,
         [string] $ParameterName,
@@ -75,14 +74,31 @@ function Complete-WPFHandler {
         $script:WPFHandlerCache.Completions[$Control] = $Type.GetEvents().Name
     }
 
-    # If no word to filter on, return all results
-    if ([String]::IsNullOrEmpty($WordToComplete)) {
-        return $script:WPFHandlerCache.Completions[$Control]
+    # Detect if word is quoted. Strip quotes for filtering
+    # and add to results returned.
+    $Quote = [Regex]::Match($WordToComplete, "^('|`")").Value
+    if ($Quote) {
+        $WordToComplete = $WordToComplete.Trim($Quote)
     }
 
-    # Filter on WordToComplete
-    return $script:WPFHandlerCache.Completions[$Control] |
+    # The results are already alphabetical so no need to sort these.
+    $Completions = $script:WPFHandlerCache.Completions[$Control] |
         Where-Object {
             $_.StartsWith($WordToComplete, [System.StringComparison]::InvariantCultureIgnoreCase)
+        } |
+        Sort-Object |
+        ForEach-Object {
+            $CompletionText = if ($Quote) { $Quote + $_ + $Quote  } else { $_ }
+            [System.Management.Automation.CompletionResult]::new(
+                <# Text to insert #> $CompletionText,
+                <# Text displayed in the list #> $_,
+                <# Result type #> [System.Management.Automation.CompletionResultType]::ParameterValue,
+                <# Tooltip #> "Event"
+            )
         }
+
+    if ($Completions.Count -gt 0) {
+        return $Completions
+    }
+    return $null  # Prevent fallback autocomplete
 }
