@@ -23,7 +23,7 @@ function New-WPFTextBox {
         if ($ScriptBlock) {
             Update-WPFObject $TextBox $ScriptBlock
         }
-        Set-WPFObjectType $TextBox 'Control'
+        Add-WPFType $TextBox 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (TextBox) with error: $_"
     }

@@ -24,7 +24,7 @@ function New-WPFImage {
     if ($ScriptBlock) {
         Update-WPFObject $Image $ScriptBlock
     }
-    Set-WPFObjectType $Image 'Control'
+    Add-WPFType $Image 'Control'
 
     return $Image
 }

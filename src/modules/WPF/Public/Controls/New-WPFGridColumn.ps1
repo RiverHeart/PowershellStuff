@@ -26,7 +26,7 @@ function New-WPFGridColumn {
         $WPFObject = [System.Windows.Controls.ColumnDefinition] @{
             Width = $Width
         }
-        Set-WPFObjectType $WPFObject 'GridDefinition'
+        Add-WPFType $WPFObject 'GridDefinition'
 
         $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
         $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children

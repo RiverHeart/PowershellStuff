@@ -24,7 +24,7 @@ function New-WPFLabel {
         if ($ScriptBlock) {
             Update-WPFObject $Label $ScriptBlock
         }
-        Set-WPFObjectType $Label 'Control'
+        Add-WPFType $Label 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Label) with error: $_"
     }

@@ -22,7 +22,7 @@ function New-WPFRelayCommand {
                 [RelayCommand]::new($Execute)
             }
 
-        Set-WPFObjectType $Command 'Command'
+        Add-WPFType $Command 'Command'
     } catch {
         Write-Error "Failed to create Command with error: $_"
     }

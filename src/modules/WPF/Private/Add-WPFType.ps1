@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Sets the WPF_TYPE property on objects to distinguish them.
+    Adds a custom type to objects for the DSL to distinguish them.
 
 .DESCRIPTION
-    Sets the WPF_TYPE property on objects to distinguish them.
+    Adds a custom type to objects for the DSL to distinguish them.
 
-    Other functions such as `Update-WPFObject` use this annotation
+    Other functions such as `Update-WPFObject` use this type
     to decide how scriptblock results should be applied to objects
     being created.
 
-    This function also ensures that annotations are only set to
+    This function also ensures that type are only set to
     supported values and will error on typos.
 
 .EXAMPLE
@@ -20,9 +20,9 @@
         Height = $Height
         Width = $Width
     }
-    Set-WPFObjectType 'Control'
+    Add-WPFType 'Control'
 #>
-function Set-WPFObjectType {
+function Add-WPFType {
     [CmdletBinding()]
     [OutputType([void], [object])]
     param(
@@ -31,7 +31,7 @@ function Set-WPFObjectType {
 
         [Parameter(Mandatory)]
         [ValidateSet(
-            'Control', 'Properties', 'Handler', 'Shape', 'GridDefinition',
+            'Control', 'Handler', 'Shape', 'GridDefinition',
             'Command'
         )]
         [string] $Type,
@@ -39,14 +39,18 @@ function Set-WPFObjectType {
         [switch] $PassThru
     )
 
+    begin {
+        $PSTypeName = "Custom.WPF.$Type"
+    }
+
     process {
         foreach($Item in $InputObject) {
-            Add-Member `
-                -InputObject $Item `
-                -MemberType NoteProperty `
-                -Name 'WPF_TYPE' `
-                -Value $Type `
-                -PassThru:$PassThru
+            if ($PSTypeName -notin $Item.PSObject.TypeNames) {
+                $Item.PSObject.TypeNames.Insert(0, $PSTypeName)
+            }
+            if ($PassThru) {
+                Write-Output $Item
+            }
         }
     }
 }

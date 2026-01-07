@@ -39,5 +39,5 @@ function Add-WPFHandler {
     return @{
         Event = $Event
         ScriptBlock = $ScriptBlock
-    } | Set-WPFObjectType -Type 'Handler' -PassThru
+    } | Add-WPFType -Type 'Handler' -PassThru
 }

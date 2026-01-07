@@ -26,7 +26,7 @@ function New-WPFGridRow {
         $WPFObject = [System.Windows.Controls.RowDefinition] @{
             Height = $Height
         }
-        Set-WPFObjectType $WPFObject 'GridDefinition'
+        Add-WPFType $WPFObject 'GridDefinition'
 
         $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
         $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children

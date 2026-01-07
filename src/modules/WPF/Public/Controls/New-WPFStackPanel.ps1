@@ -23,7 +23,7 @@ function New-WPFStackPanel {
         }
         Register-WPFObject $Name $StackPanel
         Update-WPFObject $StackPanel $ScriptBlock
-        Set-WPFObjectType $StackPanel 'Control'
+        Add-WPFType $StackPanel 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (StackPanel) with error: $_"
     }

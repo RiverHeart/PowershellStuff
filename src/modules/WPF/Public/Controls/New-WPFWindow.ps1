@@ -26,7 +26,7 @@ function New-WPFWindow {
         if (-not $Window.Height -and -not $Window.Width){
             $Window.SizeToContent = 'WidthAndHeight'
         }
-        Set-WPFObjectType $Window 'Control'
+        Add-WPFType $Window 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Window) with error: $_"
     }

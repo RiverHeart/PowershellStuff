@@ -23,7 +23,7 @@ function New-WPFScrollViewer {
         }
         Register-WPFObject $Name $WPFObject
         Update-WPFObject $WPFObject $ScriptBlock
-        Set-WPFObjectType $WPFObject 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (ScrollViewer) with error: $_"
     }

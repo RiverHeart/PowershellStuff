@@ -26,8 +26,6 @@ function Update-WPFObject {
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock,
 
-        [hashtable] $Context,
-
         # Allow caller to get results for custom updates
         # without having to rerun the scriptblock
         [switch] $PassThru
@@ -57,21 +55,21 @@ function Update-WPFObject {
             }
 
             # Handler
-            if ($Result.WPF_TYPE -eq 'Handler') {
+            if (Test-WPFType $Result 'Handler') {
                 # TODO: Wrap the scriptblock to catch errors and report them properly.
                 Write-Debug "Adding handler for event '$($Result.event)' to object '$SelfName' ($SelfType)"
                 $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
 
             # Command
-            } elseif ($Result.WPF_TYPE -eq 'Command') {
+            } elseif (Test-WPFType $Result 'Command') {
                 Write-Debug "Adding Command to object '$SelfName' ($SelfType)"
                 $InputObject.Command = $Result
 
             # Control
-            } elseif ($Result.WPF_TYPE -eq 'Control') {
+            } elseif (Test-WPFType $Result 'Control') {
                 # Uses `PassThru` to send child objects further up the chain to get
                 # processed by the Grid itself.
-                if ($InputObject.WPF_TYPE -eq 'GridDefinition') {
+                if (Test-WPFType $InputObject 'GridDefinition') {
                     continue
                 }
 
@@ -88,7 +86,7 @@ function Update-WPFObject {
                 }
 
             # Shape
-            } elseif ($Result.WPF_TYPE -eq 'Shape') {
+            } elseif (Test-WPFType $Result 'Shape') {
                 # My thinking here is that while a user can assign a Path to a button's content
                 # property other objects are probably assigned differently so it's just be easier
                 # to add them based on the object type so you don't need to remember.
@@ -97,7 +95,7 @@ function Update-WPFObject {
                 }
 
             # GridRow
-            } elseif ($Result.WPF_TYPE -eq 'GridDefinition') {
+            } elseif (Test-WPFType $Result 'GridDefinition') {
 
                 if ($InputObject -isnot [System.Windows.Controls.Grid]) {
                     # Move on. Rows and columns are processed by Grids and nothing else.

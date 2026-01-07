@@ -64,7 +64,7 @@ function New-WPFPath {
     if ($ScriptBlock) {
         Update-WPFObject $PathGeo $ScriptBlock
     }
-    Set-WPFObjectType $PathGeo 'Shape'
+    Add-WPFType $PathGeo 'Shape'
 
     return $PathGeo
 }

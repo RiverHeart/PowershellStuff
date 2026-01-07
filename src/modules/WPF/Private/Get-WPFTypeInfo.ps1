@@ -12,14 +12,14 @@
 .EXAMPLE
     Get all types
 
-    Get-WPFType
+    Get-WPFTypeInfo
 
 .EXAMPLE
     Get the button type
 
-    Get-WPFType 'Button'
+    Get-WPFTypeInfo 'Button'
 #>
-function Get-WPFType {
+function Get-WPFTypeInfo {
     [OutputType([type])]
     param(
         [ValidateNotNullOrEmpty()]

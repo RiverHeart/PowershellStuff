@@ -64,7 +64,7 @@ function Complete-WPFEvent {
     # TODO: Could use more validation here
     $Control = $ParentNode.GetCommandName()
     if (-not $script:WPFHandlerCache.Completions.ContainsKey($Control)) {
-        $Type = Get-WPFType $Control
+        $Type = Get-WPFTypeInfo $Control
 
         if (-not $Type) {
             Write-Debug "Failed to find type for control '$Control'"

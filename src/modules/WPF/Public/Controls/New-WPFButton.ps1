@@ -25,7 +25,7 @@ function New-WPFButton {
         if ($ScriptBlock) {
             Update-WPFObject $Button $ScriptBlock
         }
-        Set-WPFObjectType $Button 'Control'
+        Add-WPFType $Button 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Button) with error: $_"
     }

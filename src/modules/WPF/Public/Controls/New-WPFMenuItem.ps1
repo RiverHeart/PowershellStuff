@@ -24,7 +24,7 @@ function New-WPFMenuItem {
         }
         Register-WPFObject $Name $WPFObject
         Update-WPFObject $WPFObject $ScriptBlock
-        Set-WPFObjectType $WPFObject 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (MenuItem) with error: $_"
     }
