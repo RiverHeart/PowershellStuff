@@ -7,7 +7,7 @@
 #>
 function New-WPFLabel {
     [Alias('Label')]
-    [OutputType([string])]
+    [OutputType([System.Windows.Controls.Label])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -17,17 +17,17 @@ function New-WPFLabel {
     )
 
     try {
-        $Label = [System.Windows.Controls.Label] @{
+        $WPFObject = [System.Windows.Controls.Label] @{
             Name = $Name
         }
-        Register-WPFObject $Name $Label
+        Register-WPFObject $Name $WPFObject
         if ($ScriptBlock) {
-            Update-WPFObject $Label $ScriptBlock
+            Update-WPFObject $WPFObject $ScriptBlock
         }
-        Add-WPFType $Label 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Label) with error: $_"
     }
 
-    return $Label
+    return $WPFObject
 }

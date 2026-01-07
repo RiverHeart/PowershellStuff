@@ -7,7 +7,7 @@
 #>
 function New-WPFButton {
     [Alias('Button')]
-    [OutputType([string])]
+    [OutputType([System.Windows.Controls.Button])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -17,18 +17,18 @@ function New-WPFButton {
     )
 
     try {
-        $Button = [System.Windows.Controls.Button] @{
+        $WPFObject = [System.Windows.Controls.Button] @{
             Name = $Name
             Content = $Content
         }
-        Register-WPFObject $Name $Button
+        Register-WPFObject $Name $WPFObject
         if ($ScriptBlock) {
-            Update-WPFObject $Button $ScriptBlock
+            Update-WPFObject $WPFObject $ScriptBlock
         }
-        Add-WPFType $Button 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Button) with error: $_"
     }
 
-    return $Button
+    return $WPFObject
 }

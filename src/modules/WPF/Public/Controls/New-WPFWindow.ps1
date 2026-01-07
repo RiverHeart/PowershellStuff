@@ -18,17 +18,17 @@ function New-WPFWindow {
     )
 
     try {
-        $Window = [System.Windows.Window] @{
+        $WPFObject = [System.Windows.Window] @{
             Name = $Name
         }
-        Register-WPFObject $Name $Window
-        Update-WPFObject $Window $ScriptBlock
-        if (-not $Window.Height -and -not $Window.Width){
-            $Window.SizeToContent = 'WidthAndHeight'
+        Register-WPFObject $Name $WPFObject
+        Update-WPFObject $WPFObject $ScriptBlock
+        if (-not $WPFObject.Height -and -not $WPFObject.Width){
+            $WPFObject.SizeToContent = 'WidthAndHeight'
         }
-        Add-WPFType $Window 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Window) with error: $_"
     }
-    return $Window
+    return $WPFObject
 }

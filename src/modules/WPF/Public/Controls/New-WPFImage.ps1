@@ -17,14 +17,14 @@ function New-WPFImage {
         [scriptblock] $ScriptBlock
     )
 
-    $Image = [System.Windows.Controls.Image] @{
+    $WPFObject = [System.Windows.Controls.Image] @{
         Name = $Name
     }
-    Register-WPFObject $Name $Image
+    Register-WPFObject $Name $WPFObject
     if ($ScriptBlock) {
-        Update-WPFObject $Image $ScriptBlock
+        Update-WPFObject $WPFObject $ScriptBlock
     }
-    Add-WPFType $Image 'Control'
+    Add-WPFType $WPFObject 'Control'
 
-    return $Image
+    return $WPFObject
 }

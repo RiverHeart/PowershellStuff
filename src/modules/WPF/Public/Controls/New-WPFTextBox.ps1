@@ -7,7 +7,7 @@
 #>
 function New-WPFTextBox {
     [Alias('TextBox')]
-    [OutputType([string])]
+    [OutputType([System.Windows.Controls.TextBox])]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -16,17 +16,17 @@ function New-WPFTextBox {
     )
 
     try {
-        $TextBox = [System.Windows.Controls.TextBox] @{
+        $WPFObject = [System.Windows.Controls.TextBox] @{
             Name = $Name
         }
-        Register-WPFObject $Name $TextBox
+        Register-WPFObject $Name $WPFObject
         if ($ScriptBlock) {
-            Update-WPFObject $TextBox $ScriptBlock
+            Update-WPFObject $WPFObject $ScriptBlock
         }
-        Add-WPFType $TextBox 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (TextBox) with error: $_"
     }
 
-    return $TextBox
+    return $WPFObject
 }

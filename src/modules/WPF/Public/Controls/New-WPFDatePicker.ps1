@@ -18,16 +18,16 @@ function New-WPFDatePicker {
     )
 
     try {
-        $DatePicker = [System.Windows.Controls.DatePicker] @{
+        $WPFObject = [System.Windows.Controls.DatePicker] @{
             Name = $Name
         }
-        Register-WPFObject $Name $DatePicker
+        Register-WPFObject $Name $WPFObject
         if ($ScriptBlock) {
-            Update-WPFObject $DatePicker $ScriptBlock
+            Update-WPFObject $WPFObject $ScriptBlock
         }
-        Add-WPFType $DatePicker 'Control'
+        Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DatePicker) with error: $_"
     }
-    return $DatePicker
+    return $WPFObject
 }
