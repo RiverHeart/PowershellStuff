@@ -14,9 +14,9 @@
     search the AST to get the calling node and find the command value (e.g. `Button`)
     to determine what values should be returned.
 #>
-function Complete-WPFHandler {
+function Complete-WPFEvent {
     [CmdletBinding()]
-    [OutputType([string[]])]
+    [OutputType([CompletionResult[]])]
     param(
         [string] $CommandName,
         [string] $ParameterName,

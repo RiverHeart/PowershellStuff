@@ -25,10 +25,11 @@
 function Add-WPFHandler {
     [CmdletBinding()]
     [Alias('Handler')]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [ArgumentCompleter({ Complete-WPFHandler @args })]
+        [ArgumentCompleter({ Complete-WPFEvent @args })]
         [string] $Event,
 
         [Parameter(Mandatory)]
