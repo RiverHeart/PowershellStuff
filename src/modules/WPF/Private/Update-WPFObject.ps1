@@ -62,6 +62,11 @@ function Update-WPFObject {
                 Write-Debug "Adding handler for event '$($Result.event)' to object '$SelfName' ($SelfType)"
                 $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
 
+            # Command
+            } elseif ($Result.WPF_TYPE -eq 'Command') {
+                Write-Debug "Adding Command to object '$SelfName' ($SelfType)"
+                $InputObject.Command = $Result
+
             # Control
             } elseif ($Result.WPF_TYPE -eq 'Control') {
                 # Uses `PassThru` to send child objects further up the chain to get

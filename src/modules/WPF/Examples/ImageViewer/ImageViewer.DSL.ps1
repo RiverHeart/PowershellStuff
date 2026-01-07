@@ -39,6 +39,9 @@ Window 'Window' {
         Row {
             # Wildcard indicates this column takes all horizontal space.
             Cell '*' {
+
+                # TODO: Create an abstraction called MenuBar
+                # The DockPanel wrapper is just an annoying implementation detail.
                 DockPanel 'MenuPanel' {
                     Menu 'Menu' {
                         $self.Height = 25
@@ -84,8 +87,10 @@ Window 'Window' {
 
                         MenuItem '_Help' {
                             MenuItem '_About' {
-                                Handler Click {
-                                    Write-Host "Implement me"
+                                # Bad example of using RelayCommand. Really need something that makes
+                                # use of the CanExecute part.
+                                RelayCommand {
+                                    Write-Host 'Implement Me'
                                 }
                             }
                         }

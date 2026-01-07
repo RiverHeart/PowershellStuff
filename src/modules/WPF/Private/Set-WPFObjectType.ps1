@@ -30,7 +30,10 @@ function Set-WPFObjectType {
         [object[]] $InputObject,
 
         [Parameter(Mandatory)]
-        [ValidateSet('Control', 'Properties', 'Handler', 'Shape', 'GridDefinition')]
+        [ValidateSet(
+            'Control', 'Properties', 'Handler', 'Shape', 'GridDefinition',
+            'Command'
+        )]
         [string] $Type,
 
         [switch] $PassThru
