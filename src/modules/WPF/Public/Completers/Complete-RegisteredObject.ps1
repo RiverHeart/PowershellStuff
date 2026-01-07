@@ -16,7 +16,7 @@
 #>
 function Complete-RegisteredObject {
     [CmdletBinding()]
-    [OutputType([string[]])]
+    [OutputType([CompletionResult[]])]
     param(
         [string] $CommandName,
         [string] $ParameterName,
