@@ -1,3 +1,8 @@
+using namespace System
+using namespace System.Collections
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Provides auto-complete for the Event parameter of the Add-WPFHandler cmdlet.
@@ -16,13 +21,13 @@
 #>
 function Complete-WPFEvent {
     [CmdletBinding()]
-    [OutputType([CompletionResult[]])]
+    [OutputType([System.Management.Automation.CompletionResult[]])]
     param(
         [string] $CommandName,
         [string] $ParameterName,
         [string] $WordToComplete,
-        [System.Management.Automation.Language.CommandAst] $CommandAst,
-        [System.Collections.IDictionary] $FakeBoundParameters
+        [CommandAst] $CommandAst,
+        [IDictionary] $FakeBoundParameters
     )
 
     # Micro-optimization, maybe?
@@ -46,7 +51,7 @@ function Complete-WPFEvent {
     # CommandAst that isn't the handler itself to account for the two scenarios.
     $ParentNode = $Params.Ast.FindAll({
         param($AstNode)
-        $AstNode -is [System.Management.Automation.Language.CommandAst] -and
+        $AstNode -is [CommandAst] -and
         $AstNode.Extent.StartOffset -le $Params.PositionOfCursor.Offset -and
         $Params.PositionOfCursor.Offset -le $AstNode.Extent.EndOffset
     }, <# recurse #> $True) |
@@ -84,15 +89,15 @@ function Complete-WPFEvent {
     # The results are already alphabetical so no need to sort these.
     $Completions = $script:WPFHandlerCache.Completions[$Control] |
         Where-Object {
-            $_.StartsWith($WordToComplete, [System.StringComparison]::InvariantCultureIgnoreCase)
+            $_.StartsWith($WordToComplete, [StringComparison]::InvariantCultureIgnoreCase)
         } |
         Sort-Object |
         ForEach-Object {
             $CompletionText = if ($Quote) { $Quote + $_ + $Quote  } else { $_ }
-            [System.Management.Automation.CompletionResult]::new(
+            [CompletionResult]::new(
                 <# Text to insert #> $CompletionText,
                 <# Text displayed in the list #> $_,
-                <# Result type #> [System.Management.Automation.CompletionResultType]::ParameterValue,
+                <# Result type #> [CompletionResultType]::ParameterValue,
                 <# Tooltip #> "Event"
             )
         }
