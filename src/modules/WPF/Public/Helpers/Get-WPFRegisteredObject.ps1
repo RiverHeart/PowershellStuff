@@ -12,7 +12,7 @@
 
     Reference 'Window'
 #>
-function Select-WPFObject {
+function Get-WPFRegisteredObject {
     [CmdletBinding()]
     [OutputType([void], [object])]
     [Alias('Reference')]

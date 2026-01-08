@@ -72,7 +72,7 @@ Window 'Window' {
 
 if ($LastDialogResult) {
     Write-Host "Received user input."
-    $Date = Select-WPFObject 'DatePicker' -Property SelectedDate
+    $Date = Get-WPFRegisteredObject 'DatePicker' -Property SelectedDate
     Write-Host "Date selected: $($Date.ToShortDateString())"
 } else {
     Write-Host "User cancelled operation."

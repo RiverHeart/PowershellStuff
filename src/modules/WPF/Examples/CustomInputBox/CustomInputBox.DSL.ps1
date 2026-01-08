@@ -70,7 +70,7 @@ Window 'Window' {
 
 if ($LastDialogResult) {
     Write-Host "Received user input."
-    $Result = Select-WPFObject 'DataEntryBox' -Property Text
+    $Result = Get-WPFRegisteredObject 'DataEntryBox' -Property Text
     $Result
 } else {
     Write-Host "User cancelled operation."
