@@ -2,8 +2,10 @@ function Unregister-WPFObject {
     [CmdletBinding()]
     [Alias('Unregister')]
     param(
+        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $Name
+        [ArgumentCompleter({ Complete-RegisteredObject @args })]
+        [string[]] $Name
     )
 
     if (-not $Name) {
