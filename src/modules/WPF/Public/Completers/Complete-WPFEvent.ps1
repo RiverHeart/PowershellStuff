@@ -21,7 +21,7 @@ using namespace System.Management.Automation.Language
 #>
 function Complete-WPFEvent {
     [CmdletBinding()]
-    [OutputType([System.Management.Automation.CompletionResult[]])]
+    [OutputType([CompletionResult[]])]
     param(
         [string] $CommandName,
         [string] $ParameterName,

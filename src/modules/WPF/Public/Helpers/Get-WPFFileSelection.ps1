@@ -1,36 +1,31 @@
-# WORK IN PROGRESS
-function Get-FileSelection {
+<#
+.SYNOPSIS
+    Prompts the user to select a file from the file browser.
+
+.DESCRIPTION
+    Prompts the user to select a file from the file browser.
+
+.NOTES
+    The reason I'm use the verb `Get` instead of `Select` is
+    because
+        1) We are not the ones doing the selecting, the user is
+        2) The `Get-Credential` cmdlet prompts the user similarly.
+#>
+function Get-WPFFileSelection {
     [CmdletBinding()]
     [OutputType([string])]
-    [Alias('FileSelect')]
+    [Alias('FileBrowse')]
     param(
+        [ArgumentCompleter({ Complete-WPFFileFilter @args })]
         [ValidateNotNullOrEmpty()]
-        [string[]] $Filters,
-
-        # Quick Filters
-        [switch] $All,
-        [switch] $Image
+        [string[]] $Filter
     )
 
-    if ($All) {
-        $Filters += @('All Files (*.*)|*.*')
-    }
-    if ($Image) {
-        $Filters += @(
-            'Image Files (*.jpg;*.png;*.bmp;*.ico;*.tiff;*.gif)|*.jpg;*.png;*.bmp;*.ico;*.tiff;*.gif'
-            'JPEG (*.jpg)|*.jpg'
-            'PNG (*.png)|*.png)'
-            'Bitmap (*.bmp)|*.bmp'
-            'Icon (*.ico)|*.ico'
-            'TIFF (*.tiff)|*.tiff'
-            'GIF (*.gif)|*.gif'
-            'WebP (*.webp)|*.webp'
-        )
-    }
+    # Construct $Filter
 
     # If nothing was provided
-    if (-not $Filters) {
-        $Filters = @('All Files (*.*)|*.*')
+    if (-not $Filter) {
+        $Filter = @('All Files (*.*)|*.*')
     }
 
     try {

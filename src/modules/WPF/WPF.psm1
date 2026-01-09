@@ -5,6 +5,10 @@ if (-not $Script:WPFControlTable) {
     $Script:WPFControlTable = @{}
 }
 
+if (-not $Script:WPFFileInfoCache) {
+    $Script:WPFFileInfoCache = Import-PowerShellDataFile -Path "$ModuleRoot/Private/Data/FileInfo.psd1"
+}
+
 $Paths = @(
     'Private'
     'Public'
