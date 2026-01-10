@@ -3,11 +3,9 @@ function Get-WPFFileInfo {
     [OutputType([hashtable])]
     param(
         [ArgumentCompleter({ Complete-WPFFileInfo @args -Type })]
-        [ValidateNotNullOrEmpty()]
         [string[]] $Type,
 
         [ArgumentCompleter({ Complete-WPFFileInfo @args -Category })]
-        [ValidateNotNullOrEmpty()]
         [string[]] $Category
     )
 
