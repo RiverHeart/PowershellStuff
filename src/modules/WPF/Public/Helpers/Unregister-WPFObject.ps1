@@ -4,7 +4,7 @@ function Unregister-WPFObject {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [ArgumentCompleter({ Complete-RegisteredObject @args })]
+        [ArgumentCompleter({ Complete-WPFRegisteredObject @args })]
         [string[]] $Name
     )
 

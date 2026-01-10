@@ -19,7 +19,7 @@ using namespace System.Management.Automation.Language
     search the AST to get the calling node and find the command value (e.g. `Button`)
     to determine what values should be returned.
 #>
-function Complete-RegisteredObject {
+function Complete-WPFRegisteredObject {
     [CmdletBinding()]
     [OutputType([CompletionResult[]])]
     param(

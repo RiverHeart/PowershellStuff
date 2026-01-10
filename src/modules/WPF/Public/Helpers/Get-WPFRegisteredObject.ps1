@@ -19,7 +19,7 @@ function Get-WPFRegisteredObject {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [ArgumentCompleter({ Complete-RegisteredObject @args })]
+        [ArgumentCompleter({ Complete-WPFRegisteredObject @args })]
         [string[]] $Name,
 
         [string] $Property
