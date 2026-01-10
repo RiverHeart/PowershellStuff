@@ -16,15 +16,30 @@ function Get-WPFFileSelection {
     [OutputType([string])]
     [Alias('FileBrowse')]
     param(
+        [ArgumentCompleter({ Complete-WPFFileInfo -Type })]
+        [ValidateNotNullOrEmpty()]
+        [string[]] $Type,
+
+        [ArgumentCompleter({ Complete-WPFFileInfo -Category })]
+        [ValidateNotNullOrEmpty()]
+        [string[]] $Category,
+
+        # Hopefully a last resort
         [ArgumentCompleter({ Complete-WPFFileFilter @args })]
         [ValidateNotNullOrEmpty()]
         [string[]] $Filter
     )
 
-    # Construct $Filter
-
-    # If nothing was provided
-    if (-not $Filter) {
+    if ($Type -or $Category) {
+        $GetFileInfoParams = @{}
+        if ($Type) { $GetFileInfoParams.Type = $Type }
+        if ($Category) { $GetFileInfoParams.Category = $Category }
+        $Filter += Get-WPFFileInfo @GetFileInfoParams | Select-Object -Property Filter
+        if (-not $Filter) {
+            Write-Error "Failed to find any filters."
+            return ''
+        }
+    } else {
         $Filter = @('All Files (*.*)|*.*')
     }
 
