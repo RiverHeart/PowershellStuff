@@ -26,8 +26,6 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module ../.. -Force
 
-$CurrentNode = $null
-
 # Define the Image Viewer GUI
 Window 'Window' {
     $self.Title = 'Image Viewer'
@@ -49,32 +47,21 @@ Window 'Window' {
                         MenuItem '_File' {
                             MenuItem '_Open' {
                                 Handler Click {
-                                    # TODO: Abstract some of this stuff.
-                                    $OpenFileDialog = [Microsoft.Win32.OpenFileDialog]::new()
-                                    $OpenFileDialog.Filter = @(
-                                        'Image Files (*.jpg;*.png;*.bmp;*.ico;*.tiff;*.gif)|*.jpg;*.png;*.bmp;*.ico;*.tiff;*.gif'
-                                        'All Files (*.*)|*.*'
-                                    ) -join '|'
+                                    $Window = Reference 'Window'
+                                    $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
 
-                                    if ($OpenFileDialog.ShowDialog() -eq $True) {
-                                        $Viewer = Reference 'Viewer'
-                                        $FileName = $OpenFileDialog.FileName
-                                        $Viewer.Source = $FileName
-                                        $script:LinkedList = [LinkedList[String]]::new()
-
-                                        $ParentDir = $FileName | Split-Path -Parent
-
-                                        # Create a linked list that we can easily traverse backwards
-                                        # and forwards. AddLast() returns a LinkedListNode so use
-                                        # a Where clause at the end to get a reference to the current
-                                        # node.
-                                        $script:CurrentNode = Get-ChildItem -Path $ParentDir |
-                                            Where-Object { $_.Extension -in @('.jpg', '.png', '.bmp', '.gif', '.tiff', '.ico') } |
-                                            ForEach-Object {
-                                                $script:LinkedList.AddLast($_)
-                                            } |
-                                            Where-Object { $_.Value -eq $FileName }
+                                    # Return early if we failed to get a file
+                                    if (-not $FileName) {
+                                        return
                                     }
+
+                                    $Viewer = Reference 'Viewer'
+                                    $Viewer.Source = $FileName
+                                    $script:FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
+
+                                    # Enable buttons
+                                    (Reference 'ForwardButton').IsEnabled = $True
+                                    (Reference 'BackButton').IsEnabled = $True
                                 }
                             }
                             MenuItem '_Exit' {
@@ -113,11 +100,6 @@ Window 'Window' {
                     Image 'Viewer' {
                         $self.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
                         $self.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
-
-                        Handler SourceUpdated {
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.UpdateLayout()
-                        }
                     }
                 }
             }
@@ -135,12 +117,13 @@ Window 'Window' {
                     Button 'BackButton' {
                         $self.Width = 75
                         $self.Margin = 5
+                        $self.IsEnabled = $False
 
                         Handler 'Click' {
-                            if (-not $script:CurrentNode) { return }
-                            $script:CurrentNode = $script:CurrentNode.Previous
+                            if (-not $script:FileNavigator.CurrentFile) { return }
+                            $FileNavigator.MovePrevious()
                             $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $script:CurrentNode.Value
+                            $Viewer.Source = $script:FileNavigator.CurrentFile.FullName
                             Write-Host "Back"
                         }
                         Path 'images/arrow-left-solid-full.svg'
@@ -148,12 +131,13 @@ Window 'Window' {
                     Button 'ForwardButton' {
                         $self.Width = 75
                         $self.Margin = 5
+                        $self.IsEnabled = $False
 
                         Handler 'Click' {
-                            if (-not $script:CurrentNode) { return }
-                            $script:CurrentNode = $script:CurrentNode.Next
+                            if (-not $script:FileNavigator.CurrentFile) { return }
+                            $script:FileNavigator.MoveNext()
                             $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $script:CurrentNode.Value
+                            $Viewer.Source = $script:FileNavigator.CurrentFile.FullName
                             Write-Host "Forward"
                         }
                         Path 'images/arrow-right-solid-full.svg'

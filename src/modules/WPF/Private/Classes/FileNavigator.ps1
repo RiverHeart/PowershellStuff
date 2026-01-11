@@ -93,25 +93,37 @@ class FileNavigator {
     }
 
     FileNavigator(
-        [DirectoryInfo] $Directory,
+        [string] $Path,
         [string[]] $Extensions,
         [string[]] $Types,
         [string[]] $Categories
     ) {
-        $this.Init($Directory, $Extensions, $Types, $Categories)
+        $this.Init($Path, $Extensions, $Types, $Categories)
     }
 
     hidden [void] Init(
-        [DirectoryInfo] $Directory,
+        [string] $Path,
         [string[]] $Extensions,
         [string[]] $Types,
         [string[]] $Categories
     ) {
-        if (-not $Directory -or -not $Directory.Exists) {
-            throw [DirectoryNotFoundException]::new("Directory not found: '$Directory'")
+        if (-not $Path) {
+            throw [ArgumentNullException]::new("Path parameter cannot be null")
         }
 
-        $this.SetDirectory($Directory)
+        # Extract parent directory if given a filename
+        # We'll move to the file later
+        $FileName = ''
+        if ([File]::Exists($Path)) {
+            $FileName = $Path | Split-Path -Leaf
+            $Path = $Path | Split-Path -Parent
+        }
+
+        if (-not [Directory]::Exists($Path)) {
+            throw [DirectoryNotFoundException]::new("Directory not found: '$Path'")
+        }
+
+        $this.SetDirectory($Path)
         $this.SetFilters($Extensions, $Types, $Categories)  # Implicitly reloads files.
 
         # Add dynamic properties
@@ -126,6 +138,11 @@ class FileNavigator {
 
         # Populate $this.Files
         $this.Refresh()
+
+        # Automatically move to given file
+        if ($FileName) {
+            $this.MoveTo($FileName)
+        }
     }
 
     [void] AddEvent(
@@ -167,7 +184,7 @@ class FileNavigator {
         }
         if ($Types -or $Categories) {
             $this.ValidExtensions += Get-WPFFileInfo `
-                -Type $Types 1
+                -Type $Types `
                 -Category $Categories |
                 ForEach-Object { $_.Extensions }
         }

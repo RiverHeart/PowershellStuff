@@ -97,7 +97,7 @@ function Get-WPFFileSelection {
         #     }
         # })
 
-        if ($Window -and $OpenFileDialog.ShowDialog() -eq $True) {
+        if ($Window -and $OpenFileDialog.ShowDialog($Window) -eq $True) {
             return $OpenFileDialog.FileName
         } elseif ($OpenFileDialog.ShowDialog() -eq $True) {
             return $OpenFileDialog.FileName

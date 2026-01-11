@@ -7,7 +7,3 @@ Simple image viewer. It sports a menu bar and when you choose File->Open, you ca
 Free SVG icons sourced from [FontAwesome](https://fontawesome.com).
 
 ![Without XAML](./ImageViewer.png)
-
-## Todo
-
-* Something is broken when the directory only contains two images or possibly spaces in the name, not sure currently but too lazy to fix right now.

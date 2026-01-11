@@ -25,9 +25,9 @@
     directory and display the file there.
 
     $FileNavigator = New-WPFFileNavigator `
-        -Directory 'foo/bar/baz' `
-        -Extensions 'exe' `
-        -Categories 'Image'
+        -Path 'foo/bar/baz' `
+        -Extension 'exe' `
+        -Category 'Image'
 
     $FileNavigator.MoveNext()
     $FileNavigator.CurrentFile
@@ -38,15 +38,15 @@ function New-WPFFileNavigator {
     [CmdletBinding()]
     #[OutputType([FileNavigator])]
     param(
-        [System.IO.DirectoryInfo] $Directory,
-        [string[]] $Extensions,
-        [string[]] $Types,
-        [string[]] $Categories
+        [string] $Path,
+        [string[]] $Extension,
+        [string[]] $Type,
+        [string[]] $Category
     )
 
-    if (-not $Directory) {
-        $Directory = [System.IO.Directory]::GetCurrentDirectory()
+    if (-not $Path) {
+        $Path = [System.IO.Directory]::GetCurrentDirectory()
     }
 
-    return [FileNavigator]::new($Directory, $Extensions, $Types, $Categories)
+    return [FileNavigator]::new($Path, $Extension, $Type, $Category)
 }
