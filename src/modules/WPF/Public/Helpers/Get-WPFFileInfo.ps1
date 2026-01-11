@@ -18,8 +18,16 @@ function Get-WPFFileInfo {
             $Script:WPFFileInfo = Import-PowerShellDataFile -Path "$PSScriptRoot/../../Private/Data/FileInfo.psd1"
         }
 
-        # Search for FileInfo by type
+        # Hack to ensure All is always at the top since consumers are
+        # probably going to process results in the order returned.
+        if ('All' -in $Type) {
+            Write-Output $Script:WPFFileInfo.FileInfo['All']
+            $FoundItems += 'All'
+        }
+
+        # Search for remaining FileInfos by type
         foreach ($Entry in $Type) {
+            if ($Entry -eq 'All') { continue }
             if ($Script:WPFFileInfo.FileInfo.ContainsKey($Entry)) {
                 Write-Output $Script:WPFFileInfo.FileInfo[$Entry]
                 $FoundItems += $Entry
