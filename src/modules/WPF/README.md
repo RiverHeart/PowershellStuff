@@ -108,6 +108,36 @@ I'm not the type of person to mess around with VSCode extensions so my only opti
 
 I've found a workaround that involves accessing the callstack to get invocation args for TabExpansion2. Among those arguments are the full AST and the cursor position. With those, we can search the AST to get the calling node and find the command value (e.g. `Button`) to determine what values should be returned.
 
+**(2026-01-11)**
+
+My brain aches as I try contemplating Roman's [TabExpansion2](https://github.com/nightroman/FarNet/blob/main/PowerShellFar/TabExpansion2.ps1) override. Though it's apparently undocumented or encouraged it seems that TabExpansion2 is capable of more
+than just function parameter completion via `Register-ArgumentCompleter`. If I dump `$function:TabExpansion2` then I can see that one of the calls it makes is to an internal method `CommandCompletion::CompleteInput()` which must be calling argument completers behind the scene.
+
+```powershell
+        return [System.Management.Automation.CommandCompletion]::CompleteInput(
+            <#ast#>              $ast,
+            <#tokens#>           $tokens,
+            <#positionOfCursor#> $positionOfCursor,
+            <#options#>          $options)
+```
+
+Roman's override seems to rip all that opaque logic, replacing it with multi-stage invocations of different "processor" types, aka the scripts registered via his own version of `Register-ArgumentCompleter`. Relavent to me, I notice his `Register-InputComplete` cmdlet which takes the exact same parameters as `CommandCompletion::CompleteInput()`. Looking at [CommandCompletion](https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/CommandCompletion/CommandCompletion.cs) more closely it seems like Roman's TabExpansion2 converts some of the methods there directly to their Powershell cmdlet equivalents.
+
+```powershell
+	# input processors
+	foreach(${%} in ${*}.options['InputProcessors']) {
+		if (${*}.result = & ${%} ${*}.ast ${*}.tokens ${*}.positionOfCursor ${*}.options) {
+			if (${*}.result -is [System.Management.Automation.CommandCompletion]) {
+				return ${*}.result
+			}
+			Write-Error -ErrorAction 0 "TabExpansion2: Invalid result. Input processor: ${%}"
+		}
+	}
+```
+
+Without going that far I might be able to override `TabExpansion2` with a custom input completer for `$self` by parsing the AST before letting the normal code run. Would that I could simply use `$this` the same way it works within a class without the hacks.
+
+
 ### VSCode Snippets
 
 I'm slowly adding VSCode snippets to [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to make scaffolding the DSL easier.
