@@ -36,7 +36,7 @@ Window 'Window' {
 
         Row {
             # Wildcard indicates this column takes all horizontal space.
-            Cell '*' {
+            Cell 'Expand' {
 
                 # TODO: Create an abstraction called MenuBar
                 # The DockPanel wrapper is just an annoying implementation detail.
@@ -89,7 +89,7 @@ Window 'Window' {
         # Wildcard indicates this row takes all available vertical space;
         # which is useful because this row should be as large as possible to
         # display the image.
-        Row '*' {
+        Row 'Expand' {
             Cell {
                 # In case the image is larger than the window, use the ScrollViewer
                 # to adjust the view window.

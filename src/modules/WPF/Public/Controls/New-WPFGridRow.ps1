@@ -22,6 +22,14 @@ function New-WPFGridRow {
         [ScriptBlock] $ScriptBlock
     )
 
+    # Allow for more intuitive GridLength names
+    if ($Height -eq 'Expand') {
+        # Allow 'Expand*2' syntax
+        $Height = $Height -replace 'Expand', '*'
+    } elseif ($Height -eq 'Fit') {
+        $Height = [System.Windows.GridLength]::Auto
+    }
+
     try {
         $WPFObject = [System.Windows.Controls.RowDefinition] @{
             Height = $Height

@@ -22,6 +22,14 @@ function New-WPFGridColumn {
         [ScriptBlock] $ScriptBlock
     )
 
+    # Allow for more intuitive GridLength names
+    if ($Width -eq 'Expand') {
+        # Allow 'Expand*2' syntax
+        $Width = $Width -replace 'Expand', '*'
+    } elseif ($Width -eq 'Fit') {
+        $Width = [System.Windows.GridLength]::Auto
+    }
+
     try {
         $WPFObject = [System.Windows.Controls.ColumnDefinition] @{
             Width = $Width
