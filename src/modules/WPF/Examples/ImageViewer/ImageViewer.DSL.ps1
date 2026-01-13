@@ -37,45 +37,40 @@ Window 'Window' {
         Row {
             # Wildcard indicates this column takes all horizontal space.
             Cell 'Expand' {
+                MenuBar 'Menu' {
+                    $self.Height = 25
 
-                # TODO: Create an abstraction called MenuBar
-                # The DockPanel wrapper is just an annoying implementation detail.
-                DockPanel 'MenuPanel' {
-                    Menu 'Menu' {
-                        $self.Height = 25
+                    MenuItem '_File/_Open' {
+                        Handler Click {
+                            $Window = Reference 'Window'
+                            $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
 
-                        MenuItem '_File/_Open' {
-                            Handler Click {
-                                $Window = Reference 'Window'
-                                $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
-
-                                # Return early if we failed to get a file
-                                if (-not $FileName) {
-                                    return
-                                }
-
-                                $Viewer = Reference 'Viewer'
-                                $Viewer.Source = $FileName
-                                $script:FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
-
-                                # Enable buttons
-                                (Reference 'ForwardButton').IsEnabled = $True
-                                (Reference 'BackButton').IsEnabled = $True
+                            # Return early if we failed to get a file
+                            if (-not $FileName) {
+                                return
                             }
+
+                            $Viewer = Reference 'Viewer'
+                            $Viewer.Source = $FileName
+                            $script:FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
+
+                            # Enable buttons
+                            (Reference 'ForwardButton').IsEnabled = $True
+                            (Reference 'BackButton').IsEnabled = $True
                         }
-                        MenuItem '_File/_Exit' {
-                            Handler Click {
-                                $Window = Reference 'Window'
-                                $Window.Close()
-                            }
+                    }
+                    MenuItem '_File/_Exit' {
+                        Handler Click {
+                            $Window = Reference 'Window'
+                            $Window.Close()
                         }
+                    }
 
-                        MenuItem '_Help/_About' {
-                            # Bad example of using RelayCommand. Really need something that makes
-                            # use of the CanExecute part.
-                            RelayCommand {
-                                Write-Host 'Implement Me'
-                            }
+                    MenuItem '_Help/_About' {
+                        # Bad example of using RelayCommand. Really need something that makes
+                        # use of the CanExecute part.
+                        RelayCommand {
+                            Write-Host 'Implement Me'
                         }
                     }
                 }
