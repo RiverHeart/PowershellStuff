@@ -1,0 +1,14 @@
+<?xml version="1.0"  encoding="utf-8" ?>
+<Types>
+    <Type>
+        <Name>System.Windows.Controls.Grid</Name>
+        <Members>
+            <ScriptMethod>
+                <Name>RemoveChild</Name>
+                <Script>
+                    param([Object] $Child) $this.Children.Remove($Child)
+                </Script>
+            </ScriptMethod>
+        </Members>
+    </Type>
+</Types>

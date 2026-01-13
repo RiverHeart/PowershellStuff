@@ -121,7 +121,7 @@ than just function parameter completion via `Register-ArgumentCompleter`. If I d
             <#options#>          $options)
 ```
 
-Roman's override seems to rip all that opaque logic, replacing it with multi-stage invocations of different "processor" types, aka the scripts registered via his own version of `Register-ArgumentCompleter`. Relavent to me, I notice his `Register-InputComplete` cmdlet which takes the exact same parameters as `CommandCompletion::CompleteInput()`. Looking at [CommandCompletion](https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/CommandCompletion/CommandCompletion.cs) more closely it seems like Roman's TabExpansion2 converts some of the methods there directly to their Powershell cmdlet equivalents.
+Roman's override seems to rip all that opaque logic, replacing it with multi-stage invocations of different "processor" types, aka the scripts registered via his own version of `Register-ArgumentCompleter`. Relevant to me, I notice his `Register-InputComplete` cmdlet which takes the exact same parameters as `CommandCompletion::CompleteInput()`. Looking at [CommandCompletion](https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/CommandCompletion/CommandCompletion.cs) more closely it seems like Roman's TabExpansion2 converts some of the methods there directly to their Powershell cmdlet equivalents.
 
 ```powershell
 	# input processors

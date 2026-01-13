@@ -17,14 +17,18 @@
     This function is only intended to be called by controls.
 #>
 function Update-WPFObject {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='ByScriptBlock')]
     [OutputType([void], [object[]])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=0)]
+        [Parameter(Mandatory,ParameterSetName='ByChildObject',Position=0)]
         [object] $InputObject,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=1)]
         [scriptblock] $ScriptBlock,
+
+        [Parameter(Mandatory,ParameterSetName='ByChildObject',Position=1)]
+        [object[]] $ChildObjects,
 
         # Allow caller to get results for custom updates
         # without having to rerun the scriptblock
@@ -44,58 +48,72 @@ function Update-WPFObject {
     )
 
     try {
-        foreach ($Result in $ScriptBlock.InvokeWithContext($null, $PSVars)) {
-            $ChildName = if ($Result.Name) { $Result.Name } else { '<Nameless>' }
-            $ChildType = $Result.GetType().Name
+        if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
+            $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
+        }
+
+        foreach ($Child in $ChildObjects) {
+            $ChildName = if ($Child.Name) { $Child.Name } else { '<Nameless>' }
+            $ChildType = $Child.GetType().Name
 
             # Returning objects early so I don't need to worry about breaking out
             # of a nested if statement later. Calling `continue` is much simpler.
             if ($PassThru) {
-                Write-Output $Result
+                Write-Output $Child
             }
 
             # Handler
-            if (Test-WPFType $Result 'Handler') {
+            if (Test-WPFType $Child 'Handler') {
                 # TODO: Wrap the scriptblock to catch errors and report them properly.
-                Write-Debug "Adding handler for event '$($Result.event)' to object '$SelfName' ($SelfType)"
-                $InputObject."Add_$($Result.Event)"($Result.ScriptBlock)
+                Write-Debug "Adding handler for event '$($Child.event)' to object '$SelfName' ($SelfType)"
+                $InputObject."Add_$($Child.Event)"($Child.ScriptBlock)
 
             # Command
-            } elseif (Test-WPFType $Result 'Command') {
+            } elseif (Test-WPFType $Child 'Command') {
                 Write-Debug "Adding Command to object '$SelfName' ($SelfType)"
-                $InputObject.Command = $Result
+                $InputObject.Command = $Child
 
             # Control
-            } elseif (Test-WPFType $Result 'Control') {
+            } elseif (Test-WPFType $Child 'Control') {
                 # Uses `PassThru` to send child objects further up the chain to get
                 # processed by the Grid itself.
                 if (Test-WPFType $InputObject 'GridDefinition') {
                     continue
                 }
 
+                if ($InputObject -eq $Child.Parent) {
+                    Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
+                    continue
+                }
+
+                if ($Child.Parent) {
+                    Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.Parent.Name)' $($Child.Parent.GetType().Name))"
+                    $Child.Parent.RemoveChild($Child)
+                }
+
                 Write-Debug "Adding child object '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
-                $InputObject.AddChild($Result)
+                $InputObject.AddChild($Child)
 
                 # Hacky but what's a guy to do?
                 $IsMenuBar =
                     $InputObject -is [System.Windows.Controls.DockPanel] -and
-                    $Result -is [System.Windows.Controls.Menu]
+                    $Child -is [System.Windows.Controls.Menu]
 
                 if ($IsMenuBar) {
-                    [System.Windows.Controls.DockPanel]::SetDock($Result, [System.Windows.Controls.Dock]::Top)
+                    [System.Windows.Controls.DockPanel]::SetDock($Child, [System.Windows.Controls.Dock]::Top)
                 }
 
             # Shape
-            } elseif (Test-WPFType $Result 'Shape') {
+            } elseif (Test-WPFType $Child 'Shape') {
                 # My thinking here is that while a user can assign a Path to a button's content
                 # property other objects are probably assigned differently so it's just be easier
                 # to add them based on the object type so you don't need to remember.
                 if ($InputObject -is [System.Windows.Controls.Button]) {
-                    $InputObject.Content = $Result
+                    $InputObject.Content = $Child
                 }
 
             # GridRow
-            } elseif (Test-WPFType $Result 'GridDefinition') {
+            } elseif (Test-WPFType $Child 'GridDefinition') {
 
                 if ($InputObject -isnot [System.Windows.Controls.Grid]) {
                     # Move on. Rows and columns are processed by Grids and nothing else.
@@ -108,11 +126,11 @@ function Update-WPFObject {
                 # Add row definitions as required. They may have been
                 # initialized with the grid through explicit parameters.
                 if ($InputObject.RowDefinitions.Count -lt $RowIndex) {
-                    $InputObject.RowDefinitions.Add($Result)
+                    $InputObject.RowDefinitions.Add($Child)
                 }
 
                 # Process columns
-                foreach ($Column in $Result.Children) {
+                foreach ($Column in $Child.Children) {
                     $ColumnIndex++
 
                     # Add column definitions as required. They may have been
@@ -123,10 +141,10 @@ function Update-WPFObject {
 
                     # Set Row/Column properties on child object,
                     # then add it as a child object.
-                    foreach ($Child in $Column.Children) {
-                        [System.Windows.Controls.Grid]::SetRow($Child, ($RowIndex - 1))
-                        [System.Windows.Controls.Grid]::SetColumn($Child, ($ColumnIndex - 1))
-                        $InputObject.AddChild($Child)
+                    foreach ($ColumnChild in $Column.Children) {
+                        [System.Windows.Controls.Grid]::SetRow($ColumnChild, ($RowIndex - 1))
+                        [System.Windows.Controls.Grid]::SetColumn($ColumnChild, ($ColumnIndex - 1))
+                        $InputObject.AddChild($ColumnChild)
                     }
                 }
             } else {
