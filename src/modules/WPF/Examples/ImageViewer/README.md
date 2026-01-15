@@ -7,3 +7,12 @@ Simple image viewer. It sports a menu bar and when you choose `File->Open`, you 
 Free SVG icons sourced from [FontAwesome](https://fontawesome.com).
 
 ![Without XAML](./ImageViewer.png)
+
+
+## TODO
+
+* Add Fit and Actual size buttons
+* Add rotate button
+* Implement export to different format
+* Implement slideshow
+* Implement rotate button
