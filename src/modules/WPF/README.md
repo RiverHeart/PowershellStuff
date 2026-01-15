@@ -147,6 +147,8 @@ Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctr
 ## Todo
 
 * Error handling is atrocious. Really need a stack trace instead of a long list of chained errors.
+    * Allow child object errors to bubble up and only catch errors when creating the control the function is
+      meant to create. Also generate a callstack to go with it.
 * Right now you'll get registration errors if you're recreating an object without unregistering it first or calling `Import-Module ./WPF -Force`. `Show-WPFDialog` isn't the right place to handle this but there has to be a better way.
 
 ## Notes

@@ -22,10 +22,12 @@ function New-WPFDockPanel {
             Name = $Name
         }
         Register-WPFObject $Name $WPFObject
-        Update-WPFObject $WPFObject $ScriptBlock
         Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DockPanel) with error: $_"
     }
+
+    # NOTE: Allow exceptions from child objects to bubble up
+    Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
 }

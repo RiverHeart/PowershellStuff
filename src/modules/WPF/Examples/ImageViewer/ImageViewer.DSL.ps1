@@ -40,7 +40,7 @@ Window 'Window' {
                 MenuBar 'Menu' {
                     $self.Height = 25
 
-                    MenuItem '_File/_Open' {
+                    MenuItem '(F)ile/(O)pen' {
                         Handler Click {
                             $Window = Reference 'Window'
                             $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
@@ -59,14 +59,14 @@ Window 'Window' {
                             (Reference 'BackButton').IsEnabled = $True
                         }
                     }
-                    MenuItem '_File/_Exit' {
+                    MenuItem '(F)ile/(E)xit' {
                         Handler Click {
                             $Window = Reference 'Window'
                             $Window.Close()
                         }
                     }
 
-                    MenuItem '_Help/_About' {
+                    MenuItem '(H)elp/(A)bout' {
                         # Bad example of using RelayCommand. Really need something that makes
                         # use of the CanExecute part.
                         RelayCommand {

@@ -35,11 +35,12 @@ function New-WPFGridRow {
             Height = $Height
         }
         Add-WPFType $WPFObject 'GridDefinition'
-
-        $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
-        $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children
     } catch {
         Write-Error "Failed to create '(RowDefinition) with error: $_"
     }
+
+    # NOTE: Allow exceptions from child objects to bubble up
+    $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
+    $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children
     return $WPFObject
 }

@@ -42,9 +42,11 @@ function New-WPFGrid {
         }
         Register-WPFObject $Name $WPFObject
         Add-WPFType $WPFObject 'Control'
-        Update-WPFObject $WPFObject $ScriptBlock
     } catch {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
     }
+
+    # NOTE: Allow exceptions from child objects to bubble up
+    Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
 }

@@ -22,7 +22,6 @@ function New-WPFWindow {
             Name = $Name
         }
         Register-WPFObject $Name $WPFObject
-        Update-WPFObject $WPFObject $ScriptBlock
         if (-not $WPFObject.Height -and -not $WPFObject.Width){
             $WPFObject.SizeToContent = 'WidthAndHeight'
         }
@@ -30,5 +29,7 @@ function New-WPFWindow {
     } catch {
         Write-Error "Failed to create '$Name' (Window) with error: $_"
     }
+
+    Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
 }

@@ -153,6 +153,7 @@ function Update-WPFObject {
             }
         }
     } catch {
+        # Get base exception and surface here?
         Write-Error "Failed to update '$SelfName' ($SelfType) with error: $_"
         return
     }
