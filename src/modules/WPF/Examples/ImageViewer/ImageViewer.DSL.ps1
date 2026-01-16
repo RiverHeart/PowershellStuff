@@ -66,10 +66,15 @@ Window 'Window' {
                         }
                     }
 
+                    MenuItem '(V)iew/FullScreen' {
+                        Handler Click {
+                            $Window = Reference 'Window'
+                            $Window.Close()
+                        }
+                    }
+
                     MenuItem '(H)elp/(A)bout' {
-                        # Bad example of using RelayCommand. Really need something that makes
-                        # use of the CanExecute part.
-                        RelayCommand {
+                        Shortcut 'AboutCommand' 'Ctrl+A' {
                             Write-Host 'Implement Me'
                         }
                     }
