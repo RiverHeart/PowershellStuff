@@ -33,7 +33,7 @@ Window 'Window' {
 
     # Window doesn't have a Command property like button so
     # you need to wire up an event.
-    Handler PreviewKeyDown {
+    When PreviewKeyDown {
         param($sender, $event)
         if ($event.key -ne 'Escape') { return }
         $Window = Reference 'Window'
@@ -52,7 +52,7 @@ Window 'Window' {
                     $self.Height = 25
 
                     MenuItem '(F)ile/(O)pen' {
-                        Handler Click {
+                        Shortcut 'Open' {
                             $Window = Reference 'Window'
                             $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
 
@@ -71,14 +71,16 @@ Window 'Window' {
                         }
                     }
                     MenuItem '(F)ile/(E)xit' {
+                        # TODO: Explore using existing Close AppCommand and adding input gesture
                         Shortcut 'CloseCommand' 'Ctrl+q' {
-                            $Window = Reference 'Window'
-                            $Window.Close()
+                            (Reference 'Window').Close()
                         }
                     }
 
                     MenuItem '(V)iew/FullScreen' {
-                        Shortcut 'FullScreenCommand' 'F11' {
+                        Shortcut 'FullScreen' 'F11' {
+                            # TODO: Convert this into an extension method SetFullScreen([bool])
+                            # so we can just (Reference 'Window').SetFullScreen($True)
                             $Window = Reference 'Window'
                             if ($Window.WindowState -eq [WindowState]::Maximized) {
                                 $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
@@ -93,7 +95,8 @@ Window 'Window' {
                     }
 
                     MenuItem '(H)elp/(A)bout' {
-                        Shortcut 'AboutCommand' 'Ctrl+A' {
+                        When Click {
+                            # TODO: Open a model window here
                             Write-Host 'Implement Me'
                         }
                     }
@@ -135,12 +138,11 @@ Window 'Window' {
                         $self.Margin = 5
                         $self.IsEnabled = $False
 
-                        Handler 'Click' {
+                        When 'Click' {
                             if (-not $script:FileNavigator.CurrentFile) { return }
                             $FileNavigator.MovePrevious()
                             $Viewer = Reference 'Viewer'
                             $Viewer.Source = $script:FileNavigator.CurrentFile.FullName
-                            Write-Host "Back"
                         }
                         Path 'images/arrow-left-solid-full.svg'
                     }
@@ -149,12 +151,11 @@ Window 'Window' {
                         $self.Margin = 5
                         $self.IsEnabled = $False
 
-                        Handler 'Click' {
+                        When 'Click' {
                             if (-not $script:FileNavigator.CurrentFile) { return }
                             $script:FileNavigator.MoveNext()
                             $Viewer = Reference 'Viewer'
                             $Viewer.Source = $script:FileNavigator.CurrentFile.FullName
-                            Write-Host "Forward"
                         }
                         Path 'images/arrow-right-solid-full.svg'
                     }

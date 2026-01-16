@@ -24,7 +24,7 @@
 #>
 function Add-WPFHandler {
     [CmdletBinding()]
-    [Alias('Handler')]
+    [Alias('Handler', 'When')]
     [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
