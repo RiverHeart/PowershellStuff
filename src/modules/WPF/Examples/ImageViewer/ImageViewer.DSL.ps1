@@ -31,6 +31,17 @@ Window 'Window' {
     $self.Title = 'Image Viewer'
     $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
 
+    # Window doesn't have a Command property like button so
+    # you need to wire up an event.
+    Handler PreviewKeyDown {
+        param($sender, $event)
+        if ($event.key -ne 'Escape') { return }
+        $Window = Reference 'Window'
+        $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
+        $Window.WindowState = [WindowState]::Normal
+        $Window.ResizeMode = [ResizeMode]::CanResize
+    }
+
     Grid "Body" {
         $self.Margin = 5
 
@@ -60,16 +71,24 @@ Window 'Window' {
                         }
                     }
                     MenuItem '(F)ile/(E)xit' {
-                        Handler Click {
+                        Shortcut 'CloseCommand' 'Ctrl+q' {
                             $Window = Reference 'Window'
                             $Window.Close()
                         }
                     }
 
                     MenuItem '(V)iew/FullScreen' {
-                        Handler Click {
+                        Shortcut 'FullScreenCommand' 'F11' {
                             $Window = Reference 'Window'
-                            $Window.Close()
+                            if ($Window.WindowState -eq [WindowState]::Maximized) {
+                                $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
+                                $Window.WindowState = [WindowState]::Normal
+                                $Window.ResizeMode = [ResizeMode]::CanResize
+                            } else {
+                                $Window.WindowStyle = [WindowStyle]::None
+                                $Window.WindowState = [WindowState]::Maximized
+                                $Window.ResizeMode = [ResizeMode]::NoResize
+                            }
                         }
                     }
 
@@ -106,6 +125,7 @@ Window 'Window' {
                 # TODO:
                 # * Needs to support Counter/Clockwise rotation.
                 # * Needs to support "Fit to Window" and "Actual Image Size"
+                # * Needs to support arrow key/spacebar movement
                 StackPanel 'ButtonPanel' {
                     $self.Orientation = [Orientation]::Horizontal
                     $self.HorizontalAlignment = [HorizontalAlignment]::Center
