@@ -150,6 +150,7 @@ Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctr
     * Allow child object errors to bubble up and only catch errors when creating the control the function is
       meant to create. Also generate a callstack to go with it.
 * Right now you'll get registration errors if you're recreating an object without unregistering it first or calling `Import-Module ./WPF -Force`. `Show-WPFDialog` isn't the right place to handle this but there has to be a better way.
+* `$Parent = $PSCmdlet.GetVariableValue('self')` could be a game changer. `Update-WPFObject` does an admirable job of adding items to the parent but if the child object can add itself then that's probably preferable and keeps logic separate. Only foreseeable is Menu/MenuItem which is handled differently from other types.
 
 ## Notes
 
