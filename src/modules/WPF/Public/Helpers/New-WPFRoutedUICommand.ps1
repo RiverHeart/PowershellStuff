@@ -22,10 +22,6 @@ function New-WPFRoutedUICommand {
 
     $Parent = $PSCmdlet.GetVariableValue('self')
 
-    # Stupid trash needs a Window.CommandBinding...
-    # If we can access self from this function then maybe we can
-    # assign it from here?
-
     $KeyGestures = @()
     $KeyGestureConverter = [System.Windows.Input.KeyGestureConverter]::new()
     foreach($Item in $Shortcut) {
