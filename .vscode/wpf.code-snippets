@@ -15,61 +15,67 @@
 	// 	],
 	// 	"description": "Log output to console"
 	// }
-	"WPF-Properties": {
-		"scope": "powershell",
-		"prefix": "wpf-properties",
-		"description": "Properties",
-		"body": [
-			"Properties @{",
-			"\t${1:Name} = ${2:Value}",
-			"}"
-		]
-	},
-	"WPF-Window": {
-		"scope": "powershell",
-		"prefix": "wpf-window",
-		"description": "Window",
-		"body": [
-			"Window '${1:Name}' {",
-			"\tProperties @{",
-			"\t\tTitle = '${2:Title}'",
-			"\t\tSizeToContent = ${3|WidthAndHeight,Manual,Width,Height|}",
-			"\t\tHeight = ${4:0}",
-			"\t\tWidth = ${5:0}",
-			"\t\tWindowStartupLocation = [WindowStartupLocation]::CenterScreen",
-			"\t}\n",
-			"\t${6:Control}",
-			"}"
-		]
-	},
-	"WPF-StackPanel": {
-		"scope": "powershell",
-		"prefix": "wpf-stackpanel",
-		"description": "StackPanel",
-		"body": [
-			"StackPanel '${1:Name}' {",
-			"\tProperties @{",
-			"\t\tOrientation = [Orientation]::${2|Vertical,Horizontal|}",
-			"\t}\n",
-			"\t${3:Control}",
-			"}"
-		]
-	},
-	"WPF-Button": {
+	"Button": {
 		"scope": "powershell",
 		"prefix": "wpf-button",
 		"description": "Button",
 		"body": [
 			"Button '${1:Name}' {",
-			"\tProperties @{",
-			"\t\tContent = '${2:Content}'",
-			"\t\tWidth = ${3:Width}",
-			"\t\tHeight = ${4:Height}",
-			"\t\tIsEnabled = ${5|$True,$False|}",
-			"\t}\n",
-			"\tHandler '${6|Click,ContextMenuClosing,ContextMenuOpening,DataContextChanged,DragEnter,DragLeave,DragOver,Drop,FocusableChanged,GiveFeedback,GotFocus,GotKeyboardFocus,GotMouseCapture,GotStylusCapture,GotTouchCapture,Initialized,IsEnabledChanged,IsHitTestVisibleChanged,IsKeyboardFocusedChanged,IsKeyboardFocusWithinChanged,IsMouseCapturedChanged,IsMouseCaptureWithinChanged,IsMouseDirectlyOverChanged,IsStylusCapturedChanged,IsStylusCaptureWithinChanged,IsStylusDirectlyOverChanged,IsVisibleChanged,KeyDown,KeyUp,LayoutUpdated,Loaded,LostFocus,LostKeyboardFocus,LostMouseCapture,LostStylusCapture,LostTouchCapture,ManipulationBoundaryFeedback,ManipulationCompleted,ManipulationDelta,ManipulationInertiaStarting,ManipulationStarted,ManipulationStarting,MouseDoubleClick,MouseDown,MouseEnter,MouseLeave,MouseLeftButtonDown,MouseLeftButtonUp,MouseMove,MouseRightButtonDown,MouseRightButtonUp,MouseUp,MouseWheel,PreviewDragEnter,PreviewDragLeave,PreviewDragOver,PreviewDrop,PreviewGiveFeedback,PreviewGotKeyboardFocus,PreviewKeyDown,PreviewKeyUp,PreviewLostKeyboardFocus,PreviewMouseDoubleClick,PreviewMouseDown,PreviewMouseLeftButtonDown,PreviewMouseLeftButtonUp,PreviewMouseMove,PreviewMouseRightButtonDown,PreviewMouseRightButtonUp,PreviewMouseUp,PreviewMouseWheel,PreviewQueryContinueDrag,PreviewStylusButtonDown,PreviewStylusButtonUp,PreviewStylusDown,PreviewStylusInAirMove,PreviewStylusInRange,PreviewStylusMove,PreviewStylusOutOfRange,PreviewStylusSystemGesture,PreviewStylusUp,PreviewTextInput,PreviewTouchDown,PreviewTouchMove,PreviewTouchUp,QueryContinueDrag,QueryCursor,RequestBringIntoView,SizeChanged,SourceUpdated,StylusButtonDown,StylusButtonUp,StylusDown,StylusEnter,StylusInAirMove,StylusInRange,StylusLeave,StylusMove,StylusOutOfRange,StylusSystemGesture,StylusUp,TargetUpdated,TextInput,ToolTipClosing,ToolTipOpening,TouchDown,TouchEnter,TouchLeave,TouchMove,TouchUp,Unloaded|}' {",
+			"\t$self.Content = '${2:Content}'",
+			"\t$self.Width = ${3:Width}",
+			"\t$self.Height = ${4:Height}",
+			"\t$self.IsEnabled = ${5|$True,$False|}",
+			"\n",
+			"When '${6|Click,ContextMenuClosing,ContextMenuOpening,DataContextChanged,DragEnter,DragLeave,DragOver,Drop,FocusableChanged,GiveFeedback,GotFocus,GotKeyboardFocus,GotMouseCapture,GotStylusCapture,GotTouchCapture,Initialized,IsEnabledChanged,IsHitTestVisibleChanged,IsKeyboardFocusedChanged,IsKeyboardFocusWithinChanged,IsMouseCapturedChanged,IsMouseCaptureWithinChanged,IsMouseDirectlyOverChanged,IsStylusCapturedChanged,IsStylusCaptureWithinChanged,IsStylusDirectlyOverChanged,IsVisibleChanged,KeyDown,KeyUp,LayoutUpdated,Loaded,LostFocus,LostKeyboardFocus,LostMouseCapture,LostStylusCapture,LostTouchCapture,ManipulationBoundaryFeedback,ManipulationCompleted,ManipulationDelta,ManipulationInertiaStarting,ManipulationStarted,ManipulationStarting,MouseDoubleClick,MouseDown,MouseEnter,MouseLeave,MouseLeftButtonDown,MouseLeftButtonUp,MouseMove,MouseRightButtonDown,MouseRightButtonUp,MouseUp,MouseWheel,PreviewDragEnter,PreviewDragLeave,PreviewDragOver,PreviewDrop,PreviewGiveFeedback,PreviewGotKeyboardFocus,PreviewKeyDown,PreviewKeyUp,PreviewLostKeyboardFocus,PreviewMouseDoubleClick,PreviewMouseDown,PreviewMouseLeftButtonDown,PreviewMouseLeftButtonUp,PreviewMouseMove,PreviewMouseRightButtonDown,PreviewMouseRightButtonUp,PreviewMouseUp,PreviewMouseWheel,PreviewQueryContinueDrag,PreviewStylusButtonDown,PreviewStylusButtonUp,PreviewStylusDown,PreviewStylusInAirMove,PreviewStylusInRange,PreviewStylusMove,PreviewStylusOutOfRange,PreviewStylusSystemGesture,PreviewStylusUp,PreviewTextInput,PreviewTouchDown,PreviewTouchMove,PreviewTouchUp,QueryContinueDrag,QueryCursor,RequestBringIntoView,SizeChanged,SourceUpdated,StylusButtonDown,StylusButtonUp,StylusDown,StylusEnter,StylusInAirMove,StylusInRange,StylusLeave,StylusMove,StylusOutOfRange,StylusSystemGesture,StylusUp,TargetUpdated,TextInput,ToolTipClosing,ToolTipOpening,TouchDown,TouchEnter,TouchLeave,TouchMove,TouchUp,Unloaded|}' {",
 			"\t\t${7:HandlerLogic}",
 			"\t}",
+			"}"
+		]
+	},
+	"DatePicker": {
+		"scope": "powershell",
+		"prefix": "wpf-datepicker",
+		"description": "DatePicker",
+		"body": [
+			"DatePicker '${1:Name}' {",
+			"\t${2:When}",
+			"}"
+		]
+	},
+	"Grid": {
+		"scope": "powershell",
+		"prefix": "wpf-grid",
+		"description": "Grid",
+		"body": [
+			"Grid '${1:Name}' {",
+			"\t${2:GridRow}",
+			"}"
+		]
+	},
+	"StackPanel": {
+		"scope": "powershell",
+		"prefix": "wpf-stackpanel",
+		"description": "StackPanel",
+		"body": [
+			"StackPanel '${1:Name}' {",
+			"\t$self.Orientation = [Orientation]::${2|Vertical,Horizontal|}",
+			"\t${3:Control}",
+			"}"
+		]
+	},
+	"Window": {
+		"scope": "powershell",
+		"prefix": "wpf-window",
+		"description": "Window",
+		"body": [
+			"Window '${1:Name}' {",
+			"\t$self.Title = '${2:Title}'",
+			"\t$self.SizeToContent = ${3|WidthAndHeight,Manual,Width,Height|}",
+			"\t$self.Height = ${4:0}",
+			"\t$self.Width = ${5:0}",
+			"\t$self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen",
+			"\n",
+			"\t${6:Control}",
 			"}"
 		]
 	}
