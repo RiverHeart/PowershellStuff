@@ -25,6 +25,12 @@ function New-WPFTextBox {
         Write-Error "Failed to create '$Name' (TextBox) with error: $_"
     }
 
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('self')
+    if ($Parent) {
+        $Parent.AddChild($WPFObject)
+    }
+
     if ($ScriptBlock) {
         # NOTE: Allow exceptions from child objects to bubble up
         Update-WPFObject $WPFObject $ScriptBlock

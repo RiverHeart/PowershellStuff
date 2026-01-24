@@ -23,6 +23,7 @@ if (-not $PSScriptRoot -ne $PWD) {
 }
 
 $ErrorActionPreference = 'Stop'
+$DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
@@ -36,10 +37,9 @@ Window 'Window' {
     When PreviewKeyDown {
         param($sender, $event)
         if ($event.key -ne 'Escape') { return }
-        $Window = Reference 'Window'
-        $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
-        $Window.WindowState = [WindowState]::Normal
-        $Window.ResizeMode = [ResizeMode]::CanResize
+        $self.WindowStyle = [WindowStyle]::SingleBorderWindow
+        $self.WindowState = [WindowState]::Normal
+        $self.ResizeMode = [ResizeMode]::CanResize
     }
 
     Grid "Body" {
@@ -86,10 +86,14 @@ Window 'Window' {
                                 $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
                                 $Window.WindowState = [WindowState]::Normal
                                 $Window.ResizeMode = [ResizeMode]::CanResize
+                                (Reference 'MenuBar').Visibility = 'Visible'
+                                (Reference 'ButtonPanel').Visibility = 'Visible'
                             } else {
                                 $Window.WindowStyle = [WindowStyle]::None
                                 $Window.WindowState = [WindowState]::Maximized
                                 $Window.ResizeMode = [ResizeMode]::NoResize
+                                (Reference 'MenuBar').Visibility = 'Collapsed'
+                                (Reference 'ButtonPanel').Visibility = 'Collapsed'
                             }
                         }
                     }

@@ -23,7 +23,7 @@ function New-WPFGridColumn {
     )
 
     # Allow for more intuitive GridLength names
-    if ($Width -eq 'Expand') {
+    if ($Width -ilike 'Expand*') {
         # Allow 'Expand*2' syntax
         $Width = $Width -replace 'Expand', '*'
     } elseif ($Width -eq 'Fit') {
@@ -35,12 +35,24 @@ function New-WPFGridColumn {
             Width = $Width
         }
         Add-WPFType $WPFObject 'GridDefinition'
+        $WPFObject | Add-Member -MemberType 'NoteProperty' -Name 'Row' -Value $null -Force
     } catch {
         Write-Error "Failed to create (ColumnDefinition) with error: $_"
+    }
+
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('self')
+    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+        Update-WPFObject $Parent $WPFObject
+        $WasAutoAttached = $True
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
     $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
     $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children
-    return $WPFObject
+
+    # Don't bother returning an object if we attached to the parent.
+    if (-not $WasAutoAttached) {
+        return $WPFObject
+    }
 }

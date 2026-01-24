@@ -9,6 +9,12 @@
                     param([Object] $Child) $this.Children.Remove($Child)
                 </Script>
             </ScriptMethod>
+            <ScriptMethod>
+                <Name>AddColumn</Name>
+                <Script>
+                    param([Object] $Child) $this.Children.Remove($Child)
+                </Script>
+            </ScriptMethod>
         </Members>
     </Type>
 </Types>

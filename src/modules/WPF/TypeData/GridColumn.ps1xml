@@ -1,0 +1,45 @@
+<?xml version="1.0"  encoding="utf-8" ?>
+<Types>
+    <Type>
+        <Name>System.Windows.Controls.ColumnDefinition</Name>
+        <Members>
+            <ScriptMethod>
+                <Name>AddChild</Name>
+                <Script>
+                    param(
+                        [Parameter(Mandatory)]
+                        [Object] $Child
+                    )
+                    if (-not $this.Parent) {
+                        throw "Cannot attach child $($Child.Name) to unparented column"
+                    } elseif (-not $this.Row.Parent) {
+                        throw "Cannot attach child $($Child.Name) to column without a parented row."
+                    }
+                    $RowIndex = $this.Row.GridIndex
+                    $ColumnIndex = $this.GridIndex
+                    Write-Debug "Adding $($Child.Name) ($($Child.GetType().Name)) to $($this.Parent.Name) (R$RowIndex|C$ColumnIndex)"
+                    [System.Windows.Controls.Grid]::SetRow($Child, $this.Row.GridIndex)
+                    [System.Windows.Controls.Grid]::SetColumn($Child, $this.GridIndex)
+                    $this.Parent.AddChild($Child)
+                </Script>
+            </ScriptMethod>
+            <ScriptProperty>
+                <Name>GridIndex</Name>
+                <GetScriptBlock>
+                    # IndexOf returns -1 when this is not in collection
+                    if (-not $this.Parent) { return -2 }
+                    return $this.Parent.ColumnDefinitions.IndexOf($this)
+                </GetScriptBlock>
+            </ScriptProperty>
+            <ScriptMethod>
+                <Name>SetRow</Name>
+                <Script>
+                    param(
+                        [System.Windows.Controls.RowDefinition] $Row
+                    )
+                    $this | Add-Member -MemberType 'NoteProperty' -Name 'Row' -Value $Row -Force
+                </Script>
+            </ScriptMethod>
+        </Members>
+    </Type>
+</Types>

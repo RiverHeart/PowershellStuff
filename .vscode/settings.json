@@ -5,5 +5,8 @@
     "powershell.codeFormatting.useCorrectCasing": true,
     "powershell.codeFormatting.preset": "OTBS",
     "editor.wordBasedSuggestions": "off",
-    "editor.tabCompletion": "on"
+    "editor.tabCompletion": "on",
+    "files.associations": {
+        "ps1xml": "xml"
+    }
 }

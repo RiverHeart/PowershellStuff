@@ -36,9 +36,8 @@ Window 'Window' {
         $self.Margin = 5
 
         DatePicker 'DatePicker' {
-            Handler 'SelectedDateChanged' {
-                $OKButton = Reference 'OKButton'
-                $OKButton.IsEnabled = $True
+            When 'SelectedDateChanged' {
+                (Reference 'OKButton').IsEnabled = $True
             }
         }
 
@@ -51,9 +50,8 @@ Window 'Window' {
                 $self.Margin = 5
                 $self.IsEnabled = $False
 
-                Handler "Click" {
-                    $Window = Reference 'Window'
-                    $Window.DialogResult = $True
+                When "Click" {
+                    (Reference 'Window').DialogResult = $True
                 }
             }
             Button "CancelButton" {
@@ -61,9 +59,8 @@ Window 'Window' {
                 $self.Width = 75
                 $self.Margin = 5
 
-                Handler "Click" {
-                    $Window = Reference 'Window'
-                    $Window.DialogResult = $False
+                When "Click" {
+                    (Reference 'Window').DialogResult = $False
                 }
             }
         }

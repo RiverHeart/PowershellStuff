@@ -19,7 +19,9 @@ function New-WPFGridRow {
 
         [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
         [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        [switch] $NoAutoAttach
     )
 
     # Allow for more intuitive GridLength names
@@ -39,8 +41,19 @@ function New-WPFGridRow {
         Write-Error "Failed to create '(RowDefinition) with error: $_"
     }
 
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('self')
+    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+        Update-WPFObject $Parent $WPFObject
+        $WasAutoAttached = $True
+    }
+
     # NOTE: Allow exceptions from child objects to bubble up
     $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
     $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children
-    return $WPFObject
+
+    # Don't bother returning an object if we attached to the parent.
+    if (-not $WasAutoAttached) {
+        return $WPFObject
+    }
 }

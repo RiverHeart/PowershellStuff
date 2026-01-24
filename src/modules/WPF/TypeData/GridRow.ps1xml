@@ -1,0 +1,33 @@
+<?xml version="1.0"  encoding="utf-8" ?>
+<Types>
+    <Type>
+        <Name>System.Windows.Controls.RowDefinition</Name>
+        <Members>
+            <ScriptMethod>
+                <Name>AddColumn</Name>
+                <Script>
+                    param(
+                        [Parameter(Mandatory)]
+                        [System.Windows.Controls.ColumnDefinition] $Column
+                    )
+
+                    # Add column definitions as required. They may have been
+                    # initialized with the grid through explicit parameters.
+                    if ($this.ColumnDefinitions.Count -lt $ColumnIndex) {
+                        $this.ColumnDefinitions.Add($Column)
+                    }
+
+                    $this.Parent.AddColumn($Column)
+                </Script>
+            </ScriptMethod>
+            <ScriptProperty>
+                <Name>GridIndex</Name>
+                <GetScriptBlock>
+                    # IndexOf returns -1 when this is not in collection
+                    if (-not $this.Parent) { return -2 }
+                    return $this.Parent.RowDefinitions.IndexOf($this)
+                </GetScriptBlock>
+            </ScriptProperty>
+        </Members>
+    </Type>
+</Types>

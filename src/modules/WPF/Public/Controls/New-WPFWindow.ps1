@@ -30,6 +30,12 @@ function New-WPFWindow {
         Write-Error "Failed to create '$Name' (Window) with error: $_"
     }
 
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('self')
+    if ($Parent) {
+        $Parent.AddChild($WPFObject)
+    }
+
     Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
 }

@@ -16,14 +16,16 @@
 #>
 function New-WPFMenuItem {
     [Alias('MenuItem')]
-    [OutputType([System.Windows.Controls.MenuItem])]
+    [OutputType([void], [System.Windows.Controls.MenuItem])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
 
         [Parameter(Mandatory)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        [switch] $NoAutoAttach
     )
 
     try {
@@ -48,6 +50,12 @@ function New-WPFMenuItem {
         Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$FirstName' (MenuItem) with error: $_"
+    }
+
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('self')
+    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+        Add-WPFObject $Parent $WPFObject
     }
 
     # Recurse until we exhaust all names and get the resulsting child items

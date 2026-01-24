@@ -46,6 +46,12 @@ function New-WPFGrid {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
     }
 
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('self')
+    if ($Parent) {
+        $Parent.AddChild($WPFObject)
+    }
+
     # NOTE: Allow exceptions from child objects to bubble up
     Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
