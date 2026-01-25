@@ -38,8 +38,6 @@ function Update-WPFObject {
     $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '<Nameless>' }
     $SelfType = $InputObject.GetType().Name
 
-    $RowIndex = 0
-
     # Set `$self` as reference to the current object.
     # `$this` would be more idiomatic but this avoids
     # potential issues arising from modifying automatic variables.
