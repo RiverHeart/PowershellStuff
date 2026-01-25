@@ -16,8 +16,9 @@ function Register-WPFObject {
     [CmdletBinding()]
     [Alias('Register')]
     param(
+        # Only allow letters, numbers, and underscores
         [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [Parameter(Mandatory)]
@@ -30,6 +31,8 @@ function Register-WPFObject {
     if (-not $KeyExists -or ($KeyExists -and $Overwrite)) {
         Write-Debug "Registering object named '$Name'"
         $Script:WPFControlTable[$Name] = $InputObject
+    } elseif ($Script:WPFControlTable[$Name] -eq $InputObject) {
+        Write-Warning "Object already registered as '$Name'"
     } else {
         Write-Error "Object named '$Name' already exists."
     }
