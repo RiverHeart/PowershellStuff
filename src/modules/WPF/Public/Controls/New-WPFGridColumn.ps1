@@ -7,35 +7,72 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.columndefinition
 #>
 function New-WPFGridColumn {
-    [CmdletBinding(DefaultParameterSetName='Implicit')]
+    [CmdletBinding(DefaultParameterSetName='Bare')]
     [Alias('Column', 'Cell', 'New-WPFColumnDefinition')]
     [OutputType([System.Windows.Controls.ColumnDefinition])]
     param(
-        # Using object because you're probably going to pass a string
-        # or int instead of [GridLength] and we need Powershell to recognize
-        # the value to resolve the parameter set.
-        [Parameter(ParameterSetName='Explicit',Position=0)]
-        [object] $Width = [System.Windows.GridLength]::Auto,
+        [Parameter(ParameterSetName='SingleInit',Position=0)]
+        [Parameter(ParameterSetName='DoubleInit',Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $NameOrWidth = '__Nameless__',
 
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
-        [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]
+        [Parameter(ParameterSetName='DoubleInit',Position=1)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Width = 'Auto',
+
+        [Parameter(Mandatory,ParameterSetName='Bare',Position=0)]
+        [Parameter(Mandatory,ParameterSetName='SingleInit',Position=1)]
+        [Parameter(Mandatory,ParameterSetName='DoubleInit',Position=2)]
         [ScriptBlock] $ScriptBlock
     )
 
-    # Allow for more intuitive GridLength names
+    # NOTE:
+    # This is super hacky but I really want the syntax to support setting width without name.
+    # Because a string is castable to `GridLength`, powershell can't resolve the parameter set
+    # since position=0 looks the same as `$Name` if user passes 'Auto' or '*'.
+    # With this in mind, check if `$Name` is a valid `GridLength` value when `$Width` isn't
+    # explicitly passed.
+    $NumberOutvar = $null
+    if ($NameOrWidth -and $Width) {
+        # Clearly width is already provided
+        $Name = $NameOrWidth
+    }
+    # Check if $Name is a valid GridLength
+    elseif (
+        $NameOrWidth -in @('*', 'Auto', 'Fit') -or
+        $NameOrWidth -ilike 'Expand*' -or
+        [int]::TryParse($NameOrWidth, [ref] $NumberOutvar)
+    ) {
+        $Width = $NameOrWidth
+    }
+    # $Name was not a valid GridLength
+    else {
+        $Name = $NameOrWidth
+    }
+
     if ($Width -ilike 'Expand*') {
-        # Allow 'Expand*2' syntax
         $Width = $Width -replace 'Expand', '*'
     } elseif ($Width -eq 'Fit') {
-        $Width = [System.Windows.GridLength]::Auto
+        $Width = $Width -replace 'Fit', 'Auto'
     }
+
+    $MemberDefinitions = @(
+        @{ MemberType = 'NoteProperty'; Name = 'Children'; Value = [System.Collections.Generic.List[object]]::new() }
+    )
 
     try {
         $WPFObject = [System.Windows.Controls.ColumnDefinition] @{
+            Name = $Name
             Width = $Width
         }
+        if ($Name -ne '__Nameless__') {
+            $WPFObject.Name = $Name
+            Register-WPFObject $Name $WPFObject
+        }
         Add-WPFType $WPFObject 'GridDefinition'
-        $WPFObject | Add-Member -MemberType 'NoteProperty' -Name 'Row' -Value $null -Force
+        foreach($MemberDefinition in $MemberDefinitions) {
+            $WPFObject | Add-Member @MemberDefinition
+        }
     } catch {
         Write-Error "Failed to create (ColumnDefinition) with error: $_"
     }
@@ -43,13 +80,12 @@ function New-WPFGridColumn {
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('self')
     if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
-        Update-WPFObject $Parent $WPFObject
+        Update-WPFObject $Parent.Parent $WPFObject
         $WasAutoAttached = $True
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
-    $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
-    $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children
+    $WPFObject.Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
 
     # Don't bother returning an object if we attached to the parent.
     if (-not $WasAutoAttached) {
