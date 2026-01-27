@@ -62,6 +62,6 @@ function Add-WPFHandler {
     $Closure.Module.SessionState.PSVariable.Remove('InputObject')
 
     # QUESTION: Should I wrap the scriptblock in a try/catch?
-    Write-Debug "Adding handler for event '$Event' to object '$($InputObject.Name)' $($InputObject.GetType().Name)"
+    Write-Debug "Adding handler for event '$Event' to object '$($InputObject.Name)' ($($InputObject.GetType().Name))"
     $InputObject."Add_$Event"($Closure)
 }

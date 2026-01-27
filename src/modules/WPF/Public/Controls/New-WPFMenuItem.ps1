@@ -54,19 +54,24 @@ function New-WPFMenuItem {
 
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('self')
+    $WasAutoAttached = $False
     if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+        Write-Debug "Beginning auto-attach for $Name (MenuItem)"
         Add-WPFObject $Parent $WPFObject
+        $WasAutoAttached = $True
     }
 
     # Recurse until we exhaust all names and get the resulsting child items
     # If we're processing RemainingNames, assume that the scriptblock was passed
     # to the deepest MenuItem
     if ($RemainingNames) {
+        Write-Debug "Processing child elements for $Name (MenuItem)"
         $ChildObjects = New-WPFMenuItem -Name $RemainingNames -ScriptBlock $ScriptBlock
         Update-WPFObject $WPFObject $ChildObjects
     }
     # Or else see if we got a script block. The last MenuItem should always have one.
     elseif ($ScriptBlock) {
+        Write-Debug "Processing child elements for $Name (MenuItem)"
         Update-WPFObject $WPFObject $ScriptBlock
     }
     # Since Scriptblock is mandatory this scenario should never happen.
@@ -74,5 +79,7 @@ function New-WPFMenuItem {
         Write-Error "Something unexpected occurred constructing '$FirstName' ($MenuItem)"
     }
 
-    return $WPFObject
+    if (-not $WasAutoAttached) {
+        return $WPFObject
+    }
 }

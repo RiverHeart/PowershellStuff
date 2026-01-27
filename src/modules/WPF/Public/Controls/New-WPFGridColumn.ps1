@@ -11,52 +11,56 @@ function New-WPFGridColumn {
     [Alias('Column', 'Cell', 'New-WPFColumnDefinition')]
     [OutputType([System.Windows.Controls.ColumnDefinition])]
     param(
-        [Parameter(ParameterSetName='SingleInit',Position=0)]
-        [Parameter(ParameterSetName='DoubleInit',Position=0)]
-        [ValidateNotNullOrEmpty()]
-        [string] $NameOrWidth = '__Nameless__',
-
-        [Parameter(ParameterSetName='DoubleInit',Position=1)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Width = 'Auto',
-
-        [Parameter(Mandatory,ParameterSetName='Bare',Position=0)]
-        [Parameter(Mandatory,ParameterSetName='SingleInit',Position=1)]
-        [Parameter(Mandatory,ParameterSetName='DoubleInit',Position=2)]
-        [ScriptBlock] $ScriptBlock
+        [object] $Init1,
+        [object] $Init2,
+        [object] $Init3,
+        [switch] $NoAutoAttach
     )
 
-    # NOTE:
-    # This is super hacky but I really want the syntax to support setting width without name.
-    # Because a string is castable to `GridLength`, powershell can't resolve the parameter set
-    # since position=0 looks the same as `$Name` if user passes 'Auto' or '*'.
-    # With this in mind, check if `$Name` is a valid `GridLength` value when `$Width` isn't
-    # explicitly passed.
-    $NumberOutvar = $null
-    if ($NameOrWidth -and $Width) {
-        # Clearly width is already provided
-        $Name = $NameOrWidth
-    }
-    # Check if $Name is a valid GridLength
-    elseif (
-        $NameOrWidth -in @('*', 'Auto', 'Fit') -or
-        $NameOrWidth -ilike 'Expand*' -or
-        [int]::TryParse($NameOrWidth, [ref] $NumberOutvar)
-    ) {
-        $Width = $NameOrWidth
-    }
-    # $Name was not a valid GridLength
-    else {
-        $Name = $NameOrWidth
+    # Defaults
+    $Name = '__NamelessColumn__'
+    $Width = 'Auto'
+
+    # I hate this but I refuse to compromise on the syntax and since
+    # Powershell doesn't support a strictly typed parameter sets there's
+    # no way to represent all 3 scenarios using ParameterSet due to implicit casting.
+    if ($PSBoundParameters.Count -eq 3) {
+        [ValidateNotNullOrEmpty()] [string] $Name = $Init1
+        [ValidateNotNullOrEmpty()] [string] $Width = $Init2
+        [scriptblock] $ScriptBlock = $Init3
+    } elseif ($PSBoundParameters.Count -eq 2) {
+        [ValidateNotNullOrEmpty()] [string] $NameOrWidth = $Init1
+        [scriptblock] $ScriptBlock = $Init2
+
+        $NumberOutvar = $null
+        # Check if $Name is a valid GridLength
+        if ($NameOrWidth -in @('*', 'Auto', 'Fit') -or
+            $NameOrWidth -ilike 'Expand*' -or
+            [int]::TryParse($NameOrWidth, [ref] $NumberOutvar)
+        ) {
+            $Width = $NameOrWidth
+        }
+        # $Name was not a valid GridLength
+        else {
+            $Name = $NameOrWidth
+        }
+    } elseif ($PSBoundParameters.Count -eq 1) {
+        [scriptblock] $ScriptBlock = $Init1
+    } else {
+        throw "Bad"
     }
 
+    # Support intuitive names
     if ($Width -ilike 'Expand*') {
-        $Width = $Width -replace 'Expand', '*'
+        # Convert (Expand -> * && 'Expand*2' -> 2*)
+        $Width = $Width -replace 'Expand[*]?(\d)?', '$1*'
     } elseif ($Width -eq 'Fit') {
         $Width = $Width -replace 'Fit', 'Auto'
     }
 
     $MemberDefinitions = @(
+        # Actual `Parent` property would be the grid so compromising on the name.
+        @{ MemberType = 'NoteProperty'; Name = 'GridParent'; Value = $null }
         @{ MemberType = 'NoteProperty'; Name = 'Children'; Value = [System.Collections.Generic.List[object]]::new() }
     )
 
@@ -65,8 +69,7 @@ function New-WPFGridColumn {
             Name = $Name
             Width = $Width
         }
-        if ($Name -ne '__Nameless__') {
-            $WPFObject.Name = $Name
+        if ($Name -ne '__NamelessColumn__') {
             Register-WPFObject $Name $WPFObject
         }
         Add-WPFType $WPFObject 'GridDefinition'
@@ -78,14 +81,17 @@ function New-WPFGridColumn {
     }
 
     # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('self')
-    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
-        Update-WPFObject $Parent.Parent $WPFObject
+    $ParentRow = $PSCmdlet.GetVariableValue('self')
+    $WasAutoAttached = $False
+    if (-not $NoAutoAttach -and $ParentRow -and -not $WPFObject.ParentRow) {
+        Write-Debug "Beginning auto-attach for $Name (ColumnDefinition)"
+        Update-WPFObject $ParentRow $WPFObject
         $WasAutoAttached = $True
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
-    $WPFObject.Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
+    Write-Debug "Processing child elements for $Name (ColumnDefinition)"
+    Update-WPFObject $WPFObject $ScriptBlock
 
     # Don't bother returning an object if we attached to the parent.
     if (-not $WasAutoAttached) {

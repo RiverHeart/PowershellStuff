@@ -13,7 +13,9 @@ function New-WPFButton {
         [string] $Name,
 
         [Parameter(Mandatory)]
-        [scriptblock] $ScriptBlock
+        [scriptblock] $ScriptBlock,
+
+        [switch] $NoAutoAttach
     )
 
     try {
@@ -29,14 +31,18 @@ function New-WPFButton {
 
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('self')
-    if ($Parent) {
-        $Parent.AddChild($WPFObject)
+    $WasAutoAttached = $False
+    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+        Write-Debug "Beginning auto-attach for $Name (Button)"
+        Update-WPFObject $Parent $WPFObject
+        $WasAutoAttached = $True
     }
 
-    if ($ScriptBlock) {
-        # NOTE: Allow exceptions from child objects to bubble up
-        Update-WPFObject $WPFObject $ScriptBlock
-    }
+    # NOTE: Allow exceptions from child objects to bubble up
+    Write-Debug "Processing child elements for $Name (Button)"
+    Update-WPFObject $WPFObject $ScriptBlock
 
-    return $WPFObject
+    if (-not $WasAutoAttached) {
+        return $WPFObject
+    }
 }

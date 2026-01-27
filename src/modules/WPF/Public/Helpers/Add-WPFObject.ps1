@@ -7,55 +7,51 @@ function Add-WPFObject {
         [object[]] $ChildObjects
     )
 
-    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '<Nameless>' }
+    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
     $SelfType = $InputObject.GetType().Name
 
     foreach($Child in $ChildObjects) {
-        $ChildName = if ($Child.Name) { $Child.Name } else { '<Nameless>' }
+        $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
         $ChildType = $Child.GetType().Name
 
-        # Ignore if object is correctly parented
-        if ($InputObject -eq $Child.Parent) {
-            Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
-            continue
-        }
+        # Handle Grid relationships
+        if ((Test-WPFType $InputObject 'GridDefinition') -and $Child.GridParent) {
+            # Ignore if object is correctly parented
+            if ($InputObject -eq $Child.GridParent) {
+                Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
+                continue
+            }
 
-        # If object has incorrect parent, unattach child
-        if ($Child.Parent) {
+            # If child has incorrect parent, unattach child.
+            Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.GridParent.Name)' $($Child.GridParent.GetType().Name))"
+            $Child.GridParent.RemoveChild($Child)
+        }
+        # Handle control relationships
+        elseif ($Child.Parent) {
+            # Ignore if object is correctly parented
+            if ($InputObject -eq $Child.Parent) {
+                Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
+                continue
+            }
+
+            # If child has incorrect parent, unattach child.{
             Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.Parent.Name)' $($Child.Parent.GetType().Name))"
             $Child.Parent.RemoveChild($Child)
         }
 
-        # NOTE: This is extremely problematic because the old way
-        # was keeping track of the number of columns per row whereas
-        # this is not and ends up creating a column for every column
-        # in every row...
-        #
-        # Really, I need to have the Grid or Rows keep track of
-        # how many columns they have so I know what the whether they
-        # need added or not.
+        # Special handling for adding GridDefinitions to Grid.
+        # GridDefinitions given `AddChild()` methods so they behave
+        # the same as controls.
         if ($InputObject -is [System.Windows.Controls.Grid] -and
             $Child -is [System.Windows.Controls.RowDefinition]
         ) {
             $InputObject.RowDefinitions.Add($Child)
         }
         elseif (
-            $InputObject -is [System.Windows.Controls.Grid] -or
-            $InputObject -is [System.Windows.Controls.RowDefinition] -and
+            $InputObject -is [System.Windows.Controls.Grid] -and
             $Child -is [System.Windows.Controls.ColumnDefinition]
         ) {
-            if ($InputObject -is [System.Windows.Controls.Grid]) {
-                $InputObject.ColumnDefinitions.Add($Child)
-            } else {
-                $InputObject.AddColumn($Child)
-            }
-        }
-        elseif (
-            $Child -is [System.Windows.Controls.RowDefinition] -or
-            $Child -is [System.Windows.Controls.ColumnDefinition]
-        ) {
-            Write-Error "Cannot add '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
-            return
+            $InputObject.ColumnDefinitions.Add($Child)
         }
         else {
             Write-Debug "Adding child object '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"

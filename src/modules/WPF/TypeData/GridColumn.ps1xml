@@ -10,8 +10,8 @@
                         [Parameter(Mandatory)]
                         [Object] $Child
                     )
-
                     $this.Children.Add($Child)
+                    $Child | Add-Member -MemberType 'NoteProperty' -Name 'GridParent' -Value $this
                 </Script>
             </ScriptMethod>
             <ScriptProperty>

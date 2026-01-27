@@ -23,7 +23,9 @@ function New-WPFGrid {
 
         [Parameter(Mandatory,ParameterSetName='Explicit',Position=3)]
         [Parameter(Mandatory,ParameterSetName='Implicit',Position=1)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        [switch] $NoAutoAttach
     )
 
     try {
@@ -48,11 +50,21 @@ function New-WPFGrid {
 
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('self')
-    if ($Parent) {
-        $Parent.AddChild($WPFObject)
+    $WasAutoAttached = $False
+    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+        Write-Debug "Beginning auto-attach for $Name (Grid)"
+        Update-WPFObject $Parent $WPFObject
+        $WasAutoAttached = $True
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
+    Write-Debug "Processing child elements for $Name (Grid)"
     Update-WPFObject $WPFObject $ScriptBlock
-    return $WPFObject
+
+    # Process rows/columns and add children.
+    $WPFObject.Init()
+
+    if (-not $WasAutoAttached) {
+        return $WPFObject
+    }
 }

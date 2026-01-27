@@ -35,7 +35,7 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '<Nameless>' }
+    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
     $SelfType = $InputObject.GetType().Name
 
     # Set `$self` as reference to the current object.
@@ -51,7 +51,7 @@ function Update-WPFObject {
         }
 
         foreach ($Child in $ChildObjects) {
-            $ChildName = if ($Child.Name) { $Child.Name } else { '<Nameless>' }
+            $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
             $ChildType = $Child.GetType().Name
 
             # Returning objects early so I don't need to worry about breaking out

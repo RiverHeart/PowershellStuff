@@ -4,15 +4,36 @@
         <Name>System.Windows.Controls.Grid</Name>
         <Members>
             <ScriptMethod>
-                <Name>RemoveChild</Name>
+                <Name>Init</Name>
                 <Script>
-                    param([Object] $Child) $this.Children.Remove($Child)
-                </Script>
-            </ScriptMethod>
-            <ScriptMethod>
-                <Name>AddColumn</Name>
-                <Script>
-                    param([Object] $Child) $this.Children.Remove($Child)
+                    $RowCount = $this.RowDefinitions.Count
+
+                    Write-Debug "Initializing Grid from '$RowCount' rows."
+                    foreach($Row in $this.RowDefinitions) {
+                        $ColumnIndex = 0  # Track columns for each row
+
+                        # Don't iterate over `$this.ColumnDefinitions` because
+                        # we need to associate Columns with the Rows they're in.
+                        foreach ($Column in $Row.Children) {
+                            $ColumnIndex++
+
+                            # Add column definitions as required. They may have been
+                            # initialized with the grid through explicit parameters.
+                            $ExistingColumns = $this.ColumnDefinitions.Count
+                            if ($this.ColumnDefinitions.Count -lt $ColumnIndex) {
+                                Write-Debug "Column '$ColumnIndex' exceeds current column count '$ExistingColumns'. Adding column."
+                                $this.ColumnDefinitions.Add($Column)
+                            }
+
+                            # Set Row/Column properties on child object,
+                            # then add it as a child object.
+                            foreach ($ColumnChild in $Column.Children) {
+                                [System.Windows.Controls.Grid]::SetRow($ColumnChild, $Row.GridIndex)
+                                [System.Windows.Controls.Grid]::SetColumn($ColumnChild, ($ColumnIndex - 1))
+                                $this.AddChild($ColumnChild)
+                            }
+                        }
+                    }
                 </Script>
             </ScriptMethod>
         </Members>

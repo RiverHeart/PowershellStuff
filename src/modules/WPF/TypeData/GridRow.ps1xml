@@ -4,20 +4,14 @@
         <Name>System.Windows.Controls.RowDefinition</Name>
         <Members>
             <ScriptMethod>
-                <Name>AddColumn</Name>
+                <Name>AddChild</Name>
                 <Script>
                     param(
                         [Parameter(Mandatory)]
                         [System.Windows.Controls.ColumnDefinition] $Column
                     )
-
-                    # Add column definitions as required. They may have been
-                    # initialized with the grid through explicit parameters.
-                    if ($this.ColumnDefinitions.Count -lt $ColumnIndex) {
-                        $this.ColumnDefinitions.Add($Column)
-                    }
-
-                    $this.Parent.AddColumn($Column)
+                    $this.Children.Add($Column)
+                    $Column.GridParent = $this
                 </Script>
             </ScriptMethod>
             <ScriptProperty>

@@ -27,13 +27,14 @@ function Register-WPFObject {
         [switch] $Overwrite
     )
 
+    $Type = $InputObject.GetType().Name
     $KeyExists = $Script:WPFControlTable.ContainsKey($Name)
     if (-not $KeyExists -or ($KeyExists -and $Overwrite)) {
-        Write-Debug "Registering object named '$Name'"
+        Write-Debug "Registering object '$Type' as '$Name'"
         $Script:WPFControlTable[$Name] = $InputObject
     } elseif ($Script:WPFControlTable[$Name] -eq $InputObject) {
-        Write-Warning "Object already registered as '$Name'"
+        Write-Warning "Object '$Type' already registered as '$Name'."
     } else {
-        Write-Error "Object named '$Name' already exists."
+        Write-Error "Another object registered as '$Name' already exists."
     }
 }

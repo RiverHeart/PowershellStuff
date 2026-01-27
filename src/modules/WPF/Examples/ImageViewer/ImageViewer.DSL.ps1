@@ -46,7 +46,6 @@ Window 'Window' {
         $self.Margin = 5
 
         Row {
-            # Wildcard indicates this column takes all horizontal space.
             Cell 'Expand' {
                 MenuBar 'Menu' {
                     $self.Height = 25
@@ -77,7 +76,7 @@ Window 'Window' {
                         }
                     }
 
-                    MenuItem '(V)iew/FullScreen' {
+                    MenuItem '(V)iew/(F)ullScreen' {
                         Shortcut 'FullScreen' 'F11' {
                             # TODO: Convert this into an extension method SetFullScreen([bool])
                             # so we can just (Reference 'Window').SetFullScreen($True)
@@ -108,9 +107,9 @@ Window 'Window' {
             }
         }
 
-        # Wildcard indicates this row takes all available vertical space;
-        # which is useful because this row should be as large as possible to
-        # display the image.
+        # TODO:
+        # * Background for this row should be black by default but configurable.
+        #   * Maybe check user's OS for DarkMode preference
         Row 'Expand' {
             Cell {
                 # In case the image is larger than the window, use the ScrollViewer
@@ -142,7 +141,13 @@ Window 'Window' {
                         $self.Margin = 5
                         $self.IsEnabled = $False
 
+                        # FIXME:
+                        # Obvious in hindsight but it seems the closure I was using
+                        # to support `$Self` in Add-WPFHandler broke the scriptblock's
+                        # ability to access `$Script:` variables, rendering these controls
+                        # useless.
                         When 'Click' {
+                            Write-Host "Back"
                             if (-not $script:FileNavigator.CurrentFile) { return }
                             $FileNavigator.MovePrevious()
                             $Viewer = Reference 'Viewer'
@@ -156,6 +161,7 @@ Window 'Window' {
                         $self.IsEnabled = $False
 
                         When 'Click' {
+                            Write-Host "Forward"
                             if (-not $script:FileNavigator.CurrentFile) { return }
                             $script:FileNavigator.MoveNext()
                             $Viewer = Reference 'Viewer'
