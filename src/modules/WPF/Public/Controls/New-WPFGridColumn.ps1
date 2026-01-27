@@ -7,7 +7,7 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.columndefinition
 #>
 function New-WPFGridColumn {
-    [CmdletBinding(DefaultParameterSetName='Bare')]
+    [CmdletBinding()]
     [Alias('Column', 'Cell', 'New-WPFColumnDefinition')]
     [OutputType([System.Windows.Controls.ColumnDefinition])]
     param(

@@ -7,7 +7,7 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.rowdefinition
 #>
 function New-WPFGridRow {
-    [CmdletBinding(DefaultParameterSetName='Bare')]
+    [CmdletBinding()]
     [Alias('Row', 'New-WPFRowDefinition')]
     [OutputType([System.Windows.Controls.RowDefinition])]
     param(
