@@ -59,8 +59,9 @@ function Update-WPFObject {
             if ($PassThru) {
                 Write-Output $Child
             }
+
             # Command
-            elseif (Test-WPFType $Child 'Command') {
+            if (Test-WPFType $Child 'Command') {
                 Write-Debug "Adding Command to object '$SelfName' ($SelfType)"
                 $InputObject.Command = $Child
             }
