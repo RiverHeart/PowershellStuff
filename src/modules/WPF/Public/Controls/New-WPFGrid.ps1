@@ -6,26 +6,13 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.grid
 #>
 function New-WPFGrid {
-    [CmdletBinding(DefaultParameterSetName='Implicit')]
-    [Alias('Grid')]
+    [CmdletBinding()]
     [OutputType([System.Windows.Controls.Grid])]
     param(
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=0)]
-        [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
-
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
-        [int] $Rows,
-
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=2)]
-        [int] $Columns,
-
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=3)]
-        [Parameter(Mandatory,ParameterSetName='Implicit',Position=1)]
-        [ScriptBlock] $ScriptBlock,
-
-        [switch] $NoAutoAttach
+        [int] $Rows = 0,
+        [int] $Columns = 0
     )
 
     try {
@@ -42,29 +29,10 @@ function New-WPFGrid {
                 [System.Windows.Controls.RowDefinition] @{ Width = [System.Windows.GridLength]::Auto }
             )
         }
-        Register-WPFObject $Name $WPFObject
         Add-WPFType $WPFObject 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
     }
 
-    # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('self')
-    $WasAutoAttached = $False
-    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
-        Write-Debug "Beginning auto-attach for $Name (Grid)"
-        Update-WPFObject $Parent $WPFObject
-        $WasAutoAttached = $True
-    }
-
-    # NOTE: Allow exceptions from child objects to bubble up
-    Write-Debug "Processing child elements for $Name (Grid)"
-    Update-WPFObject $WPFObject $ScriptBlock
-
-    # Process rows/columns and add children.
-    $WPFObject.Init()
-
-    if (-not $WasAutoAttached) {
-        return $WPFObject
-    }
+    return $WPFObject
 }
