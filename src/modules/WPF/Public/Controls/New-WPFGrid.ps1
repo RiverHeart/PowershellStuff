@@ -20,13 +20,13 @@ function New-WPFGrid {
             Name = $Name
         }
         for ($i = 0; $i -lt $Rows; $i++) {
-            $InputObject.RowDefinitions.Add(
+            $WPFObject.RowDefinitions.Add(
                 [System.Windows.Controls.RowDefinition] @{ Height = [System.Windows.GridLength]::Auto }
             )
         }
         for ($i = 0; $i -lt $Columns; $i++) {
-            $InputObject.ColumnDefinitions.Add(
-                [System.Windows.Controls.RowDefinition] @{ Width = [System.Windows.GridLength]::Auto }
+            $WPFObject.ColumnDefinitions.Add(
+                [System.Windows.Controls.ColumnDefinition] @{ Width = [System.Windows.GridLength]::Auto }
             )
         }
         Add-WPFType $WPFObject 'Control'

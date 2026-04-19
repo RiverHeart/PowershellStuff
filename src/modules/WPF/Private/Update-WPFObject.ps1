@@ -35,14 +35,14 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
-    $SelfType = $InputObject.GetType().Name
+    $thisName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
+    $thisType = $InputObject.GetType().Name
 
-    # Set `$self` as reference to the current object.
+    # Set `$this` as reference to the current object.
     # `$this` would be more idiomatic but this avoids
     # potential issues arising from modifying automatic variables.
     $PSVars = @(
-        [psvariable]::new('self', $InputObject)
+        [psvariable]::new('this', $InputObject)
     )
 
     try {
@@ -62,7 +62,7 @@ function Update-WPFObject {
 
             # Command
             if (Test-WPFType $Child 'Command') {
-                Write-Debug "Adding Command to object '$SelfName' ($SelfType)"
+                Write-Debug "Adding Command to object '$thisName' ($thisType)"
                 $InputObject.Command = $Child
             }
             # Control
@@ -85,12 +85,13 @@ function Update-WPFObject {
             }
             else {
                 # Maybe instead of erroring we just pass unhandled items further up the chain?
-                Write-Warning "Cannot add '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
+                Write-Warning "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
             }
         }
     } catch {
         # Get base exception and surface here?
-        Write-Error "Failed to update '$SelfName' ($SelfType) with error: $_"
+        Write-Error "Failed to update '$thisName' ($thisType) with error: $_"
         return
     }
 }
+

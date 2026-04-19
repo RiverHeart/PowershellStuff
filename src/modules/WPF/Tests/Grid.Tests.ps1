@@ -3,25 +3,44 @@ Describe 'Grid' {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
-    It 'Should be able to add rows' {
-        $Grid = Grid 'Grid' {
+    It 'Should expose this as the current grid in scriptblock' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "Grid_$Id" {
+            $this.Margin = 8
+
             Row {
                 Column {
-                    Label 'Foo' {}
-                    Label 'Fubar' {}
+                    Label "Foo_$Id" {}
+                }
+            }
+        }
+
+        $Grid.Margin.Left | Should -Be -ExpectedValue 8
+        $Grid.Margin.Top | Should -Be -ExpectedValue 8
+        $Grid.Margin.Right | Should -Be -ExpectedValue 8
+        $Grid.Margin.Bottom | Should -Be -ExpectedValue 8
+    }
+
+    It 'Should be able to add rows' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "Grid_$Id" {
+            Row {
+                Column {
+                    Label "Foo_$Id" {}
+                    Label "Fubar_$Id" {}
                 }
                 Column {
-                    Label 'Bar' {}
-                    Label 'Barfu' {}
-                    Label 'Barbaz' {}
+                    Label "Bar_$Id" {}
+                    Label "Barfu_$Id" {}
+                    Label "Barbaz_$Id" {}
                 }
             }
             Row {
                 Column {
-                    Label 'Bazfu' {}
-                    Label 'Bazbar' {}
-                    Label 'Bazbaz' {}
-                    Label 'Bazbarfu' {}
+                    Label "Bazfu_$Id" {}
+                    Label "Bazbar_$Id" {}
+                    Label "Bazbaz_$Id" {}
+                    Label "Bazbarfu_$Id" {}
                 }
             }
         }
@@ -45,5 +64,100 @@ Describe 'Grid' {
             [System.Windows.Controls.Grid]::GetRow($_) -eq  1 -and
             [System.Windows.Controls.Grid]::GetColumn($_) -eq  0
         } | Should -HaveCount 4
+
+        $Grid.RowDefinitions.Count | Should -Be -ExpectedValue 2
+        $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 2
+    }
+
+    It 'Should infer max columns without expanding on shorter rows' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "Grid_$Id" {
+            Row {
+                Column {
+                    Label "A_$Id" {}
+                }
+                Column {
+                    Label "B_$Id" {}
+                }
+                Column {
+                    Label "C_$Id" {}
+                }
+                Column {
+                    Label "D_$Id" {}
+                }
+            }
+            Row {
+                Column {
+                    Label "E_$Id" {}
+                }
+                Column {
+                    Label "F_$Id" {}
+                }
+                Column {
+                    Label "G_$Id" {}
+                }
+            }
+        }
+
+        $Grid.RowDefinitions.Count | Should -Be -ExpectedValue 2
+        $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 4
+    }
+
+    It 'Should honor explicit row and column sizes from first declaration' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "Grid_$Id" {
+            Row 'Expand*2' {
+                Column 'Expand*3' {
+                    Label "A_$Id" {}
+                }
+                Column {
+                    Label "B_$Id" {}
+                }
+            }
+            Row {
+                Column {
+                    Label "C_$Id" {}
+                }
+            }
+        }
+
+        $Grid.RowDefinitions[0].Height.IsStar | Should -BeTrue
+        $Grid.RowDefinitions[0].Height.Value | Should -Be -ExpectedValue 2
+        $Grid.ColumnDefinitions[0].Width.IsStar | Should -BeTrue
+        $Grid.ColumnDefinitions[0].Width.Value | Should -Be -ExpectedValue 3
+    }
+
+    It 'Should auto-attach to injected parent context and not return nested grids' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Parent = [System.Windows.Window]::new()
+        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $Result = {
+            Grid "Body_$Id" {
+                Row {
+                    Column {
+                        Label "NestedLabel_$Id" {}
+                    }
+                }
+            }
+        }.InvokeWithContext($null, $PSVars)
+
+        @($Result).Count | Should -Be -ExpectedValue 0
+        $Parent.Content | Should -Not -BeNullOrEmpty
+        $Parent.Content.Name | Should -Be -ExpectedValue "Body_$Id"
+    }
+}
+
+Describe 'New-WPFGrid' {
+    BeforeAll {
+        Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    It 'Should initialize requested rows and columns' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = New-WPFGrid -Name "Grid_$Id" -Rows 2 -Columns 3
+
+        $Grid.RowDefinitions.Count | Should -Be -ExpectedValue 2
+        $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 3
     }
 }

@@ -14,26 +14,11 @@ function Add-WPFObject {
         $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
         $ChildType = $Child.GetType().Name
 
-        # Handle Grid relationships
-        if ((Test-WPFType $InputObject 'GridDefinition') -and $Child.GridParent) {
-            # Ignore if object is correctly parented
-            if ($InputObject -eq $Child.GridParent) {
-                Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
-                continue
-            }
-
-            # If child has incorrect parent, unattach child.
-            Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.GridParent.Name)' $($Child.GridParent.GetType().Name))"
-            $Child.GridParent.RemoveChild($Child)
-        }
-        # Handle control relationships
-        elseif ($Child.Parent) {
-            # Ignore if object is correctly parented
-            if ($InputObject -eq $Child.Parent) {
-                Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
-                continue
-            }
-
+        # Ignore if object is correctly parented
+        if ($InputObject -eq $Child.Parent) {
+            Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
+            continue
+        } elseif ($Child.Parent -and ($Child.Parent -ne $InputObject)) {
             # If child has incorrect parent, unattach child.{
             Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.Parent.Name)' $($Child.Parent.GetType().Name))"
             $Child.Parent.RemoveChild($Child)

@@ -29,26 +29,27 @@ Import-Module ../.. -Force
 
 # Define the Image Viewer GUI
 Window 'Window' {
-    $self.Title = 'Image Viewer'
-    $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $this.Title = 'Image Viewer'
+    $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $this.Tag = @{}
 
     # Window doesn't have a Command property like button so
     # you need to wire up an event.
     When PreviewKeyDown {
         param($sender, $event)
         if ($event.key -ne 'Escape') { return }
-        $self.WindowStyle = [WindowStyle]::SingleBorderWindow
-        $self.WindowState = [WindowState]::Normal
-        $self.ResizeMode = [ResizeMode]::CanResize
+        $this.WindowStyle = [WindowStyle]::SingleBorderWindow
+        $this.WindowState = [WindowState]::Normal
+        $this.ResizeMode = [ResizeMode]::CanResize
     }
 
     Grid "Body" {
-        $self.Margin = 5
+        $this.Margin = 5
 
         Row {
-            Cell 'Expand' {
+            Column 'Expand' {
                 MenuBar 'Menu' {
-                    $self.Height = 25
+                    $this.Height = 25
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
@@ -62,7 +63,8 @@ Window 'Window' {
 
                             $Viewer = Reference 'Viewer'
                             $Viewer.Source = $FileName
-                            $script:FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
+
+                            $Window.Tag.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
 
                             # Enable buttons
                             (Reference 'ForwardButton').IsEnabled = $True
@@ -111,61 +113,63 @@ Window 'Window' {
         # * Background for this row should be black by default but configurable.
         #   * Maybe check user's OS for DarkMode preference
         Row 'Expand' {
-            Cell {
+            Column {
                 # In case the image is larger than the window, use the ScrollViewer
                 # to adjust the view window.
                 ScrollViewer 'ScrollViewer' {
-                    $self.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
-                    $self.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
 
                     Image 'Viewer' {
-                        $self.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
-                        $self.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
+                        $this.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
+                        $this.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
                     }
                 }
             }
         }
 
         Row {
-            Cell {
+            Column {
                 # TODO:
                 # * Needs to support Counter/Clockwise rotation.
                 # * Needs to support "Fit to Window" and "Actual Image Size"
                 # * Needs to support arrow key/spacebar movement
                 StackPanel 'ButtonPanel' {
-                    $self.Orientation = [Orientation]::Horizontal
-                    $self.HorizontalAlignment = [HorizontalAlignment]::Center
+                    $this.Orientation = [Orientation]::Horizontal
+                    $this.HorizontalAlignment = [HorizontalAlignment]::Center
 
                     Button 'BackButton' {
-                        $self.Width = 75
-                        $self.Margin = 5
-                        $self.IsEnabled = $False
+                        $this.Width = 75
+                        $this.Margin = 5
+                        $this.IsEnabled = $False
 
                         # FIXME:
                         # Obvious in hindsight but it seems the closure I was using
-                        # to support `$Self` in Add-WPFHandler broke the scriptblock's
-                        # ability to access `$Script:` variables, rendering these controls
-                        # useless.
+                        # to support `$this` in Add-WPFHandler broke the scriptblock's
+                        # ability to access script-scope variables reliably, so navigator
+                        # state now lives on the Window.Tag property.
                         When 'Click' {
                             Write-Host "Back"
-                            if (-not $script:FileNavigator.CurrentFile) { return }
-                            $FileNavigator.MovePrevious()
+                            $Navigator = (Reference 'Window').Tag.FileNavigator
+                            if (-not $Navigator -or -not $Navigator.CurrentFile) { return }
+                            $Navigator.MovePrevious()
                             $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $script:FileNavigator.CurrentFile.FullName
+                            $Viewer.Source = $Navigator.CurrentFile.FullName
                         }
                         Path 'images/arrow-left-solid-full.svg'
                     }
                     Button 'ForwardButton' {
-                        $self.Width = 75
-                        $self.Margin = 5
-                        $self.IsEnabled = $False
+                        $this.Width = 75
+                        $this.Margin = 5
+                        $this.IsEnabled = $False
 
                         When 'Click' {
                             Write-Host "Forward"
-                            if (-not $script:FileNavigator.CurrentFile) { return }
-                            $script:FileNavigator.MoveNext()
+                            $Navigator = (Reference 'Window').Tag.FileNavigator
+                            if (-not $Navigator -or -not $Navigator.CurrentFile) { return }
+                            $Navigator.MoveNext()
                             $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $script:FileNavigator.CurrentFile.FullName
+                            $Viewer.Source = $Navigator.CurrentFile.FullName
                         }
                         Path 'images/arrow-right-solid-full.svg'
                     }

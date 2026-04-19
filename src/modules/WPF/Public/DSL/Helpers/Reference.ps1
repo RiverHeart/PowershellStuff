@@ -12,10 +12,10 @@
 
     Reference 'Window'
 #>
-function Get-WPFRegisteredObject {
+function Reference {
     [CmdletBinding()]
+    [Alias('Get-WPFRegisteredObject')]
     [OutputType([void], [object])]
-    [Alias('Reference')]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]

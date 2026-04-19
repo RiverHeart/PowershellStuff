@@ -25,15 +25,15 @@ $DebugPreference = 'Continue'
 Import-Module ../.. -Force
 
 Window 'Window' {
-    $self.Title = 'Select A Date'
-    $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-    $self.TopMost = $True
-    $self.SizetoContent = 'WidthAndHeight'
-    $self.Width = 0
-    $self.Height = 0
+    $this.Title = 'Select A Date'
+    $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $this.TopMost = $True
+    $this.SizetoContent = 'WidthAndHeight'
+    $this.Width = 0
+    $this.Height = 0
 
     StackPanel 'RootContainer' {
-        $self.Margin = 5
+        $this.Margin = 5
 
         DatePicker 'DatePicker' {
             When 'SelectedDateChanged' {
@@ -42,22 +42,22 @@ Window 'Window' {
         }
 
         StackPanel 'ButtonPanel' {
-            $self.Orientation = [Orientation]::Horizontal
+            $this.Orientation = [Orientation]::Horizontal
 
             Button "OKButton" {
-                $self.Content = 'OK'
-                $self.Width = 75
-                $self.Margin = 5
-                $self.IsEnabled = $False
+                $this.Content = 'OK'
+                $this.Width = 75
+                $this.Margin = 5
+                $this.IsEnabled = $False
 
                 When "Click" {
                     (Reference 'Window').DialogResult = $True
                 }
             }
             Button "CancelButton" {
-                $self.Content = 'Cancel'
-                $self.Width = 75
-                $self.Margin = 5
+                $this.Content = 'Cancel'
+                $this.Width = 75
+                $this.Margin = 5
 
                 When "Click" {
                     (Reference 'Window').DialogResult = $False
@@ -74,3 +74,4 @@ if ($LastDialogResult) {
 } else {
     Write-Host "User cancelled operation."
 }
+

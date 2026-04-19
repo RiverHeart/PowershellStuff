@@ -30,22 +30,22 @@ More examples can be found in the [Examples](./Examples/) directory.
 Import-Module ./WPF -Force
 
 Window 'Window' {
-    $self.Title = 'Button Example'
-    $self.Height = 100
-    $self.Width = 250
+    $this.Title = 'Button Example'
+    $this.Height = 100
+    $this.Width = 250
 
     StackPanel "Buttons" {
         Button "EnglishButton" {
-            $self.Content = 'English'
-            $self.Width = 100
+            $this.Content = 'English'
+            $this.Width = 100
 
             When "Click" {
                 Write-Host "Hello World"
             }
         }
         Button "JapaneseButton" {
-            $self.Content = 'Japanese'
-            $self.Width = 100
+            $this.Content = 'Japanese'
+            $this.Width = 100
 
             When "Click" {
                 Write-Host "Konichiwa Sekai"
@@ -74,7 +74,7 @@ If you need or want, you can serialize WPF objects by piping them to `Convert-WP
 
 DSL keywords are just aliases to Powershell functions which programmatically create the WPF object. For example, the keyword `Grid` is an alias for `New-WPFGrid` which returns a [Grid](https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.stackpanel?view=windowsdesktop-10.0#properties) object. The function parameters typically consist of an initializer such as the name of the object and end with a scriptblock. Powershell [ParameterSets](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_parameter_sets?view=powershell-7.5) are used to control the positional parsing of values and so far I've only found use for `Implicit` and `Explicit` sets to make things more obvious. For instance, you can call `Grid 'Name' 4 4 {}` to create a 4x4 grid or `Grid 'Name' {}` to have the layout inferred. Initializer params are typically cosmetic as you can set properties/call code from the the scriptblock. In the case of the `Grid 'Name' 4 4 {}`, the logic for creating and adding the grid definitions is hidden behind the row/column parameters.
 
-From top to bottom, each UI element is created, registered (see [object-references](#object-references)), and each scriptblock is processed by `Update-WPFObject`. An automatic variable called `$self` is injected into the scriptblock which refers to the object we just created and mostly used for property setting. Objects returned by the scriptblock are processed by custom types added as note properties. `Control` types are added as children, `Handler` types are registered with events, and so on. While `Update-WPFObject` does not call itself, it causes recursion by triggering each scriptblock in the tree of nodes.
+From top to bottom, each UI element is created, registered (see [object-references](#object-references)), and each scriptblock is processed by `Update-WPFObject`. An automatic variable called `$this` is injected into the scriptblock which refers to the object we just created and mostly used for property setting. Objects returned by the scriptblock are processed by custom types added as note properties. `Control` types are added as children, `Handler` types are registered with events, and so on. While `Update-WPFObject` does not call itself, it causes recursion by triggering each scriptblock in the tree of nodes.
 
 Grid elements such as `ColumnDefinition` and `RowDefinition` have special handling. Grid definitions are given a custom `Children` note property to which controls can be added. When a Grid receives a `RowDefinition`, it processes the row and its children. If the user did not define the Grid with rows and columns, the definitions will be added automatically. For columns specifically, definitions are added only if a column at that index doesn't exist. For instance, if you add two rows, the first row containing one column and the second row containing two columns, processing of the second row will ignore the first column definition and add the second.
 
@@ -135,7 +135,7 @@ Roman's override seems to rip all that opaque logic, replacing it with multi-sta
 	}
 ```
 
-Without going that far I might be able to override `TabExpansion2` with a custom input completer for `$self` by parsing the AST before letting the normal code run. Would that I could simply use `$this` the same way it works within a class without the hacks.
+Without going that far I might be able to override `TabExpansion2` with a custom input completer for `$this` by parsing the AST before letting the normal code run. Would that I could simply use `$this` the same way it works within a class without the hacks.
 
 
 ### VSCode Snippets
@@ -152,7 +152,7 @@ Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctr
 * Right now you'll get registration errors if you're recreating an object without unregistering it first or calling `Import-Module ./WPF -Force`. `Show-WPFDialog` isn't the right place to handle this but there has to be a better way.
 * `$Parent = $PSCmdlet.GetVariableValue('self')` could be a game changer. `Update-WPFObject` does an admirable job of adding items to the parent but if the child object can add itself then that's probably preferable and keeps logic separate. Only foreseeable is Menu/MenuItem which is handled differently from other types.
 * Right now Column/RowDefinitions are nameless but once they've attached to a grid they're name should become "$GridName_$Type_$Index" and be implemented as a script property. This should make the debug logs more helpful.
-* I've come to realize that my original code creates columns for every row but sets column position for child objects by an index counter rather than the grid index of the parent column. Effectively, a grid with 3 rows and 1 column generates 3 columns, the first of which is added to the grid and the rest are simply used to obtain child objects for the remaining rows. So maybe the Column/Cell keyword shouldn't return a column but a class or hashtable with the child objects and column metadata. Then based on the column count, grid generates a column on the fly while processing rows. This is semi-problematic though because columns appear as individual elements and property setting assumes `$Self` is the keyword object... If row 2/column 1 is really row 1/column 1 then maybe we grab a reference to the existing column? That's easy enough during grid init, but not so easy I think for the DSL construction. I feel like what I really need is some sort of multi-dimensional array that maps grid elements to their row/column.
+* I've come to realize that my original code creates columns for every row but sets column position for child objects by an index counter rather than the grid index of the parent column. Effectively, a grid with 3 rows and 1 column generates 3 columns, the first of which is added to the grid and the rest are simply used to obtain child objects for the remaining rows. So maybe the Column/Cell keyword shouldn't return a column but a class or hashtable with the child objects and column metadata. Then based on the column count, grid generates a column on the fly while processing rows. This is semi-problematic though because columns appear as individual elements and property setting assumes `$this` is the keyword object... If row 2/column 1 is really row 1/column 1 then maybe we grab a reference to the existing column? That's easy enough during grid init, but not so easy I think for the DSL construction. I feel like what I really need is some sort of multi-dimensional array that maps grid elements to their row/column.
 
 ## Notes
 
@@ -195,3 +195,4 @@ MenuItem '_Exit' {
 
 * https://powershellexplained.com/2017-03-04-Powershell-DSL-example-RDCMan/
 * https://app.pluralsight.com/library/courses/powershell-guis-building-wpf-free/table-of-contents
+

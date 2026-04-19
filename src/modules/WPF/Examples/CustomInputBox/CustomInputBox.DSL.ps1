@@ -24,30 +24,30 @@ $ErrorActionPreference = 'Stop'
 Import-Module ../.. -Force
 
 Window 'Window' {
-    $self.Title = 'Data Entry Form'
-    $self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-    $self.TopMost = $True
-    $self.Height = 300
-    $self.Width = 300
+    $this.Title = 'Data Entry Form'
+    $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $this.TopMost = $True
+    $this.Height = 300
+    $this.Width = 300
 
     StackPanel "MainStackPanel" {
-        $self.Margin = 5
+        $this.Margin = 5
 
         Label 'DataEntryLabel' {
-            $self.Content = 'Please enter the information in the space below:'
+            $this.Content = 'Please enter the information in the space below:'
         }
         TextBox "DataEntryBox" {
-            $self.HorizontalAlignment = [HorizontalAlignment]::Left
-            $self.Width = 260
-            $self.Height = 20
+            $this.HorizontalAlignment = [HorizontalAlignment]::Left
+            $this.Width = 260
+            $this.Height = 20
         }
         StackPanel 'ButtonPanel' {
-            $self.Orientation = [Orientation]::Horizontal
+            $this.Orientation = [Orientation]::Horizontal
 
             Button 'OKButton' {
-                $self.Content = 'OK'
-                $self.Width = 75
-                $self.Margin = 5
+                $this.Content = 'OK'
+                $this.Width = 75
+                $this.Margin = 5
 
                 When 'Click' {
                     $Window = Reference 'Window'
@@ -55,9 +55,9 @@ Window 'Window' {
                 }
             }
             Button 'CancelButton' {
-                $self.Content = 'Cancel'
-                $self.Width = 75
-                $self.Margin = 5
+                $this.Content = 'Cancel'
+                $this.Width = 75
+                $this.Margin = 5
 
                 When 'Click' {
                     $Window = Reference 'Window'
@@ -75,3 +75,4 @@ if ($LastDialogResult) {
 } else {
     Write-Host "User cancelled operation."
 }
+

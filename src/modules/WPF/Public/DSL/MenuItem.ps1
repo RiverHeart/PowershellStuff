@@ -14,8 +14,8 @@
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menuitem
 #>
-function New-WPFMenuItem {
-    [Alias('MenuItem')]
+function MenuItem {
+    [CmdletBinding()]
     [OutputType([void], [System.Windows.Controls.MenuItem])]
     param(
         [Parameter(Mandatory)]
@@ -52,8 +52,8 @@ function New-WPFMenuItem {
         Write-Error "Failed to create '$FirstName' (MenuItem) with error: $_"
     }
 
-    # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('self')
+    # Auto-attach to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('this')
     $WasAutoAttached = $False
     if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
         Write-Debug "Beginning auto-attach for $Name (MenuItem)"
@@ -66,7 +66,7 @@ function New-WPFMenuItem {
     # to the deepest MenuItem
     if ($RemainingNames) {
         Write-Debug "Processing child elements for $Name (MenuItem)"
-        $ChildObjects = New-WPFMenuItem -Name $RemainingNames -ScriptBlock $ScriptBlock
+        $ChildObjects = MenuItem -Name $RemainingNames -ScriptBlock $ScriptBlock
         Update-WPFObject $WPFObject $ChildObjects
     }
     # Or else see if we got a script block. The last MenuItem should always have one.

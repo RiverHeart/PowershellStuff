@@ -3,18 +3,33 @@ Describe 'Row' {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
-    It 'Should be able to add a control to itself' {
-        $Children = Row {
+    It 'Should return a row specification with columns' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Row = Row {
             Column {
-                Label 'Foobar' {}
+                Label "Foobar_$Id" {}
             }
             Column {
-                Label 'Barfu' {}
-                Label 'Bazbar' {}
+                Label "Barfu_$Id" {}
+                Label "Bazbar_$Id" {}
             }
         }
-        $Children.Count | Should -Be -ExpectedValue 2
-        $Children[0].Count | Should -Be -ExpectedValue 1
-        $Children[1].Count | Should -Be -ExpectedValue 2
+
+        $Row.PSTypeNames | Should -Contain 'WPF.Grid.RowSpec'
+        $Row.Columns.Count | Should -Be -ExpectedValue 2
+        $Row.Columns[0].Children.Count | Should -Be -ExpectedValue 1
+        $Row.Columns[1].Children.Count | Should -Be -ExpectedValue 2
+    }
+
+    It 'Should normalize explicit height aliases' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Row = Row 'Expand*2' {
+            Column {
+                Label "Foobar_$Id" {}
+            }
+        }
+
+        $Row.Height.IsStar | Should -BeTrue
+        $Row.Height.Value | Should -Be -ExpectedValue 2
     }
 }

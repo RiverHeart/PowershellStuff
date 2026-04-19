@@ -8,7 +8,7 @@
     let's them ignore it.
 #>
 function New-WPFMenuBar {
-    [Alias('MenuBar')]
+    [CmdletBinding()]
     [OutputType([System.Windows.Controls.DockPanel])]
     param(
         [Parameter(Mandatory)]

@@ -20,15 +20,15 @@ $DebugPreference = 'Continue'
 Import-Module ../.. -Force
 
 Window 'Window' {
-    $self.Title = 'Button Example'
-    $self.SizeToContent = 'WidthAndHeight'
+    $this.Title = 'Button Example'
+    $this.SizeToContent = 'WidthAndHeight'
 
     Grid 'Grid' {
         Row {
             Cell {
                 Button "EnglishButton" {
-                    $self.Content = 'English'
-                    $self.Width = 100
+                    $this.Content = 'English'
+                    $this.Width = 100
 
                     Handler "Click" {
                         Write-Host "Hello World"
@@ -37,8 +37,8 @@ Window 'Window' {
             }
             Cell {
                 Button "JapaneseButton" {
-                    $self.Content = 'Japanese'
-                    $self.Width = 100
+                    $this.Content = 'Japanese'
+                    $this.Width = 100
 
                     Handler "Click" {
                         Write-Host "Konichiwa Sekai"
@@ -50,8 +50,8 @@ Window 'Window' {
         Row {
             Cell {
                 Button "SpanishButton" {
-                    $self.Content = 'Spanish'
-                    $self.Width = 100
+                    $this.Content = 'Spanish'
+                    $this.Width = 100
 
                     Handler "Click" {
                         Write-Host "Hola mundo"
@@ -61,3 +61,4 @@ Window 'Window' {
         }
     }
 } | Show-WPFWindow
+

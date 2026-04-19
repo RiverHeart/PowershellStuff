@@ -10,7 +10,6 @@ using namespace System.Windows.Controls
 #>
 function New-WPFGridRow {
     [CmdletBinding()]
-    [Alias('New-WPFRowDefinition')]
     [OutputType([RowDefinition])]
     param(
         [ValidateNotNullOrEmpty()]

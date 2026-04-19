@@ -1,0 +1,12 @@
+# Overview
+
+This repository contains a collection of PowerShell modules and scripts for various purposes, such as WPF UI development, file management, and more. Each module has its own set of instructions and coding style guidelines to ensure consistency and maintainability across the project.
+
+# Repository Structure
+
+- `src/modules/`: Contains the source code for all PowerShell modules, organized by functionality. Code here may or may not be production-ready, but should generally follow the coding style guidelines outlined in the instructions files.
+- `src/modules/WPF/`: Contains the WPF DSL module for building Windows Presentation Foundation applications using PowerShell.
+- `src/modules/GrabBag/`: Contains miscellaneous utility functions and scripts that don't fit into a specific category.
+- `src/scripts/`: Contains standalone PowerShell scripts that can be executed directly.
+- `src/projects/`: Contains project-specific code and resources. All code in this directory should be considered experimental and may not follow the same coding style guidelines as the modules.
+- `PSScriptAnalyzerSettings.psd1`: Contains the configuration for PSScriptAnalyzer, which enforces the coding style guidelines across the project.

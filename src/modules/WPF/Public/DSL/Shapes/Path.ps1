@@ -27,9 +27,9 @@
     Path 'arrow-left-solid-full.svg'  # Name reference
     Path './arrow-left-solid-full.svg'  # Path reference
 #>
-function New-WPFPath {
+function Path {
     [CmdletBinding()]
-    [Alias('Path')]
+    [Alias('New-WPFPath')]
     [OutputType([System.Windows.Shapes.Path])]
     param(
         [Parameter(Mandatory)]

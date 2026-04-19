@@ -10,7 +10,6 @@ using namespace System.Windows.Controls
 #>
 function New-WPFGridColumn {
     [CmdletBinding()]
-    [Alias('New-WPFColumnDefinition')]
     [OutputType([ColumnDefinition])]
     param(
         [string] $Name = '__NamelessColumn__',

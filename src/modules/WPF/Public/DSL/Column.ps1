@@ -1,21 +1,27 @@
 <#
 .SYNOPSIS
-    Keyword for defining an array of objects in a WPF GridColumn.
+    Keyword for defining a column specification in a WPF Grid.
 #>
 function Column {
-    [CmdletBinding(DefaultParameterSetName='Implicit')]
-    [OutputType([object[]])]
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
     param(
-        # Using object because you're probably going to pass a string
-        # or int instead of [GridLength] and we need Powershell to recognize
-        # the value to resolve the parameter set.
-        [Parameter(ParameterSetName='Explicit',Position=0)]
+        # Keep this as object so callers can use intuitive tokens like Fit and Expand.
+        [Parameter(Position=0)]
         [object] $Width = [System.Windows.GridLength]::Auto,
 
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
-        [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]
+        [Parameter(Position=1)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($Width -is [ScriptBlock] -and -not $PSBoundParameters.ContainsKey('ScriptBlock')) {
+        $ScriptBlock = $Width
+        $Width = [System.Windows.GridLength]::Auto
+    }
+
+    if (-not $ScriptBlock) {
+        throw 'Column requires a scriptblock.'
+    }
 
     $Parent = $PSCmdlet.GetVariableValue('this')
     if ($Parent -and $Parent -isnot [System.Windows.Controls.Grid]) {
@@ -30,10 +36,12 @@ function Column {
         $Width = $Width -replace 'Fit', 'Auto'
     }
 
-    $PSVars = @(
-        [psvariable]::new('this', $Parent)
-    )
+    $PSVars = @([psvariable]::new('this', $Parent))
+    $Children = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
-    # Ensure that single the array isn't unrolled
-    return , @($ScriptBlock.InvokeWithContext($null, $PSVars))
+    return [pscustomobject] @{
+        PSTypeName = 'WPF.Grid.ColumnSpec'
+        Width = [System.Windows.GridLength] $Width
+        Children = $Children
+    }
 }
