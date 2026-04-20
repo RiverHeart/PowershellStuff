@@ -10,8 +10,13 @@ function Test-WPFType {
             'Control', 'Handler', 'Shape', 'GridDefinition',
             'Command'
         )]
-        [string] $Type
+        [string[]] $Type
     )
 
-    return $InputObject.PSObject.TypeNames -contains "Custom.WPF.$Type"
+    foreach ($TypeEntry in $Type) {
+        if ($InputObject.PSObject.TypeNames -contains "Custom.WPF.$TypeEntry") {
+            return $True
+        }
+    }
+    return $False
 }

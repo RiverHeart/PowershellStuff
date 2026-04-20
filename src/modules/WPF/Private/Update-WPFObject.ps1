@@ -35,16 +35,14 @@ function Update-WPFObject {
         [switch] $PassThru
     )
 
-    $SelfName = if ($InputObject.Name) { $InputObject.Name } else { '<Nameless>' }
-    $SelfType = $InputObject.GetType().Name
+    $thisName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
+    $thisType = $InputObject.GetType().Name
 
-    $RowIndex = 0
-
-    # Set `$self` as reference to the current object.
+    # Set `$this` as reference to the current object.
     # `$this` would be more idiomatic but this avoids
     # potential issues arising from modifying automatic variables.
     $PSVars = @(
-        [psvariable]::new('self', $InputObject)
+        [psvariable]::new('this', $InputObject)
     )
 
     try {
@@ -53,7 +51,7 @@ function Update-WPFObject {
         }
 
         foreach ($Child in $ChildObjects) {
-            $ChildName = if ($Child.Name) { $Child.Name } else { '<Nameless>' }
+            $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
             $ChildType = $Child.GetType().Name
 
             # Returning objects early so I don't need to worry about breaking out
@@ -62,99 +60,38 @@ function Update-WPFObject {
                 Write-Output $Child
             }
 
-            # Handler
-            if (Test-WPFType $Child 'Handler') {
-                # TODO: Wrap the scriptblock to catch errors and report them properly.
-                Write-Debug "Adding handler for event '$($Child.event)' to object '$SelfName' ($SelfType)"
-                $InputObject."Add_$($Child.Event)"($Child.ScriptBlock)
-
             # Command
-            } elseif (Test-WPFType $Child 'Command') {
-                Write-Debug "Adding Command to object '$SelfName' ($SelfType)"
+            if (Test-WPFType $Child 'Command') {
+                Write-Debug "Adding Command to object '$thisName' ($thisType)"
                 $InputObject.Command = $Child
-
+            }
             # Control
-            } elseif (Test-WPFType $Child 'Control') {
-                # Uses `PassThru` to send child objects further up the chain to get
-                # processed by the Grid itself.
-                if (Test-WPFType $InputObject 'GridDefinition') {
-                    continue
-                }
+            elseif (Test-WPFType $Child @('Control', 'GridDefinition')) {
+                # NOTE: Most controls are auto-attaching to their parents during
+                # creation so their parent is available to their children before
+                # recursing through their scriptblock but for objects being created
+                # on the fly or re-parented I think it still makes sense to use Update-WPFObject.
 
-                if ($InputObject -eq $Child.Parent) {
-                    Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
-                    continue
-                }
-
-                if ($Child.Parent) {
-                    Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.Parent.Name)' $($Child.Parent.GetType().Name))"
-                    $Child.Parent.RemoveChild($Child)
-                }
-
-                Write-Debug "Adding child object '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
-                $InputObject.AddChild($Child)
-
-                # Hacky but what's a guy to do?
-                $IsMenuBar =
-                    $InputObject -is [System.Windows.Controls.DockPanel] -and
-                    $Child -is [System.Windows.Controls.Menu]
-
-                if ($IsMenuBar) {
-                    [System.Windows.Controls.DockPanel]::SetDock($Child, [System.Windows.Controls.Dock]::Top)
-                }
-
+                Add-WPFObject $InputObject $Child
+            }
             # Shape
-            } elseif (Test-WPFType $Child 'Shape') {
+            elseif (Test-WPFType $Child 'Shape') {
                 # My thinking here is that while a user can assign a Path to a button's content
                 # property other objects are probably assigned differently so it's just be easier
                 # to add them based on the object type so you don't need to remember.
                 if ($InputObject -is [System.Windows.Controls.Button]) {
                     $InputObject.Content = $Child
                 }
-
-            # GridRow
-            } elseif (Test-WPFType $Child 'GridDefinition') {
-
-                if ($InputObject -isnot [System.Windows.Controls.Grid]) {
-                    # Move on. Rows and columns are processed by Grids and nothing else.
-                    continue
-                }
-
-                $ColumnIndex = 0  # Track columns for each row
-                $RowIndex++
-
-                # Add row definitions as required. They may have been
-                # initialized with the grid through explicit parameters.
-                if ($InputObject.RowDefinitions.Count -lt $RowIndex) {
-                    $InputObject.RowDefinitions.Add($Child)
-                }
-
-                # Process columns
-                foreach ($Column in $Child.Children) {
-                    $ColumnIndex++
-
-                    # Add column definitions as required. They may have been
-                    # initialized with the grid through explicit parameters.
-                    if ($InputObject.ColumnDefinitions.Count -lt $ColumnIndex) {
-                        $InputObject.ColumnDefinitions.Add($Column)
-                    }
-
-                    # Set Row/Column properties on child object,
-                    # then add it as a child object.
-                    foreach ($ColumnChild in $Column.Children) {
-                        [System.Windows.Controls.Grid]::SetRow($ColumnChild, ($RowIndex - 1))
-                        [System.Windows.Controls.Grid]::SetColumn($ColumnChild, ($ColumnIndex - 1))
-                        $InputObject.AddChild($ColumnChild)
-                    }
-                }
-            } else {
+            }
+            else {
                 # Maybe instead of erroring we just pass unhandled items further up the chain?
-                Write-Warning "Cannot add '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
+                Write-Warning "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
             }
         }
     } catch {
         # Get base exception and surface here?
-        Write-Error "Failed to update '$SelfName' ($SelfType) with error: $_"
+        Write-Error "Failed to update '$thisName' ($thisType) with error: $_"
         return
     }
 }
+

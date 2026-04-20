@@ -6,15 +6,11 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.scrollviewer
 #>
 function New-WPFScrollViewer {
-    [Alias('ScrollViewer')]
     [OutputType([System.Windows.Controls.ScrollViewer])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $Name,
-
-        [Parameter(Mandatory)]
-        [ScriptBlock] $ScriptBlock
+        [string] $Name
     )
 
     try {
@@ -27,7 +23,5 @@ function New-WPFScrollViewer {
         Write-Error "Failed to create '$Name' (ScrollViewer) with error: $_"
     }
 
-    # NOTE: Allow exceptions from child objects to bubble up
-    Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
 }

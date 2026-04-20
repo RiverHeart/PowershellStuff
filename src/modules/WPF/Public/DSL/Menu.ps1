@@ -11,7 +11,7 @@
     Target/CanExecute with this...
 
     MenuBar 'Menu' {
-        $self.Height = 25
+        $this.Height = 25
 
         MenuItem '_File/_Open' {
             Command
@@ -28,9 +28,9 @@
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menu
 #>
-function New-WPFMenu {
-    [Alias('Menu')]
-    [OutputType([System.Windows.Controls.Menu])]
+function Menu {
+    [CmdletBinding()]
+    [OutputType([void], [System.Windows.Controls.Menu])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -41,16 +41,27 @@ function New-WPFMenu {
     )
 
     try {
-        $WPFObject = [System.Windows.Controls.Menu] @{
+        $Menu = [System.Windows.Controls.Menu] @{
             Name = $Name
         }
-        Register-WPFObject $Name $WPFObject
-        Add-WPFType $WPFObject 'Control'
+        Register-WPFObject $Name $Menu
+        Add-WPFType $Menu 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Menu) with error: $_"
     }
 
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('this')
+    if ($Parent) {
+        Write-Debug "Beginning auto-attach for $Name (Menu)"
+        Update-WPFObject $Parent $Menu
+    }
+
     # NOTE: Allow exceptions from child objects to bubble up
-    Update-WPFObject $WPFObject $ScriptBlock
-    return $WPFObject
+    Write-Debug "Processing child elements for $Name (Menu)"
+    Update-WPFObject $Menu $ScriptBlock
+
+    if ($this.Parent) { return }
+    return $Menu
 }
+

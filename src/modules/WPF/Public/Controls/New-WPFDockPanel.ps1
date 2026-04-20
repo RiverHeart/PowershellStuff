@@ -6,15 +6,11 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.dockpanel
 #>
 function New-WPFDockPanel {
-    [Alias('DockPanel')]
     [OutputType([System.Windows.Controls.DockPanel])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $Name,
-
-        [Parameter(Mandatory)]
-        [ScriptBlock] $ScriptBlock
+        [string] $Name
     )
 
     try {
@@ -27,7 +23,5 @@ function New-WPFDockPanel {
         Write-Error "Failed to create '$Name' (DockPanel) with error: $_"
     }
 
-    # NOTE: Allow exceptions from child objects to bubble up
-    Update-WPFObject $WPFObject $ScriptBlock
     return $WPFObject
 }

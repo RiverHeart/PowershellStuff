@@ -1,3 +1,5 @@
+using namespace System.Windows
+using namespace System.Windows.Controls
 
 <#
 .SYNOPSIS
@@ -7,31 +9,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.rowdefinition
 #>
 function New-WPFGridRow {
-    [CmdletBinding(DefaultParameterSetName='Implicit')]
-    [Alias('Row', 'New-WPFRowDefinition')]
-    [OutputType([System.Windows.Controls.RowDefinition])]
+    [CmdletBinding()]
+    [OutputType([RowDefinition])]
     param(
-        # Using object because you're probably going to pass a string
-        # or int instead of [GridLength] and we need Powershell to recognize
-        # the value to resolve the parameter set.
-        [Parameter(ParameterSetName='Explicit',Position=0)]
-        [object] $Height = [System.Windows.GridLength]::Auto,
-
-        [Parameter(Mandatory,ParameterSetName='Explicit',Position=1)]
-        [Parameter(Mandatory,ParameterSetName='Implicit',Position=0)]
-        [ScriptBlock] $ScriptBlock
+        [ValidateNotNullOrEmpty()]
+        [string] $Name = '__NamelessRow__',
+        [GridLength] $Height = [GridLength]::Auto
     )
 
-    # Allow for more intuitive GridLength names
-    if ($Height -eq 'Expand') {
-        # Allow 'Expand*2' syntax
-        $Height = $Height -replace 'Expand', '*'
-    } elseif ($Height -eq 'Fit') {
-        $Height = [System.Windows.GridLength]::Auto
-    }
-
     try {
-        $WPFObject = [System.Windows.Controls.RowDefinition] @{
+        $WPFObject = [RowDefinition] @{
+            Name = $Name
             Height = $Height
         }
         Add-WPFType $WPFObject 'GridDefinition'
@@ -39,8 +27,5 @@ function New-WPFGridRow {
         Write-Error "Failed to create '(RowDefinition) with error: $_"
     }
 
-    # NOTE: Allow exceptions from child objects to bubble up
-    $Children = Update-WPFObject $WPFObject $ScriptBlock -PassThru
-    $WPFObject | Add-Member -MemberType NoteProperty -Name Children -Value $Children
     return $WPFObject
 }
