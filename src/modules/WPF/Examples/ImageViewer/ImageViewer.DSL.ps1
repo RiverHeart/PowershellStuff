@@ -27,20 +27,95 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
+function Invoke-ImageViewerNavigate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('Back', 'Forward')]
+        [string] $Direction
+    )
+
+    $State = (Reference 'Window').Tag
+    if (-not $State.IsFileLoaded) { return }
+    $Navigator = $State.FileNavigator
+    if (-not $Navigator.CurrentFile) { return }
+
+    if ($Direction -eq 'Back') { $Navigator.MovePrevious() } else { $Navigator.MoveNext() }
+    (Reference 'Viewer').Source = $Navigator.CurrentFile.FullName
+}
+
+function Set-ImageViewerFullScreen {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [bool] $IsFullScreen
+    )
+
+    $Window = Reference 'Window'
+    $State = $Window.Tag
+
+    if ($IsFullScreen) {
+        $State.OldWindowStyle = $Window.WindowStyle
+        $State.OldWindowState = $Window.WindowState
+        $State.OldResizeMode  = $Window.ResizeMode
+
+        $Window.WindowStyle = [WindowStyle]::None
+        $Window.WindowState = [WindowState]::Maximized
+        $Window.ResizeMode  = [ResizeMode]::NoResize
+    } else {
+        $Window.WindowStyle = $State.OldWindowStyle
+        $Window.WindowState = $State.OldWindowState
+        $Window.ResizeMode  = $State.OldResizeMode
+    }
+
+    # Updating IsFullScreen triggers Bind callbacks on Menu and ButtonPanel visibility
+    $State.IsFullScreen = $IsFullScreen
+}
+
 # Define the Image Viewer GUI
 Window 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-    $this.Tag = @{}
+    $this.Tag = New-WPFObservableState @{
+        IsFullScreen   = $false
+        IsFileLoaded   = $false
+        OldWindowStyle = [WindowStyle]::SingleBorderWindow
+        OldWindowState = [WindowState]::Normal
+        OldResizeMode  = [ResizeMode]::CanResize
+        FileNavigator  = $null
+    }
 
     # Window doesn't have a Command property like button so
     # you need to wire up an event.
-    When PreviewKeyDown {
+    When KeyDown {
         param($sender, $event)
-        if ($event.key -ne 'Escape') { return }
-        $this.WindowStyle = [WindowStyle]::SingleBorderWindow
-        $this.WindowState = [WindowState]::Normal
-        $this.ResizeMode = [ResizeMode]::CanResize
+
+        switch ($event.Key) {
+            'Escape' {
+                $State = $this.Tag
+                if (-not $State.IsFullScreen) { return }
+
+                Set-ImageViewerFullScreen -IsFullScreen $False
+                $event.Handled = $True
+                break
+            }
+            'F11' {
+                $State = $this.Tag
+                Set-ImageViewerFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                $event.Handled = $True
+                break
+            }
+            'Left' {
+                Invoke-ImageViewerNavigate -Direction Back
+                $event.Handled = $True
+                break
+            }
+            'Right' {
+                Invoke-ImageViewerNavigate -Direction Forward
+                $event.Handled = $True
+                break
+            }
+        }
     }
 
     Grid "Body" {
@@ -50,6 +125,7 @@ Window 'Window' {
             Column 'Expand' {
                 MenuBar 'Menu' {
                     $this.Height = 25
+                    Bind Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
@@ -64,11 +140,9 @@ Window 'Window' {
                             $Viewer = Reference 'Viewer'
                             $Viewer.Source = $FileName
 
-                            $Window.Tag.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
-
-                            # Enable buttons
-                            (Reference 'ForwardButton').IsEnabled = $True
-                            (Reference 'BackButton').IsEnabled = $True
+                            $State = $Window.Tag
+                            $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
+                            $State.IsFileLoaded   = $true
                         }
                     }
                     MenuItem '(F)ile/(E)xit' {
@@ -80,22 +154,9 @@ Window 'Window' {
 
                     MenuItem '(V)iew/(F)ullScreen' {
                         Shortcut 'FullScreen' 'F11' {
-                            # TODO: Convert this into an extension method SetFullScreen([bool])
-                            # so we can just (Reference 'Window').SetFullScreen($True)
                             $Window = Reference 'Window'
-                            if ($Window.WindowState -eq [WindowState]::Maximized) {
-                                $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
-                                $Window.WindowState = [WindowState]::Normal
-                                $Window.ResizeMode = [ResizeMode]::CanResize
-                                (Reference 'MenuBar').Visibility = 'Visible'
-                                (Reference 'ButtonPanel').Visibility = 'Visible'
-                            } else {
-                                $Window.WindowStyle = [WindowStyle]::None
-                                $Window.WindowState = [WindowState]::Maximized
-                                $Window.ResizeMode = [ResizeMode]::NoResize
-                                (Reference 'MenuBar').Visibility = 'Collapsed'
-                                (Reference 'ButtonPanel').Visibility = 'Collapsed'
-                            }
+                            $State = $Window.Tag
+                            Set-ImageViewerFullScreen -IsFullScreen (-not $State.IsFullScreen)
                         }
                     }
 
@@ -137,40 +198,22 @@ Window 'Window' {
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                    Bind Visibility Window.Tag.IsFullScreen -Invert
 
                     Button 'BackButton' {
                         $this.Width = 75
                         $this.Margin = 5
-                        $this.IsEnabled = $False
+                        Bind IsEnabled Window.Tag.IsFileLoaded
 
-                        # FIXME:
-                        # Obvious in hindsight but it seems the closure I was using
-                        # to support `$this` in Add-WPFHandler broke the scriptblock's
-                        # ability to access script-scope variables reliably, so navigator
-                        # state now lives on the Window.Tag property.
-                        When 'Click' {
-                            Write-Host "Back"
-                            $Navigator = (Reference 'Window').Tag.FileNavigator
-                            if (-not $Navigator -or -not $Navigator.CurrentFile) { return }
-                            $Navigator.MovePrevious()
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $Navigator.CurrentFile.FullName
-                        }
+                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
                         Path 'images/arrow-left-solid-full.svg'
                     }
                     Button 'ForwardButton' {
                         $this.Width = 75
                         $this.Margin = 5
-                        $this.IsEnabled = $False
+                        Bind IsEnabled Window.Tag.IsFileLoaded
 
-                        When 'Click' {
-                            Write-Host "Forward"
-                            $Navigator = (Reference 'Window').Tag.FileNavigator
-                            if (-not $Navigator -or -not $Navigator.CurrentFile) { return }
-                            $Navigator.MoveNext()
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $Navigator.CurrentFile.FullName
-                        }
+                        When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
                         Path 'images/arrow-right-solid-full.svg'
                     }
                 }
