@@ -18,6 +18,14 @@
         $true  -> Visible
         $false -> Collapsed
 
+.NOTES
+    The built-in conversion behavior should only support common cases that are
+    predictable, and low-surprise across many scripts. Not for one-offs or
+    convenience that only helps a single example.
+
+    For uncommon cases, use a custom converter scriptblock that transforms the
+    source value as needed before assignment.
+
 .PARAMETER Property
     The property name to update on the target control (e.g. 'Visibility', 'IsEnabled').
 
@@ -46,6 +54,20 @@
     # Enable buttons only when a file is loaded
     Button 'BackButton' {
         Bind IsEnabled Window.Tag.IsFileLoaded
+        ...
+    }
+
+.EXAMPLE
+    # Using a converter to bind a non-boolean property
+
+    Label 'Status' {
+        Bind Content Window.Tag.CurrentFile -Converter {
+            if ($args[0]) {
+                "File: $args[0].Name"
+            } else {
+                "No file loaded"
+            }
+        }
         ...
     }
 #>
