@@ -35,21 +35,28 @@ function MenuItem {
 
         # Support an alternative, in my opinion more intuitive,
         # accessor syntax: (F)ile
-        $FirstName = $FirstName.Replace('(', '_').Replace(')', '')
+        $HeaderName = $FirstName.Replace('(', '_').Replace(')', '')
+
+        # WPF names cannot contain spaces or most punctuation.
+        # Keep readable headers while generating a safe backing name.
+        $ObjectName = $HeaderName -replace '[^\w]', ''
+        if (-not $ObjectName) {
+            throw "MenuItem name '$Name' does not contain any valid name characters."
+        }
 
         # Check if object already exists, if not, create one
-        $WPFObject = Get-WPFRegisteredObject $FirstName -ErrorAction Ignore
+        $WPFObject = Get-WPFRegisteredObject $ObjectName -ErrorAction Ignore
         if (-not $WPFObject) {
             $WPFObject = [System.Windows.Controls.MenuItem] @{
-                Name = $FirstName
-                Header = $FirstName
+                Name = $ObjectName
+                Header = $HeaderName
             }
-            Register-WPFObject $FirstName $WPFObject
+            Register-WPFObject $ObjectName $WPFObject
         }
 
         Add-WPFType $WPFObject 'Control'
     } catch {
-        Write-Error "Failed to create '$FirstName' (MenuItem) with error: $_"
+        Write-Error "Failed to create '$Name' (MenuItem) with error: $_"
     }
 
     # Auto-attach to parent if one exists
@@ -76,7 +83,7 @@ function MenuItem {
     }
     # Since Scriptblock is mandatory this scenario should never happen.
     else {
-        Write-Error "Something unexpected occurred constructing '$FirstName' ($MenuItem)"
+        Write-Error "Something unexpected occurred constructing '$Name' (MenuItem)"
     }
 
     if (-not $WasAutoAttached) {

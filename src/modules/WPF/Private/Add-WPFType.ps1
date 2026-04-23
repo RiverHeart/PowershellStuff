@@ -48,6 +48,20 @@ function Add-WPFType {
             if ($PSTypeName -notin $Item.PSObject.TypeNames) {
                 $Item.PSObject.TypeNames.Insert(0, $PSTypeName)
             }
+
+            if (
+                $Type -eq 'Control' -and
+                $script:WPFImplicitStyleTable -and
+                $Item.PSObject.Properties['Style'] -and
+                -not $Item.Style
+            ) {
+                $itemType = $Item.GetType()
+                $styleKey = $itemType.FullName
+                if ($script:WPFImplicitStyleTable.ContainsKey($styleKey)) {
+                    $Item.Style = $script:WPFImplicitStyleTable[$styleKey]
+                }
+            }
+
             if ($PassThru) {
                 Write-Output $Item
             }

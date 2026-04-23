@@ -18,7 +18,7 @@ using namespace System.Windows.Media
 #>
 
 # Change to the script directory if we're not in it.
-if (-not $PSScriptRoot -ne $PWD) {
+if ($PSScriptRoot -and $PWD -ne $PSScriptRoot) {
     Set-Location $PSScriptRoot
 }
 
@@ -26,6 +26,14 @@ $ErrorActionPreference = 'Stop'
 $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
+
+function Invoke-ImageViewerToggleTheme {
+    [CmdletBinding()]
+    param()
+
+    $Window = Reference 'Window'
+    Toggle-WPFTheme -Root $Window
+}
 
 function Invoke-ImageViewerNavigate {
     [CmdletBinding()]
@@ -44,35 +52,10 @@ function Invoke-ImageViewerNavigate {
     (Reference 'Viewer').Source = $Navigator.CurrentFile.FullName
 }
 
-function Set-ImageViewerFullScreen {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [bool] $IsFullScreen
-    )
-
-    $Window = Reference 'Window'
-    $State = $Window.Tag
-
-    if ($IsFullScreen) {
-        $State.OldWindowStyle = $Window.WindowStyle
-        $State.OldWindowState = $Window.WindowState
-        $State.OldResizeMode  = $Window.ResizeMode
-
-        $Window.WindowStyle = [WindowStyle]::None
-        $Window.WindowState = [WindowState]::Maximized
-        $Window.ResizeMode  = [ResizeMode]::NoResize
-    } else {
-        $Window.WindowStyle = $State.OldWindowStyle
-        $Window.WindowState = $State.OldWindowState
-        $Window.ResizeMode  = $State.OldResizeMode
-    }
-
-    # Updating IsFullScreen triggers Bind callbacks on Menu and ButtonPanel visibility
-    $State.IsFullScreen = $IsFullScreen
-}
-
 # Define the Image Viewer GUI
+
+. "$PSScriptRoot/ImageViewer.Styles.ps1"
+
 Window 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
@@ -82,8 +65,11 @@ Window 'Window' {
         OldWindowStyle = [WindowStyle]::SingleBorderWindow
         OldWindowState = [WindowState]::Normal
         OldResizeMode  = [ResizeMode]::CanResize
+        CurrentTheme   = if (Get-WPFDarkModePreference) { 'Dark' } else { 'Light' }
         FileNavigator  = $null
     }
+
+    Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
 
     # Window doesn't have a Command property like button so
     # you need to wire up an event.
@@ -95,13 +81,13 @@ Window 'Window' {
                 $State = $this.Tag
                 if (-not $State.IsFullScreen) { return }
 
-                Set-ImageViewerFullScreen -IsFullScreen $False
+                Set-WPFWindowFullScreen -IsFullScreen $False
                 $event.Handled = $True
                 break
             }
             'F11' {
                 $State = $this.Tag
-                Set-ImageViewerFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
                 $event.Handled = $True
                 break
             }
@@ -110,7 +96,7 @@ Window 'Window' {
                 $event.Handled = $True
                 break
             }
-            'Right' {
+            { $_ -in @('Right', 'Space') } {
                 Invoke-ImageViewerNavigate -Direction Forward
                 $event.Handled = $True
                 break
@@ -156,7 +142,13 @@ Window 'Window' {
                         Shortcut 'FullScreen' 'F11' {
                             $Window = Reference 'Window'
                             $State = $Window.Tag
-                            Set-ImageViewerFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                            Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                        }
+                    }
+
+                    MenuItem '(V)iew/(T)oggle Theme' {
+                        Shortcut 'ToggleTheme' 'Ctrl+T' {
+                            Invoke-ImageViewerToggleTheme
                         }
                     }
 
@@ -170,9 +162,6 @@ Window 'Window' {
             }
         }
 
-        # TODO:
-        # * Background for this row should be black by default but configurable.
-        #   * Maybe check user's OS for DarkMode preference
         Row 'Expand' {
             Column {
                 # In case the image is larger than the window, use the ScrollViewer
@@ -193,8 +182,7 @@ Window 'Window' {
             Column {
                 # TODO:
                 # * Needs to support Counter/Clockwise rotation.
-                # * Needs to support "Fit to Window" and "Actual Image Size"
-                # * Needs to support arrow key/spacebar movement
+                # * Needs to support "Fit to Window" and "Actual Image Size" modes.
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
