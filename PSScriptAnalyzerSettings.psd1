@@ -13,6 +13,9 @@
         # Not everything using 'New' changes state
         'PSUseShouldProcessForStateChangingFunctions'
 
+        # This is just annoying when working with events and callbacks
+        'PSAvoidAssignmentToAutomaticVariables'
+
         # Annoying and practically useless when working with
         # powershell classes in modules
         'TypeNotFound'

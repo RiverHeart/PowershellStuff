@@ -6,32 +6,34 @@ applyTo: "src/modules/WPF/**/*.{ps1,psm1,psd1}"
 
 # Overview
 
-Experimental DSL for building WPF applications in Powershell without having to touch XAML.
+Experimental DSL for building WPF applications in PowerShell without directly writing XAML.
+
+Primary goal: keep the DSL simple, readable, and behaviorally stable.
 
 # DSL Example
 
-The code below creates a window with a couple of buttons. Mandatory arguments get passed as regular function parameters while child objects, properties, and event handlers are declared and returned inside scriptblocks to be processed by the parent control.
+Controls use initializer arguments followed by a trailing script block. Child controls, property assignment, and event handlers are defined inside parent script blocks.
 
 ```powershell
 Import-Module ./WPF -Force
 
 Window 'Window' {
-    $self.Title = 'Button Example'
-    $self.Height = 100
-    $self.Width = 250
+    $this.Title = 'Button Example'
+    $this.Height = 100
+    $this.Width = 250
 
     StackPanel "Buttons" {
         Button "EnglishButton" {
-            $self.Content = 'English'
-            $self.Width = 100
+            $this.Content = 'English'
+            $this.Width = 100
 
             When "Click" {
                 Write-Host "Hello World"
             }
         }
         Button "JapaneseButton" {
-            $self.Content = 'Japanese'
-            $self.Width = 100
+            $this.Content = 'Japanese'
+            $this.Width = 100
 
             When "Click" {
                 Write-Host "Konichiwa Sekai"
@@ -41,19 +43,54 @@ Window 'Window' {
 } | Show-WPFWindow
 ```
 
-# Project Goals
+# DSL Contract
 
-* Convention over configuration (WPF is flexible at the expense of usability)
-* Easy to read (everything is nested like HTML)
-* Simple things should be easy (shouldn't need to be a programmer or need an IDE to make a window with buttons)
-* Have fun :)
+Treat these as compatibility constraints unless explicitly requested:
 
-# Implementation Notes
+* Control functions use initializer arguments followed by a trailing script block: `Window 'Main' {}`.
+* Child controls are declared inside parent script blocks and are processed top-down.
+* `$this` is the object currently being configured and is the primary way to set properties.
+* `When` binds events within the current control scope.
+* `Reference` registers controls for lookup.
+* Grid definitions (`ColumnDefinition`, `RowDefinition`) are collection entries, not normal visual children.
 
-Function parameters consist of initializer args, such as the name of the object, and end with a scriptblock. For example `Window 'WindowName' {}`.
+# Internal Processing Model
 
-Objects are recursively created and processed from top to bottom. Each UI element is registered for dynamic lookup using the `Reference` keyword. Scriptblocks apply properties via an automatic variable `$self` and process child elements. Each scriptblock is processed by `Update-WPFObject`.
+Objects are recursively created and processed top-down. Script blocks apply properties and process child elements through `Update-WPFObject`.
 
-Grid elements such as `ColumnDefinition` and `RowDefinition` have special handling because they don't have a parent-child relationship with the `Grid` control. Instead, they are added to the `Grid.ColumnDefinitions` and `Grid.RowDefinitions` collections respectively.
+Grid elements such as `ColumnDefinition` and `RowDefinition` have special handling because they do not have a normal parent-child relationship with `Grid`. They are added to `Grid.ColumnDefinitions` and `Grid.RowDefinitions`.
 
-Finally, after all scriptblocks have been executed, the window object is passed to `Show-WPFDialog` which calls the `ShowDialog()` method and `Close()` when the window closes.
+After script block processing, the window object is passed to `Show-WPFDialog`, which calls `ShowDialog()` and then `Close()` when the window exits.
+
+# File Map
+
+Use this mental model when making edits:
+
+* `WPF.psm1`: module wiring, exports, loading behavior.
+* `Public/`: user-facing DSL functions.
+* `Private/`: helper logic and object-processing internals.
+* `Examples/`: executable scenarios used as behavior references.
+* `Tests/`: regression protection for DSL behavior.
+
+# Validation
+
+After making WPF module changes:
+
+* Run relevant Pester tests for `src/modules/WPF/Tests`.
+* If behavior changed, run one representative example from `src/modules/WPF/Examples`.
+* Confirm no obvious break in nested control creation, event binding, or grid definition handling.
+
+# Change Boundaries
+
+Low-risk changes:
+
+* Bug fixes in helper logic
+* Better errors and input validation
+* Tests and examples that clarify intended behavior
+
+High-risk changes (require extra care and test updates):
+
+* Renaming DSL keywords or public function names
+* Altering script block execution order
+* Changing how `Reference`, `When`, or `$this` is interpreted
+* Modifying dialog lifecycle semantics (`ShowDialog`, `Close`)
