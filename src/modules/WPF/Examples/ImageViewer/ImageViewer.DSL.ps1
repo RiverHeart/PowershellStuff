@@ -161,8 +161,7 @@ Window 'Window' {
 
                     MenuItem '(H)elp/(A)bout' {
                         When Click {
-                            # TODO: Open a model window here
-                            Write-Host 'Implement Me'
+                            Invoke-ImageViewerShowAbout
                         }
                     }
                 }
