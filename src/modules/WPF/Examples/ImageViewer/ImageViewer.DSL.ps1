@@ -154,13 +154,14 @@ Window 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.AllowDrop = $true
+    $this.WindowState = [WindowState]::Maximized
     $this.Tag = New-WPFObservableState @{
         IsFullScreen   = $false
         IsFileLoaded   = $false
         ZoomLevel      = 1.0
-        OldWindowStyle = [WindowStyle]::SingleBorderWindow
-        OldWindowState = [WindowState]::Normal
-        OldResizeMode  = [ResizeMode]::CanResize
+        OldWindowStyle = $this.WindowStyle
+        OldWindowState = $this.WindowState
+        OldResizeMode  = $this.ResizeMode
         CurrentTheme   = if (Get-WPFDarkModePreference) { 'Dark' } else { 'Light' }
         FileNavigator  = $null
     }
@@ -206,7 +207,7 @@ Window 'Window' {
     }
 
     When DragOver {
-        $event = $args[1]
+        param($sender, $event)
 
         if ($event.Data.GetDataPresent([DataFormats]::FileDrop)) {
             $event.Effects = [DragDropEffects]::Copy
@@ -218,7 +219,7 @@ Window 'Window' {
     }
 
     When Drop {
-        $event = $args[1]
+        param($sender, $event)
 
         if (-not $event.Data.GetDataPresent([DataFormats]::FileDrop)) {
             return
@@ -294,7 +295,7 @@ Window 'Window' {
                     $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
 
                     When PreviewMouseWheel {
-                        $event = $args[1]
+                        param($sender, $event)
 
                         if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
                             return
