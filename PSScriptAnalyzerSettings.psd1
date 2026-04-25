@@ -14,7 +14,10 @@
         'PSUseShouldProcessForStateChangingFunctions'
 
         # This is just annoying when working with events and callbacks
-        'PSAvoidAssignmentToAutomaticVariables'
+        'PSAvoidAssignmentToAutomaticVariable'
+
+        # Parameters may be required or available despite not being used in the function body
+        'PSReviewUnusedParameter'
 
         # Annoying and practically useless when working with
         # powershell classes in modules

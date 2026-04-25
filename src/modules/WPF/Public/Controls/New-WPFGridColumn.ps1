@@ -10,14 +10,14 @@ using namespace System.Windows.Controls
 #>
 function New-WPFGridColumn {
     [CmdletBinding()]
-    [OutputType([ColumnDefinition])]
+    [OutputType([System.Windows.Controls.ColumnDefinition])]
     param(
         [string] $Name = '__NamelessColumn__',
-        [GridLength] $Width = [GridLength]::Auto
+        [System.Windows.GridLength] $Width = [System.Windows.GridLength]::Auto
     )
 
     try {
-        $WPFObject = [ColumnDefinition] @{
+        $WPFObject = [System.Windows.Controls.ColumnDefinition] @{
             Name = $Name
             Width = $Width
         }

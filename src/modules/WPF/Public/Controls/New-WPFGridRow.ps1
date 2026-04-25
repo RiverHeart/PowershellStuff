@@ -10,15 +10,15 @@ using namespace System.Windows.Controls
 #>
 function New-WPFGridRow {
     [CmdletBinding()]
-    [OutputType([RowDefinition])]
+    [OutputType([System.Windows.Controls.RowDefinition])]
     param(
         [ValidateNotNullOrEmpty()]
         [string] $Name = '__NamelessRow__',
-        [GridLength] $Height = [GridLength]::Auto
+        [System.Windows.GridLength] $Height = [System.Windows.GridLength]::Auto
     )
 
     try {
-        $WPFObject = [RowDefinition] @{
+        $WPFObject = [System.Windows.Controls.RowDefinition] @{
             Name = $Name
             Height = $Height
         }

@@ -35,6 +35,99 @@ function Invoke-ImageViewerToggleTheme {
     Toggle-WPFTheme -Root $Window
 }
 
+function Invoke-ImageViewerUpdateStatus {
+    [CmdletBinding()]
+    param()
+
+    $State = (Reference 'Window').Tag
+    $FileLabel = Reference 'StatusFileLabel'
+    $IndexLabel = Reference 'StatusIndexLabel'
+    $DetailsLabel = Reference 'StatusDetailsLabel'
+    $ZoomLabel = Reference 'StatusZoomLabel'
+
+    if (-not $State.IsFileLoaded -or -not $State.FileNavigator -or -not $State.FileNavigator.CurrentFile) {
+        $FileLabel.Content = 'No image loaded'
+        $IndexLabel.Content = '0/0'
+        $DetailsLabel.Content = '-'
+        $ZoomLabel.Content = '100%'
+        return
+    }
+
+    $CurrentFile = $State.FileNavigator.CurrentFile
+    $CurrentIndex = $State.FileNavigator.Index + 1
+    $TotalFiles = $State.FileNavigator.Files.Count
+    $Source = (Reference 'Viewer').Source
+
+    $Dimensions = '-'
+    if ($Source -is [System.Windows.Media.Imaging.BitmapSource]) {
+        $Dimensions = "$($Source.PixelWidth)x$($Source.PixelHeight)"
+    }
+
+    $ZoomPercent = [Math]::Round([double] $State.ZoomLevel * 100)
+
+    $FileLabel.Content = $CurrentFile.Name
+    $IndexLabel.Content = "$CurrentIndex/$TotalFiles"
+    $DetailsLabel.Content = $Dimensions
+    $ZoomLabel.Content = "$ZoomPercent%"
+}
+
+function Invoke-ImageViewerSetZoom {
+    [CmdletBinding()]
+    param(
+        [double] $Delta = 0,
+
+        [switch] $Reset
+    )
+
+    $State = (Reference 'Window').Tag
+    $Viewer = Reference 'Viewer'
+
+    $ZoomLevel = if ($Reset) { 1.0 } else { [double] $State.ZoomLevel + $Delta }
+    $ZoomLevel = [Math]::Max(0.10, [Math]::Min(8.00, $ZoomLevel))
+    $ZoomLevel = [Math]::Round($ZoomLevel, 2)
+    $State.ZoomLevel = $ZoomLevel
+
+    if (-not ($Viewer.LayoutTransform -is [ScaleTransform])) {
+        $Viewer.LayoutTransform = [ScaleTransform]::new(1.0, 1.0)
+    }
+
+    $Transform = [ScaleTransform] $Viewer.LayoutTransform
+    $Transform.ScaleX = $ZoomLevel
+    $Transform.ScaleY = $ZoomLevel
+
+    Invoke-ImageViewerUpdateStatus
+}
+
+function Invoke-ImageViewerLoadFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $FileName
+    )
+
+    if (-not (Test-Path -Path $FileName -PathType Leaf)) {
+        Write-Warning "File not found: '$FileName'"
+        return
+    }
+
+    $Window = Reference 'Window'
+    $Viewer = Reference 'Viewer'
+
+    try {
+        $Viewer.Source = $FileName
+
+        $State = $Window.Tag
+        $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
+        $State.IsFileLoaded = $true
+
+        Invoke-ImageViewerSetZoom -Reset
+        Invoke-ImageViewerUpdateStatus
+    } catch {
+        Write-Warning "Failed to load image '$FileName': $_"
+    }
+}
+
 function Invoke-ImageViewerNavigate {
     [CmdletBinding()]
     param(
@@ -50,6 +143,7 @@ function Invoke-ImageViewerNavigate {
 
     if ($Direction -eq 'Back') { $Navigator.MovePrevious() } else { $Navigator.MoveNext() }
     (Reference 'Viewer').Source = $Navigator.CurrentFile.FullName
+    Invoke-ImageViewerUpdateStatus
 }
 
 # Define the Image Viewer GUI
@@ -59,9 +153,11 @@ function Invoke-ImageViewerNavigate {
 Window 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $this.AllowDrop = $true
     $this.Tag = New-WPFObservableState @{
         IsFullScreen   = $false
         IsFileLoaded   = $false
+        ZoomLevel      = 1.0
         OldWindowStyle = [WindowStyle]::SingleBorderWindow
         OldWindowState = [WindowState]::Normal
         OldResizeMode  = [ResizeMode]::CanResize
@@ -101,7 +197,39 @@ Window 'Window' {
                 $event.Handled = $True
                 break
             }
+            { $_ -in @('D0', 'NumPad0') -and ([Keyboard]::Modifiers -band [ModifierKeys]::Control) } {
+                Invoke-ImageViewerSetZoom -Reset
+                $event.Handled = $True
+                break
+            }
         }
+    }
+
+    When DragOver {
+        $event = $args[1]
+
+        if ($event.Data.GetDataPresent([DataFormats]::FileDrop)) {
+            $event.Effects = [DragDropEffects]::Copy
+        } else {
+            $event.Effects = [DragDropEffects]::None
+        }
+
+        $event.Handled = $true
+    }
+
+    When Drop {
+        $event = $args[1]
+
+        if (-not $event.Data.GetDataPresent([DataFormats]::FileDrop)) {
+            return
+        }
+
+        $Files = [string[]] $event.Data.GetData([DataFormats]::FileDrop)
+        if ($Files.Count -gt 0) {
+            Invoke-ImageViewerLoadFile -FileName $Files[0]
+        }
+
+        $event.Handled = $true
     }
 
     Grid "Body" {
@@ -123,12 +251,7 @@ Window 'Window' {
                                 return
                             }
 
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $FileName
-
-                            $State = $Window.Tag
-                            $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
-                            $State.IsFileLoaded   = $true
+                            Invoke-ImageViewerLoadFile -FileName $FileName
                         }
                     }
                     MenuItem '(F)ile/(E)xit' {
@@ -170,6 +293,18 @@ Window 'Window' {
                     $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
                     $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
 
+                    When PreviewMouseWheel {
+                        $event = $args[1]
+
+                        if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
+                            return
+                        }
+
+                        $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
+                        Invoke-ImageViewerSetZoom -Delta $Delta
+                        $event.Handled = $true
+                    }
+
                     Image 'Viewer' {
                         $this.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
                         $this.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
@@ -207,5 +342,33 @@ Window 'Window' {
                 }
             }
         }
+
+        Row {
+            Column 'Expand' {
+                DockPanel 'StatusPanel' {
+                    $this.Margin = 5, 0, 5, 0
+                    Bind Visibility Window.Tag.IsFullScreen -Invert
+
+                    Label 'StatusFileLabel' {
+                        $this.Content = 'No image loaded'
+                        [DockPanel]::SetDock($this, [Dock]::Left)
+                    }
+                    Label 'StatusIndexLabel' {
+                        $this.Content = '0/0'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                    Label 'StatusDetailsLabel' {
+                        $this.Content = '-'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                    Label 'StatusZoomLabel' {
+                        $this.Content = '100%'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                }
+            }
+        }
     }
+
+    Invoke-ImageViewerUpdateStatus
 } | Show-WPFWindow
