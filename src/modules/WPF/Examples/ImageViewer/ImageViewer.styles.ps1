@@ -29,7 +29,7 @@ Style ScrollViewer {
 }
 
 Style Menu {
-    Setter Background SurfaceBackground -Resource
+    Setter Background WindowBackground -Resource
     Setter Foreground Foreground -Resource
 }
 
