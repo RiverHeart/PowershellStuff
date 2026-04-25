@@ -11,6 +11,7 @@ function Image {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [scriptblock] $ScriptBlock

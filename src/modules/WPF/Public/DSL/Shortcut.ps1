@@ -31,6 +31,7 @@ function Shortcut {
     param(
         [Parameter(Mandatory,Position=0)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [ArgumentCompleter({ Complete-WPFApplicationCommand @args })]
         [string] $Name,
 
