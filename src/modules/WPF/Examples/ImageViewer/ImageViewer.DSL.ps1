@@ -343,31 +343,31 @@ Window 'Window' {
             }
         }
 
-        # Row {
-        #     Column 'Expand' {
-        #         DockPanel 'StatusPanel' {
-        #             $this.Margin = 5, 0, 5, 0
-        #             Bind Visibility Window.Tag.IsFullScreen -Invert
+        Row {
+            Column 'Expand' {
+                DockPanel 'StatusPanel' {
+                    $this.Margin = 5, 0, 5, 0
+                    Bind Visibility Window.Tag.IsFullScreen -Invert
 
-        #             Label 'StatusFileLabel' {
-        #                 $this.Content = 'No image loaded'
-        #                 [DockPanel]::SetDock($this, [Dock]::Left)
-        #             }
-        #             Label 'StatusIndexLabel' {
-        #                 $this.Content = '0/0'
-        #                 [DockPanel]::SetDock($this, [Dock]::Right)
-        #             }
-        #             Label 'StatusDetailsLabel' {
-        #                 $this.Content = '-'
-        #                 [DockPanel]::SetDock($this, [Dock]::Right)
-        #             }
-        #             Label 'StatusZoomLabel' {
-        #                 $this.Content = '100%'
-        #                 [DockPanel]::SetDock($this, [Dock]::Right)
-        #             }
-        #         }
-        #     }
-        # }
+                    Label 'StatusFileLabel' {
+                        $this.Content = 'No image loaded'
+                        [DockPanel]::SetDock($this, [Dock]::Left)
+                    }
+                    Label 'StatusIndexLabel' {
+                        $this.Content = '0/0'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                    Label 'StatusDetailsLabel' {
+                        $this.Content = '-'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                    Label 'StatusZoomLabel' {
+                        $this.Content = '100%'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                }
+            }
+        }
     }
 
     Invoke-ImageViewerUpdateStatus

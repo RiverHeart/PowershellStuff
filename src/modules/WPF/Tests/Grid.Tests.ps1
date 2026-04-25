@@ -69,6 +69,33 @@ Describe 'Grid' {
         $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 2
     }
 
+    It 'Should not fail resolving row and column definition types' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        {
+            $Grid = Grid "GridTypeResolution_$Id" {
+                Row {
+                    Column {
+                        Label "TypeLabelA_$Id" {}
+                    }
+                    Column {
+                        Label "TypeLabelB_$Id" {}
+                    }
+                }
+                Row {
+                    Column {
+                        Label "TypeLabelC_$Id" {}
+                    }
+                }
+            }
+
+            $Grid.RowDefinitions[0] | Should -BeOfType [System.Windows.Controls.RowDefinition]
+            $Grid.ColumnDefinitions[0] | Should -BeOfType [System.Windows.Controls.ColumnDefinition]
+            $Grid.RowDefinitions.Count | Should -Be -ExpectedValue 2
+            $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 2
+        } | Should -Not -Throw
+    }
+
     It 'Should infer max columns without expanding on shorter rows' {
         $Id = [guid]::NewGuid().ToString('N')
         $Grid = Grid "Grid_$Id" {

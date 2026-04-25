@@ -34,6 +34,11 @@ Style Menu {
 }
 
 Style MenuItem {
-    Setter Background SurfaceBackground -Resource
+    Setter Background WindowBackground -Resource
+    Setter Foreground Foreground -Resource
+}
+
+Style Label {
+    Setter Background 'Transparent'
     Setter Foreground Foreground -Resource
 }
