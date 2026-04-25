@@ -13,7 +13,7 @@
 #>
 function Theme {
     [CmdletBinding()]
-    [OutputType([System.Windows.ResourceDictionary])]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory, Position = 0)]
         [ValidateNotNullOrEmpty()]
@@ -35,6 +35,4 @@ function Theme {
     $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
     $dictionary['__WPFThemeName'] = $Name
     $script:WPFThemeTable[$Name] = $dictionary
-
-    return $dictionary
 }

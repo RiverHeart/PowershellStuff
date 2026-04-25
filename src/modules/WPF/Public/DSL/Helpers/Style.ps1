@@ -25,7 +25,7 @@
 #>
 function Style {
     [CmdletBinding()]
-    [OutputType([System.Windows.Style])]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory, Position = 0)]
         [object] $NameOrTargetType,
@@ -90,6 +90,4 @@ function Style {
     } else {
         $script:WPFImplicitStyleTable[$resolvedType.FullName] = $style
     }
-
-    return $style
 }
