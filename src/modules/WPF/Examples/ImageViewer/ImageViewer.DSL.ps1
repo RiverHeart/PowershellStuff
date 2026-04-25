@@ -29,8 +29,8 @@ Import-Module ../.. -Force
 
 # Define the Image Viewer GUI
 
-. "$PSScriptRoot/ImageViewer.Styles.ps1"
-. "$PSScriptRoot/ImageViewer.Functions.ps1"
+Import "$PSScriptRoot/ImageViewer.Styles.ps1"
+Import "$PSScriptRoot/functions/*.ps1"
 
 Window 'Window' {
     $this.Title = 'Image Viewer'
@@ -118,6 +118,7 @@ Window 'Window' {
     Grid "Body" {
         $this.Margin = 5
 
+        # MARK: MENU
         Row {
             Column 'Expand' {
                 MenuBar 'Menu' {
@@ -168,6 +169,7 @@ Window 'Window' {
             }
         }
 
+        # MARK: IMG VIEWER
         Row 'Expand' {
             Column {
                 # In case the image is larger than the window, use the ScrollViewer
@@ -196,6 +198,7 @@ Window 'Window' {
             }
         }
 
+        # MARK: TOOLBAR
         Row {
             Column {
                 # TODO:
@@ -236,6 +239,7 @@ Window 'Window' {
             }
         }
 
+        # MARK: STATUS BAR
         Row {
             Column 'Expand' {
                 DockPanel 'StatusPanel' {
