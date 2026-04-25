@@ -33,6 +33,38 @@ function Invoke-ImageViewerToggleTheme {
 
     $Window = Reference 'Window'
     Toggle-WPFTheme -Root $Window
+    Invoke-ImageViewerUpdateNavigationIconStyle
+}
+
+# NOTE: Regrettably, the only way I've found to support Light/Dark themes
+# is to update the icon colors manually.
+function Invoke-ImageViewerUpdateNavigationIconStyle {
+    [CmdletBinding()]
+    param()
+
+    $Window = Reference 'Window'
+    $State = $Window.Tag
+    $IconBrushKey = if ($State.IsFileLoaded) { 'Foreground' } else { 'DisabledForeground' }
+    $IconBrush = $Window.TryFindResource($IconBrushKey)
+
+    if (-not $IconBrush) {
+        $IconBrush = if ($State.IsFileLoaded) {
+            [System.Windows.Media.Brushes]::White
+        } else {
+            [System.Windows.Media.Brushes]::Gray
+        }
+    }
+
+    foreach ($ButtonName in @('BackButton', 'ForwardButton')) {
+        $Button = Reference $ButtonName
+        if (-not $Button) { continue }
+
+        $Path = $Button.Content
+        if ($Path -is [System.Windows.Shapes.Path]) {
+            $Path.Fill = $IconBrush
+            $Path.Stroke = $IconBrush
+        }
+    }
 }
 
 function Invoke-ImageViewerUpdateStatus {
@@ -121,6 +153,7 @@ function Invoke-ImageViewerLoadFile {
         $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
         $State.IsFileLoaded = $true
 
+        Invoke-ImageViewerUpdateNavigationIconStyle
         Invoke-ImageViewerSetZoom -Reset
         Invoke-ImageViewerUpdateStatus
     } catch {
@@ -327,18 +360,28 @@ Window 'Window' {
                     Button 'BackButton' {
                         $this.Width = 75
                         $this.Margin = 5
+                        $this.Background = 'Transparent'
+                        $this.BorderThickness = 0
                         Bind IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
-                        Path 'images/arrow-left-solid-full.svg'
+                        Path 'images/arrow-left-solid-full.svg' {
+                            Resource Fill Foreground
+                            Resource Stroke Foreground
+                        }
                     }
                     Button 'ForwardButton' {
                         $this.Width = 75
                         $this.Margin = 5
+                        $this.Background = 'Transparent'
+                        $this.BorderThickness = 0
                         Bind IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
-                        Path 'images/arrow-right-solid-full.svg'
+                        Path 'images/arrow-right-solid-full.svg' {
+                            Resource Fill Foreground
+                            Resource Stroke Foreground
+                        }
                     }
                 }
             }
@@ -372,4 +415,5 @@ Window 'Window' {
     }
 
     Invoke-ImageViewerUpdateStatus
+    Invoke-ImageViewerUpdateNavigationIconStyle
 } | Show-WPFWindow
