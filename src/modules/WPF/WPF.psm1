@@ -33,6 +33,7 @@ if (-not $Script:WPFFileInfo) {
 $Paths = @(
     'Private'
     'Public'
+    'TypeConverters'
 )
 
 foreach ($Path in $Paths) {
