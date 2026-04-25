@@ -2,6 +2,29 @@ using namespace System
 using namespace System.Windows
 using namespace System.Management.Automation
 
+<#
+.SYNOPSIS
+    Type converter for System.Windows.Thickness.
+
+.DESCRIPTION
+    This type converter allows converting from a string in the format "left,top,right,bottom"
+    or from an array of 4 numeric values to a Thickness object. This is allows for a cleaner
+    syntax when defining Thickness values in the DSL.
+
+    Thickness is a struct used in WPF to represent the thickness of a frame around a rectangle.
+    It has four properties: Left, Top, Right, and Bottom. Margin and Padding properties in WPF
+    often use Thickness to specify the amount of space around or inside a control.
+
+.EXAMPLE
+    # Using a string
+    [System.Windows.Thickness] $thickness = "10,20,30,40"
+    # $thickness is now a Thickness object with Left=10, Top=20, Right=30, Bottom=40
+
+.EXAMPLE
+    # Using an array
+    [System.Windows.Thickness] $thickness = 10, 20, 30, 40
+    # $thickness is now a Thickness object with Left=10, Top=20, Right=30, Bottom=40
+#>
 class ThicknessConverter : PSTypeConverter
 {
     [bool] CanConvertFrom([object] $SourceValue, [Type] $TargetType) {
@@ -74,4 +97,7 @@ class ThicknessConverter : PSTypeConverter
     }
 }
 
-Update-TypeData -TypeName System.Windows.Thickness -TypeConverter ThicknessConverter -Force
+Update-TypeData `
+    -TypeName System.Windows.Thickness `
+    -TypeConverter ThicknessConverter `
+    -Force
