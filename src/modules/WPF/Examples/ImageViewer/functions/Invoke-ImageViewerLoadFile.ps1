@@ -22,7 +22,7 @@ function Invoke-ImageViewerLoadFile {
         $State.IsFileLoaded = $true
 
         Invoke-ImageViewerUpdateNavigationIconStyle
-        Invoke-ImageViewerSetZoom -Reset
+        Invoke-ImageViewerFitToWindow
         Invoke-ImageViewerUpdateStatus
     } catch {
         Write-Warning "Failed to load image '$FileName': $_"

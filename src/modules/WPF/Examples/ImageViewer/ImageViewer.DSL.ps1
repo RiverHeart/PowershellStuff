@@ -153,6 +153,12 @@ Window 'Window' {
                         }
                     }
 
+                    MenuItem '(V)iew/(I)mage Fit to Window' {
+                        When Click {
+                            Invoke-ImageViewerFitToWindow
+                        }
+                    }
+
                     MenuItem '(V)iew/(T)oggle Theme' {
                         Shortcut 'ToggleTheme' 'Ctrl+T' {
                             Invoke-ImageViewerToggleTheme
@@ -176,6 +182,7 @@ Window 'Window' {
                 ScrollViewer 'ScrollViewer' {
                     $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
                     $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $this.Background = 'Transparent'
 
                     When PreviewMouseWheel {
                         param($sender, $event)
@@ -202,7 +209,7 @@ Window 'Window' {
             Column {
                 # TODO:
                 # * Needs to support Counter/Clockwise rotation.
-                # * Needs to support "Fit to Window" and "Actual Image Size" modes.
+                # * Needs to support "Actual Image Size" mode.
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
@@ -217,6 +224,20 @@ Window 'Window' {
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
                         Path 'images/arrow-left-solid-full.svg' {
+                            Resource Fill Foreground
+                            Resource Stroke Foreground
+                        }
+                    }
+                    Button 'FitToWindowButton' {
+                        $this.Width = 75
+                        $this.Margin = 5
+                        $this.Background = 'Transparent'
+                        $this.BorderThickness = 0
+                        $this.ToolTip = 'Fit image to window'
+                        Bind IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerFitToWindow }
+                        Path 'images/arrows-to-circle-solid-full.svg' {
                             Resource Fill Foreground
                             Resource Stroke Foreground
                         }
