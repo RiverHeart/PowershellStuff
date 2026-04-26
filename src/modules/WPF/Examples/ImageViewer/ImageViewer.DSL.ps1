@@ -153,9 +153,15 @@ Window 'Window' {
                         }
                     }
 
-                    MenuItem '(V)iew/(I)mage Fit to Window' {
+                    MenuItem '(V)iew/Image Fit to (W)indow' {
                         When Click {
                             Invoke-ImageViewerFitToWindow
+                        }
+                    }
+
+                    MenuItem '(V)iew/Image (A)ctual Size' {
+                        When Click {
+                            Invoke-ImageViewerSetZoom -Reset
                         }
                     }
 
@@ -209,7 +215,6 @@ Window 'Window' {
             Column {
                 # TODO:
                 # * Needs to support Counter/Clockwise rotation.
-                # * Needs to support "Actual Image Size" mode.
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
@@ -238,6 +243,20 @@ Window 'Window' {
 
                         When 'Click' { Invoke-ImageViewerFitToWindow }
                         Path 'images/arrows-to-circle-solid-full.svg' {
+                            Resource Fill Foreground
+                            Resource Stroke Foreground
+                        }
+                    }
+                    Button 'ActualSizeButton' {
+                        $this.Width = 75
+                        $this.Margin = 5
+                        $this.Background = 'Transparent'
+                        $this.BorderThickness = 0
+                        $this.ToolTip = 'Actual size (100%)'
+                        Bind IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerSetZoom -Reset }
+                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
                             Resource Fill Foreground
                             Resource Stroke Foreground
                         }
