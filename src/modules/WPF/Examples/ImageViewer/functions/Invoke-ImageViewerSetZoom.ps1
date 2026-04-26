@@ -9,6 +9,8 @@ function Invoke-ImageViewerSetZoom {
     $State = (Reference 'Window').Tag
     $Viewer = Reference 'Viewer'
 
+    $State.IsFitMode = $false
+
     $ZoomLevel = if ($Reset) { 1.0 } else { [double] $State.ZoomLevel + $Delta }
     $ZoomLevel = [Math]::Max(0.10, [Math]::Min(8.00, $ZoomLevel))
     $ZoomLevel = [Math]::Round($ZoomLevel, 2)

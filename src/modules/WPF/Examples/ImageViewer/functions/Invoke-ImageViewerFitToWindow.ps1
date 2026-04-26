@@ -51,5 +51,7 @@ function Invoke-ImageViewerFitToWindow {
     $Transform.ScaleX = $ZoomLevel
     $Transform.ScaleY = $ZoomLevel
 
+    $State.IsFitMode = $true
+
     Invoke-ImageViewerUpdateStatus
 }

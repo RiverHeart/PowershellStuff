@@ -40,6 +40,7 @@ Window 'Window' {
     $this.Tag = New-WPFObservableState @{
         IsFullScreen   = $false
         IsFileLoaded   = $false
+        IsFitMode      = $true
         ZoomLevel      = 1.0
         OldWindowStyle = $this.WindowStyle
         OldWindowState = $this.WindowState
@@ -49,6 +50,14 @@ Window 'Window' {
     }
 
     Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
+
+    # WARNING: A little debouncing might be needed to prevent multiple rapid
+    # SizeChanged events from causing issues.
+    When SizeChanged {
+        if ((Reference 'Window').Tag.IsFitMode) {
+            Invoke-ImageViewerFitToWindow
+        }
+    }
 
     # Window doesn't have a Command property like button so
     # you need to wire up an event.
@@ -61,12 +70,9 @@ Window 'Window' {
                 if (-not $State.IsFullScreen) { return }
 
                 Set-WPFWindowFullScreen -IsFullScreen $False
-                $event.Handled = $True
-                break
-            }
-            'F11' {
-                $State = $this.Tag
-                Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                if ($State.IsFitMode) {
+                    Invoke-ImageViewerFitToWindow
+                }
                 $event.Handled = $True
                 break
             }
@@ -150,6 +156,9 @@ Window 'Window' {
                             $Window = Reference 'Window'
                             $State = $Window.Tag
                             Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                            if ($State.IsFitMode) {
+                                Invoke-ImageViewerFitToWindow
+                            }
                         }
                     }
 
