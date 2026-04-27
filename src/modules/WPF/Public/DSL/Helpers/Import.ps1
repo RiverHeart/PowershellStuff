@@ -33,10 +33,10 @@ function Import {
             Where-Object { $_.Extension -in @('.ps1', '.psd1') }
 
         foreach ($File in $Files) {
-            Write-Host "Importing: $($File.FullName)"
+            Write-Debug "Importing: $($File.FullName)"
             $ExecutionContext.InvokeCommand.InvokeScript(
                 <# UseLocalScope #> $PSCmdlet.SessionState,
-                <# string script #> [scriptblock]::Create(". '$($File.FullName)'"),
+                <# string script #> { . $File.FullName },
                 <# IList input #> $null,
                 <# Params System.Object[] args #> $null
             )
