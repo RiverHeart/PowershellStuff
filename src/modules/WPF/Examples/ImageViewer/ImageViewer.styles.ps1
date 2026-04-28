@@ -26,6 +26,30 @@ Style Button {
     Setter Foreground Foreground -Resource
 }
 
+Style 'ImageViewer.IconButton' Button {
+    Setter Background 'Transparent'
+    Setter BorderBrush 'Transparent'
+    Setter BorderThickness 0
+    Setter Padding 0
+    Setter FocusVisualStyle $null
+    Setter HorizontalContentAlignment ([HorizontalAlignment]::Stretch)
+    Setter VerticalContentAlignment ([VerticalAlignment]::Stretch)
+    Setter OverridesDefaultStyle $true
+
+    $Template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
+    $Presenter = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
+
+    $Presenter.SetValue([System.Windows.Controls.ContentPresenter]::HorizontalAlignmentProperty, [HorizontalAlignment]::Stretch)
+    $Presenter.SetValue([System.Windows.Controls.ContentPresenter]::VerticalAlignmentProperty, [VerticalAlignment]::Stretch)
+    $Presenter.SetValue([System.Windows.Controls.ContentPresenter]::SnapsToDevicePixelsProperty, $true)
+
+    $Template.VisualTree = $Presenter
+
+    $this.Setters.Add(
+        [System.Windows.Setter]::new([System.Windows.Controls.Control]::TemplateProperty, $Template)
+    ) | Out-Null
+}
+
 Style ScrollViewer {
     Setter Background ScrollBackground -Resource
 }

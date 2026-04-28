@@ -81,6 +81,8 @@ function Update-WPFObject {
                 # to add them based on the object type so you don't need to remember.
                 if ($InputObject -is [System.Windows.Controls.Button]) {
                     $InputObject.Content = $Child
+                } elseif ($InputObject -is [System.Windows.Controls.Border]) {
+                    $InputObject.Child = $Child
                 }
             }
             else {

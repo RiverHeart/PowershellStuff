@@ -29,8 +29,12 @@ Import-Module ../.. -Force
 
 # Define the Image Viewer GUI
 
-Import "$PSScriptRoot/ImageViewer.Styles.ps1"
-Import "$PSScriptRoot/functions/*.ps1"
+#Import "$PSScriptRoot/ImageViewer.Styles.ps1"
+#Import "$PSScriptRoot/functions/*.ps1"
+. "$PSScriptRoot/ImageViewer.Styles.ps1"
+foreach ($File in Get-ChildItem "$PSScriptRoot/functions/*.ps1") {
+    . $File.FullName
+}
 
 Window 'Window' {
     $this.Title = 'Image Viewer'
@@ -119,6 +123,11 @@ Window 'Window' {
         }
 
         $event.Handled = $true
+    }
+
+    When 'Loaded' {
+        Invoke-ImageViewerUpdateStatus
+        Invoke-ImageViewerUpdateNavigationIconStyle
     }
 
     Grid "Body" {
@@ -229,21 +238,42 @@ Window 'Window' {
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
                     Bind Visibility Window.Tag.IsFullScreen -Invert
 
+                    $ButtonSize = 56
+                    $IconScale = 0.6
+                    $IconSize = [math]::Round($ButtonSize * $IconScale)
+                    $IconPadding = [math]::Round(($ButtonSize - $IconSize) / 2)
+                    $ButtonCornerRadius = 8
+
                     Button 'BackButton' {
-                        $this.Width = 75
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
                         $this.Margin = 5
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
                         Bind IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
-                        Path 'images/arrow-left-solid-full.svg' {
-                            Resource Fill Foreground
-                            Resource Stroke Foreground
+                        Border {
+                            $this.CornerRadius = $ButtonCornerRadius
+                            $this.Padding = $IconPadding
+                            $this.BorderThickness = 1
+                            Resource Background ButtonBackground
+                            Resource BorderBrush DisabledForeground
+
+                            Path 'images/arrow-left-solid-full.svg' {
+                                $this.Width = $IconSize
+                                $this.Height = $IconSize
+                                $this.Stretch = [Stretch]::Uniform
+                                Resource Fill Foreground
+                                Resource Stroke Foreground
+                            }
                         }
                     }
                     Button 'FitToWindowButton' {
-                        $this.Width = 75
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
                         $this.Margin = 5
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
@@ -251,13 +281,26 @@ Window 'Window' {
                         Bind IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerFitToWindow }
-                        Path 'images/arrows-to-circle-solid-full.svg' {
-                            Resource Fill Foreground
-                            Resource Stroke Foreground
+                        Border {
+                            $this.CornerRadius = $ButtonCornerRadius
+                            $this.Padding = $IconPadding
+                            $this.BorderThickness = 1
+                            Resource Background ButtonBackground
+                            Resource BorderBrush DisabledForeground
+
+                            Path 'images/arrows-to-circle-solid-full.svg' {
+                                $this.Width = $IconSize
+                                $this.Height = $IconSize
+                                $this.Stretch = [Stretch]::Uniform
+                                Resource Fill Foreground
+                                Resource Stroke Foreground
+                            }
                         }
                     }
                     Button 'ActualSizeButton' {
-                        $this.Width = 75
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
                         $this.Margin = 5
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
@@ -265,22 +308,46 @@ Window 'Window' {
                         Bind IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerSetZoom -Reset }
-                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
-                            Resource Fill Foreground
-                            Resource Stroke Foreground
+                        Border {
+                            $this.CornerRadius = $ButtonCornerRadius
+                            $this.Padding = $IconPadding
+                            $this.BorderThickness = 1
+                            Resource Background ButtonBackground
+                            Resource BorderBrush DisabledForeground
+
+                            Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                                $this.Width = $IconSize
+                                $this.Height = $IconSize
+                                $this.Stretch = [Stretch]::Uniform
+                                Resource Fill Foreground
+                                Resource Stroke Foreground
+                            }
                         }
                     }
                     Button 'ForwardButton' {
-                        $this.Width = 75
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
                         $this.Margin = 5
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
                         Bind IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
-                        Path 'images/arrow-right-solid-full.svg' {
-                            Resource Fill Foreground
-                            Resource Stroke Foreground
+                        Border {
+                            $this.CornerRadius = $ButtonCornerRadius
+                            $this.Padding = $IconPadding
+                            $this.BorderThickness = 1
+                            Resource Background ButtonBackground
+                            Resource BorderBrush DisabledForeground
+
+                            Path 'images/arrow-right-solid-full.svg' {
+                                $this.Width = $IconSize
+                                $this.Height = $IconSize
+                                $this.Stretch = [Stretch]::Uniform
+                                Resource Fill Foreground
+                                Resource Stroke Foreground
+                            }
                         }
                     }
                 }
@@ -314,7 +381,4 @@ Window 'Window' {
             }
         }
     }
-
-    Invoke-ImageViewerUpdateStatus
-    Invoke-ImageViewerUpdateNavigationIconStyle
 } | Show-WPFWindow

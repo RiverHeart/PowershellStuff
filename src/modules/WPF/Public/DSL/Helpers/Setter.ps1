@@ -46,22 +46,27 @@ function Setter {
         $setterValue = if ($Resource) {
             [System.Windows.DynamicResourceExtension]::new([string] $Value)
         } else {
-            if ($Value -is [string]) {
-                $propertyType = $descriptor.PropertyType
-                if ($propertyType -and $propertyType -ne [string]) {
-                    try {
-                        $converter = [System.ComponentModel.TypeDescriptor]::GetConverter($propertyType)
-                        if ($converter -and $converter.CanConvertFrom([string])) {
-                            $converter.ConvertFromInvariantString($Value)
-                        } else {
-                            $Value
+            $propertyType = $descriptor.PropertyType
+            if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {
+                try {
+                    [System.Management.Automation.LanguagePrimitives]::ConvertTo($Value, $propertyType)
+                } catch {
+                    if ($Value -is [string] -and $propertyType -ne [string]) {
+                        try {
+                            $converter = [System.ComponentModel.TypeDescriptor]::GetConverter($propertyType)
+                            if ($converter -and $converter.CanConvertFrom([string])) {
+                                $converter.ConvertFromInvariantString($Value)
+                            } else {
+                                $Value
+                            }
+                        } catch {
+                            Write-Error "Setter: Failed to convert '$Value' to '$($propertyType.FullName)' for property '$Property'."
+                            return
                         }
-                    } catch {
+                    } else {
                         Write-Error "Setter: Failed to convert '$Value' to '$($propertyType.FullName)' for property '$Property'."
                         return
                     }
-                } else {
-                    $Value
                 }
             } else {
                 $Value
