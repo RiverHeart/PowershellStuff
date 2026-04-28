@@ -1,0 +1,368 @@
+# WPF DSL Keyword Reference
+
+This is a practical first-pass reference for currently exported DSL commands.
+
+Scope of this page:
+
+- Focus on syntax and intent
+- Keep behavioral details brief
+- Point to examples for deeper usage
+
+## Core Pattern
+
+Most control keywords follow this shape:
+
+```powershell
+ControlName 'Name' {
+    # Set properties on $this
+    # Add child controls
+    # Add events with When
+}
+```
+
+Behavior notes:
+
+- Inside the scriptblock, $this is the object currently being configured.
+- Controls created inside another control are auto-attached to the parent.
+- Most controls return nothing when auto-attached, otherwise they return the created object.
+
+## Controls
+
+### Window
+
+Creates a WPF Window.
+
+```powershell
+Window 'MainWindow' {
+    $this.Title = 'My App'
+}
+```
+
+### Grid
+
+Creates a Grid and processes Row and Column specs.
+
+```powershell
+Grid 'Body' {
+    Row {
+        Column {
+            Label 'Title' {}
+        }
+    }
+}
+```
+
+### Row
+
+Defines a row spec inside Grid.
+
+```powershell
+Row {
+    Column { }
+}
+
+Row 'Fit' {
+    Column { }
+}
+
+Row 'Expand*2' {
+    Column { }
+}
+```
+
+### Column
+
+Defines a column spec inside Row.
+
+```powershell
+Column {
+    Label 'A' {}
+}
+
+Column 'Fit' {
+    Label 'B' {}
+}
+
+Column 'Expand*3' {
+    Label 'C' {}
+}
+```
+
+### Border
+
+Creates a Border. Supports named and nameless forms.
+
+```powershell
+Border 'Card' {
+    Label 'Header' {}
+}
+
+Border {
+    Label 'BodyText' {}
+}
+```
+
+### Button
+
+Creates a Button.
+
+```powershell
+Button 'SaveButton' {
+    $this.Content = 'Save'
+}
+```
+
+### Label
+
+Creates a Label.
+
+```powershell
+Label 'StatusLabel' {
+    $this.Content = 'Ready'
+}
+```
+
+### TextBlock
+
+Creates a TextBlock.
+
+```powershell
+TextBlock 'InfoText' {
+    $this.Text = 'Details'
+}
+```
+
+### TextBox
+
+Creates a TextBox.
+
+```powershell
+TextBox 'SearchText' {
+    $this.Width = 250
+}
+```
+
+### Image
+
+Creates an Image control.
+
+```powershell
+Image 'Preview' {
+    $this.StretchDirection = 'DownOnly'
+}
+```
+
+### ScrollViewer
+
+Creates a ScrollViewer.
+
+```powershell
+ScrollViewer 'Scroller' {
+    Image 'Viewer' {}
+}
+```
+
+### StackPanel
+
+Creates a StackPanel.
+
+```powershell
+StackPanel 'Toolbar' {
+    Button 'A' {}
+    Button 'B' {}
+}
+```
+
+### DockPanel
+
+Creates a DockPanel.
+
+```powershell
+DockPanel 'Layout' {
+    Label 'Left' {}
+    Label 'Right' {}
+}
+```
+
+### DatePicker
+
+Creates a DatePicker.
+
+```powershell
+DatePicker 'StartDate' {
+    $this.SelectedDate = [datetime]::Today
+}
+```
+
+### Menu
+
+Creates a Menu control.
+
+```powershell
+Menu 'TopMenu' {
+    MenuItem '_File' {
+        MenuItem '_Exit' {
+            When Click { (Reference 'MainWindow').Close() }
+        }
+    }
+}
+```
+
+### MenuBar
+
+Creates a Menu intended for menu bar scenarios.
+
+```powershell
+MenuBar 'Menu' {
+    MenuItem '_File/_Open' {
+        When Click { }
+    }
+}
+```
+
+### MenuItem
+
+Creates a MenuItem. Supports path shorthand using slash-separated names.
+
+```powershell
+MenuItem '_File/_Open' {
+    When Click { }
+}
+```
+
+## Shapes
+
+### Path
+
+Loads a path from an SVG file and returns a WPF Path shape.
+
+```powershell
+Path 'images/arrow-left.svg' {
+    $this.Stretch = 'Uniform'
+}
+```
+
+## Commands and Events
+
+### Shortcut
+
+Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
+
+```powershell
+Shortcut 'Open' {
+    # Uses built-in ApplicationCommand if available
+}
+
+Shortcut 'MyCommand' 'Ctrl+M' {
+    Write-Host 'Run custom command'
+}
+```
+
+### When
+
+Adds an event handler to the current object.
+
+```powershell
+When Click {
+    Write-Host 'Clicked'
+}
+```
+
+## Binding and Resources
+
+### Bind
+
+Binds a target property to an observable state path.
+
+```powershell
+Bind Visibility Window.Tag.IsFullScreen -Invert
+Bind IsEnabled Window.Tag.IsFileLoaded
+```
+
+### Resource
+
+Binds a dependency property to a dynamic resource key.
+
+```powershell
+Resource Background WindowBackground
+```
+
+### Theme
+
+Defines a named theme dictionary.
+
+```powershell
+Theme 'Light' {
+    Brush 'WindowBackground' '#FFFFFF'
+}
+```
+
+### Brush
+
+Adds a brush entry to the current Theme.
+
+```powershell
+Brush 'Foreground' '#111111'
+```
+
+## Styles
+
+### Style
+
+Defines named or implicit styles.
+
+```powershell
+Style 'PrimaryButton' Button {
+    Setter Padding '12,6,12,6'
+}
+
+Style Button {
+    Setter Margin '0,8,0,0'
+}
+```
+
+### Setter
+
+Adds a setter to the current style.
+
+```powershell
+Setter Background ButtonBackground -Resource
+Setter Margin '0,8,0,0'
+```
+
+### UseStyle
+
+Applies a named style to the current object.
+
+```powershell
+UseStyle 'PrimaryButton'
+```
+
+## Lookup and Composition Helpers
+
+### Reference
+
+Gets a registered object by name.
+
+```powershell
+$Window = Reference 'Window'
+$Buttons = Reference 'BackButton', 'ForwardButton'
+```
+
+### Import
+
+Dot-sources script files into caller scope.
+
+```powershell
+Import './functions/*.ps1'
+```
+
+## Compatibility Note
+
+The keyword contract is intentionally simple:
+
+- Use trailing scriptblocks for control bodies.
+- Build UI top-down through nesting.
+- Prefer $this for current-object configuration.
+
+If behavior changes are needed, update examples and tests in the same change.
