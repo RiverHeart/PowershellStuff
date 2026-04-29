@@ -330,6 +330,25 @@ Setter Background ButtonBackground -Resource
 Setter Margin '0,8,0,0'
 ```
 
+### Trigger
+
+Adds a property trigger to the current Style or ControlTemplate.
+
+```powershell
+Style 'PrimaryButton' Button {
+    Trigger IsMouseOver $true {
+        Setter Opacity 0.85
+    }
+}
+```
+
+```powershell
+# ControlTemplate scope supports SourceName and Setter -Target
+Trigger IsEnabled $false -SourceName 'TemplateBorder' {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
 ### UseStyle
 
 Applies a named style to the current object.
