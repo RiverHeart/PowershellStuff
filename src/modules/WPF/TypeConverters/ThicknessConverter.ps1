@@ -50,14 +50,23 @@ class ThicknessConverter : PSTypeConverter
 
         if ($SourceValue -is [string]) {
             $parts = $SourceValue.Split(',')
+
+            # Uniform
             if (
                 $parts.Length -eq 1 -and
                 [double]::TryParse($parts[0].Trim(), [ref]([double]$null))
             ) {
                 return $true
-            }
 
-            if (
+            # Symmetric
+            } elseif ($parts.length -eq 2 -and
+                [double]::TryParse($parts[0].Trim(), [ref]([double]$null)) -and
+                [double]::TryParse($parts[1].Trim(), [ref]([double]$null))
+            ) {
+                return $true
+
+            # Independent
+            } elseif (
                 $parts.Length -eq 4 -and
                 [double]::TryParse($parts[0].Trim(), [ref]([double]$null)) -and
                 [double]::TryParse($parts[1].Trim(), [ref]([double]$null)) -and
@@ -66,10 +75,20 @@ class ThicknessConverter : PSTypeConverter
             ) {
                 return $true
             }
+        # Uniform
         } elseif ($SourceValue -is [object[]] -and $SourceValue.Length -eq 1) {
             if ([double]::TryParse("$($SourceValue[0])", [ref]([double]$null))) {
                 return $true
             }
+        # Symmetric
+        } elseif ($SourceValue -is [object[]] -and $SourceValue.Length -eq 2) {
+            if (
+                [double]::TryParse("$($SourceValue[0])", [ref]([double]$null)) -and
+                [double]::TryParse("$($SourceValue[1])", [ref]([double]$null))
+            ) {
+                return $true
+            }
+        # Independent
         } elseif ($SourceValue -is [object[]] -and $SourceValue.Length -eq 4) {
             if (
                 [double]::TryParse("$($SourceValue[0])", [ref]([double]$null)) -and
@@ -110,13 +129,21 @@ class ThicknessConverter : PSTypeConverter
         if ($SourceValue -is [string]) {
             $parts = $SourceValue.Split(',')
 
+            # Uniform
             if ($parts.Length -eq 1 -and
                 [double]::TryParse($parts[0].Trim(), [ref] $left)
             ) {
                 return [System.Windows.Thickness]::new($left)
-            }
 
-            if ($parts.Length -eq 4 -and
+            # Symmetric
+            } elseif ($parts.Length -eq 2 -and
+                [double]::TryParse($parts[0].Trim(), [ref] $left) -and
+                [double]::TryParse($parts[1].Trim(), [ref] $top)
+            ) {
+                return [System.Windows.Thickness]::new($left, $top, $left, $top)
+
+            # Independent
+            } elseif ($parts.Length -eq 4 -and
                 [double]::TryParse($parts[0].Trim(), [ref] $left) -and
                 [double]::TryParse($parts[1].Trim(), [ref] $top) -and
                 [double]::TryParse($parts[2].Trim(), [ref] $right) -and
@@ -125,13 +152,21 @@ class ThicknessConverter : PSTypeConverter
                 return [System.Windows.Thickness]::new($left, $top, $right, $bottom)
             }
         } elseif ($SourceValue -is [object[]]) {
+            # Uniform
             if ($SourceValue.Length -eq 1 -and
                 [double]::TryParse("$($SourceValue[0])", [ref] $left)
             ) {
                 return [System.Windows.Thickness]::new($left)
-            }
 
-            if ($SourceValue.Length -eq 4 -and
+            # Symmetric
+            } elseif ($SourceValue.Length -eq 2 -and
+                [double]::TryParse("$($SourceValue[0])", [ref] $left) -and
+                [double]::TryParse("$($SourceValue[1])", [ref] $top)
+            ) {
+                return [System.Windows.Thickness]::new($left, $top, $left, $top)
+
+            # Independent
+            } elseif ($SourceValue.Length -eq 4 -and
                 [double]::TryParse("$($SourceValue[0])", [ref] $left) -and
                 [double]::TryParse("$($SourceValue[1])", [ref] $top) -and
                 [double]::TryParse("$($SourceValue[2])", [ref] $right) -and
