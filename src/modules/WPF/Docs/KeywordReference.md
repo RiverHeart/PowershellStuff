@@ -270,13 +270,29 @@ When Click {
 
 ## Binding and Resources
 
-### Bind
+### React
 
 Binds a target property to an observable state path.
 
 ```powershell
-Bind Visibility Window.Tag.IsFullScreen -Invert
-Bind IsEnabled Window.Tag.IsFileLoaded
+React Visibility Window.Tag.IsFullScreen -Invert
+React IsEnabled Window.Tag.IsFileLoaded
+```
+
+### Binding
+
+Creates a WPF Binding object for advanced scenarios like DataTrigger.
+
+```powershell
+DataTrigger (Binding 'IsEnabled' -Self) $false {
+    Setter Opacity 0.85
+}
+```
+
+```powershell
+DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
 ```
 
 ### Resource
@@ -362,10 +378,7 @@ Style 'PrimaryButton' Button {
 ```
 
 ```powershell
-$binding = [System.Windows.Data.Binding]::new('IsEnabled')
-$binding.RelativeSource = [System.Windows.Data.RelativeSource]::new([System.Windows.Data.RelativeSourceMode]::TemplatedParent)
-
-DataTrigger $binding $false {
+DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
     Setter Opacity 0.6 -Target 'TemplateBorder'
 }
 ```

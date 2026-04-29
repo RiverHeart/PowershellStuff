@@ -27,8 +27,7 @@ Describe 'DataTrigger' {
 
     It 'Should add control template data triggers and support setter target names' {
         $template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
-        $binding = [System.Windows.Data.Binding]::new('IsEnabled')
-        $binding.RelativeSource = [System.Windows.Data.RelativeSource]::new([System.Windows.Data.RelativeSourceMode]::TemplatedParent)
+        $binding = Binding 'IsEnabled' -TemplatedParent
         $psVars = @([psvariable]::new('this', $template))
 
         {

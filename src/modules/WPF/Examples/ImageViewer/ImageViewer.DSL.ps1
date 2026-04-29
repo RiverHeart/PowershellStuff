@@ -136,7 +136,7 @@ Window 'Window' {
             Column 'Expand' {
                 MenuBar 'Menu' {
                     $this.Height = 25
-                    Bind Visibility Window.Tag.IsFullScreen -Invert
+                    React Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
@@ -260,7 +260,7 @@ Window 'Window' {
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                    Bind Visibility Window.Tag.IsFullScreen -Invert
+                    React Visibility Window.Tag.IsFullScreen -Invert
 
                     $ButtonSize = 56
                     $IconScale = 0.6
@@ -274,7 +274,7 @@ Window 'Window' {
                         $this.Margin = 5
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
-                        Bind IsEnabled Window.Tag.IsFileLoaded
+                        React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
                         Border {
@@ -297,7 +297,7 @@ Window 'Window' {
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
                         $this.ToolTip = 'Fit image to window'
-                        Bind IsEnabled Window.Tag.IsFileLoaded
+                        React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerFitToWindow }
                         Border {
@@ -320,7 +320,7 @@ Window 'Window' {
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
                         $this.ToolTip = 'Actual size (100%)'
-                        Bind IsEnabled Window.Tag.IsFileLoaded
+                        React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerSetZoom -Reset }
                         Border {
@@ -343,7 +343,7 @@ Window 'Window' {
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
                         $this.ToolTip = 'Rotate 90° clockwise'
-                        Bind IsEnabled Window.Tag.IsFileLoaded
+                        React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
                         Border {
@@ -365,7 +365,7 @@ Window 'Window' {
                         $this.Margin = 5
                         $this.Background = 'Transparent'
                         $this.BorderThickness = 0
-                        Bind IsEnabled Window.Tag.IsFileLoaded
+                        React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
                         Border {
@@ -389,7 +389,7 @@ Window 'Window' {
             Column 'Expand' {
                 DockPanel 'StatusPanel' {
                     $this.Margin = 5, 0, 5, 0
-                    Bind Visibility Window.Tag.IsFullScreen -Invert
+                    React Visibility Window.Tag.IsFullScreen -Invert
 
                     Label 'StatusFileLabel' {
                         $this.Content = 'No image loaded'

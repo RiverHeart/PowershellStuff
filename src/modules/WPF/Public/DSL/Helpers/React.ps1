@@ -7,7 +7,7 @@
     New-WPFObservableState. Whenever the source property changes, the target
     property is updated automatically.
 
-    Call inside a DSL control body to bind $this implicitly, or pass a control
+    Call inside a DSL control body to react from $this implicitly, or pass a control
     via -InputObject for use outside a body.
 
     SourcePath format: "RegisteredName[.NavigationPath].PropertyName"
@@ -46,22 +46,22 @@
 .EXAMPLE
     # Inside a control body - hides menu when fullscreen
     MenuBar 'Menu' {
-        Bind Visibility Window.Tag.IsFullScreen -Invert
+        React Visibility Window.Tag.IsFullScreen -Invert
         ...
     }
 
 .EXAMPLE
     # Enable buttons only when a file is loaded
     Button 'BackButton' {
-        Bind IsEnabled Window.Tag.IsFileLoaded
+        React IsEnabled Window.Tag.IsFileLoaded
         ...
     }
 
 .EXAMPLE
-    # Using a converter to bind a non-boolean property
+    # Using a converter to react a non-boolean property
 
     Label 'Status' {
-        Bind Content Window.Tag.CurrentFile -Converter {
+        React Content Window.Tag.CurrentFile -Converter {
             if ($args[0]) {
                 "File: $args[0].Name"
             } else {
@@ -71,7 +71,7 @@
         ...
     }
 #>
-function Bind {
+function React {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
@@ -93,11 +93,11 @@ function Bind {
     )
 
     process {
-        Write-Verbose "Bind: Resolving target object for property '$Property' from source path '$SourcePath'."
+        Write-Verbose "React: Resolving target object for property '$Property' from source path '$SourcePath'."
         $target = if ($null -ne $InputObject) { $InputObject } else { $PSCmdlet.GetVariableValue('this') }
 
         if (-not $target) {
-            Write-Error "Bind: Unable to resolve target object. Use Bind inside a DSL control block or pass -InputObject."
+            Write-Error "React: Unable to resolve target object. Use React inside a DSL control block or pass -InputObject."
             return
         }
 
@@ -105,20 +105,20 @@ function Bind {
         # first segment -> Reference lookup, intermediates -> navigation, last -> property name
         $parts  = $SourcePath.Split('.')
         if ($parts.Length -lt 2) {
-            Write-Error "Bind: SourcePath '$SourcePath' must include at least one navigation/property segment (example: Window.Tag.IsFullScreen)."
+            Write-Error "React: SourcePath '$SourcePath' must include at least one navigation/property segment (example: Window.Tag.IsFullScreen)."
             return
         }
 
-        Write-Verbose "Bind: Resolving source root '$($parts[0])'."
+        Write-Verbose "React: Resolving source root '$($parts[0])'."
         $source = Reference $parts[0]
         for ($i = 1; $i -lt ($parts.Length - 1); $i++) {
-            Write-Verbose "Bind: Navigating source segment '$($parts[$i])'."
+            Write-Verbose "React: Navigating source segment '$($parts[$i])'."
             $source = $source.($parts[$i])
         }
         $sourceProp = $parts[-1]
 
         if ($null -eq $source) {
-            Write-Error "Bind: Failed to resolve source object for path '$SourcePath'."
+            Write-Error "React: Failed to resolve source object for path '$SourcePath'."
             return
         }
 
@@ -139,8 +139,8 @@ function Bind {
         }.GetNewClosure()
 
         $targetName = if ($target.PSObject.Properties['Name']) { $target.Name } else { '<unnamed>' }
-        Write-Debug "Bind registered: Source='$SourcePath' (property '$sourceProp') -> Target='$targetName.$Property'; Invert=$inv; ConverterPresent=$($null -ne $conv)"
-        Write-Verbose "Bind: Registering callback and applying initial value for '$Property'."
+        Write-Debug "React registered: Source='$SourcePath' (property '$sourceProp') -> Target='$targetName.$Property'; Invert=$inv; ConverterPresent=$($null -ne $conv)"
+        Write-Verbose "React: Registering callback and applying initial value for '$Property'."
         $source.AddBinding($sourceProp, $callback)
     }
 }
