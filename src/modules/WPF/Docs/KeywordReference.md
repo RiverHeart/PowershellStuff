@@ -349,6 +349,27 @@ Trigger IsEnabled $false -SourceName 'TemplateBorder' {
 }
 ```
 
+### DataTrigger
+
+Adds a data trigger to the current Style or ControlTemplate.
+
+```powershell
+Style 'PrimaryButton' Button {
+    DataTrigger 'IsEnabled' $false -Self {
+        Setter Opacity 0.85
+    }
+}
+```
+
+```powershell
+$binding = [System.Windows.Data.Binding]::new('IsEnabled')
+$binding.RelativeSource = [System.Windows.Data.RelativeSource]::new([System.Windows.Data.RelativeSourceMode]::TemplatedParent)
+
+DataTrigger $binding $false {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
 ### UseStyle
 
 Applies a named style to the current object.
