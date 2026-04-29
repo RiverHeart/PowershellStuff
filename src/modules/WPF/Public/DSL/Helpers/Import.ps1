@@ -35,9 +35,8 @@ function Import {
         foreach ($File in $Files) {
             Write-Debug "Importing: $($File.FullName)"
             $ExecutionContext.InvokeCommand.InvokeScript(
-                <# UseLocalScope #> $PSCmdlet.SessionState,
-                <# string script #> [scriptblock]::Create("{ . $($File.FullName) }"),
-                <# IList input #> $null,
+                <# SessionState #> $PSCmdlet.SessionState,
+                <# string script #> [scriptblock]::Create(". $($File.FullName)"),
                 <# Params System.Object[] args #> $null
             )
         }

@@ -29,12 +29,8 @@ Import-Module ../.. -Force
 
 # Define the Image Viewer GUI
 
-#Import "$PSScriptRoot/ImageViewer.Styles.ps1"
-#Import "$PSScriptRoot/functions/*.ps1"
-. "$PSScriptRoot/ImageViewer.Styles.ps1"
-foreach ($File in Get-ChildItem "$PSScriptRoot/functions/*.ps1") {
-    . $File.FullName
-}
+Import "$PSScriptRoot/ImageViewer.Styles.ps1"
+Import "$PSScriptRoot/functions/*.ps1"
 
 Window 'Window' {
     $this.Title = 'Image Viewer'
@@ -156,12 +152,14 @@ Window 'Window' {
                     MenuItem '(F)ile/(E)xit' {
                         # TODO: Explore using existing Close AppCommand and adding input gesture
                         Shortcut 'CloseCommand' 'Ctrl+q' {
+                            Write-Debug "Close command triggered. Closing window."
                             (Reference 'Window').Close()
                         }
                     }
 
                     MenuItem '(V)iew/(F)ullScreen' {
                         Shortcut 'FullScreen' 'F11' {
+                            Write-Debug "Toggling full screen mode."
                             $Window = Reference 'Window'
                             $State = $Window.Tag
                             Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)

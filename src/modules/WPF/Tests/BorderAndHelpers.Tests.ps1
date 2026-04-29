@@ -75,21 +75,20 @@ Describe 'When' {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
-    It 'Should preserve caller-local function access when the event fires' {
-        function Invoke-LocalWhenHelper {
-            return 'ok'
-        }
+    It 'Should inject this as the current object when event fires' {
+        $global:WhenThisName = $null
 
-        $script:WhenResult = $null
-
-        $Button = Button "WhenButton_$([guid]::NewGuid().ToString('N'))" {
+        $Name = "WhenButton_$([guid]::NewGuid().ToString('N'))"
+        $Button = Button $Name {
             When Click {
-                $script:WhenResult = Invoke-LocalWhenHelper
+                $global:WhenThisName = $this.Name
             }
         }
 
         $Button.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent))
 
-        $script:WhenResult | Should -Be -ExpectedValue 'ok'
+        $global:WhenThisName | Should -Be -ExpectedValue $Name
+
+        Remove-Variable -Name WhenThisName -Scope Global -ErrorAction SilentlyContinue
     }
 }
