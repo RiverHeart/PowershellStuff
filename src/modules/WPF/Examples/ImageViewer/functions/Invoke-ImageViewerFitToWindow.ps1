@@ -17,8 +17,16 @@ function Invoke-ImageViewerFitToWindow {
 
     $ScrollViewer.UpdateLayout()
 
-    $ViewportWidth = [double] $ScrollViewer.ActualWidth
-    $ViewportHeight = [double] $ScrollViewer.ActualHeight
+    # Viewport reflects the actual scrollable content slot after template chrome and scrollbars.
+    # ActualWidth/ActualHeight can overestimate available image area and cause edge-case overflow.
+    $ViewportWidth = [double] $ScrollViewer.ViewportWidth
+    $ViewportHeight = [double] $ScrollViewer.ViewportHeight
+
+    if ($ViewportWidth -le 0 -or $ViewportHeight -le 0) {
+        $ViewportWidth = [double] $ScrollViewer.ActualWidth
+        $ViewportHeight = [double] $ScrollViewer.ActualHeight
+    }
+
     if ($ViewportWidth -le 0 -or $ViewportHeight -le 0) {
         return
     }
@@ -40,7 +48,7 @@ function Invoke-ImageViewerFitToWindow {
 
     $ZoomLevel = [Math]::Min($ViewportWidth / $ImageWidth, $ViewportHeight / $ImageHeight)
     $ZoomLevel = [Math]::Max(0.10, [Math]::Min(8.00, $ZoomLevel))
-    $ZoomLevel = [Math]::Round($ZoomLevel, 2)
+    $ZoomLevel = [Math]::Floor($ZoomLevel * 100.0) / 100.0
     $State.ZoomLevel = $ZoomLevel
 
     if (-not ($Viewer.LayoutTransform -is [System.Windows.Media.ScaleTransform])) {
