@@ -238,8 +238,7 @@ Window 'Window' {
 
                     $ButtonSize = 56
                     $IconScale = 0.6
-                    $IconSize = [math]::Round($ButtonSize * $IconScale)
-                    $IconPadding = [math]::Round(($ButtonSize - $IconSize) / 2)
+                    $IconPadding = [math]::Round(($ButtonSize * (1 - $IconScale)) / 2)
                     $ButtonCornerRadius = 8
 
                     Button 'BackButton' {
@@ -260,11 +259,7 @@ Window 'Window' {
                             Resource BorderBrush DisabledForeground
 
                             Path 'images/arrow-left-solid-full.svg' {
-                                $this.Width = $IconSize
-                                $this.Height = $IconSize
-                                $this.Stretch = [Stretch]::Uniform
-                                Resource Fill Foreground
-                                Resource Stroke Foreground
+                                UseStyle 'ImageViewer.IconPath'
                             }
                         }
                     }
@@ -287,11 +282,7 @@ Window 'Window' {
                             Resource BorderBrush DisabledForeground
 
                             Path 'images/arrows-to-circle-solid-full.svg' {
-                                $this.Width = $IconSize
-                                $this.Height = $IconSize
-                                $this.Stretch = [Stretch]::Uniform
-                                Resource Fill Foreground
-                                Resource Stroke Foreground
+                                UseStyle 'ImageViewer.IconPath'
                             }
                         }
                     }
@@ -314,11 +305,7 @@ Window 'Window' {
                             Resource BorderBrush DisabledForeground
 
                             Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
-                                $this.Width = $IconSize
-                                $this.Height = $IconSize
-                                $this.Stretch = [Stretch]::Uniform
-                                Resource Fill Foreground
-                                Resource Stroke Foreground
+                                UseStyle 'ImageViewer.IconPath'
                             }
                         }
                     }
@@ -340,11 +327,7 @@ Window 'Window' {
                             Resource BorderBrush DisabledForeground
 
                             Path 'images/arrow-right-solid-full.svg' {
-                                $this.Width = $IconSize
-                                $this.Height = $IconSize
-                                $this.Stretch = [Stretch]::Uniform
-                                Resource Fill Foreground
-                                Resource Stroke Foreground
+                                UseStyle 'ImageViewer.IconPath'
                             }
                         }
                     }

@@ -50,6 +50,13 @@ Style 'ImageViewer.IconButton' Button {
     ) | Out-Null
 }
 
+Style 'ImageViewer.IconPath' Path {
+    Setter Stretch ([Stretch]::Uniform)
+    Setter StrokeThickness 0
+    Setter Fill Foreground -Resource
+    Setter Stroke Foreground -Resource
+}
+
 Style ScrollViewer {
     Setter Background ScrollBackground -Resource
 }
