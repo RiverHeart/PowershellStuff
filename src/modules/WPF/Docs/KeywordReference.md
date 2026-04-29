@@ -383,6 +383,29 @@ DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
 }
 ```
 
+### MultiTrigger
+
+Adds a multi-condition property trigger to the current Style or ControlTemplate.
+
+```powershell
+Style 'PrimaryButton' Button {
+    MultiTrigger @(
+        @{ Property = 'IsEnabled'; Value = $false }
+        @{ Property = 'IsDefault'; Value = $true }
+    ) {
+        Setter Opacity 0.85
+    }
+}
+```
+
+```powershell
+MultiTrigger @(
+    @{ Property = 'IsEnabled'; Value = $false; SourceName = 'TemplateBorder' }
+) {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
 ### UseStyle
 
 Applies a named style to the current object.

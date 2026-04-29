@@ -40,7 +40,11 @@ function Setter {
             $targetType = $context.TargetType
             $setterCollection = $context.Setters
             $triggerOwner = $null
-        } elseif ($context -is [System.Windows.Trigger] -or $context -is [System.Windows.DataTrigger]) {
+        } elseif (
+            $context -is [System.Windows.Trigger] -or
+            $context -is [System.Windows.DataTrigger] -or
+            $context -is [System.Windows.MultiTrigger]
+        ) {
             $targetType = $context.PSObject.Properties['_WPFTriggerTargetType'].Value
             $setterCollection = $context.Setters
             $triggerOwner = $context.PSObject.Properties['_WPFTriggerOwnerType'].Value
@@ -49,7 +53,7 @@ function Setter {
                 return
             }
         } else {
-            Write-Error 'Setter can only be used inside Style, Trigger, or DataTrigger.'
+            Write-Error 'Setter can only be used inside Style, Trigger, DataTrigger, or MultiTrigger.'
             return
         }
 
