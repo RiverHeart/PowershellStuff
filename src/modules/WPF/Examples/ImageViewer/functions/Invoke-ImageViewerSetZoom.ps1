@@ -16,13 +16,13 @@ function Invoke-ImageViewerSetZoom {
     $ZoomLevel = [Math]::Round($ZoomLevel, 2)
     $State.ZoomLevel = $ZoomLevel
 
-    if (-not ($Viewer.LayoutTransform -is [System.Windows.Media.ScaleTransform])) {
-        $Viewer.LayoutTransform = [System.Windows.Media.ScaleTransform]::new(1.0, 1.0)
-    }
-
-    $Transform = [System.Windows.Media.ScaleTransform] $Viewer.LayoutTransform
-    $Transform.ScaleX = $ZoomLevel
-    $Transform.ScaleY = $ZoomLevel
+    # Apply transforms as a group to preserve both rotation and scale.
+    $RotateTransform = [System.Windows.Media.RotateTransform]::new($State.RotationAngle)
+    $ScaleTransform = [System.Windows.Media.ScaleTransform]::new($ZoomLevel, $ZoomLevel)
+    $TransformGroup = [System.Windows.Media.TransformGroup]::new()
+    $TransformGroup.Children.Add($RotateTransform)
+    $TransformGroup.Children.Add($ScaleTransform)
+    $Viewer.LayoutTransform = $TransformGroup
 
     Invoke-ImageViewerUpdateStatus
 }

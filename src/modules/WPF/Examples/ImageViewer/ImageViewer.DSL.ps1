@@ -32,6 +32,7 @@ Import-Module ../.. -Force
 Import "$PSScriptRoot/ImageViewer.Styles.ps1"
 Import "$PSScriptRoot/functions/*.ps1"
 
+# MARK: WINDOW
 Window 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
@@ -42,6 +43,7 @@ Window 'Window' {
         IsFileLoaded   = $false
         IsFitMode      = $true
         ZoomLevel      = 1.0
+        RotationAngle  = 0
         OldWindowStyle = $this.WindowStyle
         OldWindowState = $this.WindowState
         OldResizeMode  = $this.ResizeMode
@@ -154,6 +156,30 @@ Window 'Window' {
                         Shortcut 'CloseCommand' 'Ctrl+q' {
                             Write-Debug "Close command triggered. Closing window."
                             (Reference 'Window').Close()
+                        }
+                    }
+
+                    MenuItem '(I)mage/(R)otate 90°' {
+                        Shortcut 'Rotate' 'Ctrl+R' {
+                            Invoke-ImageViewerRotate -Direction Clockwise
+                        }
+                    }
+
+                    MenuItem '(I)mage/R(o)tate -90°' {
+                        Shortcut 'RotateCounter' 'Ctrl+Shift+R' {
+                            Invoke-ImageViewerRotate -Direction CounterClockwise
+                        }
+                    }
+
+                    MenuItem '(V)iew/Zoom (I)n' {
+                        Shortcut 'ZoomIn' 'Ctrl+Add' {
+                            Invoke-ImageViewerSetZoom -Delta 0.10
+                        }
+                    }
+
+                    MenuItem '(V)iew/Zoom (O)ut' {
+                        Shortcut 'ZoomOut' 'Ctrl+Subtract' {
+                            Invoke-ImageViewerSetZoom -Delta -0.10
                         }
                     }
 
@@ -305,6 +331,29 @@ Window 'Window' {
                             Resource BorderBrush DisabledForeground
 
                             Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                                UseStyle 'ImageViewer.IconPath'
+                            }
+                        }
+                    }
+                    Button 'RotateButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
+                        $this.Margin = 5
+                        $this.Background = 'Transparent'
+                        $this.BorderThickness = 0
+                        $this.ToolTip = 'Rotate 90° clockwise'
+                        Bind IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
+                        Border {
+                            $this.CornerRadius = $ButtonCornerRadius
+                            $this.Padding = $IconPadding
+                            $this.BorderThickness = 1
+                            Resource Background ButtonBackground
+                            Resource BorderBrush DisabledForeground
+
+                            Path 'images/arrows-rotate-solid-full.svg' {
                                 UseStyle 'ImageViewer.IconPath'
                             }
                         }

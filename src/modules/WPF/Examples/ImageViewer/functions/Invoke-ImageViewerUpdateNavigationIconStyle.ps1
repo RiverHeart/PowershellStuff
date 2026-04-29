@@ -39,7 +39,12 @@ function Invoke-ImageViewerUpdateNavigationIconStyle {
         }
     }
 
-    foreach ($ButtonName in @('BackButton', 'FitToWindowButton', 'ActualSizeButton', 'ForwardButton')) {
+    $Buttons = @(
+        'BackButton', 'FitToWindowButton', 'ActualSizeButton', 'ForwardButton'
+        'RotateButton'
+    )
+
+    foreach ($ButtonName in $Buttons) {
         $Button = Reference $ButtonName
         if (-not $Button) { continue }
 
