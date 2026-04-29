@@ -27,9 +27,11 @@ function Show-WPFWindow {
 
     process {
         try {
+            # Activate before entering ShowDialog so the window gets keyboard focus at startup.
+            $Window.Activate()
+
             # Set globally so you can reference `$LastDialogResult` plainly from the main script.
             $global:LastDialogResult = $Window.ShowDialog()
-            $Window.Activate()
         } finally {
             $Window.Close()
         }
