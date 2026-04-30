@@ -263,30 +263,17 @@ Window 'Window' {
                     React Visibility Window.Tag.IsFullScreen -Invert
 
                     $ButtonSize = 56
-                    $IconScale = 0.6
-                    $IconPadding = [math]::Round(($ButtonSize * (1 - $IconScale)) / 2)
-                    $ButtonCornerRadius = 8
 
                     Button 'BackButton' {
                         UseStyle 'ImageViewer.IconButton'
                         $this.Width = $ButtonSize
                         $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.Background = 'Transparent'
-                        $this.BorderThickness = 0
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
-                        Border {
-                            $this.CornerRadius = $ButtonCornerRadius
-                            $this.Padding = $IconPadding
-                            $this.BorderThickness = 1
-                            Resource Background ButtonBackground
-                            Resource BorderBrush DisabledForeground
-
-                            Path 'images/arrow-left-solid-full.svg' {
-                                UseStyle 'ImageViewer.IconPath'
-                            }
+                        Path 'images/arrow-left-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
                     }
                     Button 'FitToWindowButton' {
@@ -294,22 +281,12 @@ Window 'Window' {
                         $this.Width = $ButtonSize
                         $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.Background = 'Transparent'
-                        $this.BorderThickness = 0
                         $this.ToolTip = 'Fit image to window'
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerFitToWindow }
-                        Border {
-                            $this.CornerRadius = $ButtonCornerRadius
-                            $this.Padding = $IconPadding
-                            $this.BorderThickness = 1
-                            Resource Background ButtonBackground
-                            Resource BorderBrush DisabledForeground
-
-                            Path 'images/arrows-to-circle-solid-full.svg' {
-                                UseStyle 'ImageViewer.IconPath'
-                            }
+                        Path 'images/arrows-to-circle-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
                     }
                     Button 'ActualSizeButton' {
@@ -317,22 +294,12 @@ Window 'Window' {
                         $this.Width = $ButtonSize
                         $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.Background = 'Transparent'
-                        $this.BorderThickness = 0
                         $this.ToolTip = 'Actual size (100%)'
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerSetZoom -Reset }
-                        Border {
-                            $this.CornerRadius = $ButtonCornerRadius
-                            $this.Padding = $IconPadding
-                            $this.BorderThickness = 1
-                            Resource Background ButtonBackground
-                            Resource BorderBrush DisabledForeground
-
-                            Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
-                                UseStyle 'ImageViewer.IconPath'
-                            }
+                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
                     }
                     Button 'RotateButton' {
@@ -340,22 +307,12 @@ Window 'Window' {
                         $this.Width = $ButtonSize
                         $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.Background = 'Transparent'
-                        $this.BorderThickness = 0
                         $this.ToolTip = 'Rotate 90° clockwise'
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
-                        Border {
-                            $this.CornerRadius = $ButtonCornerRadius
-                            $this.Padding = $IconPadding
-                            $this.BorderThickness = 1
-                            Resource Background ButtonBackground
-                            Resource BorderBrush DisabledForeground
-
-                            Path 'images/arrows-rotate-solid-full.svg' {
-                                UseStyle 'ImageViewer.IconPath'
-                            }
+                        Path 'images/arrows-rotate-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
                     }
                     Button 'ForwardButton' {
@@ -363,21 +320,11 @@ Window 'Window' {
                         $this.Width = $ButtonSize
                         $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.Background = 'Transparent'
-                        $this.BorderThickness = 0
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
-                        Border {
-                            $this.CornerRadius = $ButtonCornerRadius
-                            $this.Padding = $IconPadding
-                            $this.BorderThickness = 1
-                            Resource Background ButtonBackground
-                            Resource BorderBrush DisabledForeground
-
-                            Path 'images/arrow-right-solid-full.svg' {
-                                UseStyle 'ImageViewer.IconPath'
-                            }
+                        Path 'images/arrow-right-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
                     }
                 }
