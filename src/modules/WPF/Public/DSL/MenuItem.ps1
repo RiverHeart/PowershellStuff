@@ -11,11 +11,17 @@
 
     MenuItem 'NameOne/NameTwo/NameThree' {...}
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -MenuItem 'MyItem' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menuitem
 #>
 function MenuItem {
     [CmdletBinding()]
+    [Alias('-MenuItem')]
     [OutputType([void], [System.Windows.Controls.MenuItem])]
     param(
         [Parameter(Mandatory)]
@@ -27,6 +33,11 @@ function MenuItem {
 
         [switch] $NoAutoAttach
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         # For strings like '_File/_Exit', split on the first occurence of '/'

@@ -36,6 +36,20 @@ Describe 'Border DSL' {
         $Parent.Content.Child | Should -BeOfType [System.Windows.Controls.Label]
         $Parent.Content.Child.Name | Should -Be -ExpectedValue "BorderChild_$Id"
     }
+
+    It 'Should skip block when invoked with negative prefix' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Parent = [System.Windows.Window]::new()
+        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $Result = {
+            -Border "Border_$Id" {
+                $this.Padding = 4
+            }
+        }.InvokeWithContext($null, $PSVars)
+
+        $Parent.Content | Should -BeNullOrEmpty
+    }
 }
 
 Describe 'Find-WPFChildPath' {

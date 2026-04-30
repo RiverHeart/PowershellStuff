@@ -173,6 +173,24 @@ Describe 'Grid' {
         $Parent.Content | Should -Not -BeNullOrEmpty
         $Parent.Content.Name | Should -Be -ExpectedValue "Body_$Id"
     }
+
+    It 'Should skip block when invoked with negative prefix' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Parent = [System.Windows.Window]::new()
+        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $Result = {
+            -Grid "Grid_$Id" {
+                Row {
+                    Column {
+                        Label "Label_$Id" {}
+                    }
+                }
+            }
+        }.InvokeWithContext($null, $PSVars)
+
+        $Parent.Content | Should -BeNullOrEmpty
+    }
 }
 
 Describe 'New-WPFGrid' {

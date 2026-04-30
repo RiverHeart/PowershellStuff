@@ -2,11 +2,17 @@
 .SYNOPSIS
     Creates a WPF Label object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Label 'MyLabel' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.label
 #>
 function Label {
     [CmdletBinding()]
+    [Alias('-Label')]
     [OutputType([void], [System.Windows.Controls.Label])]
     param(
         [Parameter(Mandatory)]
@@ -17,6 +23,11 @@ function Label {
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Label = [System.Windows.Controls.Label] @{

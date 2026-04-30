@@ -1,9 +1,15 @@
 <#
 .SYNOPSIS
     Keyword for defining a row specification in a WPF Grid.
+
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Row Expand { ...code... }
 #>
 function Row {
     [CmdletBinding()]
+    [Alias('-Row')]
     [OutputType([pscustomobject])]
     param(
         # Keep this as object so callers can use intuitive tokens like Fit and Expand.
@@ -17,6 +23,11 @@ function Row {
     if ($Height -is [ScriptBlock] -and -not $PSBoundParameters.ContainsKey('ScriptBlock')) {
         $ScriptBlock = $Height
         $Height = [System.Windows.GridLength]::Auto
+    }
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation
+        return
     }
 
     if (-not $ScriptBlock) {

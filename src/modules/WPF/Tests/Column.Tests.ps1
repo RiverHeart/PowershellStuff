@@ -22,4 +22,14 @@ Describe 'Column' {
         $Column.Width.IsStar | Should -BeTrue
         $Column.Width.Value | Should -Be -ExpectedValue 3
     }
+
+    It 'Should skip block when invoked with negative prefix' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Column = -Column {
+            Label "Foobar_$Id" {}
+        }
+
+        $Column | Should -BeNullOrEmpty
+    }
 }

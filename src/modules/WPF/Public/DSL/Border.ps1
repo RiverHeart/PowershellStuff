@@ -10,6 +10,20 @@
 
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.border
+
+.EXAMPLE
+    Creates a Border with a nested Label child.
+
+    Border 'MyBorder' {
+        Label 'MyLabel' {
+            Content = 'Hello, world!'
+        }
+    }
+
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Border 'MyBorder' { ...code... }
 #>
 function Border {
     [CmdletBinding()]
@@ -24,7 +38,7 @@ function Border {
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-Debug "Negative prefix detected. Disabling this block."
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
         return
     }
 

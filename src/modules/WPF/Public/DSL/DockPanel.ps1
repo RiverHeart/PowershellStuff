@@ -2,11 +2,17 @@
 .SYNOPSIS
     Creates a WPF DockPanel object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -DockPanel 'MyPanel' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.dockpanel
 #>
 function DockPanel {
     [CmdletBinding()]
+    [Alias('-DockPanel')]
     [OutputType([void], [System.Windows.Controls.DockPanel])]
     param(
         [Parameter(Mandatory)]
@@ -17,6 +23,11 @@ function DockPanel {
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $DockPanel = [System.Windows.Controls.DockPanel] @{

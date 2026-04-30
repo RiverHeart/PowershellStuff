@@ -7,11 +7,17 @@
     and will never auto-attach to a parent. Use the Owner property to establish
     an owner relationship for modal dialogs.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Window 'MainWindow' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.window
 #>
 function Window {
     [CmdletBinding()]
+    [Alias('-Window')]
     [OutputType([void], [System.Windows.Window])]
     param(
         [Parameter(Mandatory)]
@@ -22,6 +28,11 @@ function Window {
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Window = [System.Windows.Window] @{

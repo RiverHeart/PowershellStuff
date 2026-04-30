@@ -20,6 +20,7 @@
 #>
 function Grid {
     [CmdletBinding()]
+    [Alias('-Grid')]
     [OutputType([void], [System.Windows.Controls.Grid])]
     param(
         [Parameter(Mandatory)]
@@ -30,6 +31,11 @@ function Grid {
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Grid = [System.Windows.Controls.Grid] @{
