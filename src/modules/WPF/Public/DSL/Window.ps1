@@ -2,6 +2,11 @@
 .SYNOPSIS
     Creates a WPF Window object.
 
+.DESCRIPTION
+    Creates a WPF Window object. Window is always treated as a root element
+    and will never auto-attach to a parent. Use the Owner property to establish
+    an owner relationship for modal dialogs.
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.window
 #>
@@ -31,17 +36,12 @@ function Window {
         Write-Error "Failed to create '$Name' (Window) with error: $_"
     }
 
-    # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
-        Write-Debug "Beginning auto-attach for $Name (Window)"
-        Update-WPFObject $Parent $Window
-    }
+    # Window is always root; do not auto-attach to parent
+    # Use the Owner property to establish ownership relationships
 
     # NOTE: Allow exceptions from child objects to bubble up
     Write-Debug "Processing child elements for $Name (Window)"
     Update-WPFObject $Window $ScriptBlock
 
-    if ($this.Parent) { return }
     return $Window
 }
