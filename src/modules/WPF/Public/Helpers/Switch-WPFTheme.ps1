@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Toggles between light and dark WPF themes.
+    Switches between light and dark WPF themes.
 
 .DESCRIPTION
     Switches from the current theme to the alternate theme and applies it to
     the provided root element.
 
 .EXAMPLE
-    Toggle-WPFTheme
+    Switch-WPFTheme
 #>
-function Toggle-WPFTheme {
+function Switch-WPFTheme {
     [CmdletBinding()]
     [OutputType([void])]
     param(
