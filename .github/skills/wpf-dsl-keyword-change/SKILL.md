@@ -37,6 +37,7 @@ Invoke-Pester -Path "src/modules/WPF/Tests" -Output Detailed
 
 ## Guardrails
 
+- This project is experimental. Breaking changes are allowed and preferred over backward-compatible workarounds that accumulate technical debt. Do not add aliases or shims to preserve old names — rename cleanly and update all call sites.
 - Avoid changing DSL contract unless explicitly requested.
 - Preserve naming and param formatting conventions used by existing DSL functions.
 - Keep keyword behavior and validation in dedicated helper keywords/functions; use `Update-WPFObject` primarily for composition/routing.
