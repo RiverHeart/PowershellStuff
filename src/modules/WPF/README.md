@@ -113,9 +113,9 @@ Interoperability with XAML is possible in principle, but the main workflow here 
 
 ## When This Is Not a Fit
 
-- If you need to ship a standalone binary/exe. This project intentionally avoids third-party modules, so binary distribution is not a supported workflow.
-- If your team requires a XAML-first designer workflow.
-- If you need long-term API stability right now.
+- You need to ship a standalone binary/exe. This project intentionally avoids third-party modules, so binary distribution is not a supported workflow.
+- Your team requires a XAML-first designer workflow.
+- You need long-term API stability right now.
 
 ## Requirements
 
@@ -139,18 +139,18 @@ Current limitations:
 - Some DSL areas are more mature than others.
 - Documentation is still catching up with implementation changes.
 
-## Why?
+## Why Make This?
 
 Many reasons, but a few big ones:
 
-- WinForms is limited and WPF often requires heavy ceremony.
+- WinForms is limited and WPF requires too much ceremony.
 - Declarative UI is useful, but XAML is not always the most approachable path.
 - C# is powerful, but for quick UI prototyping it can feel heavyweight.
 - The project explores whether a readable, practical PowerShell-first WPF DSL is viable.
 
 ## Project Goals
 
-- Make a fun, practical leaky abstraction.
+- Make a fun, practical, leaky abstraction.
 - Favor convention over configuration.
 - Keep syntax easy to read and edit.
 - Keep barrier to entry low by staying compatible with PowerShell 5.
