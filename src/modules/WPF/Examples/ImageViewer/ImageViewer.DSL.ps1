@@ -141,7 +141,7 @@ Window 'Window' {
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
                             $Window = Reference 'Window'
-                            $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
+                            $FileName = Get-WPFFileSelection -Category Image -Window $Window
 
                             # Return early if we failed to get a file
                             if (-not $FileName) {

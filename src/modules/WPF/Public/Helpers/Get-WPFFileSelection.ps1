@@ -24,10 +24,10 @@
     Get-WPFFileSelection -Type All, PNG, JPEG, GIF, TIFF
 
 .EXAMPLE
-    Create a file browser that automatically sets up filters for the given
-    file types and category which contains several image types.
+    Create a file browser that automatically sets up filters for all known
+    image file types.
 
-    Get-WPFFileSelection -Type All -Category Image
+    Get-WPFFileSelection -Category Image
 #>
 function Get-WPFFileSelection {
     [CmdletBinding()]
@@ -63,30 +63,26 @@ function Get-WPFFileSelection {
 
     $CreatedWindow = $False
 
-    if ($Type -or $Category) {
-        $GetFileInfoParams = @{}
-        if ($Type) { $GetFileInfoParams.Type = $Type }
-        if ($Category) { $GetFileInfoParams.Category = $Category }
-        # Get-WPFFileInfo returns hashtables; use key lookup for PS5 compatibility instead of -ExpandProperty.
-        $ResolvedFilters = Get-WPFFileInfo @GetFileInfoParams |
-            ForEach-Object {
-                if ($_ -is [hashtable] -and $_.ContainsKey('Filter')) {
-                    $_['Filter']
-                }
-            }
+    if ($Type -and $Category -and ($Type -contains 'All')) {
+        throw [System.ArgumentException]::new("-Type 'All' cannot be combined with -Category. Use -Category by itself, or specify explicit types without 'All'.")
+    }
 
-        $Filter += $ResolvedFilters
-        if (-not $Filter) {
+    if ($Type -or $Category) {
+        $DialogFilter = Resolve-WPFFileDialogFilter -Type $Type -Category $Category -Filter $Filter
+        if (-not $DialogFilter) {
             Write-Error "Failed to find any filters."
             return ''
         }
+    } elseif ($Filter) {
+        $DialogFilter = Resolve-WPFFileDialogFilter -Filter $Filter
     } else {
-        $Filter = @('All Files (*.*)|*.*')
+        $DialogFilter = @('All Files (*.*)|*.*')
     }
 
     try {
         $OpenFileDialog = [Microsoft.Win32.OpenFileDialog]::new()
-        $OpenFileDialog.Filter = $Filter -join '|'
+        $OpenFileDialog.Filter = $DialogFilter -join '|'
+        $OpenFileDialog.FilterIndex = 1
         $OpenFileDialog.Title = $Title
         $OpenFileDialog.Multiselect = $MultiSelect
 
@@ -105,9 +101,13 @@ function Get-WPFFileSelection {
         #     }
         # })
 
-        if ($Window -and $OpenFileDialog.ShowDialog($Window) -eq $True) {
-            return $OpenFileDialog.FileName
-        } elseif ($OpenFileDialog.ShowDialog() -eq $True) {
+        $DialogResult = if ($Window) {
+            $OpenFileDialog.ShowDialog($Window)
+        } else {
+            $OpenFileDialog.ShowDialog()
+        }
+
+        if ($DialogResult -eq $True) {
             return $OpenFileDialog.FileName
         }
         return ''
