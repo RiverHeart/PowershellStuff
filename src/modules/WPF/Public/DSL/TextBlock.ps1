@@ -2,11 +2,17 @@
 .SYNOPSIS
     Creates a WPF TextBlock object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -TextBlock 'MyText' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.textblock
 #>
 function TextBlock {
     [CmdletBinding()]
+    [Alias('-TextBlock')]
     [OutputType([void], [System.Windows.Controls.TextBlock])]
     param(
         [Parameter(Mandatory)]
@@ -17,6 +23,11 @@ function TextBlock {
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $TextBlock = [System.Windows.Controls.TextBlock] @{

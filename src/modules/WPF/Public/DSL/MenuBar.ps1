@@ -30,6 +30,7 @@
 #>
 function MenuBar {
     [CmdletBinding()]
+    [Alias('-MenuBar')]
     [OutputType([System.Windows.Controls.Menu])]
     param(
         [Parameter(Mandatory)]
@@ -42,6 +43,11 @@ function MenuBar {
 
         [switch] $NoAutoAttach
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $WPFObject = [System.Windows.Controls.Menu] @{

@@ -10,6 +10,20 @@
 
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.border
+
+.EXAMPLE
+    Creates a Border with a nested Label child.
+
+    Border 'MyBorder' {
+        Label 'MyLabel' {
+            Content = 'Hello, world!'
+        }
+    }
+
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Border 'MyBorder' { ...code... }
 #>
 function Border {
     [CmdletBinding()]
@@ -24,7 +38,7 @@ function Border {
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-Debug "Negative prefix detected. Disabling this block."
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
         return
     }
 
@@ -46,6 +60,27 @@ function Border {
         if ($Name -notmatch '^\w+$') {
             throw "Invalid Border name '$Name'. Name must match '^\\w+$'."
         }
+    }
+
+    # Factory mode: inside a Template block, produce a FrameworkElementFactory
+    # instead of a live Border instance.
+    if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
+        $BorderName = if ($Name) { $Name } else { '__Nameless__' }
+        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border])
+
+        if ($Name) { $Factory.Name = $Name }
+
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent) {
+            Write-Debug "Factory auto-attach: $BorderName (Border) -> $($Parent.GetType().Name)"
+            Add-WPFObject $Parent $Factory
+        }
+
+        Write-Debug "Processing factory children for $BorderName (Border)"
+        Update-WPFObject $Factory $ScriptBlock
+
+        if (-not $Parent) { return $Factory }
+        return
     }
 
     try {

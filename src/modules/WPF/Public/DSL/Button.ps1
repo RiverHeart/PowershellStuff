@@ -1,5 +1,22 @@
+<#
+.SYNOPSIS
+    Creates a WPF Button object.
+
+.EXAMPLE
+    Creates a Button with a Click event handler.
+
+    Button 'MyButton' {
+        When Click { Write-Host 'Clicked!' }
+    }
+
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Button 'MyButton' { ...code... }
+#>
 function Button {
     [CmdletBinding()]
+    [Alias('-Button')]
     [OutputType([void], [System.Windows.Controls.Button])]
     param(
         [Parameter(Mandatory)]
@@ -10,6 +27,11 @@ function Button {
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Button = [System.Windows.Controls.Button] @{

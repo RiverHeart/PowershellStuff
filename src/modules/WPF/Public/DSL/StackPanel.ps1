@@ -2,11 +2,17 @@
 .SYNOPSIS
     Creates a WPF StackPanel object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -StackPanel 'MyPanel' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.stackpanel
 #>
 function StackPanel {
     [CmdletBinding()]
+    [Alias('-StackPanel')]
     [OutputType([void], [System.Windows.Controls.StackPanel])]
     param(
         [Parameter(Mandatory)]
@@ -17,6 +23,11 @@ function StackPanel {
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $StackPanel = [System.Windows.Controls.StackPanel] @{

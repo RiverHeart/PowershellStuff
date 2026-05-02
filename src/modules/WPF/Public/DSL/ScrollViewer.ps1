@@ -2,11 +2,17 @@
 .SYNOPSIS
     Creates a WPF ScrollViewer object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -ScrollViewer 'MyViewer' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.scrollviewer
 #>
 function ScrollViewer {
     [CmdletBinding()]
+    [Alias('-ScrollViewer')]
     [OutputType([void], [System.Windows.Controls.ScrollViewer])]
     param(
         [Parameter(Mandatory)]
@@ -17,6 +23,11 @@ function ScrollViewer {
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $ScrollViewer = [System.Windows.Controls.ScrollViewer] @{

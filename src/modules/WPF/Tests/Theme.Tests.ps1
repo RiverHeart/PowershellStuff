@@ -17,13 +17,13 @@ Describe 'Theme' {
             Brush 'WindowBackground' '#1E1E1E'
         }
 
-        $psVars = @([psvariable]::new('this', $window))
+        $psVars = New-WPFVariableList -InputObject $window
         { Resource Background WindowBackground }.InvokeWithContext($null, $psVars) | Out-Null
 
         Use-WPFTheme -Name $light -Root $window
         $window.Background.Color.ToString() | Should -Be -ExpectedValue '#FFFFFFFF'
 
-        Toggle-WPFTheme -LightName $light -DarkName $dark -Root $window
+        Switch-WPFTheme -LightName $light -DarkName $dark -Root $window
         $window.Background.Color.ToString() | Should -Be -ExpectedValue '#FF1E1E1E'
     }
 
@@ -47,7 +47,7 @@ Describe 'Theme' {
             Setter Background ButtonBackground -Resource
         }
 
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
         { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
 
         $window.Content = $button
@@ -55,7 +55,7 @@ Describe 'Theme' {
         Use-WPFTheme -Name $light -Root $window
         $button.Background.Color.ToString() | Should -Be -ExpectedValue '#FFFFFFFF'
 
-        Toggle-WPFTheme -LightName $light -DarkName $dark -Root $window
+        Switch-WPFTheme -LightName $light -DarkName $dark -Root $window
         $button.Background.Color.ToString() | Should -Be -ExpectedValue '#FF1E1E1E'
     }
 
@@ -90,7 +90,7 @@ Describe 'Theme' {
             Setter Margin '0,8,0,0'
         }
 
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
         { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
 
         $button.Margin.Left | Should -Be -ExpectedValue 0

@@ -3,6 +3,6 @@ function Invoke-ImageViewerToggleTheme {
     param()
 
     $Window = Reference 'Window'
-    Toggle-WPFTheme -Root $Window
+    Switch-WPFTheme -Root $Window
     Invoke-ImageViewerUpdateNavigationIconStyle
 }

@@ -11,11 +11,7 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 
 ## TODO
 
-* Add Fit to Window and Actual Size modes
-* Add clockwise and counterclockwise rotation controls
 * Add click-and-drag panning for zoomed images
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)
-* Disable Back/Forward when only one image is available
-* Replace About placeholder with a real modal dialog
 * Show user-friendly dialogs for image load/open errors
 * Persist last opened folder between runs

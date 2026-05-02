@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Creates a reactive state object for use with the Bind DSL keyword.
+    Creates a reactive state object for use with the React DSL keyword.
 
 .DESCRIPTION
     Returns a PSCustomObject with observable properties. When a property value
     changes, all callbacks registered via AddBinding() are invoked automatically.
 
-    Use with the Bind DSL keyword to declaratively wire control properties to
+    Use with the React DSL keyword to declaratively wire control properties to
     state without manually referencing controls in event handlers.
 
 .PARAMETER Properties

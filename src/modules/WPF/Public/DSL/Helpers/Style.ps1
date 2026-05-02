@@ -79,9 +79,7 @@ function Style {
     }
 
     $style = [System.Windows.Style]::new($resolvedType)
-    $PSVars = @(
-        [psvariable]::new('this', $style)
-    )
+    $PSVars = New-WPFVariableList -InputObject $style
 
     $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
 

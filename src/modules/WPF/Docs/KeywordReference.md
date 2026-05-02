@@ -270,13 +270,29 @@ When Click {
 
 ## Binding and Resources
 
-### Bind
+### React
 
 Binds a target property to an observable state path.
 
 ```powershell
-Bind Visibility Window.Tag.IsFullScreen -Invert
-Bind IsEnabled Window.Tag.IsFileLoaded
+React Visibility Window.Tag.IsFullScreen -Invert
+React IsEnabled Window.Tag.IsFileLoaded
+```
+
+### Binding
+
+Creates a WPF Binding object for advanced scenarios like DataTrigger.
+
+```powershell
+DataTrigger (Binding 'IsEnabled' -Self) $false {
+    Setter Opacity 0.85
+}
+```
+
+```powershell
+DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
 ```
 
 ### Resource
@@ -328,6 +344,66 @@ Adds a setter to the current style.
 ```powershell
 Setter Background ButtonBackground -Resource
 Setter Margin '0,8,0,0'
+```
+
+### Trigger
+
+Adds a property trigger to the current Style or ControlTemplate.
+
+```powershell
+Style 'PrimaryButton' Button {
+    Trigger IsMouseOver $true {
+        Setter Opacity 0.85
+    }
+}
+```
+
+```powershell
+# ControlTemplate scope supports SourceName and Setter -Target
+Trigger IsEnabled $false -SourceName 'TemplateBorder' {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+### DataTrigger
+
+Adds a data trigger to the current Style or ControlTemplate.
+
+```powershell
+Style 'PrimaryButton' Button {
+    DataTrigger 'IsEnabled' $false -Self {
+        Setter Opacity 0.85
+    }
+}
+```
+
+```powershell
+DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+### MultiTrigger
+
+Adds a multi-condition property trigger to the current Style or ControlTemplate.
+
+```powershell
+Style 'PrimaryButton' Button {
+    MultiTrigger @(
+        @{ Property = 'IsEnabled'; Value = $false }
+        @{ Property = 'IsDefault'; Value = $true }
+    ) {
+        Setter Opacity 0.85
+    }
+}
+```
+
+```powershell
+MultiTrigger @(
+    @{ Property = 'IsEnabled'; Value = $false; SourceName = 'TemplateBorder' }
+) {
+    Setter Opacity 0.6 -Target 'TemplateBorder'
+}
 ```
 
 ### UseStyle
