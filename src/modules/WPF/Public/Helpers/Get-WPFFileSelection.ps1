@@ -67,7 +67,15 @@ function Get-WPFFileSelection {
         $GetFileInfoParams = @{}
         if ($Type) { $GetFileInfoParams.Type = $Type }
         if ($Category) { $GetFileInfoParams.Category = $Category }
-        $Filter += Get-WPFFileInfo @GetFileInfoParams | Select-Object -ExpandProperty Filter
+        # Get-WPFFileInfo returns hashtables; use key lookup for PS5 compatibility instead of -ExpandProperty.
+        $ResolvedFilters = Get-WPFFileInfo @GetFileInfoParams |
+            ForEach-Object {
+                if ($_ -is [hashtable] -and $_.ContainsKey('Filter')) {
+                    $_['Filter']
+                }
+            }
+
+        $Filter += $ResolvedFilters
         if (-not $Filter) {
             Write-Error "Failed to find any filters."
             return ''

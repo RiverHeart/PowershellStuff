@@ -56,7 +56,7 @@ function MenuItem {
         }
 
         # Check if object already exists, if not, create one
-        $WPFObject = Get-WPFRegisteredObject $ObjectName -ErrorAction Ignore
+        $WPFObject = Get-WPFRegisteredObject $ObjectName -ErrorAction SilentlyContinue
         if (-not $WPFObject) {
             $WPFObject = [System.Windows.Controls.MenuItem] @{
                 Name = $ObjectName
