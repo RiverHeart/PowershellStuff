@@ -62,6 +62,27 @@ function Border {
         }
     }
 
+    # Factory mode: inside a Template block, produce a FrameworkElementFactory
+    # instead of a live Border instance.
+    if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
+        $BorderName = if ($Name) { $Name } else { '__Nameless__' }
+        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border])
+
+        if ($Name) { $Factory.Name = $Name }
+
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent) {
+            Write-Debug "Factory auto-attach: $BorderName (Border) -> $($Parent.GetType().Name)"
+            Add-WPFObject $Parent $Factory
+        }
+
+        Write-Debug "Processing factory children for $BorderName (Border)"
+        Update-WPFObject $Factory $ScriptBlock
+
+        if (-not $Parent) { return $Factory }
+        return
+    }
+
     try {
         $Border = if ($Name) {
             [System.Windows.Controls.Border] @{

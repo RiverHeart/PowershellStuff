@@ -11,19 +11,24 @@ function New-WPFVariableList {
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.List[psvariable]])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Position = 0)]
         [object] $InputObject,
 
         # Allow caller to add additional variables as needed
-        [psvariable[]] $AdditionalVariables
+        [psvariable[]] $AdditionalVariables,
+
+        # Caller's session state, used to capture preference variables from the
+        # calling scope rather than the module scope.
+        [System.Management.Automation.SessionState] $CallerSessionState
     )
 
+    $PrefSource = if ($CallerSessionState) { $CallerSessionState.PSVariable } else { $PSCmdlet.SessionState.PSVariable }
     $DefaultVars = @(
-        [psvariable]::new('this', $InputObject),
-        $PSCmdlet.SessionState.PSVariable.Get('WarningPreference'),
-        $PSCmdlet.SessionState.PSVariable.Get('DebugPreference'),
-        $PSCmdlet.SessionState.PSVariable.Get('ErrorActionPreference'),
-        $PSCmdlet.SessionState.PSVariable.Get('VerbosePreference')
+        if ($null -ne $InputObject) { [psvariable]::new('this', $InputObject) }
+        $PrefSource.Get('WarningPreference'),
+        $PrefSource.Get('DebugPreference'),
+        $PrefSource.Get('ErrorActionPreference'),
+        $PrefSource.Get('VerbosePreference')
     )
     $PSVars = [System.Collections.Generic.List[psvariable]]::new()
     foreach($DefaultVar in $DefaultVars) {

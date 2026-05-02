@@ -1,6 +1,7 @@
 Describe 'MultiTrigger' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $WarningPreference = 'SilentlyContinue'
     }
 
     It 'Should apply style multi trigger setters when all conditions are met' {
@@ -19,7 +20,7 @@ Describe 'MultiTrigger' {
             }
         }
 
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
         { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
 
         $button.Opacity | Should -Be -ExpectedValue 1.0
@@ -33,7 +34,7 @@ Describe 'MultiTrigger' {
 
     It 'Should add control template multi triggers and support source/target names' {
         $template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
-        $psVars = @([psvariable]::new('this', $template))
+        $psVars = New-WPFVariableList -InputObject $template
 
         {
             MultiTrigger @(
@@ -56,7 +57,7 @@ Describe 'MultiTrigger' {
 
     It 'Should reject multi trigger usage outside style or template contexts' {
         $button = [System.Windows.Controls.Button]::new()
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
 
         {
             { MultiTrigger @(@{ Property = 'IsEnabled'; Value = $false }) { Setter Opacity 0.5 } -ErrorAction Stop }.InvokeWithContext($null, $psVars) | Out-Null

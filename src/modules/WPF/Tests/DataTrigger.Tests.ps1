@@ -16,7 +16,7 @@ Describe 'DataTrigger' {
             }
         }
 
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
         { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
 
         $button.Opacity | Should -Be -ExpectedValue 1.0
@@ -28,7 +28,7 @@ Describe 'DataTrigger' {
     It 'Should add control template data triggers and support setter target names' {
         $template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
         $binding = Binding 'IsEnabled' -TemplatedParent
-        $psVars = @([psvariable]::new('this', $template))
+        $psVars = New-WPFVariableList -InputObject $template
 
         {
             DataTrigger $binding $false {
@@ -47,7 +47,7 @@ Describe 'DataTrigger' {
 
     It 'Should reject data trigger usage outside style or template contexts' {
         $button = [System.Windows.Controls.Button]::new()
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
 
         {
             { DataTrigger 'IsEnabled' $false -Self { Setter Opacity 0.5 } -ErrorAction Stop }.InvokeWithContext($null, $psVars) | Out-Null

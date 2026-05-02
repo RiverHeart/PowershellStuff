@@ -70,9 +70,7 @@ function Binding {
     }
 
     if ($ScriptBlock) {
-        $PSVars = @(
-            [psvariable]::new('this', $binding)
-        )
+        $PSVars = New-WPFVariableList -InputObject $binding
         $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
     }
 

@@ -1,12 +1,13 @@
 Describe 'Border DSL' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $WarningPreference = 'SilentlyContinue'
     }
 
     It 'Should create and auto-attach a named border' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+        $psVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {
             Border "Border_$Id" {
@@ -23,7 +24,7 @@ Describe 'Border DSL' {
     It 'Should support nameless border syntax' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Controls.Button]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+        $psVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {
             Border {
@@ -40,13 +41,16 @@ Describe 'Border DSL' {
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $WarningPreference = 'SilentlyContinue'
+        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
+        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         $Result = {
             -Border "Border_$Id" {
                 $this.Padding = 4
             }
-        }.InvokeWithContext($null, $PSVars)
+        }.Invoke()
 
         $Parent.Content | Should -BeNullOrEmpty
     }
@@ -55,6 +59,7 @@ Describe 'Border DSL' {
 Describe 'Find-WPFChildPath' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $WarningPreference = 'SilentlyContinue'
     }
 
     It 'Should return the same object when node is already a Path' {
@@ -87,6 +92,7 @@ Describe 'Find-WPFChildPath' {
 Describe 'When' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $WarningPreference = 'SilentlyContinue'
     }
 
     It 'Should inject this as the current object when event fires' {

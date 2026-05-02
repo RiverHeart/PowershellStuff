@@ -103,9 +103,7 @@ function DataTrigger {
         $trigger | Add-Member -NotePropertyName '_WPFTriggerTargetType' -NotePropertyValue $targetType -Force
         $trigger | Add-Member -NotePropertyName '_WPFTriggerOwnerType' -NotePropertyValue $triggerOwner -Force
 
-        $PSVars = @(
-            [psvariable]::new('this', $trigger)
-        )
+        $PSVars = New-WPFVariableList -InputObject $trigger
         $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
 
         $target.Triggers.Add($trigger) | Out-Null

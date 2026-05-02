@@ -49,10 +49,7 @@ function Template {
 
     $template = [System.Windows.Controls.ControlTemplate]::new($style.TargetType)
 
-    $PSVars = @(
-        [psvariable]::new('this', $template)
-        [psvariable]::new('WPFFactoryContext', $true)
-    )
+    $PSVars = New-WPFVariableList -InputObject $template
 
     $ScriptBlock.InvokeWithContext($null, $PSVars) | Out-Null
 

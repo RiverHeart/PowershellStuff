@@ -47,7 +47,7 @@ function Column {
         $Width = $Width -replace 'Fit', 'Auto'
     }
 
-    $PSVars = @([psvariable]::new('this', $Parent))
+    $PSVars = New-WPFVariableList -InputObject $Parent
     $Children = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
     return [pscustomobject] @{

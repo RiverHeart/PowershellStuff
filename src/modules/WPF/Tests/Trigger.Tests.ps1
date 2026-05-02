@@ -16,7 +16,7 @@ Describe 'Trigger' {
             }
         }
 
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
         { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
 
         $button.Opacity | Should -Be -ExpectedValue 1.0
@@ -27,7 +27,7 @@ Describe 'Trigger' {
 
     It 'Should add control template triggers and support setter target names' {
         $template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
-        $psVars = @([psvariable]::new('this', $template))
+        $psVars = New-WPFVariableList -InputObject $template
 
         {
             Trigger IsEnabled $false -SourceName 'TemplateRoot' {
@@ -47,7 +47,7 @@ Describe 'Trigger' {
 
     It 'Should reject trigger usage outside style or template contexts' {
         $button = [System.Windows.Controls.Button]::new()
-        $psVars = @([psvariable]::new('this', $button))
+        $psVars = New-WPFVariableList -InputObject $button
 
         {
             { Trigger IsEnabled $false { Setter Opacity 0.5 } -ErrorAction Stop }.InvokeWithContext($null, $psVars) | Out-Null

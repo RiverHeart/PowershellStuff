@@ -47,7 +47,7 @@ function Row {
         $Height = $Height -replace 'Fit', 'Auto'
     }
 
-    $PSVars = @([psvariable]::new('this', $Parent))
+    $PSVars = New-WPFVariableList -InputObject $Parent
     $Columns = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
     return [pscustomobject] @{

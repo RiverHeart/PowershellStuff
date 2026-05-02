@@ -157,7 +157,7 @@ Describe 'Grid' {
     It 'Should auto-attach to injected parent context and not return nested grids' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+        $psVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {
             Grid "Body_$Id" {
@@ -177,7 +177,10 @@ Describe 'Grid' {
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $WarningPreference = 'SilentlyContinue'
+        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
+        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         $Result = {
             -Grid "Grid_$Id" {
@@ -187,7 +190,7 @@ Describe 'Grid' {
                     }
                 }
             }
-        }.InvokeWithContext($null, $PSVars)
+        }.Invoke()
 
         $Parent.Content | Should -BeNullOrEmpty
     }

@@ -28,9 +28,7 @@ function Theme {
     }
 
     $dictionary = [System.Windows.ResourceDictionary]::new()
-    $PSVars = @(
-        [psvariable]::new('this', $dictionary)
-    )
+    $PSVars = New-WPFVariableList -InputObject $dictionary
 
     $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
     $dictionary['__WPFThemeName'] = $Name

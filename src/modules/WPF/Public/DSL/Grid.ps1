@@ -57,7 +57,7 @@ function Grid {
         Update-WPFObject $Parent $Grid
     }
 
-    $PSVars = @([psvariable]::new('this', $Grid))
+    $PSVars = New-WPFVariableList -InputObject $Grid
     $Rows = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
     for ($RowIndex = 0; $RowIndex -lt $Rows.Count; $RowIndex++) {
