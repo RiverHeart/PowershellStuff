@@ -62,4 +62,5 @@ function Invoke-ImageViewerFitToWindow {
     $State.IsFitMode = $true
 
     Invoke-ImageViewerUpdateStatus
+    Invoke-ImageViewerUpdateNavigationIconStyle
 }

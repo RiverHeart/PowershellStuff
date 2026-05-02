@@ -4,7 +4,7 @@
     Updates the navigation button icon colors to match the current theme.
 
 .DESCRIPTION
-    Refreshes the Fill and Stroke colors of all navigation button icons (Back, FitToWindow, ActualSize, Forward)
+    Refreshes the Fill and Stroke colors of all navigation button icons (Back, ZoomMode, Forward)
     based on the active theme (Light/Dark) and the current file state (loaded/not loaded).
 
     When a file is loaded, icons render in the theme's foreground color. When no file is loaded, icons render
@@ -40,8 +40,7 @@ function Invoke-ImageViewerUpdateNavigationIconStyle {
     }
 
     $Buttons = @(
-        'BackButton', 'FitToWindowButton', 'ActualSizeButton', 'ForwardButton'
-        'RotateButton'
+        'BackButton', 'ZoomModeButton', 'ForwardButton', 'RotateButton'
     )
 
     foreach ($ButtonName in $Buttons) {

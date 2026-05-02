@@ -25,4 +25,5 @@ function Invoke-ImageViewerSetZoom {
     $Viewer.LayoutTransform = $TransformGroup
 
     Invoke-ImageViewerUpdateStatus
+    Invoke-ImageViewerUpdateNavigationIconStyle
 }

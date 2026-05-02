@@ -276,30 +276,39 @@ Window 'Window' {
                             UseStyle 'ImageViewer.IconPath'
                         }
                     }
-                    Button 'FitToWindowButton' {
+                    Button 'ZoomModeButton' {
                         UseStyle 'ImageViewer.IconButton'
                         $this.Width = $ButtonSize
                         $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.ToolTip = 'Fit image to window'
                         React IsEnabled Window.Tag.IsFileLoaded
-
-                        When 'Click' { Invoke-ImageViewerFitToWindow }
-                        Path 'images/arrows-to-circle-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
+                        React ToolTip Window.Tag.IsFitMode -Converter {
+                            param($IsFitMode)
+                            if ($IsFitMode) {
+                                'Actual size (100%)'
+                            } else {
+                                'Fit image to window'
+                            }
                         }
-                    }
-                    Button 'ActualSizeButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
-                        $this.ToolTip = 'Actual size (100%)'
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        React Content Window.Tag.IsFitMode -Converter {
+                            param($IsFitMode)
+                            if ($IsFitMode) {
+                                Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            } else {
+                                Path 'images/arrows-to-circle-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            }
+                        }
 
-                        When 'Click' { Invoke-ImageViewerSetZoom -Reset }
-                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
+                        When 'Click' {
+                            if ((Reference 'Window').Tag.IsFitMode) {
+                                Invoke-ImageViewerSetZoom -Reset
+                            } else {
+                                Invoke-ImageViewerFitToWindow
+                            }
                         }
                     }
                     Button 'RotateButton' {
