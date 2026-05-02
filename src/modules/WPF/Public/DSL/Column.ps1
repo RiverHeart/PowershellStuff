@@ -1,9 +1,15 @@
 <#
 .SYNOPSIS
     Keyword for defining a column specification in a WPF Grid.
+
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Column Expand { ...code... }
 #>
 function Column {
     [CmdletBinding()]
+    [Alias('-Column')]
     [OutputType([pscustomobject])]
     param(
         # Keep this as object so callers can use intuitive tokens like Fit and Expand.
@@ -17,6 +23,11 @@ function Column {
     if ($Width -is [ScriptBlock] -and -not $PSBoundParameters.ContainsKey('ScriptBlock')) {
         $ScriptBlock = $Width
         $Width = [System.Windows.GridLength]::Auto
+    }
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation
+        return
     }
 
     if (-not $ScriptBlock) {
@@ -36,7 +47,7 @@ function Column {
         $Width = $Width -replace 'Fit', 'Auto'
     }
 
-    $PSVars = @([psvariable]::new('this', $Parent))
+    $PSVars = New-WPFVariableList -InputObject $Parent
     $Children = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
     return [pscustomobject] @{

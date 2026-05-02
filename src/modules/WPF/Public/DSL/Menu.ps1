@@ -30,15 +30,22 @@
 #>
 function Menu {
     [CmdletBinding()]
+    [Alias('-Menu')]
     [OutputType([void], [System.Windows.Controls.Menu])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Menu = [System.Windows.Controls.Menu] @{

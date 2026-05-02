@@ -37,13 +37,7 @@ function Update-WPFObject {
 
     $thisName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
     $thisType = $InputObject.GetType().Name
-
-    # Set `$this` as reference to the current object.
-    # `$this` would be more idiomatic but this avoids
-    # potential issues arising from modifying automatic variables.
-    $PSVars = @(
-        [psvariable]::new('this', $InputObject)
-    )
+    $PSVars = New-WPFVariableList -InputObject $InputObject
 
     try {
         if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
@@ -81,6 +75,8 @@ function Update-WPFObject {
                 # to add them based on the object type so you don't need to remember.
                 if ($InputObject -is [System.Windows.Controls.Button]) {
                     $InputObject.Content = $Child
+                } elseif ($InputObject -is [System.Windows.Controls.Border]) {
+                    $InputObject.Child = $Child
                 }
             }
             else {

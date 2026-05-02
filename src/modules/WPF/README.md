@@ -6,6 +6,7 @@
 ## Table of Contents
 * [Overview](#overview)
 * [Example](#example)
+* [Documentation](#documentation)
 * [How It Works](#how-it-works)
 * [Why?](#why)
 * [Project Goals](#project-goals)
@@ -19,6 +20,16 @@
 ## Overview
 
 Experimental internal Domain-Specific Language (DSL) for building WPF applications in Powershell without having to touch XAML. Because everything in the DSL is Powershell code, you have the full power of the language at your fingertips when developing a GUI.
+
+## Documentation
+
+Current DSL documentation:
+
+- [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
+- [Documenting This DSL](./Docs/DocumentingTheDSL.md)
+- [Keyword Reference](./Docs/KeywordReference.md)
+- [Contribution Checklist](./Docs/ContributionChecklist.md)
+- [Keyword Entry Template](./Docs/Templates/KeywordEntryTemplate.md)
 
 ## Example
 
@@ -146,6 +157,7 @@ Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctr
 
 ## Todo
 
+* Add negative prefix aliases to DSL keywords which when used disable that block of code. For example `-Border`
 * Error handling is atrocious. Really need a stack trace instead of a long list of chained errors.
     * Allow child object errors to bubble up and only catch errors when creating the control the function is
       meant to create. Also generate a callstack to go with it.

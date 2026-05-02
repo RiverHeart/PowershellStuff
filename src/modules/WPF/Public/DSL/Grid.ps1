@@ -20,15 +20,22 @@
 #>
 function Grid {
     [CmdletBinding()]
+    [Alias('-Grid')]
     [OutputType([void], [System.Windows.Controls.Grid])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Grid = [System.Windows.Controls.Grid] @{
@@ -50,7 +57,7 @@ function Grid {
         Update-WPFObject $Parent $Grid
     }
 
-    $PSVars = @([psvariable]::new('this', $Grid))
+    $PSVars = New-WPFVariableList -InputObject $Grid
     $Rows = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
     for ($RowIndex = 0; $RowIndex -lt $Rows.Count; $RowIndex++) {

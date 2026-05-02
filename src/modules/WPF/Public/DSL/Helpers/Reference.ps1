@@ -19,6 +19,7 @@ function Reference {
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [ArgumentCompleter({ Complete-WPFRegisteredObject @args })]
         [string[]] $Name,
 

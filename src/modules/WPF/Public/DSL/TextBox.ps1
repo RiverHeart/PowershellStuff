@@ -2,20 +2,32 @@
 .SYNOPSIS
     Creates a WPF TextBox object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -TextBox 'MyText' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.textbox
 #>
 function TextBox {
     [CmdletBinding()]
+    [Alias('-TextBox')]
     [OutputType([void], [System.Windows.Controls.TextBox])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $TextBox = [System.Windows.Controls.TextBox] @{

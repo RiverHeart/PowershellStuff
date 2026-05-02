@@ -11,8 +11,7 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 
 ## TODO
 
-* Add Fit and Actual size buttons
-* Add rotate button
-* Implement export to different format
-* Implement slideshow
-* Implement rotate button
+* Add click-and-drag panning for zoomed images
+* Add Home/End keyboard navigation (optional: PageUp/PageDown)
+* Show user-friendly dialogs for image load/open errors
+* Persist last opened folder between runs

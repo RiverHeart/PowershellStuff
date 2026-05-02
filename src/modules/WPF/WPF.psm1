@@ -7,6 +7,24 @@ if (-not $Script:WPFControlTable) {
     $Script:WPFControlTable = @{}
 }
 
+if (-not $Script:WPFThemeTable) {
+    $Script:WPFThemeTable = @{}
+}
+
+if (-not $Script:WPFStyleTable) {
+    $Script:WPFStyleTable = @{}
+}
+
+if (-not $Script:WPFImplicitStyleTable) {
+    $Script:WPFImplicitStyleTable = @{}
+}
+
+if (-not $Script:WPFThemeState) {
+    $Script:WPFThemeState = [ordered]@{
+        ActiveTheme = $null
+    }
+}
+
 # Load FileInfo objects
 if (-not $Script:WPFFileInfo) {
     $Script:WPFFileInfo = Import-PowerShellDataFile -Path "$ModuleRoot/Private/Data/FileInfo.psd1"
@@ -15,6 +33,7 @@ if (-not $Script:WPFFileInfo) {
 $Paths = @(
     'Private'
     'Public'
+    'TypeConverters'
 )
 
 foreach ($Path in $Paths) {

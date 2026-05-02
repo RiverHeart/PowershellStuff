@@ -18,7 +18,7 @@ using namespace System.Windows.Media
 #>
 
 # Change to the script directory if we're not in it.
-if (-not $PSScriptRoot -ne $PWD) {
+if ($PSScriptRoot -and $PWD -ne $PSScriptRoot) {
     Set-Location $PSScriptRoot
 }
 
@@ -28,28 +28,115 @@ $DebugPreference = 'Continue'
 Import-Module ../.. -Force
 
 # Define the Image Viewer GUI
+
+Import "$PSScriptRoot/ImageViewer.Styles.ps1"
+Import "$PSScriptRoot/functions/*.ps1"
+
+# MARK: WINDOW
 Window 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
-    $this.Tag = @{}
+    $this.AllowDrop = $true
+    $this.WindowState = [WindowState]::Maximized
+    $this.Tag = New-WPFObservableState @{
+        IsFullScreen   = $false
+        IsFileLoaded   = $false
+        IsFitMode      = $true
+        ZoomLevel      = 1.0
+        RotationAngle  = 0
+        OldWindowStyle = $this.WindowStyle
+        OldWindowState = $this.WindowState
+        OldResizeMode  = $this.ResizeMode
+        CurrentTheme   = if (Get-WPFDarkModePreference) { 'Dark' } else { 'Light' }
+        FileNavigator  = $null
+    }
+
+    Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
+
+    # WARNING: A little debouncing might be needed to prevent multiple rapid
+    # SizeChanged events from causing issues.
+    When SizeChanged {
+        if ((Reference 'Window').Tag.IsFitMode) {
+            Invoke-ImageViewerFitToWindow
+        }
+    }
 
     # Window doesn't have a Command property like button so
     # you need to wire up an event.
-    When PreviewKeyDown {
+    When KeyDown {
         param($sender, $event)
-        if ($event.key -ne 'Escape') { return }
-        $this.WindowStyle = [WindowStyle]::SingleBorderWindow
-        $this.WindowState = [WindowState]::Normal
-        $this.ResizeMode = [ResizeMode]::CanResize
+
+        switch ($event.Key) {
+            'Escape' {
+                $State = $this.Tag
+                if (-not $State.IsFullScreen) { return }
+
+                Set-WPFWindowFullScreen -IsFullScreen $False
+                if ($State.IsFitMode) {
+                    Invoke-ImageViewerFitToWindow
+                }
+                $event.Handled = $True
+                break
+            }
+            'Left' {
+                Invoke-ImageViewerNavigate -Direction Back
+                $event.Handled = $True
+                break
+            }
+            { $_ -in @('Right', 'Space') } {
+                Invoke-ImageViewerNavigate -Direction Forward
+                $event.Handled = $True
+                break
+            }
+            { $_ -in @('D0', 'NumPad0') -and ([Keyboard]::Modifiers -band [ModifierKeys]::Control) } {
+                Invoke-ImageViewerSetZoom -Reset
+                $event.Handled = $True
+                break
+            }
+        }
+    }
+
+    When DragOver {
+        param($sender, $event)
+
+        if ($event.Data.GetDataPresent([DataFormats]::FileDrop)) {
+            $event.Effects = [DragDropEffects]::Copy
+        } else {
+            $event.Effects = [DragDropEffects]::None
+        }
+
+        $event.Handled = $true
+    }
+
+    When Drop {
+        param($sender, $event)
+
+        if (-not $event.Data.GetDataPresent([DataFormats]::FileDrop)) {
+            return
+        }
+
+        $Files = [string[]] $event.Data.GetData([DataFormats]::FileDrop)
+        if ($Files.Count -gt 0) {
+            Invoke-ImageViewerLoadFile -FileName $Files[0]
+        }
+
+        $event.Handled = $true
+    }
+
+    When 'Loaded' {
+        Invoke-ImageViewerUpdateStatus
+        Invoke-ImageViewerUpdateNavigationIconStyle
     }
 
     Grid "Body" {
         $this.Margin = 5
 
+        # MARK: MENU
         Row {
             Column 'Expand' {
                 MenuBar 'Menu' {
                     $this.Height = 25
+                    React Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
@@ -61,57 +148,81 @@ Window 'Window' {
                                 return
                             }
 
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $FileName
-
-                            $Window.Tag.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
-
-                            # Enable buttons
-                            (Reference 'ForwardButton').IsEnabled = $True
-                            (Reference 'BackButton').IsEnabled = $True
+                            Invoke-ImageViewerLoadFile -FileName $FileName
                         }
                     }
                     MenuItem '(F)ile/(E)xit' {
                         # TODO: Explore using existing Close AppCommand and adding input gesture
                         Shortcut 'CloseCommand' 'Ctrl+q' {
+                            Write-Debug "Close command triggered. Closing window."
                             (Reference 'Window').Close()
+                        }
+                    }
+
+                    MenuItem '(I)mage/(R)otate 90°' {
+                        Shortcut 'Rotate' 'Ctrl+R' {
+                            Invoke-ImageViewerRotate -Direction Clockwise
+                        }
+                    }
+
+                    MenuItem '(I)mage/R(o)tate -90°' {
+                        Shortcut 'RotateCounter' 'Ctrl+Shift+R' {
+                            Invoke-ImageViewerRotate -Direction CounterClockwise
+                        }
+                    }
+
+                    MenuItem '(V)iew/Zoom (I)n' {
+                        Shortcut 'ZoomIn' 'Ctrl+Add' {
+                            Invoke-ImageViewerSetZoom -Delta 0.10
+                        }
+                    }
+
+                    MenuItem '(V)iew/Zoom (O)ut' {
+                        Shortcut 'ZoomOut' 'Ctrl+Subtract' {
+                            Invoke-ImageViewerSetZoom -Delta -0.10
                         }
                     }
 
                     MenuItem '(V)iew/(F)ullScreen' {
                         Shortcut 'FullScreen' 'F11' {
-                            # TODO: Convert this into an extension method SetFullScreen([bool])
-                            # so we can just (Reference 'Window').SetFullScreen($True)
+                            Write-Debug "Toggling full screen mode."
                             $Window = Reference 'Window'
-                            if ($Window.WindowState -eq [WindowState]::Maximized) {
-                                $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
-                                $Window.WindowState = [WindowState]::Normal
-                                $Window.ResizeMode = [ResizeMode]::CanResize
-                                (Reference 'MenuBar').Visibility = 'Visible'
-                                (Reference 'ButtonPanel').Visibility = 'Visible'
-                            } else {
-                                $Window.WindowStyle = [WindowStyle]::None
-                                $Window.WindowState = [WindowState]::Maximized
-                                $Window.ResizeMode = [ResizeMode]::NoResize
-                                (Reference 'MenuBar').Visibility = 'Collapsed'
-                                (Reference 'ButtonPanel').Visibility = 'Collapsed'
+                            $State = $Window.Tag
+                            Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                            if ($State.IsFitMode) {
+                                Invoke-ImageViewerFitToWindow
                             }
+                        }
+                    }
+
+                    MenuItem '(V)iew/Image Fit to (W)indow' {
+                        When Click {
+                            Invoke-ImageViewerFitToWindow
+                        }
+                    }
+
+                    MenuItem '(V)iew/Image (A)ctual Size' {
+                        When Click {
+                            Invoke-ImageViewerSetZoom -Reset
+                        }
+                    }
+
+                    MenuItem '(V)iew/(T)oggle Theme' {
+                        Shortcut 'ToggleTheme' 'Ctrl+T' {
+                            Invoke-ImageViewerToggleTheme
                         }
                     }
 
                     MenuItem '(H)elp/(A)bout' {
                         When Click {
-                            # TODO: Open a model window here
-                            Write-Host 'Implement Me'
+                            Invoke-ImageViewerShowAbout
                         }
                     }
                 }
             }
         }
 
-        # TODO:
-        # * Background for this row should be black by default but configurable.
-        #   * Maybe check user's OS for DarkMode preference
+        # MARK: IMG VIEWER
         Row 'Expand' {
             Column {
                 # In case the image is larger than the window, use the ScrollViewer
@@ -119,6 +230,19 @@ Window 'Window' {
                 ScrollViewer 'ScrollViewer' {
                     $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
                     $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $this.Background = 'Transparent'
+
+                    When PreviewMouseWheel {
+                        param($sender, $event)
+
+                        if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
+                            return
+                        }
+
+                        $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
+                        Invoke-ImageViewerSetZoom -Delta $Delta
+                        $event.Handled = $true
+                    }
 
                     Image 'Viewer' {
                         $this.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
@@ -128,50 +252,107 @@ Window 'Window' {
             }
         }
 
+        # MARK: TOOLBAR
         Row {
             Column {
                 # TODO:
                 # * Needs to support Counter/Clockwise rotation.
-                # * Needs to support "Fit to Window" and "Actual Image Size"
-                # * Needs to support arrow key/spacebar movement
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                    React Visibility Window.Tag.IsFullScreen -Invert
+
+                    $ButtonSize = 56
 
                     Button 'BackButton' {
-                        $this.Width = 75
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.IsEnabled = $False
+                        React IsEnabled Window.Tag.IsFileLoaded
 
-                        # FIXME:
-                        # Obvious in hindsight but it seems the closure I was using
-                        # to support `$this` in Add-WPFHandler broke the scriptblock's
-                        # ability to access script-scope variables reliably, so navigator
-                        # state now lives on the Window.Tag property.
-                        When 'Click' {
-                            Write-Host "Back"
-                            $Navigator = (Reference 'Window').Tag.FileNavigator
-                            if (-not $Navigator -or -not $Navigator.CurrentFile) { return }
-                            $Navigator.MovePrevious()
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $Navigator.CurrentFile.FullName
+                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
+                        Path 'images/arrow-left-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
-                        Path 'images/arrow-left-solid-full.svg'
+                    }
+                    Button 'FitToWindowButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
+                        $this.Margin = 5
+                        $this.ToolTip = 'Fit image to window'
+                        React IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerFitToWindow }
+                        Path 'images/arrows-to-circle-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
+                    }
+                    Button 'ActualSizeButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
+                        $this.Margin = 5
+                        $this.ToolTip = 'Actual size (100%)'
+                        React IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerSetZoom -Reset }
+                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
+                    }
+                    Button 'RotateButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
+                        $this.Margin = 5
+                        $this.ToolTip = 'Rotate 90° clockwise'
+                        React IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
+                        Path 'images/arrows-rotate-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
                     }
                     Button 'ForwardButton' {
-                        $this.Width = 75
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.Width = $ButtonSize
+                        $this.Height = $ButtonSize
                         $this.Margin = 5
-                        $this.IsEnabled = $False
+                        React IsEnabled Window.Tag.IsFileLoaded
 
-                        When 'Click' {
-                            Write-Host "Forward"
-                            $Navigator = (Reference 'Window').Tag.FileNavigator
-                            if (-not $Navigator -or -not $Navigator.CurrentFile) { return }
-                            $Navigator.MoveNext()
-                            $Viewer = Reference 'Viewer'
-                            $Viewer.Source = $Navigator.CurrentFile.FullName
+                        When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
+                        Path 'images/arrow-right-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
-                        Path 'images/arrow-right-solid-full.svg'
+                    }
+                }
+            }
+        }
+
+        # MARK: STATUS BAR
+        Row {
+            Column 'Expand' {
+                DockPanel 'StatusPanel' {
+                    $this.Margin = 5, 0, 5, 0
+                    React Visibility Window.Tag.IsFullScreen -Invert
+
+                    Label 'StatusFileLabel' {
+                        $this.Content = 'No image loaded'
+                        [DockPanel]::SetDock($this, [Dock]::Left)
+                    }
+                    Label 'StatusIndexLabel' {
+                        $this.Content = '0/0'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                    Label 'StatusDetailsLabel' {
+                        $this.Content = '-'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
+                    }
+                    Label 'StatusZoomLabel' {
+                        $this.Content = '100%'
+                        [DockPanel]::SetDock($this, [Dock]::Right)
                     }
                 }
             }

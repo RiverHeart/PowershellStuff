@@ -2,20 +2,32 @@
 .SYNOPSIS
     Creates a WPF DatePicker object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -DatePicker 'MyDate' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.datepicker
 #>
 function DatePicker {
     [CmdletBinding()]
+    [Alias('-DatePicker')]
     [OutputType([void], [System.Windows.Controls.DatePicker])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $DatePicker = [System.Windows.Controls.DatePicker] @{

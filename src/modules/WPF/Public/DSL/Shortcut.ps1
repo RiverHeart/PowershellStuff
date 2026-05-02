@@ -27,10 +27,12 @@
 #>
 function Shortcut {
     [CmdletBinding()]
+    [Alias('-Shortcut')]
     [OutputType([System.Windows.Input.RoutedUICommand])]
     param(
         [Parameter(Mandatory,Position=0)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [ArgumentCompleter({ Complete-WPFApplicationCommand @args })]
         [string] $Name,
 
@@ -40,6 +42,11 @@ function Shortcut {
         [Parameter(Position=2)]
         [scriptblock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     # Manual binding normalization: if position 1 is a scriptblock and ScriptBlock param is empty,
     # treat as implicit form (command reference only, no shortcuts).

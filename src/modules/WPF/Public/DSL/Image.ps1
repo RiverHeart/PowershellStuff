@@ -2,19 +2,31 @@
 .SYNOPSIS
     Creates a WPF Image object.
 
+.EXAMPLE
+    Disable a block of code without commenting it out by using a negative prefix.
+
+    -Image 'MyImage' { ...code... }
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.image
 #>
 function Image {
     [CmdletBinding()]
+    [Alias('-Image')]
     [OutputType([void], [System.Windows.Controls.Image])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^\w+$')]
         [string] $Name,
 
         [scriptblock] $ScriptBlock
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
 
     try {
         $Image = [System.Windows.Controls.Image] @{
