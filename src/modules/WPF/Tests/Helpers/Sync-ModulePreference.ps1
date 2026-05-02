@@ -1,3 +1,4 @@
+
 <#
 .SYNOPSIS
     Synchronizes the session state of the callee with the session
