@@ -6,13 +6,16 @@ Describe 'Label' {
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $WarningPreference = 'SilentlyContinue'
+        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
+        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         $Result = {
             -Label "Label_$Id" {
                 $this.Content = "Hello"
             }
-        }.InvokeWithContext($null, $PSVars)
+        }.Invoke()
 
         $Parent.Content | Should -BeNullOrEmpty
     }

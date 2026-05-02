@@ -1,7 +1,6 @@
 Describe 'MultiTrigger' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
-        $WarningPreference = 'SilentlyContinue'
     }
 
     It 'Should apply style multi trigger setters when all conditions are met' {

@@ -6,13 +6,16 @@ Describe 'MenuItem' {
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $MenuBar = [System.Windows.Controls.Menu]::new()
-        $PSVars = @([psvariable]::new('this', $MenuBar))
+
+        $WarningPreference = 'SilentlyContinue'
+        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
+        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         $Result = {
             -MenuItem "Item_$Id" {
                 $this.Header = "File"
             }
-        }.InvokeWithContext($null, $PSVars)
+        }.Invoke()
 
         $MenuBar.Items.Count | Should -Be -ExpectedValue 0
     }

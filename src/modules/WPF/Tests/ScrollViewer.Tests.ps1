@@ -6,13 +6,16 @@ Describe 'ScrollViewer' {
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-        $PSVars = @([psvariable]::new('this', $Parent))
+
+        $WarningPreference = 'SilentlyContinue'
+        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
+        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         $Result = {
             -ScrollViewer "Viewer_$Id" {
                 Label "Child_$Id" {}
             }
-        }.InvokeWithContext($null, $PSVars)
+        }.Invoke()
 
         $Parent.Content | Should -BeNullOrEmpty
     }

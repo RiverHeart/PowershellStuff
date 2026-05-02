@@ -1,6 +1,7 @@
 Describe 'ThicknessConverter' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $WarningPreference = 'SilentlyContinue'
     }
 
     It 'Should convert a single text value to uniform thickness' {
