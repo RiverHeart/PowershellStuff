@@ -47,41 +47,30 @@ Style 'ImageViewer.IconButton' Button {
     $IconPadding   = [int](($ButtonSize * (1 - $IconScale)) / 2)
     $CornerRadius  = 8
 
-    $BorderFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border])
-    $BorderFactory.Name = 'TemplateBorder'
-    $BorderFactory.SetValue([System.Windows.Controls.Border]::CornerRadiusProperty, [System.Windows.CornerRadius]::new($CornerRadius))
-    $BorderFactory.SetValue([System.Windows.Controls.Border]::PaddingProperty, [System.Windows.Thickness]::new($IconPadding))
-    $BorderFactory.SetValue([System.Windows.Controls.Border]::BorderThicknessProperty, [System.Windows.Thickness]::new(1))
-    $BorderFactory.SetResourceReference([System.Windows.Controls.Border]::BackgroundProperty, 'ButtonBackground')
-    $BorderFactory.SetResourceReference([System.Windows.Controls.Border]::BorderBrushProperty, 'DisabledForeground')
+    Template {
+        Border 'TemplateBorder' {
+            Setter CornerRadius ([System.Windows.CornerRadius]::new($CornerRadius))
+            Setter Padding ([System.Windows.Thickness]::new($IconPadding))
+            Setter BorderThickness ([System.Windows.Thickness]::new(1))
+            Setter Background ButtonBackground -Resource
+            Setter BorderBrush DisabledForeground -Resource
 
-    $Presenter = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
-    $Presenter.SetValue([System.Windows.Controls.ContentPresenter]::HorizontalAlignmentProperty, [HorizontalAlignment]::Stretch)
-    $Presenter.SetValue([System.Windows.Controls.ContentPresenter]::VerticalAlignmentProperty, [VerticalAlignment]::Stretch)
-    $Presenter.SetValue([System.Windows.Controls.ContentPresenter]::SnapsToDevicePixelsProperty, $true)
+            ContentPresenter {
+                Setter HorizontalAlignment ([HorizontalAlignment]::Stretch)
+                Setter VerticalAlignment ([VerticalAlignment]::Stretch)
+                Setter SnapsToDevicePixels $true
+            }
+        }
 
-    $BorderFactory.AppendChild($Presenter)
-    $Template.VisualTree = $BorderFactory
-
-    # Hover trigger — highlights TemplateBorder when the pointer is over the button.
-    $HoverTrigger = [System.Windows.Trigger]::new()
-    $HoverTrigger.Property = [System.Windows.UIElement]::IsMouseOverProperty
-    $HoverTrigger.Value = $true
-    $HoverSetter = [System.Windows.Setter]::new(
-        [System.Windows.Controls.Border]::BackgroundProperty,
-        [System.Windows.DynamicResourceExtension]::new('ButtonHoverBackground')
-    )
-    $HoverSetter.TargetName = 'TemplateBorder'
-    $HoverTrigger.Setters.Add($HoverSetter) | Out-Null
-    $Template.Triggers.Add($HoverTrigger) | Out-Null
-
-    $this.Setters.Add(
-        [System.Windows.Setter]::new([System.Windows.Controls.Control]::TemplateProperty, $Template)
-    ) | Out-Null
+        # Hover trigger — highlights TemplateBorder when the pointer is over the button.
+        Trigger IsMouseOver $true {
+            Setter Background ButtonHoverBackground -Resource -Target 'TemplateBorder'
+        }
+    }
 }
 
 Style 'ImageViewer.IconPath' Path {
-    Setter Stretch ([Stretch]::Uniform)
+    Setter Stretch ([System.Windows.Media.Stretch]::Uniform)
     Setter StrokeThickness 0
     Setter Fill Foreground -Resource
     Setter Stroke Foreground -Resource

@@ -28,12 +28,14 @@ function Add-WPFObject {
         if ($InputObject -is [System.Windows.FrameworkElementFactory]) {
             Write-Debug "AppendChild: '$ChildName' ($ChildType) -> factory '$SelfName'"
             $InputObject.AppendChild($Child)
+            continue
         }
         elseif ($InputObject -is [System.Windows.Controls.ControlTemplate] -and
             $Child -is [System.Windows.FrameworkElementFactory]
         ) {
             Write-Debug "Setting VisualTree: '$ChildName' ($ChildType) -> ControlTemplate"
             $InputObject.VisualTree = $Child
+            continue
         }
         # Special handling for adding GridDefinitions to Grid.
         # GridDefinitions given `AddChild()` methods so they behave
