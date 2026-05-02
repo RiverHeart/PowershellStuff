@@ -30,7 +30,7 @@ Import-Module ../.. -Force
 # Define the Image Viewer GUI
 
 Import "$PSScriptRoot/ImageViewer.Styles.ps1"
-Import "$PSScriptRoot/functions/*.ps1"
+Import "$PSScriptRoot/functions"
 
 # MARK: WINDOW
 Window 'Window' {

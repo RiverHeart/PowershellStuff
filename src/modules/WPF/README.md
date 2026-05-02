@@ -17,7 +17,7 @@ This is a trimmed excerpt from the ImageViewer application in [Examples/ImageVie
 Import-Module ./WPF -Force
 
 Import "./Examples/ImageViewer/ImageViewer.styles.ps1"
-Import "./Examples/ImageViewer/functions/*.ps1"
+Import "./Examples/ImageViewer/functions"
 
 Window 'Window' {
     $this.Title = 'Image Viewer'
