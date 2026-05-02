@@ -1,210 +1,178 @@
-# WPF Powershell
+# WPF PowerShell
 
 > [!WARNING]
-> Work in progress. Nothing is guaranteed to work as intended.
+> Experimental project. APIs, syntax, and behavior may change.
 
-## Table of Contents
-* [Overview](#overview)
-* [Example](#example)
-* [Documentation](#documentation)
-* [How It Works](#how-it-works)
-* [Why?](#why)
-* [Project Goals](#project-goals)
-* [Autocomplete](#autocomplete)
-  * [Intellisense](#intellisense)
-  * [VSCode Snippets](#vscode-snippets)
-* [Todo](#todo)
-* [Notes](#notes)
-* [Resources](#resources)
+A code-first PowerShell DSL for building WPF desktop applications without requiring XAML as the primary authoring model.
 
-## Overview
-
-Experimental internal Domain-Specific Language (DSL) for building WPF applications in Powershell without having to touch XAML. Because everything in the DSL is Powershell code, you have the full power of the language at your fingertips when developing a GUI.
-
-## Documentation
-
-Current DSL documentation:
-
-- [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
-- [Documenting This DSL](./Docs/DocumentingTheDSL.md)
-- [Keyword Reference](./Docs/KeywordReference.md)
-- [Contribution Checklist](./Docs/ContributionChecklist.md)
-- [Keyword Entry Template](./Docs/Templates/KeywordEntryTemplate.md)
+The focus is readability and fast iteration: define UI structure, behavior, and styling in one place using nested PowerShell syntax.
 
 ## Example
 
-The code below creates a window with a couple of buttons. Mandatory arguments get passed as regular function parameters while child objects, properties, and event handlers are declared and returned inside scriptblocks to be processed by the parent control.
+This is a trimmed excerpt from the ImageViewer application in [Examples/ImageViewer](./Examples/ImageViewer). It is a real, non-trivial app; the full source is linked below.
 
-More examples can be found in the [Examples](./Examples/) directory.
+![Image Viewer](./Examples/ImageViewer/ImageViewer.png)
 
-```powershell
+```PowerShell
 Import-Module ./WPF -Force
 
+Import "./Examples/ImageViewer/ImageViewer.styles.ps1"
+Import "./Examples/ImageViewer/functions/*.ps1"
+
 Window 'Window' {
-    $this.Title = 'Button Example'
-    $this.Height = 100
-    $this.Width = 250
+    $this.Title = 'Image Viewer'
+    $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
+    $this.AllowDrop = $true
+    $this.WindowState = [WindowState]::Maximized
+    $this.Tag = New-WPFObservableState @{
+        IsFullScreen  = $false
+        IsFileLoaded  = $false
+        IsFitMode     = $true
+        ZoomLevel     = 1.0
+        RotationAngle = 0
+        CurrentTheme  = if (Get-WPFDarkModePreference) { 'Dark' } else { 'Light' }
+        FileNavigator = $null
+    }
 
-    StackPanel "Buttons" {
-        Button "EnglishButton" {
-            $this.Content = 'English'
-            $this.Width = 100
+    Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
 
-            When "Click" {
-                Write-Host "Hello World"
+    When KeyDown {
+        param($sender, $event)
+
+        switch ($event.Key) {
+            'Escape' {
+                if ((Reference 'Window').Tag.IsFullScreen) {
+                    Set-WPFWindowFullScreen -IsFullScreen $false
+                    Invoke-ImageViewerFitToWindow
+                    $event.Handled = $true
+                }
+            }
+            'Left' {
+                Invoke-ImageViewerNavigate -Direction Back
+                $event.Handled = $true
+            }
+            { $_ -in @('Right', 'Space') } {
+                Invoke-ImageViewerNavigate -Direction Forward
+                $event.Handled = $true
             }
         }
-        Button "JapaneseButton" {
-            $this.Content = 'Japanese'
-            $this.Width = 100
+    }
 
-            When "Click" {
-                Write-Host "Konichiwa Sekai"
+    Grid 'Body' {
+        Row {
+            Column 'Expand' {
+                MenuBar 'Menu' {
+                    React Visibility Window.Tag.IsFullScreen -Invert
+
+                    MenuItem '(F)ile/(O)pen' {
+                        Shortcut 'Open' {
+                            $fileName = Get-WPFFileSelection -Type All -Category Image -Window (Reference 'Window')
+                            if ($fileName) {
+                                Invoke-ImageViewerLoadFile -FileName $fileName
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row 'Expand' {
+            Column {
+                ScrollViewer 'ScrollViewer' {
+                    $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                    $this.Background = 'Transparent'
+
+                    Image 'Viewer' {
+                        $this.VerticalAlignment = [VerticalAlignment]::Center
+                        $this.StretchDirection = [StretchDirection]::DownOnly
+                    }
+                }
             }
         }
     }
 } | Show-WPFWindow
 ```
 
-![Button Example](./Images/ButtonExample.png)
+Full example: [Examples/ImageViewer](./Examples/ImageViewer)
 
-If you need or want, you can serialize WPF objects by piping them to `Convert-WPFObjectToXaml`. In the case of the example above, you'll get the following output. Of course, you'll still need to wire everything up in C#.
+The DSL reduces WPF ceremony, but larger desktop applications still carry real complexity.
 
-**Output**
-```xml
-<?xml version="1.0" encoding="utf-16"?>
-<Window ThemeMode="None" Title="Button Example" Name="Window" Width="250" Height="100" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-  <StackPanel Name="Buttons">
-    <Button Name="EnglishButton" Width="100">English</Button>
-    <Button Name="JapaneseButton" Width="100">Japanese</Button>
-  </StackPanel>
-</Window>
-```
+## Design Philosophy
 
-## How It Works
+This DSL is intentionally code-first.
 
-DSL keywords are just aliases to Powershell functions which programmatically create the WPF object. For example, the keyword `Grid` is an alias for `New-WPFGrid` which returns a [Grid](https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.stackpanel?view=windowsdesktop-10.0#properties) object. The function parameters typically consist of an initializer such as the name of the object and end with a scriptblock. Powershell [ParameterSets](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_parameter_sets?view=powershell-7.5) are used to control the positional parsing of values and so far I've only found use for `Implicit` and `Explicit` sets to make things more obvious. For instance, you can call `Grid 'Name' 4 4 {}` to create a 4x4 grid or `Grid 'Name' {}` to have the layout inferred. Initializer params are typically cosmetic as you can set properties/call code from the the scriptblock. In the case of the `Grid 'Name' 4 4 {}`, the logic for creating and adding the grid definitions is hidden behind the row/column parameters.
+Interoperability with XAML is possible in principle, but the main workflow here is closer to HTML/CSS/JavaScript ergonomics: structure, style, and behavior can be authored in a unified code-first workflow, while still being split across files when that keeps a project maintainable.
 
-From top to bottom, each UI element is created, registered (see [object-references](#object-references)), and each scriptblock is processed by `Update-WPFObject`. An automatic variable called `$this` is injected into the scriptblock which refers to the object we just created and mostly used for property setting. Objects returned by the scriptblock are processed by custom types added as note properties. `Control` types are added as children, `Handler` types are registered with events, and so on. While `Update-WPFObject` does not call itself, it causes recursion by triggering each scriptblock in the tree of nodes.
+## Why Use It
 
-Grid elements such as `ColumnDefinition` and `RowDefinition` have special handling. Grid definitions are given a custom `Children` note property to which controls can be added. When a Grid receives a `RowDefinition`, it processes the row and its children. If the user did not define the Grid with rows and columns, the definitions will be added automatically. For columns specifically, definitions are added only if a column at that index doesn't exist. For instance, if you add two rows, the first row containing one column and the second row containing two columns, processing of the second row will ignore the first column definition and add the second.
+- Build WPF applications directly in PowerShell.
+- Keep UI layout, event handling, and style definitions close together.
+- Reduce boilerplate compared to typical C#/XAML-first workflows.
+- Keep setup friction low for beginners and prototyping.
 
-Finally, after all scriptblocks have been executed, the window object is passed to `Show-WPFDialog` which calls the `ShowDialog()` method and `Close()` when the window closes.
+## When This Is Not a Fit
+
+- If you need to ship a standalone binary/exe. This project intentionally avoids third-party modules, so binary distribution is not a supported workflow.
+- If your team requires a XAML-first designer workflow.
+- If you need long-term API stability right now.
+
+## Requirements
+
+- Windows
+- PowerShell 5 compatibility (project goal)
+- A PowerShell editor
+- WPF assemblies available on a standard Windows environment
+
+Since Windows PowerShell v5, PowerShell ISE, and WPF come pre-installed on Windows, you already have all of these.
+
+For a more powerful editing experience, you can install [VSCode](https://code.visualstudio.com/download) with the PowerShell extension. When you open this project, you'll be prompted to install extensions recommended by it.
+
+## Project Status
+
+Usable for experimentation and personal tools, still evolving.
+
+Current limitations:
+
+- Editor autocomplete is limited.
+- Error reporting still needs improvement.
+- Some DSL areas are more mature than others.
+- Documentation is still catching up with implementation changes.
 
 ## Why?
 
-Many reasons but if I had to name a few big ones:
-* WinForms is too limited and WPF demands too much (XAML, Visual Studio, C#, MVVM)
-* Declarative syntax is good but I just instinctively hate XAML
-* C# requires too much ceremony for my lizard brain
-* Because I wanted to see how difficult this would be
+Many reasons, but a few big ones:
+
+- WinForms is limited and WPF often requires heavy ceremony.
+- Declarative UI is useful, but XAML is not always the most approachable path.
+- C# is powerful, but for quick UI prototyping it can feel heavyweight.
+- The project explores whether a readable, practical PowerShell-first WPF DSL is viable.
 
 ## Project Goals
 
-* Make a fun leaky abstraction
-* Convention over configuration (WPF is flexible at the expense of usability)
-* Easy to read (everything is nested like HTML)
-* Simple things should be easy (shouldn't need to be a programmer or need an IDE to make a window with buttons)
-* Composibility (keywords are just functions with aliases)
-* Lots of examples (if this is actually useful/productive then sample projects should demonstrate that)
-* Xaml escape hatch (should be possible to convert objects to their Xaml representation)
+- Make a fun, practical leaky abstraction.
+- Favor convention over configuration.
+- Keep syntax easy to read and edit.
+- Keep barrier to entry low by staying compatible with PowerShell 5.
+- Let users compose UI from regular functions rather than opaque tooling.
+- Provide enough examples to prove real-world usefulness.
 
-## Autocomplete
+## Documentation
 
-TLDR: I can't provide real intellisense but I'm working on some basic stuff using VSCode snippets and Powershell's TabExpansion2.
+- [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
+- [Documenting This DSL](./Docs/DocumentingTheDSL.md)
+- [Keyword Reference](./Docs/KeywordReference.md)
+- [Contribution Checklist](./Docs/ContributionChecklist.md)
+- [Keyword Entry Template](./Docs/Templates/KeywordEntryTemplate.md)
+- [Maintainer Notes](./Docs/MaintainerNotes.md)
+- [Release Readiness Checklist](./Docs/ReleaseReadinessChecklist.md)
+- [Repository Migration Plan](./Docs/RepositoryMigrationPlan.md)
+- [Development Log](./Docs/DevLog/2026-05.md)
+- [Examples](./Examples)
 
-### Intellisense
-
-I'm not the type of person to mess around with VSCode extensions so my only option is to use what is natively provided by Powershell. Unfortunately, it's trickier than it should be because while the `ArgumentCompleterAttribute` passes a `CommandAST` to the scriptblock that AST is limited to the scriptblock. In other words, because `Handler` is defined inside a scriptblock passed to `Button`, we can't access the part of the AST where `Button` is defined simply by travering the `Parent` property of the `CommandAST`.
-
-I've found a workaround that involves accessing the callstack to get invocation args for TabExpansion2. Among those arguments are the full AST and the cursor position. With those, we can search the AST to get the calling node and find the command value (e.g. `Button`) to determine what values should be returned.
-
-**(2026-01-11)**
-
-My brain aches as I try contemplating Roman's [TabExpansion2](https://github.com/nightroman/FarNet/blob/main/PowerShellFar/TabExpansion2.ps1) override. Though it's apparently undocumented or encouraged it seems that TabExpansion2 is capable of more
-than just function parameter completion via `Register-ArgumentCompleter`. If I dump `$function:TabExpansion2` then I can see that one of the calls it makes is to an internal method `CommandCompletion::CompleteInput()` which must be calling argument completers behind the scene.
-
-```powershell
-        return [System.Management.Automation.CommandCompletion]::CompleteInput(
-            <#ast#>              $ast,
-            <#tokens#>           $tokens,
-            <#positionOfCursor#> $positionOfCursor,
-            <#options#>          $options)
-```
-
-Roman's override seems to rip all that opaque logic, replacing it with multi-stage invocations of different "processor" types, aka the scripts registered via his own version of `Register-ArgumentCompleter`. Relevant to me, I notice his `Register-InputComplete` cmdlet which takes the exact same parameters as `CommandCompletion::CompleteInput()`. Looking at [CommandCompletion](https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/CommandCompletion/CommandCompletion.cs) more closely it seems like Roman's TabExpansion2 converts some of the methods there directly to their Powershell cmdlet equivalents.
-
-```powershell
-	# input processors
-	foreach(${%} in ${*}.options['InputProcessors']) {
-		if (${*}.result = & ${%} ${*}.ast ${*}.tokens ${*}.positionOfCursor ${*}.options) {
-			if (${*}.result -is [System.Management.Automation.CommandCompletion]) {
-				return ${*}.result
-			}
-			Write-Error -ErrorAction 0 "TabExpansion2: Invalid result. Input processor: ${%}"
-		}
-	}
-```
-
-Without going that far I might be able to override `TabExpansion2` with a custom input completer for `$this` by parsing the AST before letting the normal code run. Would that I could simply use `$this` the same way it works within a class without the hacks.
-
-
-### VSCode Snippets
-
-I'm slowly adding VSCode snippets to [wpf.code-snippets](../../../.vscode/wpf.code-snippets) to make scaffolding the DSL easier.
-
-Snippets can be triggered by typing the `wpf-<control name>` or by pressing `Ctrl+Alt+J`.
-
-## Todo
-
-* Add negative prefix aliases to DSL keywords which when used disable that block of code. For example `-Border`
-* Error handling is atrocious. Really need a stack trace instead of a long list of chained errors.
-    * Allow child object errors to bubble up and only catch errors when creating the control the function is
-      meant to create. Also generate a callstack to go with it.
-* Right now you'll get registration errors if you're recreating an object without unregistering it first or calling `Import-Module ./WPF -Force`. `Show-WPFDialog` isn't the right place to handle this but there has to be a better way.
-* `$Parent = $PSCmdlet.GetVariableValue('self')` could be a game changer. `Update-WPFObject` does an admirable job of adding items to the parent but if the child object can add itself then that's probably preferable and keeps logic separate. Only foreseeable is Menu/MenuItem which is handled differently from other types.
-* Right now Column/RowDefinitions are nameless but once they've attached to a grid they're name should become "$GridName_$Type_$Index" and be implemented as a script property. This should make the debug logs more helpful.
-* I've come to realize that my original code creates columns for every row but sets column position for child objects by an index counter rather than the grid index of the parent column. Effectively, a grid with 3 rows and 1 column generates 3 columns, the first of which is added to the grid and the rest are simply used to obtain child objects for the remaining rows. So maybe the Column/Cell keyword shouldn't return a column but a class or hashtable with the child objects and column metadata. Then based on the column count, grid generates a column on the fly while processing rows. This is semi-problematic though because columns appear as individual elements and property setting assumes `$this` is the keyword object... If row 2/column 1 is really row 1/column 1 then maybe we grab a reference to the existing column? That's easy enough during grid init, but not so easy I think for the DSL construction. I feel like what I really need is some sort of multi-dimensional array that maps grid elements to their row/column.
-
-## Notes
-
-### Object References
-
-Because children are defined by functions and added automatically there is an issue regarding node access. If each element were created the regular way you'd have a variable reference but not here. I'm thinking that perhaps that creating a control automatically creates a variable or stores a reference in a hashtable where the lookup key is the name of the control. If I went the automatic variable route I would need to ensure that whitespace was converted to underscores or hyphens. For the Window, it doesn't have a name property so I would need to add one on creation or use something else.
-
-**(2025-12-24)**
-
-I implemented a control lookup system using some helper functions and a hashtable which seems to work. Users can use the `Reference` keyword to lookup any registered object. I found out afterwards that WPF supports a name lookup system via the `FindName('name')` method. Like my implementation, it only works if the name has been registered. Unlike my implementation, it's a PITA because it requires instancing a `NameScope` and calling `[NameScope]::SetNameScope($NameScope, $Window)` for `RegisterName('name', $object)` to work. Additionally, this seems to fundamentally alter the WPF app, requiring an `Application` instance to call `$App.Run($Window)`. `$Window.ShowDialog()` simply does nothing when a `Namescope` is set and those might be specific to XAML so it's unclear how to properly use them with programmatically created controls.
-
-Attempts to rerun the app now fail with `Cannot create more than one System.Windows.Application instance in the same AppDomain.` even though I've called `$App.Windows.Close()` to close all windows and the app's shutdown mode is set to `OnLastWindowClose`. This may not even be worthwhile as an application doesn't return anything via stdout. Printing to the console using `Write-Host` is possible but returning a string is a no go.
-
-While I generally prefer to use native mechanisms where possible, I'm either incapable of understanding it or it is too inflexible to behave how I want so I'm going to ignore it for now.
-
-### RelayCommand
-
-**(2026-01-06)**
-
-Like Prometheus stealing fire from the gods I have absconded away with the `RelayCommand` implementation from `CommunityToolkit.Mvvm`. I think maybe the `CommandManager` class was the thing that required the `CommandBinding` as assigning the command directly worked fine. I'm not in love with the syntax for the command which is currently `RelayCommand { Execute Code } { Can Execute Code }` because there could be a target and having two scriptblocks like that doesn't really fit with what we've done so far. If only I had contextual commands but that's a lot of effort for a little payoff. This does mean that in theory, you can now grey out a 'Save' menu item until the user makes a change.
-
-**(2025-12-27)**
-
-While attempting to implement a menu bar I learned that, although you can setup a simple handler, there is a special `ICommand` interface used to share logic around. For instance, you might put `CloseWindow()` code here. So you might think that you'd instance a `Command` object, connect it to a `MenuItem` like "Close" and be done. Haha... hahahaha.... ha... okay I'm fine again. No, there isn't a `Command` object, `ICommand` is just an interface, you need to create a class called `RelayCommand` which implements two private methods which `ICommand` defines as `Executed` (for the doing) and `CanExecute` (for the can do, which they cannot by default) call. Not only does `ICommand` and its' target need to be associated with the `MenuItem` but you must also wrap this in a `CommandBinding` instance before adding it to the target `UIElement`.
-
-Alas, as is typical these days, the `RelayCommand` class which underpins the `ICommand` implementation cannot be easily implemented using dotnet core because the `CommandManager` class was dropped and, seemingly, is only available from a third party module `CommunityToolkit.Mvvm`. I learned this while trying to create the `RelayCommand` class in C# and import into Powershell using `Add-Type -TypeDefinition`. Well, even if that module were Microsoft's own I wouldn't use it here anyway. As a final insult, the built-in `ApplicationCommands` don't implement any logic of their own... why...? You know what, don't answer that.
-
-At the end of the day, frustrated with the inflexibility of what must be the most flexible framework ever designed, I'm left with a simple, functional "Click" event handle. The moral of the story is KISS.
-
-```powershell
-MenuItem '_Exit' {
-    Handler Click {
-        $Window = Reference 'Window'
-        $Window.Close()
-    }
-}
-```
 
 ## Resources
 
-* https://powershellexplained.com/2017-03-04-Powershell-DSL-example-RDCMan/
-* https://app.pluralsight.com/library/courses/powershell-guis-building-wpf-free/table-of-contents
+- https://PowerShellexplained.com/2017-03-04-PowerShell-DSL-example-RDCMan/
+- https://app.pluralsight.com/library/courses/PowerShell-guis-building-wpf-free/table-of-contents
 
