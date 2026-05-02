@@ -49,9 +49,9 @@ Style 'ImageViewer.IconButton' Button {
 
     Template {
         Border 'TemplateBorder' {
-            Setter CornerRadius ([System.Windows.CornerRadius]::new($CornerRadius))
-            Setter Padding ([System.Windows.Thickness]::new($IconPadding))
-            Setter BorderThickness ([System.Windows.Thickness]::new(1))
+            Setter CornerRadius $CornerRadius
+            Setter Padding $IconPadding
+            Setter BorderThickness 1
             Setter Background ButtonBackground -Resource
             Setter BorderBrush DisabledForeground -Resource
 
