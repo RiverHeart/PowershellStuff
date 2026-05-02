@@ -1,3 +1,4 @@
+using assembly 'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\PresentationFramework\v4.0_4.0.0.0__31bf3856ad364e35\PresentationFramework.dll'
 using namespace System
 using namespace System.Windows
 using namespace System.Management.Automation
@@ -7,23 +8,23 @@ using namespace System.Management.Automation
     Type converter for System.Windows.CornerRadius.
 
 .DESCRIPTION
-    This type converter allows converting from a string in the format "left,top,right,bottom"
+    This type converter allows converting from a string in the format "topLeft,topRight,bottomRight,bottomLeft"
     or from an array of 4 numeric values to a CornerRadius object. This is allows for a cleaner
     syntax when defining CornerRadius values in the DSL.
 
     CornerRadius is a struct used in WPF to represent the CornerRadius of a frame around a rectangle.
-    It has four properties: Left, Top, Right, and Bottom. Margin and Padding properties in WPF
+    It has four properties: TopLeft, TopRight, BottomRight, and BottomLeft. Margin and Padding properties in WPF
     often use CornerRadius to specify the amount of space around or inside a control.
 
 .EXAMPLE
     # Using a string
     [System.Windows.CornerRadius] $CornerRadius = "10,20,30,40"
-    # $CornerRadius is now a CornerRadius object with Left=10, Top=20, Right=30, Bottom=40
+    # $CornerRadius is now a CornerRadius object with TopLeft=10, TopRight=20, BottomRight=30, BottomLeft=40
 
 .EXAMPLE
     # Using an array
     [System.Windows.CornerRadius] $CornerRadius = 10, 20, 30, 40
-    # $CornerRadius is now a CornerRadius object with Left=10, Top=20, Right=30, Bottom=40
+    # $CornerRadius is now a CornerRadius object with TopLeft=10, TopRight=20, BottomRight=30, BottomLeft=40
 #>
 class CornerRadiusConverter : PSTypeConverter
 {
@@ -104,10 +105,10 @@ class CornerRadiusConverter : PSTypeConverter
     }
 
     [object] ConvertFrom([object] $SourceValue, [Type] $TargetType, [IFormatProvider] $FormatProvider, [bool] $IgnoreCase) {
-        $left = $null
-        $top = $null
-        $right = $null
-        $bottom = $null
+        $topLeft = $null
+        $topRight = $null
+        $bottomRight = $null
+        $bottomLeft = $null
 
         if (
             $SourceValue -is [byte] -or
@@ -122,8 +123,8 @@ class CornerRadiusConverter : PSTypeConverter
             $SourceValue -is [double] -or
             $SourceValue -is [decimal]
         ) {
-            $left = [double] $SourceValue
-            return [System.Windows.CornerRadius]::new($left)
+            $topLeft = [double] $SourceValue
+            return [System.Windows.CornerRadius]::new($topLeft)
         }
 
         if ($SourceValue -is [string]) {
@@ -131,52 +132,52 @@ class CornerRadiusConverter : PSTypeConverter
 
             # Uniform
             if ($parts.Length -eq 1 -and
-                [double]::TryParse($parts[0].Trim(), [ref] $left)
+                [double]::TryParse($parts[0].Trim(), [ref] $topLeft)
             ) {
-                return [System.Windows.CornerRadius]::new($left)
+                return [System.Windows.CornerRadius]::new($topLeft)
 
             # Symmetric
             } elseif ($parts.Length -eq 2 -and
-                [double]::TryParse($parts[0].Trim(), [ref] $left) -and
-                [double]::TryParse($parts[1].Trim(), [ref] $top)
+                [double]::TryParse($parts[0].Trim(), [ref] $topLeft) -and
+                [double]::TryParse($parts[1].Trim(), [ref] $topRight)
             ) {
-                return [System.Windows.CornerRadius]::new($left, $top, $left, $top)
+                return [System.Windows.CornerRadius]::new($topLeft, $topRight, $topLeft, $topRight)
 
             # Independent
             } elseif ($parts.Length -eq 4 -and
-                [double]::TryParse($parts[0].Trim(), [ref] $left) -and
-                [double]::TryParse($parts[1].Trim(), [ref] $top) -and
-                [double]::TryParse($parts[2].Trim(), [ref] $right) -and
-                [double]::TryParse($parts[3].Trim(), [ref] $bottom)
+                [double]::TryParse($parts[0].Trim(), [ref] $topLeft) -and
+                [double]::TryParse($parts[1].Trim(), [ref] $topRight) -and
+                [double]::TryParse($parts[2].Trim(), [ref] $bottomRight) -and
+                [double]::TryParse($parts[3].Trim(), [ref] $bottomLeft)
             ) {
-                return [System.Windows.CornerRadius]::new($left, $top, $right, $bottom)
+                return [System.Windows.CornerRadius]::new($topLeft, $topRight, $bottomRight, $bottomLeft)
             }
         } elseif ($SourceValue -is [object[]]) {
             # Uniform
             if ($SourceValue.Length -eq 1 -and
-                [double]::TryParse("$($SourceValue[0])", [ref] $left)
+                [double]::TryParse("$($SourceValue[0])", [ref] $topLeft)
             ) {
-                return [System.Windows.CornerRadius]::new($left)
+                return [System.Windows.CornerRadius]::new($topLeft)
 
             # Symmetric
             } elseif ($SourceValue.Length -eq 2 -and
-                [double]::TryParse("$($SourceValue[0])", [ref] $left) -and
-                [double]::TryParse("$($SourceValue[1])", [ref] $top)
+                [double]::TryParse("$($SourceValue[0])", [ref] $topLeft) -and
+                [double]::TryParse("$($SourceValue[1])", [ref] $topRight)
             ) {
-                return [System.Windows.CornerRadius]::new($left, $top, $left, $top)
+                return [System.Windows.CornerRadius]::new($topLeft, $topRight, $topLeft, $topRight)
 
             # Independent
             } elseif ($SourceValue.Length -eq 4 -and
-                [double]::TryParse("$($SourceValue[0])", [ref] $left) -and
-                [double]::TryParse("$($SourceValue[1])", [ref] $top) -and
-                [double]::TryParse("$($SourceValue[2])", [ref] $right) -and
-                [double]::TryParse("$($SourceValue[3])", [ref] $bottom)
+                [double]::TryParse("$($SourceValue[0])", [ref] $topLeft) -and
+                [double]::TryParse("$($SourceValue[1])", [ref] $topRight) -and
+                [double]::TryParse("$($SourceValue[2])", [ref] $bottomRight) -and
+                [double]::TryParse("$($SourceValue[3])", [ref] $bottomLeft)
             ) {
-                return [System.Windows.CornerRadius]::new($left, $top, $right, $bottom)
+                return [System.Windows.CornerRadius]::new($topLeft, $topRight, $bottomRight, $bottomLeft)
             }
         }
 
-        throw [System.NotSupportedException]::new("Cannot convert '$SourceValue' to $TargetType. Expected a single uniform value or 'left,top,right,bottom'.")
+        throw [System.NotSupportedException]::new("Cannot convert '$SourceValue' to $TargetType. Expected a single uniform value or 'topLeft,topRight,bottomRight,bottomLeft'.")
     }
 
     [bool] CanConvertTo([object] $SourceValue, [Type] $TargetType) {
