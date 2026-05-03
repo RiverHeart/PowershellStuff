@@ -66,7 +66,7 @@ Window 'Window' {
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
-                            $fileName = Get-WPFFileSelection -Type All -Category Image -Window (Reference 'Window')
+                            $fileName = Get-WPFFileSelection -Category Image -Window (Reference 'Window')
                             if ($fileName) {
                                 Invoke-ImageViewerLoadFile -FileName $fileName
                             }
