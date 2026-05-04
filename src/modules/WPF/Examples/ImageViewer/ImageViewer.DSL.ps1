@@ -39,15 +39,26 @@ Window 'Window' {
     $this.AllowDrop = $true
     $this.WindowState = [WindowState]::Maximized
     $this.Tag = New-WPFObservableState @{
+        # Viewer State
         IsFullScreen   = $false
         IsFileLoaded   = $false
         IsFitMode      = $true
         ZoomLevel      = 1.0
         RotationAngle  = 0
+
+        # Copy State
+        IsCopyFeedbackActive = $false
+        CopyFeedbackTimer = $null
+
+        # Window State Backup (for toggling full screen)
         OldWindowStyle = $this.WindowStyle
         OldWindowState = $this.WindowState
         OldResizeMode  = $this.ResizeMode
+
+        # Theme State
         CurrentTheme   = if (Get-WPFDarkModePreference) { 'Dark' } else { 'Light' }
+
+        # Navigation State
         FileNavigator  = $null
     }
 
@@ -263,13 +274,36 @@ Window 'Window' {
                     Button 'CopyButton' {
                         UseStyle 'ImageViewer.IconButton'
                         React IsEnabled Window.Tag.IsFileLoaded
+                        React ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
+                            param($IsCopyFeedbackActive)
+
+                            if ($IsCopyFeedbackActive) {
+                                'Copied to clipboard'
+                            } else {
+                                'Copy image to clipboard'
+                            }
+                        }
+                        React Content Window.Tag.IsCopyFeedbackActive -Converter {
+                            param($IsCopyFeedbackActive)
+
+                            if ($IsCopyFeedbackActive) {
+                                Path 'images/clipboard-check-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            } else {
+                                Path 'images/clipboard-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            }
+                        }
 
                         When 'Click' {
-                            Set-WPFClipboard -InputObject (Reference 'Viewer')
-                            Update-ImageViewerIcon -PanelName 'ButtonPanel'
-                        }
-                        Path 'images/clipboard-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
+                            try {
+                                Set-WPFClipboard -InputObject (Reference 'Viewer') -ErrorAction Stop
+                                Invoke-ImageViewerCopyFeedback -Success
+                            } catch {
+                                Invoke-ImageViewerCopyFeedback
+                            }
                         }
                     }
                     Button 'BackButton' {
