@@ -112,7 +112,7 @@ FunctionsToExport = @(
     'Window'
 
     # DSL/Helpers
-    'React'
+    'Const'
     'Binding'
     'Brush'
     'DataTrigger'

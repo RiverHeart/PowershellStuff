@@ -21,6 +21,10 @@
 
         # Annoying and practically useless when working with
         # powershell classes in modules
-        'TypeNotFound'
+        'TypeNotFound',
+
+        # DSL functions are designed to be used with positional parameters,
+        # and enforcing named parameters would make them more cumbersome to use.
+        'PSAvoidUsingPositionalParameters'
     )
 }
