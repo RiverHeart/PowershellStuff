@@ -270,13 +270,13 @@ When Click {
 
 ## Binding and Resources
 
-### React
+### Watch
 
 Binds a target property to an observable state path.
 
 ```powershell
-React Visibility Window.Tag.IsFullScreen -Invert
-React IsEnabled Window.Tag.IsFileLoaded
+Watch Visibility Window.Tag.IsFullScreen -Invert
+Watch IsEnabled Window.Tag.IsFileLoaded
 ```
 
 ### Binding

@@ -146,7 +146,7 @@ Window 'Window' {
             Column 'Expand' {
                 MenuBar 'Menu' {
                     $this.Height = 25
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {
@@ -268,15 +268,15 @@ Window 'Window' {
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     Button 'CopyButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        React IsEnabled Window.Tag.IsFileLoaded
-                        React ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
+                        Watch IsEnabled Window.Tag.IsFileLoaded
+                        Watch ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
                             if ($_) { 'Copied to clipboard' } else { 'Copy image to clipboard' }
                         }
-                        React Content Window.Tag.IsCopyFeedbackActive -Converter {
+                        Watch Content Window.Tag.IsCopyFeedbackActive -Converter {
                             if ($_) {
                                 Path 'images/clipboard-check-solid-full.svg' {
                                     UseStyle 'ImageViewer.IconPath'
@@ -299,7 +299,7 @@ Window 'Window' {
                     }
                     Button 'BackButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
                         Path 'images/arrow-left-solid-full.svg' {
@@ -308,11 +308,11 @@ Window 'Window' {
                     }
                     Button 'ZoomModeButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        React IsEnabled Window.Tag.IsFileLoaded
-                        React ToolTip Window.Tag.IsFitMode -Converter {
+                        Watch IsEnabled Window.Tag.IsFileLoaded
+                        Watch ToolTip Window.Tag.IsFitMode -Converter {
                             if ($_) { 'Actual size (100%)' } else { 'Fit image to window' }
                         }
-                        React Content Window.Tag.IsFitMode -Converter {
+                        Watch Content Window.Tag.IsFitMode -Converter {
                             if ($_) {
                                 Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
                                     UseStyle 'ImageViewer.IconPath'
@@ -335,7 +335,7 @@ Window 'Window' {
                     Button 'RotateButton' {
                         UseStyle 'ImageViewer.IconButton'
                         $this.ToolTip = 'Rotate 90° clockwise'
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
                         Path 'images/arrows-rotate-solid-full.svg' {
@@ -344,7 +344,7 @@ Window 'Window' {
                     }
                     Button 'ForwardButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
                         Path 'images/arrow-right-solid-full.svg' {
@@ -360,7 +360,7 @@ Window 'Window' {
             Column 'Expand' {
                 DockPanel 'StatusPanel' {
                     $this.Margin = 5, 0, 5, 0
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     Label 'StatusFileLabel' {
                         $this.Content = 'No image loaded'

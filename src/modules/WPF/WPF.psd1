@@ -112,13 +112,12 @@ FunctionsToExport = @(
     'Window'
 
     # DSL/Helpers
-    'React'
+    'Watch'
     'Binding'
     'Brush'
     'DataTrigger'
     'Import'
     'MultiTrigger'
-    'React'
     'Reference'
     'Resource'
     'Setter'
@@ -127,6 +126,7 @@ FunctionsToExport = @(
     'Template'
     'Trigger'
     'UseStyle'
+    'Watch'
     'When'
 
     # DSL/Custom Controls

@@ -61,7 +61,7 @@ Window 'Window' {
         Row {
             Column 'Expand' {
                 MenuBar 'Menu' {
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
                         Shortcut 'Open' {

@@ -1,4 +1,4 @@
-Describe 'React' {
+Describe 'Watch' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
@@ -14,7 +14,7 @@ Describe 'React' {
             }
 
             Label $labelName {
-                React Content "$windowName.Tag.IsReady" -Converter {
+                Watch Content "$windowName.Tag.IsReady" -Converter {
                     param($SourceValue)
 
                     if ($SourceValue) { 'Ready' } else { 'Not Ready' }
@@ -42,7 +42,7 @@ Describe 'React' {
             }
 
             Label $labelName {
-                React Content "$windowName.Tag.IsReady" -Converter {
+                Watch Content "$windowName.Tag.IsReady" -Converter {
                     if ($_) { 'Ready' } else { 'Not Ready' }
                 }
             }
@@ -68,7 +68,7 @@ Describe 'React' {
             }
 
             Label $labelName {
-                React Visibility "$windowName.Tag.IsFullScreen" -Invert
+                Watch Visibility "$windowName.Tag.IsFullScreen" -Invert
             }
         }
 
