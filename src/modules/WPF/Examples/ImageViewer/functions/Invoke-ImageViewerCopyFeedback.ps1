@@ -37,7 +37,6 @@ function Invoke-ImageViewerCopyFeedback {
             $State.IsCopyFeedbackActive = $false
 
             Invoke-ImageViewerUpdateStatus
-            Update-ImageViewerIcon -PanelName 'ButtonPanel'
         })
 
         $State.CopyFeedbackTimer = $Timer
@@ -58,6 +57,5 @@ function Invoke-ImageViewerCopyFeedback {
         $DetailsLabel.Content = 'Copy failed'
     }
 
-    Update-ImageViewerIcon -PanelName 'ButtonPanel'
     $State.CopyFeedbackTimer.Start()
 }

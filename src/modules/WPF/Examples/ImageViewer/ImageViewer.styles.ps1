@@ -1,3 +1,5 @@
+using namespace System.Windows.Media
+
 Theme 'Light' {
     Brush 'WindowBackground' '#FFFFFF'
     Brush 'SurfaceBackground' '#F8F8F8'
@@ -73,10 +75,15 @@ Style 'ImageViewer.IconButton' Button {
 }
 
 Style 'ImageViewer.IconPath' Path {
-    Setter Stretch ([System.Windows.Media.Stretch]::Uniform)
+    Setter Stretch ([Stretch]::Uniform)
     Setter StrokeThickness 0
-    Setter Fill Foreground -Resource
-    Setter Stroke Foreground -Resource
+    Setter Fill DisabledForeground -Resource
+    Setter Stroke DisabledForeground -Resource
+
+    Trigger IsEnabled $true {
+        Setter Fill Foreground -Resource
+        Setter Stroke Foreground -Resource
+    }
 }
 
 Style ScrollViewer {

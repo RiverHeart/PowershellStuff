@@ -25,7 +25,6 @@ function Invoke-ImageViewerLoadFile {
         return
     }
 
-    Update-ImageViewerIcon -PanelName 'ButtonPanel'
     Invoke-ImageViewerFitToWindow
     Invoke-ImageViewerUpdateStatus
 }

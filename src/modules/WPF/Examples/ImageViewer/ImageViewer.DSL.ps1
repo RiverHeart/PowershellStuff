@@ -136,7 +136,6 @@ Window 'Window' {
 
     When 'Loaded' {
         Invoke-ImageViewerUpdateStatus
-        Update-ImageViewerIcon -PanelName 'ButtonPanel'
     }
 
     Grid "Body" {

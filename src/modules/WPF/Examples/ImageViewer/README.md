@@ -8,9 +8,23 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 
 ![Without XAML](./ImageViewer.png)
 
+## Features
+
+* Displays an image and its name, resolution, and folder index
+* Navigation between images in the active file's directory
+* Image rotation
+* Image zoom with "Actual Fit"/"Fit to Window" actions.
+* Supports fullscreen mode
+* Supports Dark/Light modes
 
 ## TODO
 
+* Add a copy/paste button. Reusable component?
+* Create zoom slider
+* Support "Save As"
+* Support image cropping
+* Support slideshow mode
+* Support figure drawing mode
 * Add click-and-drag panning for zoomed images
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)
 * Show user-friendly dialogs for image load/open errors

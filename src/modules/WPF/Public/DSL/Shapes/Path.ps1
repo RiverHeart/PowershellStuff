@@ -53,12 +53,13 @@ function Path {
     $Geometry = [System.Windows.Media.Geometry]::Parse($SvgDocument.svg.path.d)
     $Geometry.Freeze()  # Make unmodifiable for performance.
 
+    # WARNING: Do not set Fill or Stroke properties since they have a higher precedence than
+    # styles and will interfere with theme-based coloring. Instead, rely on the default
+    # black fill and use styles to set the fill color to the desired theme resource.
     $PathGeo = [System.Windows.Shapes.Path] @{
-        Data = $Geometry
-        Stroke = [System.Windows.Media.Brushes]::Black
-        Fill = [System.Windows.Media.Brushes]::Black
+        Data            = $Geometry
         StrokeThickness = 1
-        Stretch = [System.Windows.Media.Stretch]::Uniform
+        Stretch         = [System.Windows.Media.Stretch]::Uniform
     }
 
     if ($ScriptBlock) {

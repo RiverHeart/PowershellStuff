@@ -25,5 +25,4 @@ function Invoke-ImageViewerSetZoom {
     $Viewer.LayoutTransform = $TransformGroup
 
     Invoke-ImageViewerUpdateStatus
-    Update-ImageViewerIcon -PanelName 'ButtonPanel'
 }
