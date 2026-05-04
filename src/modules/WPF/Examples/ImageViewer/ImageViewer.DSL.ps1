@@ -274,18 +274,10 @@ Window 'Window' {
                         UseStyle 'ImageViewer.IconButton'
                         React IsEnabled Window.Tag.IsFileLoaded
                         React ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
-                            param($IsCopyFeedbackActive)
-
-                            if ($IsCopyFeedbackActive) {
-                                'Copied to clipboard'
-                            } else {
-                                'Copy image to clipboard'
-                            }
+                            if ($_) { 'Copied to clipboard' } else { 'Copy image to clipboard' }
                         }
                         React Content Window.Tag.IsCopyFeedbackActive -Converter {
-                            param($IsCopyFeedbackActive)
-
-                            if ($IsCopyFeedbackActive) {
+                            if ($_) {
                                 Path 'images/clipboard-check-solid-full.svg' {
                                     UseStyle 'ImageViewer.IconPath'
                                 }
@@ -318,16 +310,10 @@ Window 'Window' {
                         UseStyle 'ImageViewer.IconButton'
                         React IsEnabled Window.Tag.IsFileLoaded
                         React ToolTip Window.Tag.IsFitMode -Converter {
-                            param($IsFitMode)
-                            if ($IsFitMode) {
-                                'Actual size (100%)'
-                            } else {
-                                'Fit image to window'
-                            }
+                            if ($_) { 'Actual size (100%)' } else { 'Fit image to window' }
                         }
                         React Content Window.Tag.IsFitMode -Converter {
-                            param($IsFitMode)
-                            if ($IsFitMode) {
+                            if ($_) {
                                 Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
                                     UseStyle 'ImageViewer.IconPath'
                                 }
