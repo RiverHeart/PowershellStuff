@@ -147,6 +147,7 @@ FunctionsToExport = @(
     'New-WPFSize'
     'New-WPFVariableList'
     'Register-WPFObject'
+    'Set-WPFClipboard'
     'Set-WPFWindowFullScreen'
     'Show-WPFWindow'
     'Switch-WPFTheme'
