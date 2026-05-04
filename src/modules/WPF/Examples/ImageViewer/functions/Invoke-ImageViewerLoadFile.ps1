@@ -20,11 +20,12 @@ function Invoke-ImageViewerLoadFile {
         $State = $Window.Tag
         $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
         $State.IsFileLoaded = $true
-
-        Invoke-ImageViewerUpdateNavigationIconStyle
-        Invoke-ImageViewerFitToWindow
-        Invoke-ImageViewerUpdateStatus
     } catch {
-        Write-Warning "Failed to load image '$FileName': $_"
+        Write-Error "Failed to load image '$FileName': $_"
+        return
     }
+
+    Update-ImageViewerIcon -PanelName 'ButtonPanel'
+    Invoke-ImageViewerFitToWindow
+    Invoke-ImageViewerUpdateStatus
 }

@@ -38,14 +38,17 @@ Style 'ImageViewer.IconButton' Button {
     Setter VerticalContentAlignment ([VerticalAlignment]::Stretch)
     Setter OverridesDefaultStyle $true
 
-    $Template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
-
     # Icon sizing: the icon occupies $IconScale of the button's interior.
     # Padding fills the remaining space equally on all sides.
-    $ButtonSize    = 56
-    $IconScale     = 0.6
-    $IconPadding   = [int](($ButtonSize * (1 - $IconScale)) / 2)
-    $CornerRadius  = 8
+    $ButtonSize = 56
+    $IconScale = 0.6
+    $IconPadding = [int](($ButtonSize * (1 - $IconScale)) / 2)
+    $CornerRadius = 8
+    $IconButtonMargin = 5
+
+    Setter Width $ButtonSize
+    Setter Height $ButtonSize
+    Setter Margin $IconButtonMargin
 
     Template {
         Border 'TemplateBorder' {

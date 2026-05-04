@@ -138,7 +138,7 @@ FunctionsToExport = @(
     'Add-WPFObject'
     'Convert-SvgToXaml'
     'Convert-WPFObjectToXaml'
-    'Find-WPFChildPath'
+    'Find-WPFChildNode'
     'Get-WPFDarkModePreference'
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'

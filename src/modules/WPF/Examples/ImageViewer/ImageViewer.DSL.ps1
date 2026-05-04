@@ -125,7 +125,7 @@ Window 'Window' {
 
     When 'Loaded' {
         Invoke-ImageViewerUpdateStatus
-        Invoke-ImageViewerUpdateNavigationIconStyle
+        Update-ImageViewerIcon -PanelName 'ButtonPanel'
     }
 
     Grid "Body" {
@@ -255,20 +255,25 @@ Window 'Window' {
         # MARK: TOOLBAR
         Row {
             Column {
-                # TODO:
-                # * Needs to support Counter/Clockwise rotation.
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
                     React Visibility Window.Tag.IsFullScreen -Invert
 
-                    $ButtonSize = 56
+                    Button 'CopyButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        React IsEnabled Window.Tag.IsFileLoaded
 
+                        When 'Click' {
+                            Set-WPFClipboard -InputObject (Reference 'Viewer')
+                            Update-ImageViewerIcon -PanelName 'ButtonPanel'
+                        }
+                        Path 'images/clipboard-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
+                    }
                     Button 'BackButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
@@ -278,9 +283,6 @@ Window 'Window' {
                     }
                     Button 'ZoomModeButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
                         React IsEnabled Window.Tag.IsFileLoaded
                         React ToolTip Window.Tag.IsFitMode -Converter {
                             param($IsFitMode)
@@ -313,9 +315,6 @@ Window 'Window' {
                     }
                     Button 'RotateButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
                         $this.ToolTip = 'Rotate 90° clockwise'
                         React IsEnabled Window.Tag.IsFileLoaded
 
@@ -326,9 +325,6 @@ Window 'Window' {
                     }
                     Button 'ForwardButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
                         React IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
