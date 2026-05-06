@@ -47,6 +47,10 @@ MenuItem '_Exit' {
 }
 ```
 
+**2026-05-05**
+
+See [RelayCommandSyntaxProposal.md](RelayCommandSyntaxProposal.md) for the proposed DSL syntax, behavior contract, and phased implementation plan.
+
 ## Notes Hygiene
 
 - Keep this file for information another maintainer would need six months from now.
