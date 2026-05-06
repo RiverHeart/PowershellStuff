@@ -1,4 +1,3 @@
-using assembly 'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\PresentationFramework\v4.0_4.0.0.0__31bf3856ad364e35\PresentationFramework.dll'
 using namespace System
 using namespace System.Windows
 using namespace System.Management.Automation
