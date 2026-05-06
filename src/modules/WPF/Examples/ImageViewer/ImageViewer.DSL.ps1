@@ -161,6 +161,24 @@ Window 'Window' {
                             Invoke-ImageViewerLoadFile -FileName $FileName
                         }
                     }
+                    MenuItem '(F)ile/(S)ave As' {
+                        Shortcut 'SaveAs' 'Ctrl+Shift+S' {
+                            $BitmapSource = Reference 'Viewer' -Property Source
+                            $CurrentFile = (Reference 'Window').Tag.FileNavigator.CurrentFile
+                            $SourcePath = $null
+                            $InitialDirectory = $null
+
+                            if ($null -ne $CurrentFile) {
+                                $SourcePath = $CurrentFile.FullName
+                                $InitialDirectory = $CurrentFile.DirectoryName
+                            }
+
+                            Invoke-ImageViewerSaveFileAs `
+                                -Image $BitmapSource `
+                                -SourcePath $SourcePath `
+                                -InitialDirectory $InitialDirectory
+                        }
+                    }
                     MenuItem '(F)ile/(E)xit' {
                         # TODO: Explore using existing Close AppCommand and adding input gesture
                         Shortcut 'CloseCommand' 'Ctrl+q' {
