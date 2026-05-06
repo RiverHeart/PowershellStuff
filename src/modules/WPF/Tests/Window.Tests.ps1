@@ -6,6 +6,9 @@ Describe 'Window' {
     # NOTE: This test serves as a reminder that shortname resolution inside the DSL
     # scriptblocks works and failures should be treated as regressions. The test itself
     # may not be adequate to catch all edge cases however.
+    #
+    # Even things as innocuous as adding a new function to the module can cause failures
+    # for no apparent reason.
     It 'Should resolve namespaced WPF short type names in nested DSL scriptblocks' {
         $Id = [guid]::NewGuid().ToString('N')
 
