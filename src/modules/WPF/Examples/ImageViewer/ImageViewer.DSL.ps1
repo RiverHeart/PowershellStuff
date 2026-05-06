@@ -297,15 +297,6 @@ Window 'Window' {
                             }
                         }
                     }
-                    Button 'BackButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        Watch IsEnabled Window.Tag.IsFileLoaded
-
-                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
-                        Path 'images/arrow-left-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
-                        }
-                    }
                     Button 'ZoomModeButton' {
                         UseStyle 'ImageViewer.IconButton'
                         Watch IsEnabled Window.Tag.IsFileLoaded
@@ -339,6 +330,15 @@ Window 'Window' {
 
                         When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
                         Path 'images/arrows-rotate-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
+                    }
+                    Button 'BackButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        Watch IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
+                        Path 'images/arrow-left-solid-full.svg' {
                             UseStyle 'ImageViewer.IconPath'
                         }
                     }
