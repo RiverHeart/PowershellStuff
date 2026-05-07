@@ -4,23 +4,26 @@
         # Dogmatic nonsense
         'PSUseApprovedVerbs'
 
-        # Used to be an issue, not anymore
+        # Used to be an issue in earlier versions of PowerShell, but is no longer a problem in modern versions.
         'PSAvoidUsingWriteHost'
 
-        # I'll use proxy functions if I want
+        # Proxy functions are a legitimate use case this rule fails to account for.
         'PSAvoidOverwritingBuiltInCmdlets'
 
         # Not everything using 'New' changes state
         'PSUseShouldProcessForStateChangingFunctions'
 
-        # This is just annoying when working with events and callbacks
+        # $Sender and $Event are the expected parameters for event handlers.
         'PSAvoidAssignmentToAutomaticVariable'
 
-        # Parameters may be required or available despite not being used in the function body
+        # Explicit parameters may be required or provide clarity on availability
+        # despite not being used in the function body
         'PSReviewUnusedParameter'
 
-        # Annoying and practically useless when working with
-        # powershell classes in modules
-        'TypeNotFound'
+        # Useless when working with powershell classes in modules
+        'TypeNotFound',
+
+        # Produces false positive for the 'Command' DSL keyword
+        'PSAvoidUsingCmdletAliases'
     )
 }
