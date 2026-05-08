@@ -249,12 +249,20 @@ Path 'images/arrow-left.svg' {
 Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
 
 ```powershell
-Shortcut 'Open' {
+Command 'Open' {
     # Uses built-in ApplicationCommand if available
 }
 
-Shortcut 'MyCommand' 'Ctrl+M' {
+Command 'MyCommand' 'Ctrl+M' {
     Write-Host 'Run custom command'
+}
+
+Command 'SaveAs' 'Ctrl+Shift+S' {
+    Execute { Write-Host 'Saving...' }
+    CanExecute { $IsFileLoaded }
+    # RelayCommand does not rely on CommandManager in this module,
+    # so we refresh availability explicitly when file state changes.
+    (Reference 'Window').Tag.SaveAsCommand = $this.Command
 }
 ```
 

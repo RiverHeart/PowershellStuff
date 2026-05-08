@@ -20,6 +20,10 @@ function Invoke-ImageViewerLoadFile {
         $State = $Window.Tag
         $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
         $State.IsFileLoaded = $true
+
+        if ($State.SaveAsCommand -and $State.SaveAsCommand -is [RelayCommand]) {
+            $State.SaveAsCommand.NotifyCanExecuteChanged()
+        }
     } catch {
         Write-Error "Failed to load image '$FileName': $_"
         return
