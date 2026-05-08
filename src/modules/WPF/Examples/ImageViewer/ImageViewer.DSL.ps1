@@ -27,6 +27,8 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
+Start-Sleep -Seconds 2
+
 # Define the Image Viewer GUI
 
 Import "$PSScriptRoot/ImageViewer.Styles.ps1"
@@ -60,6 +62,9 @@ Window 'Window' {
 
         # Navigation State
         FileNavigator  = $null
+
+        # Command References
+        SaveAsCommand  = $null
     }
 
     Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
@@ -149,7 +154,7 @@ Window 'Window' {
                     Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
-                        Shortcut 'Open' {
+                        Command 'Open' {
                             $Window = Reference 'Window'
                             $FileName = Get-WPFFileSelection -Category Image -Window $Window
 
@@ -162,57 +167,65 @@ Window 'Window' {
                         }
                     }
                     MenuItem '(F)ile/(S)ave As' {
-                        Shortcut 'SaveAs' 'Ctrl+Shift+S' {
-                            $BitmapSource = Reference 'Viewer' -Property Source
-                            $CurrentFile = (Reference 'Window').Tag.FileNavigator.CurrentFile
-                            $SourcePath = $null
-                            $InitialDirectory = $null
+                        Command 'SaveAs' 'Ctrl+Shift+S' {
+                            Execute {
+                                $BitmapSource = Reference 'Viewer' -Property Source
+                                $CurrentFile = (Reference 'Window').Tag.FileNavigator.CurrentFile
+                                $SourcePath = $null
+                                $InitialDirectory = $null
 
-                            if ($null -ne $CurrentFile) {
-                                $SourcePath = $CurrentFile.FullName
-                                $InitialDirectory = $CurrentFile.DirectoryName
+                                if ($null -ne $CurrentFile) {
+                                    $SourcePath = $CurrentFile.FullName
+                                    $InitialDirectory = $CurrentFile.DirectoryName
+                                }
+
+                                Invoke-ImageViewerSaveFileAs `
+                                    -Image $BitmapSource `
+                                    -SourcePath $SourcePath `
+                                    -InitialDirectory $InitialDirectory
                             }
-
-                            Invoke-ImageViewerSaveFileAs `
-                                -Image $BitmapSource `
-                                -SourcePath $SourcePath `
-                                -InitialDirectory $InitialDirectory
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                            }
                         }
+
+                        # RelayCommand does not rely on CommandManager in this module,
+                        # so we refresh availability explicitly when file state changes.
+                        (Reference 'Window').Tag.SaveAsCommand = $this.Command
                     }
                     MenuItem '(F)ile/(E)xit' {
-                        # TODO: Explore using existing Close AppCommand and adding input gesture
-                        Shortcut 'CloseCommand' 'Ctrl+q' {
+                        Command 'CloseCommand' 'Ctrl+q' {
                             Write-Debug "Close command triggered. Closing window."
                             (Reference 'Window').Close()
                         }
                     }
 
                     MenuItem '(I)mage/(R)otate 90°' {
-                        Shortcut 'Rotate' 'Ctrl+R' {
+                        Command 'Rotate' 'Ctrl+R' {
                             Invoke-ImageViewerRotate -Direction Clockwise
                         }
                     }
 
                     MenuItem '(I)mage/R(o)tate -90°' {
-                        Shortcut 'RotateCounter' 'Ctrl+Shift+R' {
+                        Command 'RotateCounter' 'Ctrl+Shift+R' {
                             Invoke-ImageViewerRotate -Direction CounterClockwise
                         }
                     }
 
                     MenuItem '(V)iew/Zoom (I)n' {
-                        Shortcut 'ZoomIn' 'Ctrl+Add' {
+                        Command 'ZoomIn' 'Ctrl+Add' {
                             Invoke-ImageViewerSetZoom -Delta 0.10
                         }
                     }
 
                     MenuItem '(V)iew/Zoom (O)ut' {
-                        Shortcut 'ZoomOut' 'Ctrl+Subtract' {
+                        Command 'ZoomOut' 'Ctrl+Subtract' {
                             Invoke-ImageViewerSetZoom -Delta -0.10
                         }
                     }
 
                     MenuItem '(V)iew/(F)ullScreen' {
-                        Shortcut 'FullScreen' 'F11' {
+                        Command 'FullScreen' 'F11' {
                             Write-Debug "Toggling full screen mode."
                             $Window = Reference 'Window'
                             $State = $Window.Tag
@@ -236,7 +249,7 @@ Window 'Window' {
                     }
 
                     MenuItem '(V)iew/(T)oggle Theme' {
-                        Shortcut 'ToggleTheme' 'Ctrl+T' {
+                        Command 'ToggleTheme' 'Ctrl+T' {
                             Invoke-ImageViewerToggleTheme
                         }
                     }

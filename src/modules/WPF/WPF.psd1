@@ -91,6 +91,7 @@ FunctionsToExport = @(
     # DSL
 
     # DSL/Controls
+    'Command'
     'Border'
     'ContentPresenter'
     'Button'
@@ -105,7 +106,6 @@ FunctionsToExport = @(
     'Menu'
     'MenuItem'
     'ScrollViewer'
-    'Shortcut'
     'StackPanel'
     'TextBlock'
     'TextBox'
@@ -114,8 +114,11 @@ FunctionsToExport = @(
     # DSL/Helpers
     'Watch'
     'Binding'
+    'BoundTo'
     'Brush'
     'DataTrigger'
+    'Execute'
+    'CanExecute'
     'Import'
     'MultiTrigger'
     'Reference'

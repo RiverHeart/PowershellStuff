@@ -97,7 +97,7 @@ Style Menu {
 
 Style MenuItem {
     Setter Background WindowBackground -Resource
-    Setter Foreground Foreground -Resource
+    Setter Foreground Black -Resource
 }
 
 Style Label {
