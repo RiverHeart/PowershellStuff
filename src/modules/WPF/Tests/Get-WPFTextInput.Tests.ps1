@@ -31,6 +31,20 @@ Describe 'Get-WPFTextInput' {
         }
     }
 
+    It 'Should return the default value in numeric mode when dialog is accepted' {
+        InModuleScope WPF {
+            Mock -CommandName Show-WPFWindow -MockWith {
+                param($Window)
+                $true
+            }
+
+            $Result = Get-WPFTextInput -Prompt 'Enter interval' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
+
+            $Result | Should -Be -ExpectedValue '3.0'
+            Should -Invoke -CommandName Show-WPFWindow -Times 1 -Exactly
+        }
+    }
+
     It 'Should throw when numeric bounds are used without -Numeric' {
         {
             Get-WPFTextInput -Prompt 'Enter interval' -Minimum 0.5 -Maximum 5

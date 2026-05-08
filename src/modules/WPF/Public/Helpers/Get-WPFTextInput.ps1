@@ -1,3 +1,8 @@
+using namespace System.Globalization
+using namespace System.Windows
+using namespace System.Windows.Controls
+using namespace System.Windows.Media
+
 <#
 .SYNOPSIS
     Shows a native WPF text input dialog and returns user-entered text.
@@ -60,7 +65,7 @@ function Get-WPFTextInput {
 
         [Parameter()]
         [AllowNull()]
-        [System.Windows.Window] $Owner,
+        [Window] $Owner,
 
         [Parameter()]
         [switch] $Numeric,
@@ -91,67 +96,67 @@ function Get-WPFTextInput {
         throw 'Get-WPFTextInput: -Minimum cannot be greater than -Maximum.'
     }
 
-    $Window = [System.Windows.Window]::new()
+    $Window = [Window]::new()
     $Window.Title = $Title
-    $Window.WindowStyle = [System.Windows.WindowStyle]::SingleBorderWindow
-    $Window.ResizeMode = [System.Windows.ResizeMode]::NoResize
-    $Window.SizeToContent = [System.Windows.SizeToContent]::WidthAndHeight
+    $Window.WindowStyle = [WindowStyle]::SingleBorderWindow
+    $Window.ResizeMode = [ResizeMode]::NoResize
+    $Window.SizeToContent = [SizeToContent]::WidthAndHeight
     $Window.MinWidth = 420
     $Window.ShowInTaskbar = $false
-    $Window.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen
+    $Window.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
 
     if ($Owner) {
         $Window.Owner = $Owner
-        $Window.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterOwner
+        $Window.WindowStartupLocation = [WindowStartupLocation]::CenterOwner
     }
 
-    $Root = [System.Windows.Controls.Grid]::new()
-    $Root.Margin = [System.Windows.Thickness]::new(14)
+    $Root = [Grid]::new()
+    $Root.Margin = [Thickness]::new(14)
 
-    $null = $Root.RowDefinitions.Add([System.Windows.Controls.RowDefinition]::new())
-    $null = $Root.RowDefinitions.Add([System.Windows.Controls.RowDefinition]::new())
-    $null = $Root.RowDefinitions.Add([System.Windows.Controls.RowDefinition]::new())
-    $null = $Root.RowDefinitions.Add([System.Windows.Controls.RowDefinition]::new())
+    $null = $Root.RowDefinitions.Add([RowDefinition]::new())
+    $null = $Root.RowDefinitions.Add([RowDefinition]::new())
+    $null = $Root.RowDefinitions.Add([RowDefinition]::new())
+    $null = $Root.RowDefinitions.Add([RowDefinition]::new())
 
-    $PromptText = [System.Windows.Controls.TextBlock]::new()
+    $PromptText = [TextBlock]::new()
     $PromptText.Text = $Prompt
-    $PromptText.TextWrapping = [System.Windows.TextWrapping]::Wrap
-    $PromptText.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
-    [System.Windows.Controls.Grid]::SetRow($PromptText, 0)
+    $PromptText.TextWrapping = [TextWrapping]::Wrap
+    $PromptText.Margin = [Thickness]::new(0, 0, 0, 8)
+    [Grid]::SetRow($PromptText, 0)
     $null = $Root.Children.Add($PromptText)
 
-    $TextBox = [System.Windows.Controls.TextBox]::new()
+    $TextBox = [TextBox]::new()
     $TextBox.Text = $DefaultValue
     $TextBox.MinWidth = 360
-    $TextBox.Margin = [System.Windows.Thickness]::new(0, 0, 0, 4)
-    [System.Windows.Controls.Grid]::SetRow($TextBox, 1)
+    $TextBox.Margin = [Thickness]::new(0, 0, 0, 4)
+    [Grid]::SetRow($TextBox, 1)
     $null = $Root.Children.Add($TextBox)
 
-    $ValidationText = [System.Windows.Controls.TextBlock]::new()
-    $ValidationText.TextWrapping = [System.Windows.TextWrapping]::Wrap
-    $ValidationText.Foreground = [System.Windows.Media.Brushes]::IndianRed
+    $ValidationText = [TextBlock]::new()
+    $ValidationText.TextWrapping = [TextWrapping]::Wrap
+    $ValidationText.Foreground = [Brushes]::IndianRed
     $ValidationText.FontSize = 12
-    $ValidationText.Margin = [System.Windows.Thickness]::new(0, 0, 0, 12)
-    $ValidationText.Visibility = [System.Windows.Visibility]::Collapsed
-    [System.Windows.Controls.Grid]::SetRow($ValidationText, 2)
+    $ValidationText.Margin = [Thickness]::new(0, 0, 0, 12)
+    $ValidationText.Visibility = [Visibility]::Collapsed
+    [Grid]::SetRow($ValidationText, 2)
     $null = $Root.Children.Add($ValidationText)
 
-    $Buttons = [System.Windows.Controls.StackPanel]::new()
-    $Buttons.Orientation = [System.Windows.Controls.Orientation]::Horizontal
-    $Buttons.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Right
-    [System.Windows.Controls.Grid]::SetRow($Buttons, 3)
+    $Buttons = [StackPanel]::new()
+    $Buttons.Orientation = [Orientation]::Horizontal
+    $Buttons.HorizontalAlignment = [HorizontalAlignment]::Right
+    [Grid]::SetRow($Buttons, 3)
 
-    $OkButton = [System.Windows.Controls.Button]::new()
+    $OkButton = [Button]::new()
     $OkButton.Content = 'OK'
     $OkButton.MinWidth = 80
-    $OkButton.Margin = [System.Windows.Thickness]::new(0, 0, 8, 0)
+    $OkButton.Margin = [Thickness]::new(0, 0, 8, 0)
     $OkButton.IsDefault = $true
     $null = $OkButton.add_Click({
         $Window.DialogResult = $true
     })
     $null = $Buttons.Children.Add($OkButton)
 
-    $CancelButton = [System.Windows.Controls.Button]::new()
+    $CancelButton = [Button]::new()
     $CancelButton.Content = 'Cancel'
     $CancelButton.MinWidth = 80
     $CancelButton.IsCancel = $true
@@ -169,13 +174,21 @@ function Get-WPFTextInput {
     })
 
     if ($Numeric) {
-        $decimalSeparator = [System.Globalization.CultureInfo]::CurrentCulture.NumberFormat.NumberDecimalSeparator
+        $decimalSeparator = [CultureInfo]::CurrentCulture.NumberFormat.NumberDecimalSeparator
         $escapedSeparator = [System.Text.RegularExpressions.Regex]::Escape($decimalSeparator)
         $inputPattern = if ($AllowDecimal) {
-            "^[+-]?\\d*($escapedSeparator\\d*)?$"
+            "^[+-]?\d*($escapedSeparator\d*)?$"
         } else {
             '^[+-]?\d*$'
         }
+
+        Write-Debug (
+            'Get-WPFTextInput numeric mode initialized. AllowDecimal={0}; MinBound={1}; MaxBound={2}; Pattern={3}' -f
+            [bool] $AllowDecimal,
+            $Minimum.HasValue,
+            $Maximum.HasValue,
+            $inputPattern
+        )
 
         $isValidNumericText = {
             param([string] $Text)
@@ -187,16 +200,16 @@ function Get-WPFTextInput {
             [double] $parsed = 0
             $isParsed = [double]::TryParse(
                 $Text,
-                [System.Globalization.NumberStyles]::Float,
-                [System.Globalization.CultureInfo]::CurrentCulture,
+                [NumberStyles]::Float,
+                [CultureInfo]::CurrentCulture,
                 [ref] $parsed
             )
 
             if (-not $isParsed) {
                 $isParsed = [double]::TryParse(
                     $Text,
-                    [System.Globalization.NumberStyles]::Float,
-                    [System.Globalization.CultureInfo]::InvariantCulture,
+                    [NumberStyles]::Float,
+                    [CultureInfo]::InvariantCulture,
                     [ref] $parsed
                 )
             }
@@ -241,11 +254,18 @@ function Get-WPFTextInput {
             $isValid = & $isValidNumericText $TextBox.Text
             $OkButton.IsEnabled = $isValid
 
+            Write-Debug (
+                'Get-WPFTextInput validation refresh. TextLength={0}; IsValid={1}; OkEnabled={2}' -f
+                $TextBox.Text.Length,
+                $isValid,
+                $OkButton.IsEnabled
+            )
+
             if ($isValid) {
-                $ValidationText.Visibility = [System.Windows.Visibility]::Collapsed
+                $ValidationText.Visibility = [Visibility]::Collapsed
                 $ValidationText.Text = ''
             } else {
-                $ValidationText.Visibility = [System.Windows.Visibility]::Visible
+                $ValidationText.Visibility = [Visibility]::Visible
                 $ValidationText.Text = & $getValidationMessage
             }
         }
@@ -257,29 +277,46 @@ function Get-WPFTextInput {
         $null = $TextBox.add_PreviewTextInput({
             param($sender, $event)
 
-            $currentText = $sender.Text
-            $start = $sender.SelectionStart
-            $length = $sender.SelectionLength
-            $prefix = if ($start -gt 0) { $currentText.Substring(0, $start) } else { '' }
-            $suffixIndex = $start + $length
-            $suffix = if ($suffixIndex -lt $currentText.Length) { $currentText.Substring($suffixIndex) } else { '' }
-            $proposed = "$prefix$($event.Text)$suffix"
+            try {
+                $currentText = $sender.Text
+                $start = $sender.SelectionStart
+                $length = $sender.SelectionLength
+                $prefix = if ($start -gt 0) { $currentText.Substring(0, $start) } else { '' }
+                $suffixIndex = $start + $length
+                $suffix = if ($suffixIndex -lt $currentText.Length) { $currentText.Substring($suffixIndex) } else { '' }
+                $proposed = "$prefix$($event.Text)$suffix"
+                $isAllowed = $proposed -match $inputPattern
 
-            if ($proposed -notmatch $inputPattern) {
-                $event.Handled = $true
+                Write-Debug (
+                    'Get-WPFTextInput preview input. CurrentLength={0}; InsertLength={1}; SelectionStart={2}; SelectionLength={3}; ProposedLength={4}; Allowed={5}' -f
+                    $currentText.Length,
+                    $event.Text.Length,
+                    $start,
+                    $length,
+                    $proposed.Length,
+                    $isAllowed
+                )
+
+                if (-not $isAllowed) {
+                    $event.Handled = $true
+                }
+            } catch {
+                Write-Debug (
+                    'Get-WPFTextInput preview input handler error: {0}' -f $_.Exception.Message
+                )
             }
         })
 
-        [System.Windows.DataObject]::AddPastingHandler(
+        [DataObject]::AddPastingHandler(
             $TextBox,
-            [System.Windows.DataObjectPastingEventHandler] {
+            [DataObjectPastingEventHandler] {
                 param($sender, $event)
 
-                if (-not $event.DataObject.GetDataPresent([System.Windows.DataFormats]::Text)) {
+                if (-not $event.DataObject.GetDataPresent([DataFormats]::Text)) {
                     return
                 }
 
-                $pastedText = [string] $event.DataObject.GetData([System.Windows.DataFormats]::Text)
+                $pastedText = [string] $event.DataObject.GetData([DataFormats]::Text)
                 $currentText = $sender.Text
                 $start = $sender.SelectionStart
                 $length = $sender.SelectionLength
@@ -287,8 +324,19 @@ function Get-WPFTextInput {
                 $suffixIndex = $start + $length
                 $suffix = if ($suffixIndex -lt $currentText.Length) { $currentText.Substring($suffixIndex) } else { '' }
                 $proposed = "$prefix$pastedText$suffix"
+                $isAllowed = $proposed -match $inputPattern
 
-                if ($proposed -notmatch $inputPattern) {
+                Write-Debug (
+                    'Get-WPFTextInput paste input. CurrentLength={0}; PasteLength={1}; SelectionStart={2}; SelectionLength={3}; ProposedLength={4}; Allowed={5}' -f
+                    $currentText.Length,
+                    $pastedText.Length,
+                    $start,
+                    $length,
+                    $proposed.Length,
+                    $isAllowed
+                )
+
+                if (-not $isAllowed) {
                     $event.CancelCommand()
                 }
             }
