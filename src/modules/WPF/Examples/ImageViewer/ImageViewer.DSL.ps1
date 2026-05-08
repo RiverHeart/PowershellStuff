@@ -154,6 +154,8 @@ Window 'Window' {
                     Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'Open' {
                             $Window = Reference 'Window'
                             $FileName = Get-WPFFileSelection -Category Image -Window $Window
@@ -167,6 +169,8 @@ Window 'Window' {
                         }
                     }
                     MenuItem '(F)ile/(S)ave As' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'SaveAs' 'Ctrl+Shift+S' {
                             Execute {
                                 $BitmapSource = Reference 'Viewer' -Property Source
@@ -194,6 +198,8 @@ Window 'Window' {
                         (Reference 'Window').Tag.SaveAsCommand = $this.Command
                     }
                     MenuItem '(F)ile/(E)xit' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'CloseCommand' 'Ctrl+q' {
                             Write-Debug "Close command triggered. Closing window."
                             (Reference 'Window').Close()
@@ -201,30 +207,40 @@ Window 'Window' {
                     }
 
                     MenuItem '(I)mage/(R)otate 90°' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'Rotate' 'Ctrl+R' {
                             Invoke-ImageViewerRotate -Direction Clockwise
                         }
                     }
 
                     MenuItem '(I)mage/R(o)tate -90°' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'RotateCounter' 'Ctrl+Shift+R' {
                             Invoke-ImageViewerRotate -Direction CounterClockwise
                         }
                     }
 
                     MenuItem '(V)iew/Zoom (I)n' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'ZoomIn' 'Ctrl+Add' {
                             Invoke-ImageViewerSetZoom -Delta 0.10
                         }
                     }
 
                     MenuItem '(V)iew/Zoom (O)ut' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'ZoomOut' 'Ctrl+Subtract' {
                             Invoke-ImageViewerSetZoom -Delta -0.10
                         }
                     }
 
                     MenuItem '(V)iew/(F)ullScreen' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'FullScreen' 'F11' {
                             Write-Debug "Toggling full screen mode."
                             $Window = Reference 'Window'
@@ -237,24 +253,32 @@ Window 'Window' {
                     }
 
                     MenuItem '(V)iew/Image Fit to (W)indow' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         When Click {
                             Invoke-ImageViewerFitToWindow
                         }
                     }
 
                     MenuItem '(V)iew/Image (A)ctual Size' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         When Click {
                             Invoke-ImageViewerSetZoom -Reset
                         }
                     }
 
                     MenuItem '(V)iew/(T)oggle Theme' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         Command 'ToggleTheme' 'Ctrl+T' {
                             Invoke-ImageViewerToggleTheme
                         }
                     }
 
                     MenuItem '(H)elp/(A)bout' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         When Click {
                             Invoke-ImageViewerShowAbout
                         }

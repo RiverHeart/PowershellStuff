@@ -95,9 +95,10 @@ Style Menu {
     Setter Foreground Foreground -Resource
 }
 
-Style MenuItem {
-    Setter Background WindowBackground -Resource
-    Setter Foreground Black -Resource
+Style 'ImageViewer.UnthemedMenuItem' MenuItem {
+    # Use OS system brushes so MenuItem stays unthemed and does not inherit Menu foreground.
+    Setter Background ([System.Windows.SystemColors]::MenuBrush)
+    Setter Foreground ([System.Windows.SystemColors]::MenuTextBrush)
 }
 
 Style Label {
