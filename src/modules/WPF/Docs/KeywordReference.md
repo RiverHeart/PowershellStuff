@@ -441,6 +441,18 @@ Dot-sources script files into caller scope.
 Import './functions/*.ps1'
 ```
 
+### Get-WPFTextInput
+
+Shows a native WPF modal input dialog with prompt text and returns entered text.
+
+```powershell
+$Interval = Get-WPFTextInput -Prompt 'Enter slideshow interval in seconds:' -Title 'Start Slideshow' -DefaultValue '3.0'
+```
+
+```powershell
+$Interval = Get-WPFTextInput -Prompt 'Seconds:' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
+```
+
 ## Compatibility Note
 
 The keyword contract is intentionally simple:

@@ -14,17 +14,18 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Navigation between images in the active file's directory
 * Image rotation
 * Image zoom with "Actual Fit"/"Fit to Window" actions.
+* Copy image button
+* SaveAs with automatic format conversion
 * Supports fullscreen mode
 * Supports Dark/Light modes
+* Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
 
 ## TODO
 
-* Add a copy/paste button. Reusable component?
 * Create zoom slider
-* Support "Save As"
 * Support image cropping
-* Support slideshow mode
 * Support figure drawing mode
+* Picture-in-picture?
 * Add click-and-drag panning for zoomed images
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)
 * Show user-friendly dialogs for image load/open errors

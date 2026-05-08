@@ -62,6 +62,9 @@ Window 'Window' {
 
         # Navigation State
         FileNavigator  = $null
+        IsSlideshowActive = $false
+        SlideshowTimer = $null
+        SlideshowIntervalSeconds = 3.0
 
         # Command References
         SaveAsCommand  = $null
@@ -85,7 +88,18 @@ Window 'Window' {
         switch ($event.Key) {
             'Escape' {
                 $State = $this.Tag
-                if (-not $State.IsFullScreen) { return }
+                $StoppedSlideshow = $false
+                if ($State.IsSlideshowActive) {
+                    Stop-ImageViewerSlideshow
+                    $StoppedSlideshow = $true
+                }
+
+                if (-not $State.IsFullScreen) {
+                    if ($StoppedSlideshow) {
+                        $event.Handled = $True
+                    }
+                    break
+                }
 
                 Set-WPFWindowFullScreen -IsFullScreen $False
                 if ($State.IsFitMode) {
@@ -110,6 +124,10 @@ Window 'Window' {
                 break
             }
         }
+    }
+
+    When Closing {
+        Stop-ImageViewerSlideshow
     }
 
     When DragOver {
@@ -248,6 +266,19 @@ Window 'Window' {
                             Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
                             if ($State.IsFitMode) {
                                 Invoke-ImageViewerFitToWindow
+                            }
+                        }
+                    }
+
+                    MenuItem '(V)iew/(S)lideshow' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'Slideshow' 'F5' {
+                            Execute {
+                                Invoke-ImageViewerToggleSlideshow
+                            }
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.IsFileLoaded
                             }
                         }
                     }

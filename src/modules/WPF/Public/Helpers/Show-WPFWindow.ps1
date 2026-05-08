@@ -31,7 +31,9 @@ function Show-WPFWindow {
             $Window.Activate()
 
             # Set globally so you can reference `$LastDialogResult` plainly from the main script.
-            $global:LastDialogResult = $Window.ShowDialog()
+            $DialogResult = $Window.ShowDialog()
+            $global:LastDialogResult = $DialogResult
+            Write-Output $DialogResult
         } finally {
             $Window.Close()
         }

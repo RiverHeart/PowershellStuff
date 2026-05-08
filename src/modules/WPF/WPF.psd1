@@ -146,6 +146,7 @@ FunctionsToExport = @(
     'Get-WPFDarkModePreference'
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'
+    'Get-WPFTextInput'
     'New-WPFObservableState'
     'New-WPFPoint'
     'New-WPFSize'
