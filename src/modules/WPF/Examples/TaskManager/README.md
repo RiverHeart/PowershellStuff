@@ -8,5 +8,5 @@ Generated with New-WPFProject.
 ./TaskManager.DSL.ps1
 `
 
-The generated scaffold creates an empty unctions folder and a starter style file.
+The generated scaffold creates an empty functions folder and a starter style file.
 Both are safe to leave empty while you build out the app.
