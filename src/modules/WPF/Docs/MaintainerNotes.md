@@ -7,7 +7,6 @@ Use the development log for dated progress entries and in-flight investigation n
 ## Backlog Candidates
 
 - Improve error handling so child object failures bubble up cleanly and produce a useful call stack.
-- Prevent or clean up registration errors when rebuilding a UI without `Import-Module ./WPF -Force`.
 - Evaluate whether `$PSCmdlet.GetVariableValue('self')` can simplify parent/child attachment logic without breaking menu handling.
 - Give attached `ColumnDefinition` and `RowDefinition` objects stable generated names to improve debug output.
 - Rework grid row and column mapping so child placement uses actual grid coordinates rather than an index counter artifact.
@@ -25,6 +24,12 @@ WPF also has built-in name lookup via `FindName('name')`, but using it programma
 That approach also appeared to alter application behavior. It pushed execution toward an explicit `Application` instance and `$App.Run($Window)`, while `$Window.ShowDialog()` stopped behaving as expected once a `NameScope` was involved.
 
 Repeated runs also hit `Cannot create more than one System.Windows.Application instance in the same AppDomain.` even after closing app windows and using `OnLastWindowClose` shutdown mode. For now the custom reference registry remains the practical choice.
+
+On 2026-05-09 the registry moved from a single module-scoped hashtable to context-scoped tables keyed by window lifecycle contexts. Each `Window` call creates and activates a context, and `Reference` resolves names against the current object context first. This allows duplicate names like `Window` and `RootGrid` across separate windows without requiring module reloads.
+
+The `Window` keyword now attaches context cleanup to the window `Closed` event so registry state does not accumulate between UI rebuilds in the same session.
+
+`Show-WPFWindow` supports an unattended smoke-test mode controlled by the `WPF_SMOKE_TEST` environment variable. When enabled (`1`, `true`, `yes`, or `on`), windows auto-close right after first render by setting `DialogResult = $false`. This allows DSL apps to run in automation and emit debug output without a human closing UI windows.
 
 ### RelayCommand
 

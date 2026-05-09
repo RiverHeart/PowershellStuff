@@ -34,16 +34,26 @@ function Window {
         return
     }
 
+    $ContextId = New-WPFControlContext -Name $Name -Activate
+
     try {
         $Window = [System.Windows.Window] @{
             Name = $Name
         }
-        Register-WPFObject $Name $Window
+        Set-WPFControlContext -InputObject $Window -ContextId $ContextId
+        Register-WPFObject -Name $Name -InputObject $Window -ContextId $ContextId -Overwrite
+
+        $Window.Add_Closed({
+            param($Sender, $Args)
+            Remove-WPFControlContext -InputObject $Sender
+        })
+
         if (-not $Window.Height -and -not $Window.Width){
             $Window.SizeToContent = 'WidthAndHeight'
         }
         Add-WPFType $Window 'Control'
     } catch {
+        Remove-WPFControlContext -ContextId $ContextId
         Write-Error "Failed to create '$Name' (Window) with error: $_"
     }
 

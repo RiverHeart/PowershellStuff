@@ -26,7 +26,7 @@ if ($PSScriptRoot -and $PWD -ne $PSScriptRoot) {
 $ErrorActionPreference = 'Stop'
 $DebugPreference = 'Continue'
 
-Import-Module ../.. -Force
+Import-Module ../..
 
 Start-Sleep -Seconds 2
 

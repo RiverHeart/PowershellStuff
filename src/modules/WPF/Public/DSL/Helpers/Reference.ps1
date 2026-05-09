@@ -29,17 +29,62 @@ function Reference {
         [ArgumentCompleter({ Complete-WPFRegisteredObject @args })]
         [string[]] $Name,
 
+        [Parameter(HelpMessage = 'Optional context id to resolve against.')]
+        [string] $ContextId,
+
         [Parameter(HelpMessage = 'Optionally specify a property to select from the registered object. If not specified, the entire object will be returned.')]
         [string] $Property
     )
 
     process {
+        $State = Get-WPFControlRegistry
+        $ScopeObject = $PSCmdlet.GetVariableValue('this')
+
         foreach($Item in $Name) {
-            if ($Script:WPFControlTable.ContainsKey($Item)) {
+            $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $ScopeObject
+            $TargetObject = $null
+
+            if ($ResolvedContextId -and $State.Contexts.ContainsKey($ResolvedContextId)) {
+                $ControlTable = $State.Contexts[$ResolvedContextId].Objects
+                if ($ControlTable.ContainsKey($Item)) {
+                    $TargetObject = $ControlTable[$Item]
+                }
+            }
+
+            if (-not $TargetObject) {
+                $Matches = @(
+                    foreach ($Context in $State.Contexts.Values) {
+                        if ($Context.Objects.ContainsKey($Item)) {
+                            [pscustomobject] @{
+                                ContextId = $Context.Id
+                                Name      = $Context.Name
+                                Object    = $Context.Objects[$Item]
+                            }
+                        }
+                    }
+                )
+
+                if ($Matches.Count -eq 1) {
+                    $TargetObject = $Matches[0].Object
+                } elseif ($Matches.Count -gt 1) {
+                    $Hints = $Matches |
+                        ForEach-Object {
+                            if ($_.Name) {
+                                "{0} ({1})" -f $_.ContextId, $_.Name
+                            } else {
+                                $_.ContextId
+                            }
+                        }
+                    Write-Error "Reference '$Item' is ambiguous across contexts: $($Hints -join ', '). Specify -ContextId."
+                    return
+                }
+            }
+
+            if ($TargetObject) {
                 if ($Property) {
-                    $Script:WPFControlTable[$Item] | Select-Object -ExpandProperty $Property
+                    $TargetObject | Select-Object -ExpandProperty $Property
                 } else {
-                    $Script:WPFControlTable[$Item]
+                    $TargetObject
                 }
             } else {
                 Write-Error "No object registered with name '$Item'"

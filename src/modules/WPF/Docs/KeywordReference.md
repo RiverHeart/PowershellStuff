@@ -426,11 +426,14 @@ UseStyle 'PrimaryButton'
 
 ### Reference
 
-Gets a registered object by name.
+Gets a registered object by name from the current window context.
+
+If multiple windows register the same name, `Reference` resolves by the current DSL object context. Use `-ContextId` for explicit lookup.
 
 ```powershell
 $Window = Reference 'Window'
 $Buttons = Reference 'BackButton', 'ForwardButton'
+$Window = Reference 'Window' -ContextId $Window._WPFContextId
 ```
 
 ### Import
@@ -439,6 +442,18 @@ Dot-sources script files into caller scope.
 
 ```powershell
 Import './functions/*.ps1'
+```
+
+### Show-WPFWindow
+
+Shows a WPF window modally and returns its dialog result.
+
+For unattended automation, set environment variable `WPF_SMOKE_TEST=1` (also accepts `true`, `yes`, `on`) to auto-close windows after first render.
+
+```powershell
+Window 'Window' {
+    $this.Title = 'Hello'
+} | Show-WPFWindow
 ```
 
 ### Get-WPFTextInput

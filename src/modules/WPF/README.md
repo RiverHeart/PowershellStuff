@@ -139,6 +139,20 @@ Current limitations:
 - Some DSL areas are more mature than others.
 - Documentation is still catching up with implementation changes.
 
+## Automation Smoke Mode
+
+When running WPF examples in unattended automation (for example, agent validation or CI), set `WPF_SMOKE_TEST` so modal windows close automatically after first render.
+
+Accepted enabled values: `1`, `true`, `yes`, `on`.
+
+PowerShell example:
+
+```powershell
+$env:WPF_SMOKE_TEST = '1'
+./Examples/ImageViewer/ImageViewer.DSL.ps1
+Remove-Item Env:WPF_SMOKE_TEST -ErrorAction SilentlyContinue
+```
+
 ## Why Make This?
 
 Many reasons, but a few big ones:

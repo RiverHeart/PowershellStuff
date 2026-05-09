@@ -1,20 +1,21 @@
 <#
 .SYNOPSIS
-    Calls `ShowDialog()`, `Activate()` and `Close()` on the given Window object.
+    Shows a WPF window modally and returns its dialog result.
 
 .DESCRIPTION
-    Calls `ShowDialog()`, `Activate()` and `Close()` on the given Window object.
+    Activates the given window, calls ShowDialog(), stores the returned value in
+    $global:LastDialogResult, and outputs the dialog result.
 
-    A `finally` block ensures that `Close()` gets called if the window closes or crashes.
+    In smoke-test mode (WPF_SMOKE_TEST enabled), the window auto-closes after first
+    render so UI scripts can run unattended in automation.
 
-.NOTES
-    Unsure if I should be handling resource cleanup here.
-    I tried doing that in the `finally` block but forgot that
-    in some instances I was getting a value from an object
-    after the window closes which requires the name to be registered.
+.PARAMETER Window
+    The WPF window instance to display.
 
 .EXAMPLE
-    New-WPFApp -Path $PSScriptRoot -Name Main
+    Window 'MainWindow' {
+        $this.Title = 'Example'
+    } | Show-WPFWindow
 #>
 function Show-WPFWindow {
     [CmdletBinding()]
@@ -26,7 +27,29 @@ function Show-WPFWindow {
     )
 
     process {
+        $SmokeAutoCloseHandler = $null
+
         try {
+            if (Test-WPFSmokeTestMode) {
+                Write-Debug "Smoke test mode enabled: Adding auto-close handler to '$($Window.Name)'"
+                $SmokeAutoCloseHandler = {
+                    param($Sender, $Args)
+
+                    try {
+                        if ($null -eq $Sender.DialogResult) {
+                            # Closing via DialogResult keeps ShowDialog semantics intact.
+                            $Sender.DialogResult = $false
+                        } else {
+                            $Sender.Close()
+                        }
+                    } catch {
+                        $Sender.Close()
+                    }
+                }
+
+                $Window.Add_ContentRendered($SmokeAutoCloseHandler)
+            }
+
             # Activate before entering ShowDialog so the window gets keyboard focus at startup.
             $Window.Activate()
 
@@ -35,6 +58,10 @@ function Show-WPFWindow {
             $global:LastDialogResult = $DialogResult
             Write-Output $DialogResult
         } finally {
+            if ($SmokeAutoCloseHandler) {
+                $Window.Remove_ContentRendered($SmokeAutoCloseHandler)
+            }
+
             $Window.Close()
         }
     }
