@@ -37,7 +37,7 @@ function Complete-WPFRegisteredObject {
         $WordToComplete = $WordToComplete.Trim($Quote)
     }
 
-    $Completions = $script:WPFControlTable.Keys |
+    $Completions = Get-WPFRegisteredObjectNames |
         Where-Object {
             $_.StartsWith($WordToComplete, [StringComparison]::InvariantCultureIgnoreCase)
         } |

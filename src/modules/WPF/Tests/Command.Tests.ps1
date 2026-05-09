@@ -49,7 +49,7 @@ Describe 'Command' {
 
     It 'Should add a CommandBinding and assign routed command when BoundTo is supplied' {
         InModuleScope WPF {
-            $script:WPFControlTable.Clear()
+            Clear-WPFControlRegistry
         }
 
         $Window = [System.Windows.Window]::new()
@@ -71,7 +71,7 @@ Describe 'Command' {
 
     It 'Should add a CommandBinding with -BoundTo' {
         InModuleScope WPF {
-            $script:WPFControlTable.Clear()
+            Clear-WPFControlRegistry
         }
 
         $Window = [System.Windows.Window]::new()
@@ -92,7 +92,7 @@ Describe 'Command' {
 
     It 'Should show gesture text for built-in command when explicit gesture is provided' {
         InModuleScope WPF {
-            $script:WPFControlTable.Clear()
+            Clear-WPFControlRegistry
         }
 
         $Window = [System.Windows.Window]::new()
@@ -114,7 +114,7 @@ Describe 'Command' {
 
     It 'Should create a custom routed command with a single gesture' {
         InModuleScope WPF {
-            $script:WPFControlTable.Clear()
+            Clear-WPFControlRegistry
         }
 
         $Window = [System.Windows.Window]::new()
@@ -161,7 +161,7 @@ Describe 'Command' {
 
     It 'Should error when CanExecute and BoundTo are both supplied' {
         InModuleScope WPF {
-            $script:WPFControlTable.Clear()
+            Clear-WPFControlRegistry
         }
 
         $Window = [System.Windows.Window]::new()
@@ -182,7 +182,7 @@ Describe 'Command' {
 
     It 'Should create a RelayCommand with KeyBinding on Window when gesture is supplied without BoundTo' {
         InModuleScope WPF {
-            $script:WPFControlTable.Clear()
+            Clear-WPFControlRegistry
         }
 
         $Window = [System.Windows.Window]::new()

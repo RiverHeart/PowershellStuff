@@ -2,9 +2,12 @@ $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
 $script:LastDialogResult = $false
 
-# Create module var to map names to controls
-if (-not $Script:WPFControlTable) {
-    $Script:WPFControlTable = @{}
+# Create module var to map context ids to control tables
+if (-not $Script:WPFControlRegistry) {
+    $Script:WPFControlRegistry = [ordered] @{
+        ActiveContextId = $null
+        Contexts        = @{}
+    }
 }
 
 if (-not $Script:WPFThemeTable) {

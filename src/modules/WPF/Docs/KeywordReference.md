@@ -426,11 +426,14 @@ UseStyle 'PrimaryButton'
 
 ### Reference
 
-Gets a registered object by name.
+Gets a registered object by name from the current window context.
+
+If multiple windows register the same name, `Reference` resolves by the current DSL object context. Use `-ContextId` for explicit lookup.
 
 ```powershell
 $Window = Reference 'Window'
 $Buttons = Reference 'BackButton', 'ForwardButton'
+$Window = Reference 'Window' -ContextId $Window._WPFContextId
 ```
 
 ### Import
