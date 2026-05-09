@@ -21,10 +21,14 @@ function Invoke-ImageViewerLoadFile {
         $State.FileNavigator = New-WPFFileNavigator -Path $FileName -Category Image
         $State.IsFileLoaded = $true
 
-        Invoke-ImageViewerUpdateNavigationIconStyle
-        Invoke-ImageViewerFitToWindow
-        Invoke-ImageViewerUpdateStatus
+        if ($State.SaveAsCommand -and $State.SaveAsCommand -is [RelayCommand]) {
+            $State.SaveAsCommand.NotifyCanExecuteChanged()
+        }
     } catch {
-        Write-Warning "Failed to load image '$FileName': $_"
+        Write-Error "Failed to load image '$FileName': $_"
+        return
     }
+
+    Invoke-ImageViewerFitToWindow
+    Invoke-ImageViewerUpdateStatus
 }

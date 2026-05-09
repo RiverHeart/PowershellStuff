@@ -13,6 +13,7 @@ function Invoke-ImageViewerNavigate {
 
     if ($Direction -eq 'Back') { $Navigator.MovePrevious() } else { $Navigator.MoveNext() }
     (Reference 'Viewer').Source = $Navigator.CurrentFile.FullName
+    Invoke-ImageViewerRotate -ResetRotation
     Invoke-ImageViewerFitToWindow
     Invoke-ImageViewerUpdateStatus
 }

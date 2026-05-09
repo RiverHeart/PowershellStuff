@@ -4,5 +4,4 @@ function Invoke-ImageViewerToggleTheme {
 
     $Window = Reference 'Window'
     Switch-WPFTheme -Root $Window
-    Invoke-ImageViewerUpdateNavigationIconStyle
 }

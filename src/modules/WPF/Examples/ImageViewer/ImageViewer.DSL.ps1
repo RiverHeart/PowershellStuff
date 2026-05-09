@@ -4,6 +4,7 @@ using namespace System.Windows
 using namespace System.Windows.Controls
 using namespace System.Windows.Input
 using namespace System.Windows.Media
+using namespace System.Windows.Threading
 
 <#
 .SYNOPSIS
@@ -27,10 +28,12 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
+Start-Sleep -Seconds 2
+
 # Define the Image Viewer GUI
 
 Import "$PSScriptRoot/ImageViewer.Styles.ps1"
-Import "$PSScriptRoot/functions/*.ps1"
+Import "$PSScriptRoot/functions"
 
 # MARK: WINDOW
 Window 'Window' {
@@ -39,16 +42,37 @@ Window 'Window' {
     $this.AllowDrop = $true
     $this.WindowState = [WindowState]::Maximized
     $this.Tag = New-WPFObservableState @{
+        # Viewer State
         IsFullScreen   = $false
         IsFileLoaded   = $false
         IsFitMode      = $true
         ZoomLevel      = 1.0
         RotationAngle  = 0
+
+        # Copy State
+        IsCopyFeedbackActive = $false
+        CopyFeedbackTimer = $null
+
+        # Window State Backup (for toggling full screen)
         OldWindowStyle = $this.WindowStyle
         OldWindowState = $this.WindowState
         OldResizeMode  = $this.ResizeMode
+
+        # Theme State
         CurrentTheme   = if (Get-WPFDarkModePreference) { 'Dark' } else { 'Light' }
+
+        # Navigation State
         FileNavigator  = $null
+        IsSlideshowActive = $false
+        SlideshowTimer = $null
+        SlideshowIntervalSeconds = 3.0
+
+        # Command References
+        SaveAsCommand  = $null
+
+        # Misc State
+        MouseIdleTimer = $null
+        MouseMoveHandler = $null
     }
 
     Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
@@ -69,7 +93,18 @@ Window 'Window' {
         switch ($event.Key) {
             'Escape' {
                 $State = $this.Tag
-                if (-not $State.IsFullScreen) { return }
+                $StoppedSlideshow = $false
+                if ($State.IsSlideshowActive) {
+                    Stop-ImageViewerSlideshow
+                    $StoppedSlideshow = $true
+                }
+
+                if (-not $State.IsFullScreen) {
+                    if ($StoppedSlideshow) {
+                        $event.Handled = $True
+                    }
+                    break
+                }
 
                 Set-WPFWindowFullScreen -IsFullScreen $False
                 if ($State.IsFitMode) {
@@ -94,6 +129,11 @@ Window 'Window' {
                 break
             }
         }
+    }
+
+    When Closing {
+        Stop-ImageViewerSlideshow
+        Stop-ImageViewerMouseIdleHide
     }
 
     When DragOver {
@@ -125,7 +165,6 @@ Window 'Window' {
 
     When 'Loaded' {
         Invoke-ImageViewerUpdateStatus
-        Invoke-ImageViewerUpdateNavigationIconStyle
     }
 
     Grid "Body" {
@@ -136,12 +175,14 @@ Window 'Window' {
             Column 'Expand' {
                 MenuBar 'Menu' {
                     $this.Height = 25
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
-                        Shortcut 'Open' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'Open' {
                             $Window = Reference 'Window'
-                            $FileName = Get-WPFFileSelection -Type All -Category Image -Window $Window
+                            $FileName = Get-WPFFileSelection -Category Image -Window $Window
 
                             # Return early if we failed to get a file
                             if (-not $FileName) {
@@ -151,69 +192,139 @@ Window 'Window' {
                             Invoke-ImageViewerLoadFile -FileName $FileName
                         }
                     }
+                    MenuItem '(F)ile/(S)ave As' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'SaveAs' 'Ctrl+Shift+S' {
+                            Execute {
+                                $BitmapSource = Reference 'Viewer' -Property Source
+                                $CurrentFile = (Reference 'Window').Tag.FileNavigator.CurrentFile
+                                $SourcePath = $null
+                                $InitialDirectory = $null
+
+                                if ($null -ne $CurrentFile) {
+                                    $SourcePath = $CurrentFile.FullName
+                                    $InitialDirectory = $CurrentFile.DirectoryName
+                                }
+
+                                Invoke-ImageViewerSaveFileAs `
+                                    -Image $BitmapSource `
+                                    -SourcePath $SourcePath `
+                                    -InitialDirectory $InitialDirectory
+                            }
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                            }
+                        }
+
+                        # RelayCommand does not rely on CommandManager in this module,
+                        # so we refresh availability explicitly when file state changes.
+                        (Reference 'Window').Tag.SaveAsCommand = $this.Command
+                    }
                     MenuItem '(F)ile/(E)xit' {
-                        # TODO: Explore using existing Close AppCommand and adding input gesture
-                        Shortcut 'CloseCommand' 'Ctrl+q' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'CloseCommand' 'Ctrl+q' {
                             Write-Debug "Close command triggered. Closing window."
                             (Reference 'Window').Close()
                         }
                     }
 
                     MenuItem '(I)mage/(R)otate 90°' {
-                        Shortcut 'Rotate' 'Ctrl+R' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'Rotate' 'Ctrl+R' {
                             Invoke-ImageViewerRotate -Direction Clockwise
                         }
                     }
 
                     MenuItem '(I)mage/R(o)tate -90°' {
-                        Shortcut 'RotateCounter' 'Ctrl+Shift+R' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'RotateCounter' 'Ctrl+Shift+R' {
                             Invoke-ImageViewerRotate -Direction CounterClockwise
                         }
                     }
 
                     MenuItem '(V)iew/Zoom (I)n' {
-                        Shortcut 'ZoomIn' 'Ctrl+Add' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'ZoomIn' 'Ctrl+Add' {
                             Invoke-ImageViewerSetZoom -Delta 0.10
                         }
                     }
 
                     MenuItem '(V)iew/Zoom (O)ut' {
-                        Shortcut 'ZoomOut' 'Ctrl+Subtract' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'ZoomOut' 'Ctrl+Subtract' {
                             Invoke-ImageViewerSetZoom -Delta -0.10
                         }
                     }
 
                     MenuItem '(V)iew/(F)ullScreen' {
-                        Shortcut 'FullScreen' 'F11' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'FullScreen' 'F11' {
                             Write-Debug "Toggling full screen mode."
                             $Window = Reference 'Window'
                             $State = $Window.Tag
-                            Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                            $IsEnteringFullScreen = -not $State.IsFullScreen
+
+                            Set-WPFWindowFullScreen -IsFullScreen $IsEnteringFullScreen
+
+                            if ($IsEnteringFullScreen) {
+                                Start-ImageViewerMouseIdleHide
+                            } else {
+                                Stop-ImageViewerMouseIdleHide
+                            }
+
                             if ($State.IsFitMode) {
                                 Invoke-ImageViewerFitToWindow
                             }
                         }
                     }
 
+                    MenuItem '(V)iew/(S)lideshow' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'Slideshow' 'F5' {
+                            Execute {
+                                Invoke-ImageViewerToggleSlideshow
+                            }
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                            }
+                        }
+                    }
+
                     MenuItem '(V)iew/Image Fit to (W)indow' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         When Click {
                             Invoke-ImageViewerFitToWindow
                         }
                     }
 
                     MenuItem '(V)iew/Image (A)ctual Size' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         When Click {
                             Invoke-ImageViewerSetZoom -Reset
                         }
                     }
 
                     MenuItem '(V)iew/(T)oggle Theme' {
-                        Shortcut 'ToggleTheme' 'Ctrl+T' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'ToggleTheme' 'Ctrl+T' {
                             Invoke-ImageViewerToggleTheme
                         }
                     }
 
                     MenuItem '(H)elp/(A)bout' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
                         When Click {
                             Invoke-ImageViewerShowAbout
                         }
@@ -255,72 +366,86 @@ Window 'Window' {
         # MARK: TOOLBAR
         Row {
             Column {
-                # TODO:
-                # * Needs to support Counter/Clockwise rotation.
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
-                    $ButtonSize = 56
-
-                    Button 'BackButton' {
+                    Button 'CopyButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch IsEnabled Window.Tag.IsFileLoaded
+                        Watch ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
+                            if ($_) { 'Copied to clipboard' } else { 'Copy image to clipboard' }
+                        }
+                        Watch Content Window.Tag.IsCopyFeedbackActive -Converter {
+                            if ($_) {
+                                Path 'images/clipboard-check-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            } else {
+                                Path 'images/clipboard-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            }
+                        }
 
-                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
-                        Path 'images/arrow-left-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
+                        When 'Click' {
+                            try {
+                                Set-WPFClipboard -InputObject (Reference 'Viewer') -ErrorAction Stop
+                                Invoke-ImageViewerCopyFeedback -Success
+                            } catch {
+                                Invoke-ImageViewerCopyFeedback
+                            }
                         }
                     }
-                    Button 'FitToWindowButton' {
+                    Button 'ZoomModeButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
-                        $this.ToolTip = 'Fit image to window'
-                        React IsEnabled Window.Tag.IsFileLoaded
-
-                        When 'Click' { Invoke-ImageViewerFitToWindow }
-                        Path 'images/arrows-to-circle-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
+                        Watch IsEnabled Window.Tag.IsFileLoaded
+                        Watch ToolTip Window.Tag.IsFitMode -Converter {
+                            if ($_) { 'Actual size (100%)' } else { 'Fit image to window' }
                         }
-                    }
-                    Button 'ActualSizeButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
-                        $this.ToolTip = 'Actual size (100%)'
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch Content Window.Tag.IsFitMode -Converter {
+                            if ($_) {
+                                Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            } else {
+                                Path 'images/arrows-to-circle-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
+                                }
+                            }
+                        }
 
-                        When 'Click' { Invoke-ImageViewerSetZoom -Reset }
-                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
+                        When 'Click' {
+                            if ((Reference 'Window').Tag.IsFitMode) {
+                                Invoke-ImageViewerSetZoom -Reset
+                            } else {
+                                Invoke-ImageViewerFitToWindow
+                            }
                         }
                     }
                     Button 'RotateButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
                         $this.ToolTip = 'Rotate 90° clockwise'
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
                         Path 'images/arrows-rotate-solid-full.svg' {
                             UseStyle 'ImageViewer.IconPath'
                         }
                     }
+                    Button 'BackButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        Watch IsEnabled Window.Tag.IsFileLoaded
+
+                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
+                        Path 'images/arrow-left-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
+                    }
                     Button 'ForwardButton' {
                         UseStyle 'ImageViewer.IconButton'
-                        $this.Width = $ButtonSize
-                        $this.Height = $ButtonSize
-                        $this.Margin = 5
-                        React IsEnabled Window.Tag.IsFileLoaded
+                        Watch IsEnabled Window.Tag.IsFileLoaded
 
                         When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
                         Path 'images/arrow-right-solid-full.svg' {
@@ -336,7 +461,7 @@ Window 'Window' {
             Column 'Expand' {
                 DockPanel 'StatusPanel' {
                     $this.Margin = 5, 0, 5, 0
-                    React Visibility Window.Tag.IsFullScreen -Invert
+                    Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     Label 'StatusFileLabel' {
                         $this.Content = 'No image loaded'

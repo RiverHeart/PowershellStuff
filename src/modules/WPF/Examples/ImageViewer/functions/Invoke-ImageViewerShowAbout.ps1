@@ -1,3 +1,10 @@
+using namespace Microsoft
+using namespace System.Collections.Generic
+using namespace System.Windows
+using namespace System.Windows.Controls
+using namespace System.Windows.Input
+using namespace System.Windows.Media
+
 function Invoke-ImageViewerShowAbout {
     [CmdletBinding()]
     param()

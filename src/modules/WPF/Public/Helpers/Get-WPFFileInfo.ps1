@@ -42,6 +42,7 @@ function Get-WPFFileInfo {
         # Find FileInfos in the given category
         foreach($KVP in $Script:WPFFileInfo.FileInfo.GetEnumerator()) {
             $Key, $FileInfo = $KVP.Key, $KVP.Value
+            $FileCategories = @($FileInfo.Categories) + @($FileInfo.Category)
 
             # Ignore items already found, either by name or category
             if ($Key -in $FoundItems) {
@@ -50,7 +51,7 @@ function Get-WPFFileInfo {
 
             # Check if the FileInfo has one of the categories
             foreach($Entry in $Category) {
-                if ($Entry -in $FileInfo.Categories) {
+                if ($Entry -in $FileCategories) {
                     Write-Output $FileInfo
                     $FoundItems += $Key
                     break

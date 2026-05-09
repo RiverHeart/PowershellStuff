@@ -249,12 +249,20 @@ Path 'images/arrow-left.svg' {
 Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
 
 ```powershell
-Shortcut 'Open' {
+Command 'Open' {
     # Uses built-in ApplicationCommand if available
 }
 
-Shortcut 'MyCommand' 'Ctrl+M' {
+Command 'MyCommand' 'Ctrl+M' {
     Write-Host 'Run custom command'
+}
+
+Command 'SaveAs' 'Ctrl+Shift+S' {
+    Execute { Write-Host 'Saving...' }
+    CanExecute { $IsFileLoaded }
+    # RelayCommand does not rely on CommandManager in this module,
+    # so we refresh availability explicitly when file state changes.
+    (Reference 'Window').Tag.SaveAsCommand = $this.Command
 }
 ```
 
@@ -270,13 +278,13 @@ When Click {
 
 ## Binding and Resources
 
-### React
+### Watch
 
 Binds a target property to an observable state path.
 
 ```powershell
-React Visibility Window.Tag.IsFullScreen -Invert
-React IsEnabled Window.Tag.IsFileLoaded
+Watch Visibility Window.Tag.IsFullScreen -Invert
+Watch IsEnabled Window.Tag.IsFileLoaded
 ```
 
 ### Binding
@@ -431,6 +439,18 @@ Dot-sources script files into caller scope.
 
 ```powershell
 Import './functions/*.ps1'
+```
+
+### Get-WPFTextInput
+
+Shows a native WPF modal input dialog with prompt text and returns entered text.
+
+```powershell
+$Interval = Get-WPFTextInput -Prompt 'Enter slideshow interval in seconds:' -Title 'Start Slideshow' -DefaultValue '3.0'
+```
+
+```powershell
+$Interval = Get-WPFTextInput -Prompt 'Seconds:' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
 ```
 
 ## Compatibility Note

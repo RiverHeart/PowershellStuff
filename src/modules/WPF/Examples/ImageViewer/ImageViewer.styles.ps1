@@ -1,3 +1,5 @@
+using namespace System.Windows.Media
+
 Theme 'Light' {
     Brush 'WindowBackground' '#FFFFFF'
     Brush 'SurfaceBackground' '#F8F8F8'
@@ -38,20 +40,23 @@ Style 'ImageViewer.IconButton' Button {
     Setter VerticalContentAlignment ([VerticalAlignment]::Stretch)
     Setter OverridesDefaultStyle $true
 
-    $Template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
-
     # Icon sizing: the icon occupies $IconScale of the button's interior.
     # Padding fills the remaining space equally on all sides.
-    $ButtonSize    = 56
-    $IconScale     = 0.6
-    $IconPadding   = [int](($ButtonSize * (1 - $IconScale)) / 2)
-    $CornerRadius  = 8
+    $ButtonSize = 56
+    $IconScale = 0.6
+    $IconPadding = [int](($ButtonSize * (1 - $IconScale)) / 2)
+    $CornerRadius = 8
+    $IconButtonMargin = 5
+
+    Setter Width $ButtonSize
+    Setter Height $ButtonSize
+    Setter Margin $IconButtonMargin
 
     Template {
         Border 'TemplateBorder' {
-            Setter CornerRadius ([System.Windows.CornerRadius]::new($CornerRadius))
-            Setter Padding ([System.Windows.Thickness]::new($IconPadding))
-            Setter BorderThickness ([System.Windows.Thickness]::new(1))
+            Setter CornerRadius $CornerRadius
+            Setter Padding $IconPadding
+            Setter BorderThickness 1
             Setter Background ButtonBackground -Resource
             Setter BorderBrush DisabledForeground -Resource
 
@@ -70,10 +75,15 @@ Style 'ImageViewer.IconButton' Button {
 }
 
 Style 'ImageViewer.IconPath' Path {
-    Setter Stretch ([System.Windows.Media.Stretch]::Uniform)
+    Setter Stretch ([Stretch]::Uniform)
     Setter StrokeThickness 0
-    Setter Fill Foreground -Resource
-    Setter Stroke Foreground -Resource
+    Setter Fill DisabledForeground -Resource
+    Setter Stroke DisabledForeground -Resource
+
+    Trigger IsEnabled $true {
+        Setter Fill Foreground -Resource
+        Setter Stroke Foreground -Resource
+    }
 }
 
 Style ScrollViewer {
@@ -85,9 +95,10 @@ Style Menu {
     Setter Foreground Foreground -Resource
 }
 
-Style MenuItem {
-    Setter Background WindowBackground -Resource
-    Setter Foreground Foreground -Resource
+Style 'ImageViewer.UnthemedMenuItem' MenuItem {
+    # Use OS system brushes so MenuItem stays unthemed and does not inherit Menu foreground.
+    Setter Background ([System.Windows.SystemColors]::MenuBrush)
+    Setter Foreground ([System.Windows.SystemColors]::MenuTextBrush)
 }
 
 Style Label {

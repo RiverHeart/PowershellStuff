@@ -57,7 +57,7 @@ function Update-WPFObject {
             # Command
             if (Test-WPFType $Child 'Command') {
                 Write-Debug "Adding Command to object '$thisName' ($thisType)"
-                $InputObject.Command = $Child
+                Set-WPFObjectSpec -InputObject $InputObject -Name 'Command' -Value $Child | Out-Null
             }
             # Control
             elseif (Test-WPFType $Child @('Control', 'GridDefinition')) {
@@ -84,6 +84,8 @@ function Update-WPFObject {
                 Write-Warning "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
             }
         }
+
+        Update-WPFObjectSpec -InputObject $InputObject
     } catch {
         # Get base exception and surface here?
         Write-Error "Failed to update '$thisName' ($thisType) with error: $_"

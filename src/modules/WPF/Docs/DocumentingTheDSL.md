@@ -108,19 +108,20 @@ Notes:
 - Supports named and nameless forms.
 - Auto-attaches when created inside another control's scriptblock.
 
-### Find-WPFChildPath
+### Find-WPFChildNode
 
-Purpose: Finds the first `System.Windows.Shapes.Path` under a dependency object.
+Purpose: Finds child dependency objects under a root dependency object.
 
 Syntax:
 
-- `Find-WPFChildPath -Node <DependencyObject>`
+- `Find-WPFChildNode -Node <DependencyObject> -Type <Type>`
+- `Find-WPFChildNode -Node <DependencyObject> -Type <Type> -All`
 
 Notes:
 
-- Checks logical children first (`Child`, `Content`, `Children`).
+- Traverses logical children first (`Child`, `Content`, `Children`).
 - Falls back to visual tree traversal.
-- Returns `$null` if no path is found.
+- Returns the first match by default; use `-All` to return all matches.
 
 ## Writing Style Guidelines
 

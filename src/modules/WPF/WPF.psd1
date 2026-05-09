@@ -15,7 +15,7 @@ RootModule = 'WPF'
 ModuleVersion = '1.0'
 
 # Supported PSEditions
-# CompatiblePSEditions = @()
+CompatiblePSEditions = @('Desktop', 'Core')
 
 # ID used to uniquely identify this module
 GUID = 'de14295a-0783-486f-9c6b-0219824deb66'
@@ -24,16 +24,16 @@ GUID = 'de14295a-0783-486f-9c6b-0219824deb66'
 Author = 'Riverheart'
 
 # Company or vendor of this module
-CompanyName = 'Unknown'
+CompanyName = 'None'
 
 # Copyright statement for this module
 Copyright = '(c) 2021 Riverheart. All rights reserved.'
 
 # Description of the functionality provided by this module
-# Description = ''
+Description = 'Provides a set of functions and cmdlets for building WPF applications in PowerShell.'
 
 # Minimum version of the Windows PowerShell engine required by this module
-# PowerShellVersion = ''
+PowerShellVersion = '5.1'
 
 # Name of the Windows PowerShell host required by this module
 # PowerShellHostName = ''
@@ -91,6 +91,7 @@ FunctionsToExport = @(
     # DSL
 
     # DSL/Controls
+    'Command'
     'Border'
     'ContentPresenter'
     'Button'
@@ -105,27 +106,30 @@ FunctionsToExport = @(
     'Menu'
     'MenuItem'
     'ScrollViewer'
-    'Shortcut'
     'StackPanel'
     'TextBlock'
     'TextBox'
     'Window'
 
     # DSL/Helpers
-    'React'
+    'Watch'
     'Binding'
+    'BoundTo'
     'Brush'
     'DataTrigger'
+    'Execute'
+    'CanExecute'
     'Import'
     'MultiTrigger'
-    'Resource'
     'Reference'
+    'Resource'
     'Setter'
     'Style'
     'Theme'
     'Template'
     'Trigger'
     'UseStyle'
+    'Watch'
     'When'
 
     # DSL/Custom Controls
@@ -138,15 +142,17 @@ FunctionsToExport = @(
     'Add-WPFObject'
     'Convert-SvgToXaml'
     'Convert-WPFObjectToXaml'
-    'Find-WPFChildPath'
+    'Find-WPFChildNode'
     'Get-WPFDarkModePreference'
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'
+    'Get-WPFTextInput'
     'New-WPFObservableState'
     'New-WPFPoint'
     'New-WPFSize'
     'New-WPFVariableList'
     'Register-WPFObject'
+    'Set-WPFClipboard'
     'Set-WPFWindowFullScreen'
     'Show-WPFWindow'
     'Switch-WPFTheme'

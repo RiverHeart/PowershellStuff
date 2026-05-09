@@ -4,7 +4,7 @@
         Image = @{ Display = 'Image'; Description = 'All Image File Types' }
         Audio = @{ Display = 'Audio'; Description = 'All Audio File Types' }
         Video = @{ Display = 'Video'; Description = 'All Video File Types' }
-        Programming = @{ Display = 'Progamming'; Description = 'Programming Language Files' }
+        Programming = @{ Display = 'Programming'; Description = 'Programming Language Files' }
         Archive = @{ Display = 'Archive'; Description = 'All Archive File Types' }
         OpenDocument = @{ Display = 'OpenDocument'; Description = 'Files associated with Open/Libre Office' }
         Microsoft = @{ Display = 'Microsoft Office'; Description = 'Microsoft Office Files' }
@@ -24,9 +24,9 @@
         EPub = @{ Display = 'EPub'; Extensions = 'epub'; Filter = 'EPub (*.epub)|*.epub'; Description = 'E-book format'; Categories = 'Document' }
 
         #- Microsoft Office
-        Excel = @{ Display = 'Excel'; Extensions = @('xls', 'xlsx', 'xlsm', 'xltx', 'xlsb'); Filter = 'Excel (*.xls;*.xlsx;*.xlsm;*.xltx;*.xlsb)|*.xls;*.xlsx;*.xlsm;*.xltx;*.xlsb'; Description = 'Microsoft Excel Spreadsheet'; Categories = @('Document', 'MicrosoftOffice') }
-        PowerPoint = @{ Display = 'PowerPoint'; Extensions = @('ppt', 'pptx', 'pptm', 'potx', 'potm'); Filter = 'PowerPoint (*.ppt;*.pptx;*.pptm;*.potx;*.potm)|*.ppt;*.pptx;*.pptm;*.potx;*.potm'; Description = 'Microsoft PowerPoint Presentation'; Categories = @('Document', 'MicrosoftOffice') }
-        Word = @{ Display = 'Word'; Extensions = @('doc', 'docx', 'docm'); Filter = 'Word (*.doc;*.docx;*.docm)|*.doc;*.docx;*.docm'; Description = 'Microsoft Word document'; Categories = @('Document', 'MicrosoftOffice') }
+        Excel = @{ Display = 'Excel'; Extensions = @('xls', 'xlsx', 'xlsm', 'xltx', 'xlsb'); Filter = 'Excel (*.xls;*.xlsx;*.xlsm;*.xltx;*.xlsb)|*.xls;*.xlsx;*.xlsm;*.xltx;*.xlsb'; Description = 'Microsoft Excel Spreadsheet'; Categories = @('Document', 'Microsoft') }
+        PowerPoint = @{ Display = 'PowerPoint'; Extensions = @('ppt', 'pptx', 'pptm', 'potx', 'potm'); Filter = 'PowerPoint (*.ppt;*.pptx;*.pptm;*.potx;*.potm)|*.ppt;*.pptx;*.pptm;*.potx;*.potm'; Description = 'Microsoft PowerPoint Presentation'; Categories = @('Document', 'Microsoft') }
+        Word = @{ Display = 'Word'; Extensions = @('doc', 'docx', 'docm'); Filter = 'Word (*.doc;*.docx;*.docm)|*.doc;*.docx;*.docm'; Description = 'Microsoft Word document'; Categories = @('Document', 'Microsoft') }
 
         #- Open Document
         OpenText = @{ Display = 'Open Text'; Extensions = @('odt', 'ott'); Filter = 'Open Text (*.odt;*.ott)|*.odt;*.ott'; Description = 'Open Document Text'; Categories = @('Document', 'OpenDocument') }
@@ -42,7 +42,7 @@
         JPEG = @{ Display = 'JPEG'; Extensions = @('jpeg', 'jpg'); Filter = 'JPEG (*.jpeg;*.jpg)|*.jpeg;*.jpg'; Description = 'JPEG Image'; Categories = 'Image' }
         PNG = @{ Display = 'PNG'; Extensions = 'png'; Filter = 'PNG (*.png)|*.png'; Description = 'Portable Network Graphics'; Categories = 'Image' }
         GIF = @{ Display = 'GIF'; Extensions = 'gif'; Filter = 'GIF (*.gif)|*.gif'; Description = 'Graphics Interchange Format'; Categories = 'Image' }
-        Bitmap = @{ Display = 'Bitmap'; Extensions = 'bmp'; Filter = 'Bitmap (*.bmp)|*.bpm'; Description = 'Bitmap Image.'; Categories = 'Image' }
+        Bitmap = @{ Display = 'Bitmap'; Extensions = 'bmp'; Filter = 'Bitmap (*.bmp)|*.bmp'; Description = 'Bitmap Image.'; Categories = 'Image' }
         SVG = @{ Display = 'SVG'; Extensions = 'svg'; Filter = 'SVG (*.svg)|*.svg'; Description = 'Scalable Vector Graphics'; Categories = 'Image' }
         Icon = @{ Display = 'Icon'; Extensions = 'ico'; Filter = 'Icon (*.ico)|*.ico'; Description = 'Windows Icon'; Categories = 'Image' }
         TIFF = @{ Display = 'TIFF'; Extensions = @('tiff', 'tif'); Filter = 'TIFF (*.tiff;*.tif)|*.tiff;*.tif'; Description = 'Tagged Image File Format'; Categories = 'Image' }
@@ -83,7 +83,7 @@
         #region Markup
         #==============
 
-        HTML =@{ Display = 'HTML'; Extensions = @('html', 'htm', 'xhtml'); Filter = 'HTML (*.html;*.htm;*.htmx)|*.html;*.htm;*.htmx'; Description = 'HyperText Markup Language'; Categories = 'Markup' }
+        HTML =@{ Display = 'HTML'; Extensions = @('html', 'htm', 'xhtml'); Filter = 'HTML (*.html;*.htm;*.xhtml)|*.html;*.htm;*.xhtml'; Description = 'HyperText Markup Language'; Categories = 'Markup' }
         XML = @{ Display = 'XML'; Extensions = 'xml'; Filter = 'XML (*.xml)|*.xml'; Description = 'Extensible Markup Language'; Categories = 'Markup' }
         Markdown = @{ Display = 'Markdown'; Extensions = 'md'; Filter = 'Markdown (*.md)|*.md'; Description = 'Markdown'; Categories = 'Markup' }
         CSS = @{ Display = 'CSS'; Extensions = 'css'; Filter = 'CSS (*.css)|*.css'; Description = 'Cascading Style Sheets'; Categories = 'Markup' }
@@ -95,17 +95,17 @@
         #===================
 
         #- Misc
-        Javascript = @{ Display = 'Javascript'; Extensions = 'js'; Filter = 'Javascript (*.js)|*.js'; Description = 'Javascript'; Category = 'Programming' }
-        Ruby =       @{ Display = 'Ruby'; Extensions = 'rb'; Filter = 'Ruby (*.rb)|*.rb'; Description = 'Ruby'; Category = 'Programming' }
+        Javascript = @{ Display = 'Javascript'; Extensions = 'js'; Filter = 'Javascript (*.js)|*.js'; Description = 'Javascript'; Categories = 'Programming' }
+        Ruby =       @{ Display = 'Ruby'; Extensions = 'rb'; Filter = 'Ruby (*.rb)|*.rb'; Description = 'Ruby'; Categories = 'Programming' }
         Python = @{ Display = 'Python';Extensions = 'py'; Filter = 'Python (*.py)|*.py'; Description = 'Python'; Categories = 'Programming' }
         PHP  = @{ Display = 'PHP'; Extensions = 'php'; Filter = 'PHP (*.php)|*.php'; Description = 'PHP'; Categories = 'Programming' }
         CSharp = @{ Display = 'CSharp'; Extensions = 'cs'; Filter = 'CSharp (*.cs)|*.cs'; Description = 'C#'; Categories = 'Programming' }
 
         #- Powershell
-        PowershellAll = @{ Display = 'Powershell (All)'; Extensions = @('ps1', 'psd1', 'psm1'); Filter = 'Powershell Files (*.ps1;*.psd1;*.psm1)|*.psd1;*.psd1;*.psm1'; Description = 'All Powershell Files'; Categories = @('Programming', 'Powershell') }
+        PowershellAll = @{ Display = 'Powershell (All)'; Extensions = @('ps1', 'psd1', 'psm1'); Filter = 'Powershell Files (*.ps1;*.psd1;*.psm1)|*.ps1;*.psd1;*.psm1'; Description = 'All Powershell Files'; Categories = @('Programming', 'Powershell') }
         Powershell = @{ Display = 'Powershell'; Extensions = 'ps1'; Filter = 'Powershell (*.ps1)|*.ps1'; Description = 'Powershell Script'; Categories = @('Programming', 'Powershell') }
         PowershellData = @{ Display = 'Powershell Data'; Extensions = 'psd1'; Filter = 'Powershell Data (*.psd1)|*.psd1'; Description = 'Powershell Data File'; Categories = @('Programming', 'Powershell') }
-        PowershellModule = @{ Display = 'Powershell Module'; Extensions = 'psm1'; Filter = 'Powershell Module (*.psdm1)|*.psm1'; Description = 'Powershell Module File'; Categories = @('Programming', 'Powershell') }
+        PowershellModule = @{ Display = 'Powershell Module'; Extensions = 'psm1'; Filter = 'Powershell Module (*.psm1)|*.psm1'; Description = 'Powershell Module File'; Categories = @('Programming', 'Powershell') }
         #endregion Programming
 
         #region Archive
