@@ -79,6 +79,7 @@ After making WPF module changes:
 * Run relevant Pester tests for `src/modules/WPF/Tests`.
 * If behavior changed, run one representative example from `src/modules/WPF/Examples`.
 * Confirm no obvious break in nested control creation, event binding, or grid definition handling.
+* When running examples unattended (agent/automation), set `WPF_SMOKE_TEST=1` so `Show-WPFWindow` auto-closes after first render and scripts do not hang waiting for manual window close.
 
 # Change Boundaries
 

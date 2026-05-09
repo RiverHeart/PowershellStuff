@@ -444,6 +444,18 @@ Dot-sources script files into caller scope.
 Import './functions/*.ps1'
 ```
 
+### Show-WPFWindow
+
+Shows a WPF window modally and returns its dialog result.
+
+For unattended automation, set environment variable `WPF_SMOKE_TEST=1` (also accepts `true`, `yes`, `on`) to auto-close windows after first render.
+
+```powershell
+Window 'Window' {
+    $this.Title = 'Hello'
+} | Show-WPFWindow
+```
+
 ### Get-WPFTextInput
 
 Shows a native WPF modal input dialog with prompt text and returns entered text.

@@ -29,6 +29,8 @@ On 2026-05-09 the registry moved from a single module-scoped hashtable to contex
 
 The `Window` keyword now attaches context cleanup to the window `Closed` event so registry state does not accumulate between UI rebuilds in the same session.
 
+`Show-WPFWindow` supports an unattended smoke-test mode controlled by the `WPF_SMOKE_TEST` environment variable. When enabled (`1`, `true`, `yes`, or `on`), windows auto-close right after first render by setting `DialogResult = $false`. This allows DSL apps to run in automation and emit debug output without a human closing UI windows.
+
 ### RelayCommand
 
 While working on menu support, the initial expectation was that `ICommand` could be attached directly to a `MenuItem` with a simple command object. In practice, usable command wiring in WPF revolved around a `RelayCommand` implementation and, initially, `CommandBinding`.
