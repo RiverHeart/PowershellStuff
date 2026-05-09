@@ -4,6 +4,7 @@ using namespace System.Windows
 using namespace System.Windows.Controls
 using namespace System.Windows.Input
 using namespace System.Windows.Media
+using namespace System.Windows.Threading
 
 <#
 .SYNOPSIS
@@ -68,6 +69,10 @@ Window 'Window' {
 
         # Command References
         SaveAsCommand  = $null
+
+        # Misc State
+        MouseIdleTimer = $null
+        MouseMoveHandler = $null
     }
 
     Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
@@ -128,6 +133,7 @@ Window 'Window' {
 
     When Closing {
         Stop-ImageViewerSlideshow
+        Stop-ImageViewerMouseIdleHide
     }
 
     When DragOver {
@@ -263,7 +269,16 @@ Window 'Window' {
                             Write-Debug "Toggling full screen mode."
                             $Window = Reference 'Window'
                             $State = $Window.Tag
-                            Set-WPFWindowFullScreen -IsFullScreen (-not $State.IsFullScreen)
+                            $IsEnteringFullScreen = -not $State.IsFullScreen
+
+                            Set-WPFWindowFullScreen -IsFullScreen $IsEnteringFullScreen
+
+                            if ($IsEnteringFullScreen) {
+                                Start-ImageViewerMouseIdleHide
+                            } else {
+                                Stop-ImageViewerMouseIdleHide
+                            }
+
                             if ($State.IsFitMode) {
                                 Invoke-ImageViewerFitToWindow
                             }

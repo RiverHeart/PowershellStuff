@@ -16,7 +16,7 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Image zoom with "Actual Fit"/"Fit to Window" actions.
 * Copy image button
 * SaveAs with automatic format conversion
-* Supports fullscreen mode
+* Fullscreen mode with mouse auto-hide on idle
 * Supports Dark/Light modes
 * Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
 
