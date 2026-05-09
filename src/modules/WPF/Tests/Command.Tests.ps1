@@ -35,7 +35,6 @@ Describe 'Command' {
         $Parent = [System.Windows.Controls.MenuItem]::new()
         $PSVars = New-WPFVariableList -InputObject $Parent
 
-        $Executed = $false
         {
             Command 'DoThing' {
                 Execute { $null = $true }

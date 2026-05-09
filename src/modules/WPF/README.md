@@ -5,11 +5,23 @@
 
 A code-first PowerShell DSL for building WPF desktop applications without requiring XAML as the primary authoring model.
 
-The focus is readability and fast iteration: define UI structure, behavior, and styling in one place using nested PowerShell syntax.
+The focus is readability and fast iteration: define UI structure, behavior, and styling in one place using nested PowerShell syntax or spread across a few helper files without rigid MVC or MVVM patterns.
 
-## Example
+## Table of Contents
 
-This is a trimmed excerpt from the ImageViewer application in [Examples/ImageViewer](./Examples/ImageViewer). It is a real, non-trivial app; the full source is linked below.
+* [Flagship Example](#flagship-example)
+* [Design Philosophy](#design-philosophy)
+* [Why Use it](#why-use-it)
+* [When This Is Not a Fit](#when-this-is-not-a-fit)
+* [Requirements](#requirements)
+* [Project Status](#project-status)
+* [Project Goals](#project-goals)
+* [Documentation](#documentation)
+* [Resources](#resources)
+
+## Flagship Example
+
+The following is a screenshot and trimmed excerpt from the ImageViewer application in [Examples/ImageViewer](./Examples/ImageViewer) so you can get a sense of what you can produce and what the syntax looks like. The ImageViewer is a real, non-trivial app.
 
 ![Image Viewer](./Examples/ImageViewer/ImageViewer.png)
 
@@ -139,20 +151,6 @@ Current limitations:
 - Some DSL areas are more mature than others.
 - Documentation is still catching up with implementation changes.
 
-## Automation Smoke Mode
-
-When running WPF examples in unattended automation (for example, agent validation or CI), set `WPF_SMOKE_TEST` so modal windows close automatically after first render.
-
-Accepted enabled values: `1`, `true`, `yes`, `on`.
-
-PowerShell example:
-
-```powershell
-$env:WPF_SMOKE_TEST = '1'
-./Examples/ImageViewer/ImageViewer.DSL.ps1
-Remove-Item Env:WPF_SMOKE_TEST -ErrorAction SilentlyContinue
-```
-
 ## Why Make This?
 
 Many reasons, but a few big ones:
@@ -173,6 +171,7 @@ Many reasons, but a few big ones:
 
 ## Documentation
 
+- [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
 - [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
 - [Documenting This DSL](./Docs/DocumentingTheDSL.md)
 - [Keyword Reference](./Docs/KeywordReference.md)
@@ -183,7 +182,6 @@ Many reasons, but a few big ones:
 - [Repository Migration Plan](./Docs/RepositoryMigrationPlan.md)
 - [Development Log](./Docs/DevLog/2026-05.md)
 - [Examples](./Examples)
-
 
 ## Resources
 
