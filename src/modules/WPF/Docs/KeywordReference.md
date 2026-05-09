@@ -184,6 +184,21 @@ DockPanel 'Layout' {
 }
 ```
 
+### DataGrid
+
+Creates a DataGrid. Use `$this.ItemsSource` to bind data and `$this.AutoGenerateColumns` to control column generation.
+
+```powershell
+DataGrid 'ProcessList' {
+    $this.AutoGenerateColumns = $false
+    $this.ItemsSource = Get-Process
+    $this.Columns.Add([System.Windows.Controls.DataGridTextColumn] @{
+        Header  = 'Name'
+        Binding = [System.Windows.Data.Binding] 'ProcessName'
+    })
+}
+```
+
 ### DatePicker
 
 Creates a DatePicker.
@@ -300,6 +315,19 @@ DataTrigger (Binding 'IsEnabled' -Self) $false {
 ```powershell
 DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
     Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+### ValueConverter
+
+Creates an `IValueConverter` from PowerShell scriptblocks for use with WPF bindings.
+
+```powershell
+Binding 'WorkingSet64' -ScriptBlock {
+    $this.Converter = New-WPFValueConverter {
+        param($Value)
+        [math]::Round($Value / 1MB, 2)
+    }
 }
 ```
 

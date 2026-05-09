@@ -81,6 +81,7 @@ FunctionsToExport = @(
     # Class Helpers
     'New-WPFFileNavigator'
     'New-WPFRelayCommand'
+    'New-WPFValueConverter'
 
     # Completers
     'Complete-WPFApplicationCommand'
@@ -95,6 +96,7 @@ FunctionsToExport = @(
     'Border'
     'ContentPresenter'
     'Button'
+    'DataGrid'
     'DatePicker'
     'DockPanel'
     'Image'
