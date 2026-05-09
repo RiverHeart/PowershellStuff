@@ -456,6 +456,22 @@ Window 'Window' {
 } | Show-WPFWindow
 ```
 
+### New-WPFProject
+
+Creates a generic WPF DSL project scaffold with a starter window script, style file, and conventional folders.
+
+```powershell
+New-WPFProject MyApp
+```
+
+```powershell
+New-WPFProject MyApp C:\Projects
+```
+
+```powershell
+New-WPFProject MyApp -Bare
+```
+
 ### Get-WPFTextInput
 
 Shows a native WPF modal input dialog with prompt text and returns entered text.

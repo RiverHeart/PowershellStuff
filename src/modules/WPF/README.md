@@ -169,6 +169,34 @@ Many reasons, but a few big ones:
 - Let users compose UI from regular functions rather than opaque tooling.
 - Provide enough examples to prove real-world usefulness.
 
+## Project Scaffolding
+
+Use `New-WPFProject` to generate a repeatable starter structure for new DSL apps.
+
+```powershell
+New-WPFProject MyApp
+```
+
+The generated project includes:
+
+- `MyApp.DSL.ps1`
+- `MyApp.Styles.ps1`
+- `functions/`
+- `images/`
+- `README.md`
+
+Specify a parent directory as the second parameter:
+
+```powershell
+New-WPFProject MyApp C:\Projects
+```
+
+Use `-Bare` for a more minimal starter without the default File menu shell:
+
+```powershell
+New-WPFProject MyApp -Bare
+```
+
 ## Documentation
 
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)

@@ -149,6 +149,7 @@ FunctionsToExport = @(
     'Get-WPFTextInput'
     'New-WPFObservableState'
     'New-WPFPoint'
+    'New-WPFProject'
     'New-WPFSize'
     'New-WPFVariableList'
     'Register-WPFObject'
