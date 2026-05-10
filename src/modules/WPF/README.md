@@ -200,6 +200,7 @@ New-WPFProject MyApp -Bare
 ## Documentation
 
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
+- [Autocomplete Guidance](./Docs/AutoComplete.md)
 - [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
 - [Documenting This DSL](./Docs/DocumentingTheDSL.md)
 - [Keyword Reference](./Docs/KeywordReference.md)
