@@ -291,6 +291,34 @@ When Click {
 }
 ```
 
+### TimedEvent
+
+Creates and starts a DispatcherTimer, registers it by name for `Reference`, and ensures cleanup through window lifecycle registry clearing.
+
+TimedEvent requires an explicit interval in milliseconds.
+
+```powershell
+TimedEvent 'RefreshProcess' 3000 {
+    param($sender, $e)
+    # Periodic work
+}
+```
+
+```powershell
+# Async mode: run work in a background runspace and update UI on completion
+TimedEvent 'RefreshData' 3000 `
+  -Work {
+      Get-Process
+  } `
+  -OnComplete {
+      param($processes, $sender)
+      # $sender is the DispatcherTimer
+      # Update UI state here
+      $null = $processes
+      $null = $sender
+}
+```
+
 ## Binding and Resources
 
 ### Watch

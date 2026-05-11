@@ -129,6 +129,7 @@ FunctionsToExport = @(
     'Style'
     'Theme'
     'Template'
+    'TimedEvent'
     'Trigger'
     'UseStyle'
     'Watch'

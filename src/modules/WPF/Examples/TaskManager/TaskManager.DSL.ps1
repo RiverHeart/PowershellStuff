@@ -20,6 +20,7 @@ Import "$PSScriptRoot/TaskManager.Styles.ps1"
 Import "$PSScriptRoot/functions"
 
 Window 'Window' {
+    $this = [System.Windows.Window]$this
     $this.Title = 'TaskManager'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.Width = 1000
@@ -28,11 +29,14 @@ Window 'Window' {
         # Add app state fields here.
         CurrentView = 'Home'
         IsDirty = $false
-        ProcessUpdateTimer = $null
     }
 
     When Loaded {
         Write-Debug 'TaskManager loaded.'
+    }
+
+    When Closed {
+        Write-Debug 'TaskManager window closed.'
     }
 
     # Uncomment this block to add window-wide keyboard shortcuts.
@@ -64,86 +68,130 @@ Window 'Window' {
         Row 'Expand' {
             Column {
                 DataGrid 'ProcessList' {
-                    # TimedEvent 2000 {
-                    #     $this.ItemsSource = Get-Process
-                    # }
+                    $this.AutoGenerateColumns = $false
+                    $this.CanUserSortColumns = $true
+                    $this.IsReadOnly = $true
+                    $this.CanUserAddRows = $false
+                    $this.CanUserDeleteRows = $false
+                    $this.CanUserResizeRows = $false
+                    $this.VerticalScrollBarVisibility = [ScrollBarVisibility]::Auto
+                    $this.HorizontalScrollBarVisibility = [ScrollBarVisibility]::Auto
 
+                    $this = [System.Windows.Controls.DataGrid] $this
                     $ProcessItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
                     $CpuSamples = @{}
                     $CpuCoreCount = [Math]::Max(1, [int]$env:NUMBER_OF_PROCESSORS)
                     $LastSampleTime = Get-Date
 
-                    $UpdateProcessItems = {
-                        param(
-                            [System.Collections.ObjectModel.ObservableCollection[object]] $Items,
-                            [hashtable] $Samples,
-                            [datetime] $PreviousSampleTime,
-                            [int] $CoreCount
-                        )
-
-                        $CurrentSampleTime = Get-Date
-                        $ElapsedSeconds = [Math]::Max(0.001, ($CurrentSampleTime - $PreviousSampleTime).TotalSeconds)
-                        $CurrentProcesses = Get-Process
-
-                        $Items.Clear()
-                        foreach ($Process in $CurrentProcesses) {
-                            $CurrentCpu = [double]$Process.TotalProcessorTime.TotalSeconds
-                            $PreviousCpu = $null
-                            if ($Samples.ContainsKey($Process.Id)) {
-                                $PreviousCpu = [double]$Samples[$Process.Id]
-                            }
-
-                            $CpuPercent =
-                                if ($null -ne $PreviousCpu) {
-                                    [double]([Math]::Round([Math]::Max(0, (($CurrentCpu - $PreviousCpu) / $ElapsedSeconds) * 100 / $CoreCount), 1))
-                                } else {
-                                    [double]0
-                                }
-
-                            $Items.Add([pscustomobject]@{
-                                Name = $Process.ProcessName
-                                Id = $Process.Id
-                                CpuPercent = $CpuPercent
-                                MemoryMB = [Math]::Round([double]$Process.WorkingSet64 / 1MB, 1)
-                            })
-
-                            $Samples[$Process.Id] = $CurrentCpu
-                        }
-
-                        foreach ($SampledPid in @($Samples.Keys)) {
-                            if (-not ($CurrentProcesses.Id -contains $SampledPid)) {
-                                $Samples.Remove($SampledPid)
-                            }
-                        }
-
-                        return $CurrentSampleTime
-                    }
-
-                    $LastSampleTime = & $UpdateProcessItems $ProcessItems $CpuSamples $LastSampleTime $CpuCoreCount
                     $this.ItemsSource = $ProcessItems
 
-                    $Timer = [DispatcherTimer]::new()
-                    $Timer.Interval = [TimeSpan]::FromSeconds(3)
-                    $Timer.add_Tick({
-                        $TimerState = $this.Tag
-                        $TimerState.LastSampleTime = & $TimerState.UpdateProcessItems `
-                            $TimerState.Items `
-                            $TimerState.CpuSamples `
-                            $TimerState.LastSampleTime `
-                            $TimerState.CpuCoreCount
-                    })
-                    (Reference 'Window').Tag.ProcessUpdateTimer = $Timer
-                    $Timer.Tag = @{
+                    # Prime the grid immediately so it is populated before the first timed refresh.
+                    $InitialProcessData = Get-Process | ForEach-Object {
+                        @{
+                            Name = $_.ProcessName
+                            Id = $_.Id
+                            CpuTime = [double] $_.TotalProcessorTime.TotalSeconds
+                            Memory = $_.WorkingSet64
+                        }
+                    }
+
+                    foreach ($Process in $InitialProcessData) {
+                        $ProcessItems.Add([pscustomobject] @{
+                            Name = $Process.Name
+                            Id = $Process.Id
+                            CpuPercent = [double] 0
+                            MemoryMB = [Math]::Round([double] $Process.Memory / 1MB, 1)
+                        })
+
+                        $CpuSamples[$Process.Id] = [double] $Process.CpuTime
+                    }
+
+                    $LastSampleTime = Get-Date
+
+                    # Run background process sampling async to keep UI responsive
+                    TimedEvent 'ProcessRefresh' 3000 `
+                      -Work {
+                          # Background thread: expensive operation
+                          Get-Process | ForEach-Object {
+                              @{
+                                  Name = $_.ProcessName
+                                  Id = $_.Id
+                                  CpuTime = [double] $_.TotalProcessorTime.TotalSeconds
+                                  Memory = $_.WorkingSet64
+                              }
+                          }
+                      } `
+                      -OnComplete {
+                          param($ProcessData, $TimerSender)
+                          # UI thread: update controls with results
+                          if ($null -eq $ProcessData) { return }
+                          if ($null -eq $TimerSender) { return }
+
+                          $TimerState = $TimerSender.Tag
+                          if ($null -eq $TimerState) { return }
+
+                          $CurrentSampleTime = Get-Date
+                          $ElapsedSeconds = [Math]::Max(0.001, ($CurrentSampleTime - $TimerState.LastSampleTime).TotalSeconds)
+                          $CoreCount = $TimerState.CpuCoreCount
+                          $CpuSamples = $TimerState.CpuSamples
+                          $ProcessItems = $TimerState.Items
+
+                          # Preserve selection
+                          $ProcessList = Reference 'ProcessList'
+                          $SelectedProcess = $ProcessList.SelectedItem
+                          $SelectedProcessId = if ($null -ne $SelectedProcess) { $SelectedProcess.Id } else { $null }
+
+                          $ProcessItems.Clear()
+                          foreach ($Process in $ProcessData) {
+                              $CurrentCpu = [double] $Process.CpuTime
+                              $PreviousCpu = $null
+                              if ($CpuSamples.ContainsKey($Process.Id)) {
+                                  $PreviousCpu = [double] $CpuSamples[$Process.Id]
+                              }
+
+                              $CpuPercent = if ($null -ne $PreviousCpu) {
+                                  [double] ([Math]::Round([Math]::Max(0, (($CurrentCpu - $PreviousCpu) / $ElapsedSeconds) * 100 / $CoreCount), 1))
+                              } else {
+                                  [double] 0
+                              }
+
+                              $ProcessItems.Add([pscustomobject] @{
+                                  Name = $Process.Name
+                                  Id = $Process.Id
+                                  CpuPercent = $CpuPercent
+                                  MemoryMB = [Math]::Round([double] $Process.Memory / 1MB, 1)
+                              })
+
+                              $CpuSamples[$Process.Id] = $CurrentCpu
+                          }
+
+                          # Clean up old samples
+                          $ActiveProcessIds = $ProcessData | ForEach-Object { $_.Id }
+                          foreach ($SampledPid in @($CpuSamples.Keys)) {
+                              if (-not ($ActiveProcessIds -contains $SampledPid)) {
+                                  $CpuSamples.Remove($SampledPid)
+                              }
+                          }
+
+                          # Restore selection
+                          if ($null -ne $SelectedProcessId) {
+                              $ReselectedItem = $ProcessItems | Where-Object { $_.Id -eq $SelectedProcessId } | Select-Object -First 1
+                              if ($null -ne $ReselectedItem) {
+                                  $ProcessList.SelectedItem = $ReselectedItem
+                              }
+                          }
+
+                          $TimerState.LastSampleTime = $CurrentSampleTime
+                      }
+
+                    $ProcessRefreshTimer = Reference 'ProcessRefresh'
+                    $ProcessRefreshTimer.Tag = @{
                         Items = $ProcessItems
                         CpuSamples = $CpuSamples
                         CpuCoreCount = $CpuCoreCount
                         LastSampleTime = $LastSampleTime
-                        UpdateProcessItems = $UpdateProcessItems
                     }
-                    $Timer.Start()
 
-                    $this.AutoGenerateColumns = $false
-                    $this.CanUserSortColumns = $true
                     $this.Columns.Add([DataGridTextColumn] @{
                         Header  = 'Name'
                         Width   = [DataGridLength]::new(3, [DataGridLengthUnitType]::Star)
@@ -176,6 +224,35 @@ Window 'Window' {
                             }
                         })
                     })
+                }
+            }
+        }
+
+        Row {
+            Column 'Expand' {
+                DockPanel 'BottomBar' {
+                    Label "ProcessCountLabel" {
+                        $this.Content = "Processes: "
+                        $this.FontWeight = 'Bold'
+                    }
+                    TextBlock 'ProcessCount' {
+                        $this.Text = (Binding 'Items.Count' -Source (Reference 'ProcessList'))
+                    }
+                    Button 'StopProcessButton' {
+                        $this.Content = 'Stop Selected Process'
+                        $this.Margin = 10, 0, 0, 0
+                        Command 'StopProcessCommand' {
+                            param($sender, $event)
+                            $SelectedProcess = (Reference 'ProcessList').SelectedItem
+                            if ($null -ne $SelectedProcess) {
+                                try {
+                                    Stop-Process -Id $SelectedProcess.Id -ErrorAction Stop
+                                } catch {
+                                    [System.Windows.MessageBox]::Show("Failed to stop process: $_", "Error", [MessageBoxButton]::OK, [MessageBoxImage]::Error)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

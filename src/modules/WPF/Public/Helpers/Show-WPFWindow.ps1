@@ -63,6 +63,9 @@ function Show-WPFWindow {
             }
 
             $Window.Close()
+
+            # Dispose all tracked disposable objects and clear the registry
+            Clear-WPFControlRegistry
         }
     }
 }
