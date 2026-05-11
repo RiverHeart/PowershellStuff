@@ -68,6 +68,7 @@ Window 'Window' {
         Row 'Expand' {
             Column {
                 DataGrid 'ProcessList' {
+                    $this = [System.Windows.Controls.DataGrid] $this
                     $this.AutoGenerateColumns = $false
                     $this.CanUserSortColumns = $true
                     $this.IsReadOnly = $true
@@ -77,7 +78,6 @@ Window 'Window' {
                     $this.VerticalScrollBarVisibility = [ScrollBarVisibility]::Auto
                     $this.HorizontalScrollBarVisibility = [ScrollBarVisibility]::Auto
 
-                    $this = [System.Windows.Controls.DataGrid] $this
                     $ProcessItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
                     $CpuSamples = @{}
                     $CpuCoreCount = [Math]::Max(1, [int]$env:NUMBER_OF_PROCESSORS)
@@ -231,16 +231,24 @@ Window 'Window' {
         Row {
             Column 'Expand' {
                 DockPanel 'BottomBar' {
+                    $this = [System.Windows.Controls.DockPanel] $this
+                    $this.LastChildFill = $false
+                    $this.Margin = 8, 6
                     Label "ProcessCountLabel" {
                         $this.Content = "Processes: "
                         $this.FontWeight = 'Bold'
+                        $this.VerticalAlignment = 'Center'
+                        $this.Margin = 0, 0, 4, 0
                     }
                     TextBlock 'ProcessCount' {
-                        $this.Text = (Binding 'Items.Count' -Source (Reference 'ProcessList'))
+                        $this.VerticalAlignment = 'Center'
+                        $this.Margin = 0, 0, 12, 0
+                        Bind-Property Text ItemsSource.Count -Source (Reference 'ProcessList')
                     }
                     Button 'StopProcessButton' {
-                        $this.Content = 'Stop Selected Process'
-                        $this.Margin = 10, 0, 0, 0
+                        [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
+                        $this.Content = 'Stop Process'
+                        $this.Margin = 0
                         Command 'StopProcessCommand' {
                             param($sender, $event)
                             $SelectedProcess = (Reference 'ProcessList').SelectedItem

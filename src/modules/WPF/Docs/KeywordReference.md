@@ -330,6 +330,37 @@ Watch Visibility Window.Tag.IsFullScreen -Invert
 Watch IsEnabled Window.Tag.IsFileLoaded
 ```
 
+### Bind-Property
+
+Binds a dependency property to a binding path, source, or relative source.
+
+Use this to bind regular properties (like `TextBlock.Text`) to other control properties or observable sources.
+
+```powershell
+TextBlock 'ProcessCount' {
+    Bind-Property Text ItemsSource.Count -Source (Reference 'ProcessList')
+}
+```
+
+```powershell
+Rectangle 'Loading' {
+    Bind-Property Visibility IsLoading -Self
+}
+```
+
+With a value converter:
+
+```powershell
+Label 'Status' {
+    Bind-Property Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
+        $this.Converter = New-WPFValueConverter {
+            param($File)
+            if ($File) { "File: $($File.Name)" } else { 'No file' }
+        }
+    }
+}
+```
+
 ### Binding
 
 Creates a WPF Binding object for advanced scenarios like DataTrigger.
