@@ -25,10 +25,13 @@ Window 'Window' {
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.Width = 1000
     $this.Height = 700
-    $this.Tag = New-WPFObservableState @{
+
+    State @{
         # Add app state fields here.
         CurrentView = 'Home'
         IsDirty = $false
+        TotalCpuPercent = 0
+        TotalMemoryMB = 0
     }
 
     When Loaded {
@@ -38,18 +41,6 @@ Window 'Window' {
     When Closed {
         Write-Debug 'TaskManager window closed.'
     }
-
-    # Uncomment this block to add window-wide keyboard shortcuts.
-    # When KeyDown {
-    #     param($sender, $event)
-    #
-    #     switch ($event.Key) {
-    #         'Escape' {
-    #             (Reference 'Window').Close()
-    #             $event.Handled = $true
-    #         }
-    #     }
-    # }
 
     Grid 'Body' {
         Row {
@@ -75,8 +66,7 @@ Window 'Window' {
                     $this.CanUserAddRows = $false
                     $this.CanUserDeleteRows = $false
                     $this.CanUserResizeRows = $false
-                    $this.VerticalScrollBarVisibility = [ScrollBarVisibility]::Auto
-                    $this.HorizontalScrollBarVisibility = [ScrollBarVisibility]::Auto
+                    $this.ColumnHeaderHeight = 60
 
                     $ProcessItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
                     $CpuSamples = @{}
@@ -173,6 +163,15 @@ Window 'Window' {
                               }
                           }
 
+                          # Calculate totals
+                          $TotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
+                          $TotalMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+
+                          # Update window state with totals
+                          $Window = Reference 'Window'
+                          $Window.Tag.TotalCpuPercent = $TotalCpu
+                          $Window.Tag.TotalMemoryMB = $TotalMemory
+
                           # Restore selection
                           if ($null -ne $SelectedProcessId) {
                               $ReselectedItem = $ProcessItems | Where-Object { $_.Id -eq $SelectedProcessId } | Select-Object -First 1
@@ -202,7 +201,7 @@ Window 'Window' {
                         Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
                         Binding = [System.Windows.Data.Binding] 'Id'
                     })
-                    $this.Columns.Add([DataGridTextColumn] @{
+                    $cpuColumn = [DataGridTextColumn]@{
                         Header  = 'CPU'
                         Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
                         Binding = (Binding 'CpuPercent' -ScriptBlock {
@@ -212,8 +211,13 @@ Window 'Window' {
                                 return ('{0:N1}%' -f [double]$Value)
                             }
                         })
+                    }
+                    $cpuColumn.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalCpuPercent' -Label 'CPU' -ValueConverter {
+                        param($Value)
+                        if ($null -eq $Value) { '0.0%' } else { '{0:N1}%' -f [double]$Value }
                     })
-                    $this.Columns.Add([DataGridTextColumn] @{
+                    $this.Columns.Add($cpuColumn)
+                    $memoryColumn = [DataGridTextColumn]@{
                         Header  = 'Memory (MB)'
                         Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
                         Binding = (Binding 'MemoryMB' -ScriptBlock {
@@ -223,7 +227,12 @@ Window 'Window' {
                                 return ('{0:N1}' -f [double]$Value)
                             }
                         })
+                    }
+                    $memoryColumn.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalMemoryMB' -Label 'Memory (MB)' -ValueConverter {
+                        param($Value)
+                        if ($null -eq $Value) { '0.0' } else { '{0:N1}' -f [double]$Value }
                     })
+                    $this.Columns.Add($memoryColumn)
                 }
             }
         }
@@ -248,7 +257,7 @@ Window 'Window' {
                     Button 'StopProcessButton' {
                         [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
                         $this.Content = 'Stop Process'
-                        $this.Margin = 0
+                        $this.Margin = 0, 10, 10, 10
                         Command 'StopProcessCommand' {
                             param($sender, $event)
                             $SelectedProcess = (Reference 'ProcessList').SelectedItem
