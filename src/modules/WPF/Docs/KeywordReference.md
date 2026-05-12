@@ -321,6 +321,62 @@ TimedEvent 'RefreshData' 3000 `
 
 ## Binding and Resources
 
+### State
+
+Creates observable state for the current DSL parent, enabling reactive UI updates via bindings and callbacks.
+
+The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or watched via the `Watch` keyword.
+
+PowerShell-side callback hooks are also supported through `AddBinding()`, which fires when the underlying property changes.
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Count = 0
+        IsReady = $false
+        CurrentFile = $null
+    }
+
+    # Now use the state properties in bindings
+    TextBlock 'Counter' {
+        BindProperty Text Count -Self
+    }
+}
+```
+
+State properties are also accessible via `Window.Tag`:
+
+State can also be attached to other DSL parents that expose a writable `Tag` property, though the root `Window` is the typical place to keep app-level state.
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Count = 0
+    }
+
+    Button 'Increment' {
+        When Click {
+            $window = Reference 'Window'
+            $window.Tag.Count++
+        }
+    }
+}
+```
+
+Watch state changes with the `Watch` keyword:
+
+```powershell
+Window 'MyApp' {
+    State @{
+        IsLoading = $false
+    }
+
+    TextBlock 'Status' {
+        Watch Visibility Window.Tag.IsLoading -Invert
+    }
+}
+```
+
 ### Watch
 
 Binds a target property to an observable state path.
@@ -580,3 +636,4 @@ The keyword contract is intentionally simple:
 - Prefer $this for current-object configuration.
 
 If behavior changes are needed, update examples and tests in the same change.
+

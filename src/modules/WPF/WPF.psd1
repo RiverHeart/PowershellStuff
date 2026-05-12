@@ -127,6 +127,7 @@ FunctionsToExport = @(
     'Reference'
     'Resource'
     'Setter'
+    'State'
     'Style'
     'Theme'
     'Template'
