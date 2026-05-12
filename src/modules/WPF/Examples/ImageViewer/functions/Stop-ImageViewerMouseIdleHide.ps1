@@ -1,11 +1,22 @@
 function Stop-ImageViewerMouseIdleHide {
     [CmdletBinding()]
-    param()
+    param(
+        [System.Windows.Window] $Window
+    )
 
     Write-Debug "Stopping mouse idle hide."
 
-    $Window = Reference 'Window'
+    if ($null -eq $Window) {
+        $Window = Reference 'Window' -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $Window) {
+        return
+    }
+
     $State = $Window.Tag
+    if ($null -eq $State) {
+        return
+    }
 
     # Stop the timer
     if ($State.MouseIdleTimer) {

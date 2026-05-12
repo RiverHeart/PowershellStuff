@@ -1,9 +1,22 @@
 function Stop-ImageViewerSlideshow {
     [CmdletBinding()]
-    param()
+    param(
+        [System.Windows.Window] $Window
+    )
 
-    $Window = Reference 'Window'
+    Write-Debug "Stopping slideshow."
+
+    if ($null -eq $Window) {
+        $Window = Reference 'Window' -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $Window) {
+        return
+    }
+
     $State = $Window.Tag
+    if ($null -eq $State) {
+        return
+    }
 
     if ($State.SlideshowTimer) {
         $State.SlideshowTimer.Stop()

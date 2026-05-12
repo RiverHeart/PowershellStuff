@@ -45,6 +45,49 @@ Describe 'TimedEvent' {
         $Timer.Interval.TotalMilliseconds | Should -Be 60000
     }
 
+    It 'Should stop timers when their window closes' {
+        $Window = Window 'Window' {
+            TimedEvent 'ProcessRefresh' 60000 {
+                param($sender, $e)
+                $null = $sender
+                $null = $e
+            }
+        }
+
+        $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
+        $Timer = Reference 'ProcessRefresh' -ContextId $ContextId
+
+        $Timer.IsEnabled | Should -BeTrue
+
+        $Window.Close()
+
+        $Timer.IsEnabled | Should -BeFalse
+    }
+
+    It 'Should stop async timers when their window closes' {
+        $Window = Window 'Window' {
+            TimedEvent 'AsyncRefresh' 60000 `
+              -Work {
+                  Start-Sleep -Milliseconds 50
+                  'result'
+              } `
+              -OnComplete {
+                  param($Result, $TimerSender)
+                  $null = $Result
+                  $null = $TimerSender
+              }
+        }
+
+        $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
+        $Timer = Reference 'AsyncRefresh' -ContextId $ContextId
+
+        $Timer.IsEnabled | Should -BeTrue
+        $Window.Close()
+
+        $Timer.IsEnabled | Should -BeFalse
+        $Timer.Tag.IsRefreshing | Should -BeFalse
+    }
+
     It 'Should dispose registered IDisposable objects during registry clear and continue on failures' {
         $Good = [TestWPFDisposable]::new()
         $Bad = [TestWPFThrowingDisposable]::new()
