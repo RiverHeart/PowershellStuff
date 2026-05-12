@@ -26,18 +26,22 @@ function Invoke-ImageViewerCopyFeedback {
     if (-not $State.CopyFeedbackTimer) {
         $Timer = [System.Windows.Threading.DispatcherTimer]::new()
         $Timer.Interval = [TimeSpan]::FromMilliseconds(2000)
+        $TimerWindow = $Window
+        $TimerState = $State
 
         $null = $Timer.add_Tick({
             param($sender, $event)
 
             $sender.Stop()
 
-            $Window = Reference 'Window'
-            $State = $Window.Tag
-            $State.IsCopyFeedbackActive = $false
+            if (-not $TimerWindow.IsLoaded) {
+                return
+            }
+
+            $TimerState.IsCopyFeedbackActive = $false
 
             Invoke-ImageViewerUpdateStatus
-        })
+        }.GetNewClosure())
 
         $State.CopyFeedbackTimer = $Timer
     }

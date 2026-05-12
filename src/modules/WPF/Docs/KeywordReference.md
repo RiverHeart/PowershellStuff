@@ -184,6 +184,21 @@ DockPanel 'Layout' {
 }
 ```
 
+### DataGrid
+
+Creates a DataGrid. Use `$this.ItemsSource` to bind data and `$this.AutoGenerateColumns` to control column generation.
+
+```powershell
+DataGrid 'ProcessList' {
+    $this.AutoGenerateColumns = $false
+    $this.ItemsSource = Get-Process
+    $this.Columns.Add([System.Windows.Controls.DataGridTextColumn] @{
+        Header  = 'Name'
+        Binding = [System.Windows.Data.Binding] 'ProcessName'
+    })
+}
+```
+
 ### DatePicker
 
 Creates a DatePicker.
@@ -276,7 +291,91 @@ When Click {
 }
 ```
 
+### TimedEvent
+
+Creates and starts a DispatcherTimer, registers it by name for `Reference`, and ensures cleanup through window lifecycle registry clearing.
+
+TimedEvent requires an explicit interval in milliseconds.
+
+```powershell
+TimedEvent 'RefreshProcess' 3000 {
+    param($sender, $e)
+    # Periodic work
+}
+```
+
+```powershell
+# Async mode: run work in a background runspace and update UI on completion
+TimedEvent 'RefreshData' 3000 `
+  -Work {
+      Get-Process
+  } `
+  -OnComplete {
+      param($processes, $sender)
+      # $sender is the DispatcherTimer
+      # Update UI state here
+      $null = $processes
+      $null = $sender
+}
+```
+
 ## Binding and Resources
+
+### State
+
+Creates observable state for the current DSL parent, enabling reactive UI updates via bindings and callbacks.
+
+The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or watched via the `Watch` keyword.
+
+PowerShell-side callback hooks are also supported through `AddBinding()`, which fires when the underlying property changes.
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Count = 0
+        IsReady = $false
+        CurrentFile = $null
+    }
+
+    # Now use the state properties in bindings
+    TextBlock 'Counter' {
+        BindProperty Text Count -Self
+    }
+}
+```
+
+State properties are also accessible via `Window.Tag`:
+
+State can also be attached to other DSL parents that expose a writable `Tag` property, though the root `Window` is the typical place to keep app-level state.
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Count = 0
+    }
+
+    Button 'Increment' {
+        When Click {
+            $window = Reference 'Window'
+            $window.Tag.Count++
+        }
+    }
+}
+```
+
+Watch state changes with the `Watch` keyword:
+
+```powershell
+Window 'MyApp' {
+    State @{
+        IsLoading = $false
+    }
+
+    TextBlock 'Status' {
+        Watch Visibility Window.Tag.IsLoading -Invert
+    }
+}
+```
 
 ### Watch
 
@@ -285,6 +384,37 @@ Binds a target property to an observable state path.
 ```powershell
 Watch Visibility Window.Tag.IsFullScreen -Invert
 Watch IsEnabled Window.Tag.IsFileLoaded
+```
+
+### BindProperty
+
+Binds a dependency property to a binding path, source, or relative source.
+
+Use this to bind regular properties (like `TextBlock.Text`) to other control properties or observable sources.
+
+```powershell
+TextBlock 'ProcessCount' {
+    BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
+}
+```
+
+```powershell
+Rectangle 'Loading' {
+    BindProperty Visibility IsLoading -Self
+}
+```
+
+With a value converter:
+
+```powershell
+Label 'Status' {
+    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
+        $this.Converter = New-WPFValueConverter {
+            param($File)
+            if ($File) { "File: $($File.Name)" } else { 'No file' }
+        }
+    }
+}
 ```
 
 ### Binding
@@ -300,6 +430,19 @@ DataTrigger (Binding 'IsEnabled' -Self) $false {
 ```powershell
 DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
     Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+### ValueConverter
+
+Creates an `IValueConverter` from PowerShell scriptblocks for use with WPF bindings.
+
+```powershell
+Binding 'WorkingSet64' -ScriptBlock {
+    $this.Converter = New-WPFValueConverter {
+        param($Value)
+        [math]::Round($Value / 1MB, 2)
+    }
 }
 ```
 
@@ -493,3 +636,4 @@ The keyword contract is intentionally simple:
 - Prefer $this for current-object configuration.
 
 If behavior changes are needed, update examples and tests in the same change.
+

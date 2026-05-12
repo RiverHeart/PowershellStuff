@@ -7,9 +7,6 @@ Use the development log for dated progress entries and in-flight investigation n
 ## Backlog Candidates
 
 - Improve error handling so child object failures bubble up cleanly and produce a useful call stack.
-- Evaluate whether `$PSCmdlet.GetVariableValue('self')` can simplify parent/child attachment logic without breaking menu handling.
-- Give attached `ColumnDefinition` and `RowDefinition` objects stable generated names to improve debug output.
-- Rework grid row and column mapping so child placement uses actual grid coordinates rather than an index counter artifact.
 
 ## Design Notes
 

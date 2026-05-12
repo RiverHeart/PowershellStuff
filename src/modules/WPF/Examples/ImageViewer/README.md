@@ -20,6 +20,33 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Supports Dark/Light modes
 * Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
 
+## CLI Automation Flags
+
+`ImageViewer.DSL.ps1` supports optional script parameters for automation:
+
+* `-FilePath <string>`: Opens a file on startup.
+* `-SlideshowIntervalSeconds <double>`: Starts slideshow automatically at the specified interval.
+* `-AutoCloseSeconds <double>`: Closes the window automatically after the specified delay.
+* `-StartFullscreen`: Enters fullscreen mode on startup.
+* `-Smoke`: Convenience flag for unattended runs; defaults auto-close to 1 second when `-AutoCloseSeconds` is not provided.
+
+Example runs:
+
+```powershell
+# Open file, start slideshow at 2.5s, close after 10s
+.\ImageViewer.DSL.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2.5 -AutoCloseSeconds 10
+
+# Quick unattended smoke run
+.\ImageViewer.DSL.ps1 -Smoke
+```
+
+For repeatable automation, use the wrapper script:
+
+```powershell
+# Open a file, run slideshow at 2s, auto-close after 10s
+.\Invoke-ImageViewerSmoke.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2 -AutoCloseSeconds 10
+```
+
 ## TODO
 
 * Create zoom slider

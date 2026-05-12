@@ -200,6 +200,7 @@ New-WPFProject MyApp -Bare
 ## Documentation
 
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
+- [Autocomplete Guidance](./Docs/AutoComplete.md)
 - [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
 - [Documenting This DSL](./Docs/DocumentingTheDSL.md)
 - [Keyword Reference](./Docs/KeywordReference.md)
@@ -209,6 +210,7 @@ New-WPFProject MyApp -Bare
 - [Release Readiness Checklist](./Docs/ReleaseReadinessChecklist.md)
 - [Repository Migration Plan](./Docs/RepositoryMigrationPlan.md)
 - [Development Log](./Docs/DevLog/2026-05.md)
+- [Test Summary Runner Script](./Scripts/Invoke-WPFTestSummary.ps1)
 - [Examples](./Examples)
 
 ## Resources

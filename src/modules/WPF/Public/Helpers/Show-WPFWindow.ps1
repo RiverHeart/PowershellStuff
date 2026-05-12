@@ -62,7 +62,17 @@ function Show-WPFWindow {
                 $Window.Remove_ContentRendered($SmokeAutoCloseHandler)
             }
 
-            $Window.Close()
+            if ($Window.IsLoaded) {
+                $Window.Close()
+            }
+
+            # Only remove the shown window's context when it actually has one.
+            # Helper dialogs created outside the DSL are not registered and must
+            # not trigger active-context fallback removal.
+            $ContextId = Get-WPFControlContextId -InputObject $Window
+            if ($ContextId) {
+                Remove-WPFControlContext -ContextId $ContextId
+            }
         }
     }
 }

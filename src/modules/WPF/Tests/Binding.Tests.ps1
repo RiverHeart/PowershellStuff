@@ -23,4 +23,18 @@ Describe 'Binding' {
             Binding 'IsEnabled' -Self -TemplatedParent -ErrorAction Stop
         } | Should -Throw
     }
+
+    It 'Should allow setting Converter in Binding scriptblock' {
+        $binding = Binding 'WorkingSet64' -ScriptBlock {
+            $this.Converter = New-WPFValueConverter {
+                param($Value)
+                [math]::Round($Value / 1MB, 2)
+            }
+        }
+
+        $converted = $binding.Converter.Convert(1048576, [object], $null, [System.Globalization.CultureInfo]::InvariantCulture)
+
+        $binding.Converter | Should -BeOfType [System.Windows.Data.IValueConverter]
+        $converted | Should -Be 1
+    }
 }

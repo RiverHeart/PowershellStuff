@@ -81,6 +81,7 @@ FunctionsToExport = @(
     # Class Helpers
     'New-WPFFileNavigator'
     'New-WPFRelayCommand'
+    'New-WPFValueConverter'
 
     # Completers
     'Complete-WPFApplicationCommand'
@@ -95,6 +96,7 @@ FunctionsToExport = @(
     'Border'
     'ContentPresenter'
     'Button'
+    'DataGrid'
     'DatePicker'
     'DockPanel'
     'Image'
@@ -114,6 +116,7 @@ FunctionsToExport = @(
     # DSL/Helpers
     'Watch'
     'Binding'
+    'BindProperty'
     'BoundTo'
     'Brush'
     'DataTrigger'
@@ -124,9 +127,11 @@ FunctionsToExport = @(
     'Reference'
     'Resource'
     'Setter'
+    'State'
     'Style'
     'Theme'
     'Template'
+    'TimedEvent'
     'Trigger'
     'UseStyle'
     'Watch'
