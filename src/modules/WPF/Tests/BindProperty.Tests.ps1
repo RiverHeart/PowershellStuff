@@ -1,4 +1,4 @@
-Describe 'Bind-Property' {
+Describe 'BindProperty' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
@@ -16,7 +16,7 @@ Describe 'Bind-Property' {
         $Grid.ItemsSource.Add(@{ Name = 'Process2'; Id = 2 })
 
         # Bind TextBlock.Text to Grid.ItemsSource.Count
-        Bind-Property -InputObject $TextBlock -Property Text -Path ItemsSource.Count -Source $Grid
+        BindProperty -InputObject $TextBlock -Property Text -Path ItemsSource.Count -Source $Grid
 
         # TextBlock should have a binding set
         $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBlock, [System.Windows.Controls.TextBlock]::TextProperty)
@@ -30,7 +30,7 @@ Describe 'Bind-Property' {
         $Button.IsEnabled = $true
 
         # Bind Button.IsEnabled to itself (just as a test)
-        Bind-Property -InputObject $Button -Property IsEnabled -Path IsEnabled -Self
+        BindProperty -InputObject $Button -Property IsEnabled -Path IsEnabled -Self
 
         $binding = [System.Windows.Data.BindingOperations]::GetBinding($Button, [System.Windows.Controls.Button]::IsEnabledProperty)
         $binding | Should -Not -BeNullOrEmpty
@@ -41,7 +41,7 @@ Describe 'Bind-Property' {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
 
         {
-            Bind-Property -InputObject $TextBlock -Property Text -Path 'SomePath' -Self -TemplatedParent -ErrorAction Stop
+            BindProperty -InputObject $TextBlock -Property Text -Path 'SomePath' -Self -TemplatedParent -ErrorAction Stop
         } | Should -Throw
     }
 
@@ -49,7 +49,7 @@ Describe 'Bind-Property' {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
 
         {
-            Bind-Property -InputObject $TextBlock -Property Text -Path 'SomePath' -ErrorAction Stop
+            BindProperty -InputObject $TextBlock -Property Text -Path 'SomePath' -ErrorAction Stop
         } | Should -Throw
     }
 
@@ -60,7 +60,7 @@ Describe 'Bind-Property' {
         $converterApplied = $false
 
         # Bind with a converter
-        Bind-Property -InputObject $TextBlock -Property Text -Path ItemsSource.Count -Source $Grid -ScriptBlock {
+        BindProperty -InputObject $TextBlock -Property Text -Path ItemsSource.Count -Source $Grid -ScriptBlock {
             $this.Converter = New-WPFValueConverter {
                 param($Value)
                 $converterApplied = $true
@@ -77,7 +77,7 @@ Describe 'Bind-Property' {
         $DummySource = [pscustomobject]@{ Value = 42 }
 
         $TextBlockInstance = TextBlock 'TestText' {
-            Bind-Property Text Value -Source $DummySource
+            BindProperty Text Value -Source $DummySource
         }
 
         $BindingApplied = [System.Windows.Data.BindingOperations]::GetBinding(
@@ -93,7 +93,7 @@ Describe 'Bind-Property' {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
 
         {
-            Bind-Property -InputObject $TextBlock -Property 'NonExistentProperty' -Path 'SomePath' -Self -ErrorAction Stop
+            BindProperty -InputObject $TextBlock -Property 'NonExistentProperty' -Path 'SomePath' -Self -ErrorAction Stop
         } | Should -Throw
     }
 }

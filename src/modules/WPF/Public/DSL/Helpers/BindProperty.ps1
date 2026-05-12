@@ -39,19 +39,19 @@
 .EXAMPLE
     # Bind TextBlock.Text to DataGrid.ItemsSource.Count
     TextBlock 'ProcessCount' {
-        Bind-Property Text ItemsSource.Count -Source (Reference 'ProcessList')
+        BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
     }
 
 .EXAMPLE
     # Bind visibility relative to the target control itself
     Rectangle 'Loading' {
-        Bind-Property Visibility IsLoading -Self
+        BindProperty Visibility IsLoading -Self
     }
 
 .EXAMPLE
     # Configure the binding with a converter
     Label 'Status' {
-        Bind-Property Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
+        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
             $this.Converter = New-WPFValueConverter {
                 param($File)
                 if ($File) { "File: $($File.Name)" } else { 'No file' }
@@ -62,7 +62,7 @@
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.data.bindingoperations
 #>
-function Bind-Property {
+function BindProperty {
     [CmdletBinding()]
     [OutputType([void])]
     param(
@@ -96,11 +96,11 @@ function Bind-Property {
     )
 
     process {
-        Write-Verbose "Bind-Property: Binding '$Property' to '$Path'."
+        Write-Verbose "BindProperty: Binding '$Property' to '$Path'."
         $Target = if ($null -ne $InputObject) { $InputObject } else { $PSCmdlet.GetVariableValue('this') }
 
         if (-not $Target) {
-            Write-Error "Bind-Property: Unable to resolve target object. Use Bind-Property inside a DSL control block or pass -InputObject."
+            Write-Error "BindProperty: Unable to resolve target object. Use BindProperty inside a DSL control block or pass -InputObject."
             return
         }
 
@@ -112,12 +112,12 @@ function Bind-Property {
         if ($PSBoundParameters.ContainsKey('Source')) { $selectorCount++ }
 
         if ($selectorCount -gt 1) {
-            Write-Error 'Bind-Property: Specify at most one source selector from -Self, -TemplatedParent, -ElementName, or -Source.'
+            Write-Error 'BindProperty: Specify at most one source selector from -Self, -TemplatedParent, -ElementName, or -Source.'
             return
         }
 
         if ($selectorCount -eq 0) {
-            Write-Error 'Bind-Property: You must specify a source selector: -Self, -TemplatedParent, -ElementName, or -Source.'
+            Write-Error 'BindProperty: You must specify a source selector: -Self, -TemplatedParent, -ElementName, or -Source.'
             return
         }
 
@@ -126,7 +126,7 @@ function Bind-Property {
         $DepPropDescriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $TargetType, $TargetType)
 
         if (-not $DepPropDescriptor) {
-            Write-Error "Bind-Property: Property '$Property' is not a valid dependency property on type '$($TargetType.FullName)'."
+            Write-Error "BindProperty: Property '$Property' is not a valid dependency property on type '$($TargetType.FullName)'."
             return
         }
 
@@ -151,6 +151,6 @@ function Bind-Property {
 
         # Apply the binding using BindingOperations
         $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $DepPropDescriptor.DependencyProperty, $binding)
-        Write-Verbose "Bind-Property: Successfully bound '$Property' on $($TargetType.Name) to '$Path'."
+        Write-Verbose "BindProperty: Successfully bound '$Property' on $($TargetType.Name) to '$Path'."
     }
 }

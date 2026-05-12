@@ -116,7 +116,7 @@ FunctionsToExport = @(
     # DSL/Helpers
     'Watch'
     'Binding'
-    'Bind-Property'
+    'BindProperty'
     'BoundTo'
     'Brush'
     'DataTrigger'

@@ -243,7 +243,7 @@ Window 'Window' {
                     TextBlock 'ProcessCount' {
                         $this.VerticalAlignment = 'Center'
                         $this.Margin = 0, 0, 12, 0
-                        Bind-Property Text ItemsSource.Count -Source (Reference 'ProcessList')
+                        BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
                     }
                     Button 'StopProcessButton' {
                         [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
