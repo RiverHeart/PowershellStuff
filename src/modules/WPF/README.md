@@ -210,6 +210,7 @@ New-WPFProject MyApp -Bare
 - [Release Readiness Checklist](./Docs/ReleaseReadinessChecklist.md)
 - [Repository Migration Plan](./Docs/RepositoryMigrationPlan.md)
 - [Development Log](./Docs/DevLog/2026-05.md)
+- [Bulk Replacement Tool](./Scripts/Invoke-WPFBulkReplace.ps1)
 - [Test Summary Runner Script](./Scripts/Invoke-WPFTestSummary.ps1)
 - [Examples](./Examples)
 
