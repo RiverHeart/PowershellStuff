@@ -16,6 +16,10 @@ Describe 'State DataContext Binding' -Tag 'State' {
     }
 
     It 'Should expose DataContext for standard WPF bindings' {
+        InModuleScope WPF {
+            Mock Write-Warning {}
+        }
+
         $window = Window "TestWindow_$([guid]::NewGuid().ToString('N'))" {
             State @{ Count = 0 }
             $this.Content = [System.Windows.Controls.TextBlock]::new()
@@ -27,6 +31,10 @@ Describe 'State DataContext Binding' -Tag 'State' {
         $window.DataContext.Count = 99
         [System.Windows.Data.BindingOperations]::GetBindingExpression($window.Content, [System.Windows.Controls.TextBlock]::TextProperty).UpdateTarget()
         $window.Content.Text | Should -Be '99'
+
+        InModuleScope WPF {
+            Should -Invoke Write-Warning -Times 0 -Exactly
+        }
     }
 
     It 'Should keep Tag and DataContext synchronized for backward compatibility' {
@@ -39,5 +47,21 @@ Describe 'State DataContext Binding' -Tag 'State' {
 
         $window.DataContext.Value = 'uvw'
         $window.Tag.Value | Should -Be 'uvw'
+    }
+
+    It 'Should set DataContext on non-window DSL parents when available' {
+        $buttonName = "Button_$([guid]::NewGuid().ToString('N'))"
+
+        $window = Window "TestWindow_$([guid]::NewGuid().ToString('N'))" {
+            Button $buttonName {
+                State @{ Clicks = 5 }
+            }
+        }
+
+        $button = Reference $buttonName
+
+        $button.Tag | Should -Not -BeNullOrEmpty
+        $button.DataContext | Should -Be $button.Tag
+        $button.DataContext.Clicks | Should -Be 5
     }
 }
