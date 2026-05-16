@@ -1,4 +1,4 @@
-Describe 'Theme' {
+Describe 'Theme' -Tag 'Theme' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

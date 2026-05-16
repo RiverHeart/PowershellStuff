@@ -1,4 +1,4 @@
-Describe 'Show-WPFWindow' {
+Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
         $script:OriginalSmokeValue = [Environment]::GetEnvironmentVariable('WPF_SMOKE_TEST')

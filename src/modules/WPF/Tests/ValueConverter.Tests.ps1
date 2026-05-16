@@ -1,4 +1,4 @@
-Describe 'ValueConverter' {
+Describe 'ValueConverter' -Tag 'ValueConverter' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

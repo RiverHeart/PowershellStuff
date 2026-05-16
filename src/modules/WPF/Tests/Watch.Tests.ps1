@@ -1,4 +1,4 @@
-Describe 'Watch' {
+Describe 'Watch' -Tag 'Watch' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

@@ -1,4 +1,4 @@
-Describe 'Button' {
+Describe 'Button' -Tag 'Button' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

@@ -1,4 +1,4 @@
-Describe 'ScrollViewer' {
+Describe 'ScrollViewer' -Tag 'ScrollViewer' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

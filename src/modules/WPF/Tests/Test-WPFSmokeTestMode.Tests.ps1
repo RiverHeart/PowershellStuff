@@ -1,4 +1,4 @@
-Describe 'Test-WPFSmokeTestMode' {
+Describe 'Test-WPFSmokeTestMode' -Tag 'Test-WPFSmokeTestMode' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
         $script:OriginalSmokeValue = [Environment]::GetEnvironmentVariable('WPF_SMOKE_TEST')

@@ -1,4 +1,4 @@
-Describe 'RelayCommand' {
+Describe 'RelayCommand' -Tag 'RelayCommand' {
     It 'Should compile in Windows PowerShell 5.1' {
         $PowerShellExe = Get-Command -Name 'powershell.exe' -ErrorAction SilentlyContinue
         $PowerShellExe | Should -Not -BeNullOrEmpty

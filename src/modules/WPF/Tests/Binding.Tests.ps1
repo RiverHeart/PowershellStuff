@@ -1,4 +1,4 @@
-Describe 'Binding' {
+Describe 'Binding' -Tag 'Binding' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

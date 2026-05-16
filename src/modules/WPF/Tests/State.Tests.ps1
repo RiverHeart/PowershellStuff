@@ -2,7 +2,7 @@ BeforeAll {
     Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force -ErrorAction Stop
 }
 
-Describe 'State' {
+Describe 'State' -Tag 'State' {
     It 'Should create observable state via New-WPFObservableState' {
         $result = New-WPFObservableState @{
             Count = 0

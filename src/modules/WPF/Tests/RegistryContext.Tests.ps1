@@ -1,4 +1,4 @@
-Describe 'Registry Context' {
+Describe 'Registry Context' -Tag 'RegistryContext' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

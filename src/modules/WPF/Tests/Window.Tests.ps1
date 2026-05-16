@@ -1,4 +1,4 @@
-Describe 'Window' {
+Describe 'Window' -Tag 'Window' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF" -Force
     }

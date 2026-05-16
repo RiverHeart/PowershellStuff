@@ -1,4 +1,4 @@
-Describe 'BindProperty' {
+Describe 'BindProperty' -Tag 'BindProperty' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

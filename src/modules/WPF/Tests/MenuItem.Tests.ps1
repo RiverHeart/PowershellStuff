@@ -1,4 +1,4 @@
-Describe 'MenuItem' {
+Describe 'MenuItem' -Tag 'MenuItem' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
