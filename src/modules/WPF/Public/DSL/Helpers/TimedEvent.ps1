@@ -156,7 +156,8 @@ function TimedEvent {
                         $null = $PendingPowerShell.EndInvoke($PendingResult)
                         $WorkResult = @()
                         if ($null -ne $PendingOutput) {
-                            $WorkResult = @($PendingOutput)
+                            # Materialize pipeline output items, not the output buffer object itself.
+                            $WorkResult = @($PendingOutput | ForEach-Object { $_ })
                         }
 
                         $ErrorRecords = @()

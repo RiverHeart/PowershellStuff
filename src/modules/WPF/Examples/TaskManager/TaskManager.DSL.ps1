@@ -43,6 +43,7 @@ Window 'Window' {
     }
 
     Grid 'Body' {
+        # MARK: MENU
         Row {
             Column 'Expand' {
                 MenuBar 'Menu' {
@@ -56,6 +57,7 @@ Window 'Window' {
             }
         }
 
+        # MARK: PROCESS LIST
         Row 'Expand' {
             Column {
                 DataGrid 'ProcessList' {
@@ -237,6 +239,7 @@ Window 'Window' {
             }
         }
 
+        # MARK: BOTTOM BAR
         Row {
             Column 'Expand' {
                 DockPanel 'BottomBar' {

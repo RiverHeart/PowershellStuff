@@ -297,6 +297,11 @@ Creates and starts a DispatcherTimer, registers it by name for `Reference`, and 
 
 TimedEvent requires an explicit interval in milliseconds.
 
+In async mode, `-OnComplete` receives two parameters:
+
+- `Result`: array of objects emitted by `-Work`
+- `Sender`: the DispatcherTimer instance
+
 ```powershell
 TimedEvent 'RefreshProcess' 3000 {
     param($sender, $e)

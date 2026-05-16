@@ -3,7 +3,7 @@
     Creates a data template for a DataGrid column header with a total value and label.
 
 .DESCRIPTION
-    Builds a DataTemplate containing a StackPanel with two centered TextBlocks:
+    Builds a DataTemplate containing a StackPanel with two right-aligned TextBlocks:
     - A bold, larger total value bound to a source property
     - A gray, smaller label below it
 
@@ -43,13 +43,14 @@ function New-ColumnHeaderTemplate {
     # Build the entire tree using FrameworkElementFactory
     # Create the StackPanel factory
     $panelFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.StackPanel])
-    $panelFactory.SetValue([System.Windows.Controls.StackPanel]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Center)
+    $panelFactory.SetValue([System.Windows.Controls.StackPanel]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Right)
 
     # Create the total value TextBlock factory
     $totalBlockFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.TextBlock])
     $totalBlockFactory.SetValue([System.Windows.Controls.TextBlock]::FontWeightProperty, [System.Windows.FontWeights]::Bold)
     $totalBlockFactory.SetValue([System.Windows.Controls.TextBlock]::FontSizeProperty, [double]14)
-    $totalBlockFactory.SetValue([System.Windows.Controls.TextBlock]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Center)
+    $totalBlockFactory.SetValue([System.Windows.Controls.TextBlock]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Right)
+    $totalBlockFactory.SetValue([System.Windows.Controls.TextBlock]::TextAlignmentProperty, [System.Windows.TextAlignment]::Right)
 
     # Create and set the binding on the factory
     # Bind to Window.Tag.<PropertyPath> to access observable state
@@ -68,7 +69,8 @@ function New-ColumnHeaderTemplate {
     $labelBlockFactory.SetValue([System.Windows.Controls.TextBlock]::TextProperty, $Label)
     $labelBlockFactory.SetValue([System.Windows.Controls.TextBlock]::FontSizeProperty, [double]10)
     $labelBlockFactory.SetValue([System.Windows.Controls.TextBlock]::ForegroundProperty, [System.Windows.Media.Brushes]::Gray)
-    $labelBlockFactory.SetValue([System.Windows.Controls.TextBlock]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Center)
+    $labelBlockFactory.SetValue([System.Windows.Controls.TextBlock]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Right)
+    $labelBlockFactory.SetValue([System.Windows.Controls.TextBlock]::TextAlignmentProperty, [System.Windows.TextAlignment]::Right)
     $panelFactory.AppendChild($labelBlockFactory)
 
     # Create and return the DataTemplate

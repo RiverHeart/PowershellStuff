@@ -205,4 +205,53 @@ Describe 'TimedEvent' {
             $Window.Close()
         }
     }
+
+    It 'Should pass emitted Work items to OnComplete in async mode' {
+        $Window = Window 'Window' {
+            $this.Width = 120
+            $this.Height = 80
+            $this.ShowInTaskbar = $false
+            $this.Tag = @{
+                ItemCount = 0
+                FirstName = $null
+            }
+
+            TimedEvent 'AsyncResultShape' 100 `
+              -Work {
+                  [pscustomobject]@{ Name = 'Alpha' }
+                  [pscustomobject]@{ Name = 'Beta' }
+              } `
+              -OnComplete {
+                  param($Result, $TimerSender)
+                  $Items = @($Result)
+                  $WindowRef = Reference 'Window'
+                  $WindowRef.Tag.ItemCount = $Items.Count
+                  $WindowRef.Tag.FirstName = if ($Items.Count -gt 0) { $Items[0].Name } else { $null }
+                  $TimerSender.Stop()
+              }
+        }
+
+        # Run a short dispatcher frame to allow timer tick and async completion.
+        $Frame = [System.Windows.Threading.DispatcherFrame]::new()
+        $Stopper = [System.Windows.Threading.DispatcherTimer]::new()
+        $Stopper.Interval = [System.TimeSpan]::FromMilliseconds(900)
+        $Stopper.add_Tick({
+            param($sender, $e)
+            $null = $e
+            $sender.Stop()
+            $Frame.Continue = $false
+        })
+
+        try {
+            $Window.Show()
+            $Stopper.Start()
+            [System.Windows.Threading.Dispatcher]::PushFrame($Frame)
+
+            $Window.Tag.ItemCount | Should -Be 2
+            $Window.Tag.FirstName | Should -Be 'Alpha'
+        } finally {
+            $Stopper.Stop()
+            $Window.Close()
+        }
+    }
 }
