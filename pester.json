@@ -1,0 +1,9 @@
+{
+  "isRoot": true,
+  "TestSuites": [
+    {
+      "Name": "WPF",
+      "ConfigPath": "src/modules/WPF/Tests/pester.json"
+    }
+  ]
+}
