@@ -24,7 +24,7 @@ Prefer custom tooling over 3rd party tools unless they are industry standards su
 Comment-based help is written above the function declaration. In function param blocks, parameter attributes are placed above each parameter, and the type and variable stay on the same line.
 
 **Coding preferences:**
-Keep examples minimal and executable on Windows PowerShell/PowerShell 7 unless the user specifies otherwise. Preserve existing project style where possible.
+Keep examples minimal and executable on Windows PowerShell/PowerShell 7 unless the user specifies otherwise. Preserve existing project style where possible. Use comments to explain why, not what, for non-obvious code.
 
 **Operational guidelines:**
 - Use VSCode for reading and editing code in this repository.
