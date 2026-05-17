@@ -74,7 +74,7 @@ function Update-WPFObject {
                 Set-WPFObjectSpec -InputObject $InputObject -Name 'Command' -Value $Child | Out-Null
             }
             # Control
-            elseif (Test-WPFType $Child @('Control', 'GridDefinition')) {
+            elseif (Test-WPFType $Child @('Control', 'GridDefinition', 'DataGridColumn')) {
                 # NOTE: Most controls are auto-attaching to their parents during
                 # creation so their parent is available to their children before
                 # recursing through their scriptblock but for objects being created

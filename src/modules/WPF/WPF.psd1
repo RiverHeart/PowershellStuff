@@ -97,6 +97,7 @@ FunctionsToExport = @(
     'ContentPresenter'
     'Button'
     'DataGrid'
+    'DataGridTextColumn'
     'DatePicker'
     'DockPanel'
     'Image'

@@ -37,6 +37,14 @@ function Add-WPFObject {
             $InputObject.VisualTree = $Child
             continue
         }
+        elseif (
+            $InputObject -is [System.Windows.Controls.DataGrid] -and
+            $Child -is [System.Windows.Controls.DataGridColumn]
+        ) {
+            Write-Debug "Adding DataGridColumn '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
+            $InputObject.Columns.Add($Child)
+            continue
+        }
         # Special handling for adding GridDefinitions to Grid.
         # GridDefinitions given `AddChild()` methods so they behave
         # the same as controls.

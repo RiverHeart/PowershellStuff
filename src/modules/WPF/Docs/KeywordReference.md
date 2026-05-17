@@ -209,6 +209,25 @@ DataGrid 'ProcessList' {
 }
 ```
 
+### DataGridTextColumn
+
+Creates a DataGridTextColumn and auto-attaches it when declared inside a `DataGrid` block.
+
+The second argument can be either a binding path string or a pre-built `Binding` object.
+
+```powershell
+DataGrid 'ProcessList' {
+    DataGridTextColumn 'Name' 'ProcessName' {
+        $this.Width = [System.Windows.Controls.DataGridLength]::new(3, [System.Windows.Controls.DataGridLengthUnitType]::Star)
+    }
+
+    DataGridTextColumn 'CPU' (Binding 'CpuPercent') {
+        UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
+        UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+    }
+}
+```
+
 ### DatePicker
 
 Creates a DatePicker.
@@ -578,6 +597,13 @@ Applies a named style to the current object.
 
 ```powershell
 UseStyle 'PrimaryButton'
+```
+
+`UseStyle` also supports applying styles to `DataGridTextColumn` style slots:
+
+```powershell
+UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
+UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
 ```
 
 ## Lookup and Composition Helpers

@@ -223,53 +223,45 @@ Window 'Window' {
                         LastSampleTime = $LastSampleTime
                     }
 
-                    $this.Columns.Add([DataGridTextColumn] @{
-                        Header  = 'Name'
-                        Width   = [DataGridLength]::new(3, [DataGridLengthUnitType]::Star)
-                        Binding = [System.Windows.Data.Binding] 'Name'
-                    })
-                    $this.Columns.Add([DataGridTextColumn] @{
-                        Header  = 'ID'
-                        Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
-                        Binding = [System.Windows.Data.Binding] 'Id'
-                    })
-                    $cpuColumn = [DataGridTextColumn]@{
-                        Header  = 'CPU'
-                        Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
-                        Binding = (Binding 'CpuPercent' -ScriptBlock {
-                            $this.Converter = New-WPFValueConverter {
-                                param($Value)
-                                if ($null -eq $Value) { return '' }
-                                return ('{0:N1}%' -f [double]$Value)
-                            }
-                        })
+                    DataGridTextColumn 'Name' 'Name' {
+                        $this.Width = [DataGridLength]::new(3, [DataGridLengthUnitType]::Star)
                     }
-                    UseStyle 'RightAlignedDataGridHeader' $cpuColumn -TargetType HeaderStyle
-                    UseStyle 'RightAlignedDataGridCell' $cpuColumn -TargetType ElementStyle
-                    $cpuColumn.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalCpuPercent' -Label 'CPU' -ValueConverter {
-                        param($Value)
-                        if ($null -eq $Value) { '0.0%' } else { '{0:N1}%' -f [double]$Value }
-                    })
-                    $this.Columns.Add($cpuColumn)
 
-                    $memoryColumn = [DataGridTextColumn]@{
-                        Header  = 'Memory (MB)'
-                        Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
-                        Binding = (Binding 'MemoryMB' -ScriptBlock {
-                            $this.Converter = New-WPFValueConverter {
-                                param($Value)
-                                if ($null -eq $Value) { return '' }
-                                return ('{0:N1}' -f [double]$Value)
-                            }
+                    DataGridTextColumn 'ID' 'Id' {
+                        $this.Width = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
+                    }
+
+                    DataGridTextColumn 'CPU' (Binding 'CpuPercent' -ScriptBlock {
+                        $this.Converter = New-WPFValueConverter {
+                            param($Value)
+                            if ($null -eq $Value) { return '' }
+                            return ('{0:N1}%' -f [double]$Value)
+                        }
+                    }) {
+                        $this.Width = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
+                        UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
+                        UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+                        $this.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalCpuPercent' -Label 'CPU' -ValueConverter {
+                            param($Value)
+                            if ($null -eq $Value) { '0.0%' } else { '{0:N1}%' -f [double]$Value }
                         })
                     }
-                    UseStyle 'RightAlignedDataGridHeader' $memoryColumn -TargetType HeaderStyle
-                    UseStyle 'RightAlignedDataGridCell' $memoryColumn -TargetType ElementStyle
-                    $memoryColumn.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalMemoryMB' -Label 'Memory (MB)' -ValueConverter {
-                        param($Value)
-                        if ($null -eq $Value) { '0.0' } else { '{0:N1}' -f [double]$Value }
-                    })
-                    $this.Columns.Add($memoryColumn)
+
+                    DataGridTextColumn 'Memory (MB)' (Binding 'MemoryMB' -ScriptBlock {
+                        $this.Converter = New-WPFValueConverter {
+                            param($Value)
+                            if ($null -eq $Value) { return '' }
+                            return ('{0:N1}' -f [double]$Value)
+                        }
+                    }) {
+                        $this.Width = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
+                        UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
+                        UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+                        $this.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalMemoryMB' -Label 'Memory (MB)' -ValueConverter {
+                            param($Value)
+                            if ($null -eq $Value) { '0.0' } else { '{0:N1}' -f [double]$Value }
+                        })
+                    }
 
                     $Window = Reference 'Window'
                     $WindowState = if ($null -ne $Window.DataContext) {
