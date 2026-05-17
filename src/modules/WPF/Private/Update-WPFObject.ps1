@@ -40,6 +40,8 @@ function Update-WPFObject {
     $PSVars = New-WPFVariableList -InputObject $InputObject
     $strictUnexpectedChild = Test-WPFStrictUnexpectedChildMode
 
+    Write-Debug "Updating WPF object '$thisName' ($thisType)"
+
     try {
         if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
             $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
@@ -103,6 +105,8 @@ function Update-WPFObject {
         }
 
         Update-WPFObjectSpec -InputObject $InputObject
+
+        Write-Debug "Finished updating '$thisName' ($thisType)"
     } catch {
         if ($strictUnexpectedChild) {
             throw

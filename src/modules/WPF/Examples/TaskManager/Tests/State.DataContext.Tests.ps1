@@ -2,7 +2,8 @@
 
 Describe 'State keyword DataContext integration' {
     BeforeAll {
-        Import-Module -Name "$PSScriptRoot/../../WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../WPF.psd1" -Force
+        . "$PSScriptRoot/../functions/New-ColumnHeaderTemplate.ps1"
     }
 
     It 'Should set DataContext and Tag to the same observable state object on Window' {
@@ -34,5 +35,19 @@ Describe 'State keyword DataContext integration' {
             State @{ OldWay = 'still works' }
         }
         $window.Tag.OldWay | Should -Be 'still works'
+    }
+
+    It 'Should bind column header totals through Window.DataContext' {
+        $template = New-ColumnHeaderTemplate -TotalPropertyPath 'TotalCpuPercent' -Label 'CPU'
+        $template.Seal()
+        $root = $template.LoadContent()
+        $totalBlock = $root.Children[0]
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($totalBlock, [System.Windows.Controls.TextBlock]::TextProperty)
+
+        $binding | Should -Not -BeNullOrEmpty
+        $binding.Path.Path | Should -Be 'DataContext.TotalCpuPercent'
+        $binding.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::FindAncestor)
+        $binding.RelativeSource.AncestorType | Should -Be ([System.Windows.Window])
     }
 }

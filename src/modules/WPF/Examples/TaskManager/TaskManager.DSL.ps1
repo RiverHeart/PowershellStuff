@@ -36,6 +36,7 @@ Window 'Window' {
 
     When Loaded {
         Write-Debug 'TaskManager loaded.'
+        Invoke-TaskManagerRefreshHeaderBindings -DataGrid (Reference 'ProcessList')
     }
 
     When Closed {
@@ -97,6 +98,24 @@ Window 'Window' {
 
                         $CpuSamples[$Process.Id] = [double] $Process.CpuTime
                     }
+
+                    $InitialTotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
+                    $InitialTotalMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+
+                    $Window = Reference 'Window'
+                    $WindowState = if ($null -ne $Window.DataContext) {
+                        Write-Debug 'TaskManager initial totals update target: Window.DataContext'
+                        $Window.DataContext
+                    } else {
+                        Write-Debug 'TaskManager initial totals update target: Window.Tag (DataContext unavailable)'
+                        $Window.Tag
+                    }
+
+                    $WindowState.TotalCpuPercent = $InitialTotalCpu
+                    $WindowState.TotalMemoryMB = $InitialTotalMemory
+                    Write-Debug ("TaskManager initial totals set: CPU={0:N1}%, Memory={1:N1}MB" -f [double]$InitialTotalCpu, [double]$InitialTotalMemory)
+
+                    Invoke-TaskManagerRefreshHeaderBindings -DataGrid $this
 
                     $LastSampleTime = Get-Date
 
@@ -171,8 +190,19 @@ Window 'Window' {
 
                           # Update window state with totals
                           $Window = Reference 'Window'
-                          $Window.Tag.TotalCpuPercent = $TotalCpu
-                          $Window.Tag.TotalMemoryMB = $TotalMemory
+                          $WindowState = if ($null -ne $Window.DataContext) {
+                              Write-Debug 'TaskManager totals update target: Window.DataContext'
+                              $Window.DataContext
+                          } else {
+                              Write-Debug 'TaskManager totals update target: Window.Tag (DataContext unavailable)'
+                              $Window.Tag
+                          }
+
+                          $WindowState.TotalCpuPercent = $TotalCpu
+                          $WindowState.TotalMemoryMB = $TotalMemory
+                          Write-Debug ("TaskManager totals updated: CPU={0:N1}%, Memory={1:N1}MB, Items={2}" -f [double]$TotalCpu, [double]$TotalMemory, $ProcessItems.Count)
+
+                          Invoke-TaskManagerRefreshHeaderBindings -DataGrid $ProcessList
 
                           # Restore selection
                           if ($null -ne $SelectedProcessId) {
@@ -235,6 +265,27 @@ Window 'Window' {
                         if ($null -eq $Value) { '0.0' } else { '{0:N1}' -f [double]$Value }
                     })
                     $this.Columns.Add($memoryColumn)
+
+                    $Window = Reference 'Window'
+                    $WindowState = if ($null -ne $Window.DataContext) {
+                        $Window.DataContext
+                    } else {
+                        $Window.Tag
+                    }
+
+                    if ($null -ne $WindowState.PSObject.Methods['AddBinding']) {
+                        $WindowState.AddBinding('TotalCpuPercent', {
+                                param($Value)
+                                Write-Debug ("TaskManager TotalCpuPercent changed: {0}" -f $Value)
+                                Invoke-TaskManagerRefreshHeaderBindings -DataGrid (Reference 'ProcessList')
+                            }, $false)
+
+                        $WindowState.AddBinding('TotalMemoryMB', {
+                                param($Value)
+                                Write-Debug ("TaskManager TotalMemoryMB changed: {0}" -f $Value)
+                                Invoke-TaskManagerRefreshHeaderBindings -DataGrid (Reference 'ProcessList')
+                            }, $false)
+                    }
                 }
             }
         }
