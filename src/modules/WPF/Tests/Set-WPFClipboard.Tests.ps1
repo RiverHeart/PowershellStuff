@@ -1,4 +1,4 @@
-Describe 'Set-WPFClipboard' {
+Describe 'Set-WPFClipboard' -Tag 'Set-WPFClipboard' {
     BeforeAll {
         Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force

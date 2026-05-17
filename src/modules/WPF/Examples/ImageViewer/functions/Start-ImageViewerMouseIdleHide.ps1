@@ -11,15 +11,21 @@ function Start-ImageViewerMouseIdleHide {
     if (-not $State.MouseIdleTimer) {
         $Timer = [System.Windows.Threading.DispatcherTimer]::new()
         $Timer.Interval = [TimeSpan]::FromSeconds(3)
+        $TimerWindow = $Window
         $Timer.add_Tick({
-            $Window = (Reference 'Window')
-            $Window.Cursor = [Cursors]::None
+            if (-not $TimerWindow.IsLoaded) {
+                $this.Stop()
+                return
+            }
+
+            $TimerWindow.Cursor = [Cursors]::None
             $this.Stop()
-        })
+        }.GetNewClosure())
         $State.MouseIdleTimer = $Timer
     }
 
     # Define the MouseMove event handler
+    $MouseMoveWindow = $Window
     $MouseMoveHandler = {
         param($sender, $event)
 
@@ -28,9 +34,10 @@ function Start-ImageViewerMouseIdleHide {
         $sender.Tag.MouseIdleTimer.Start()
 
         # Restore the cursor
-        $Window = (Reference 'Window')
-        $Window.Cursor = [Cursors]::Arrow
-    }
+        if ($MouseMoveWindow.IsLoaded) {
+            $MouseMoveWindow.Cursor = [Cursors]::Arrow
+        }
+    }.GetNewClosure()
 
     # Store the handler reference for later removal
     $State.MouseMoveHandler = $MouseMoveHandler

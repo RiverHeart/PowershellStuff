@@ -1,4 +1,4 @@
-Describe 'TextBox' {
+Describe 'TextBox' -Tag 'TextBox' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

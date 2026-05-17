@@ -17,6 +17,22 @@ using namespace System.Windows.Threading
     them using the forward/back buttons. Loops around from front to back and
     vice versa.
 #>
+param (
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string] $FilePath,
+
+    [Parameter()]
+    [ValidateRange(0.5, 600)]
+    [double] $SlideshowIntervalSeconds,
+
+    [Parameter()]
+    [ValidateRange(0, 600)]
+    [double] $AutoCloseSeconds,
+
+    [Parameter()]
+    [switch] $StartFullscreen
+)
 
 # Change to the script directory if we're not in it.
 if ($PSScriptRoot -and $PWD -ne $PSScriptRoot) {
@@ -41,7 +57,7 @@ Window 'Window' {
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.AllowDrop = $true
     $this.WindowState = [WindowState]::Maximized
-    $this.Tag = New-WPFObservableState @{
+    State @{
         # Viewer State
         IsFullScreen   = $false
         IsFileLoaded   = $false
@@ -69,6 +85,7 @@ Window 'Window' {
 
         # Command References
         SaveAsCommand  = $null
+        SlideshowCommand = $null
 
         # Misc State
         MouseIdleTimer = $null
@@ -132,8 +149,8 @@ Window 'Window' {
     }
 
     When Closing {
-        Stop-ImageViewerSlideshow
-        Stop-ImageViewerMouseIdleHide
+        Stop-ImageViewerSlideshow -Window $this
+        Stop-ImageViewerMouseIdleHide -Window $this
     }
 
     When DragOver {
@@ -165,6 +182,24 @@ Window 'Window' {
 
     When 'Loaded' {
         Invoke-ImageViewerUpdateStatus
+
+        if ($FilePath) {
+            try {
+                $ResolvedFilePath = (Resolve-Path -LiteralPath $FilePath -ErrorAction Stop).Path
+                Invoke-ImageViewerLoadFile -FileName $ResolvedFilePath
+            } catch {
+                Write-Warning "Failed to resolve initial file path '$FilePath': $_"
+            }
+        }
+
+        if ($StartFullscreen -and -not $this.Tag.IsFullScreen) {
+            Set-WPFWindowFullScreen -IsFullScreen $true
+        }
+
+        if ($PSBoundParameters.ContainsKey('SlideshowIntervalSeconds')) {
+            Start-ImageViewerSlideshow -IntervalSeconds $SlideshowIntervalSeconds
+        }
+
     }
 
     Grid "Body" {
@@ -296,6 +331,9 @@ Window 'Window' {
                                 [bool] (Reference 'Window').Tag.IsFileLoaded
                             }
                         }
+
+                        # RelayCommand does not auto-requery in this module.
+                        (Reference 'Window').Tag.SlideshowCommand = $this.Command
                     }
 
                     MenuItem '(V)iew/Image Fit to (W)indow' {

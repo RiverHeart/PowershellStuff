@@ -42,6 +42,7 @@ function Window {
         }
         Set-WPFControlContext -InputObject $Window -ContextId $ContextId
         Register-WPFObject -Name $Name -InputObject $Window -ContextId $ContextId -Overwrite
+        $Window.Resources['WPFDialogCloseReason'] = 'User'
 
         $Window.Add_Closed({
             param($Sender, $Args)
@@ -59,6 +60,90 @@ function Window {
 
     # Window is always root; do not auto-attach to parent
     # Use the Owner property to establish ownership relationships
+
+    $ShouldAutoClose = $false
+    $EffectiveAutoCloseSeconds = 0.0
+    $CallerBoundParameters = $PSCmdlet.GetVariableValue('PSBoundParameters', $null)
+    $CallerAutoCloseSeconds = $PSCmdlet.GetVariableValue('AutoCloseSeconds', $null)
+
+    # Prefer explicit caller AutoCloseSeconds. Fallback to WPF_AUTO_CLOSE_SECONDS.
+    if ($CallerBoundParameters -and
+        ($CallerBoundParameters -is [System.Collections.IDictionary]) -and
+        $CallerBoundParameters.ContainsKey('AutoCloseSeconds')
+    ) {
+        $ShouldAutoClose = $true
+        $EffectiveAutoCloseSeconds = [double] $CallerAutoCloseSeconds
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:WPF_AUTO_CLOSE_SECONDS)) {
+        $ParsedAutoCloseSeconds = 0.0
+        if ([double]::TryParse($env:WPF_AUTO_CLOSE_SECONDS, [ref] $ParsedAutoCloseSeconds)) {
+            $ShouldAutoClose = $true
+            $EffectiveAutoCloseSeconds = $ParsedAutoCloseSeconds
+        } else {
+            Write-Warning "Ignoring WPF_AUTO_CLOSE_SECONDS because it is not a valid number: '$($env:WPF_AUTO_CLOSE_SECONDS)'"
+        }
+    }
+
+    if ($ShouldAutoClose) {
+        $AutoCloseSecondsValue = [double] $EffectiveAutoCloseSeconds
+        $AutoCloseTimer = $null
+        $AutoCloseHandler = $null
+        $AutoCloseHandler = {
+            param($Sender, $Args)
+            Write-Debug ("[WPF] Auto-close trigger 'ContentRendered' fired for '{0}' with delay {1}s" -f $Sender.Name, $AutoCloseSecondsValue)
+
+            try {
+                if ($AutoCloseSecondsValue -le 0) {
+                    $Sender.Resources['WPFDialogCloseReason'] = 'AutoClose'
+                    if ($null -eq $Sender.DialogResult) {
+                        $Sender.DialogResult = $false
+                    } else {
+                        $Sender.Close()
+                    }
+                    return
+                }
+
+                if ($AutoCloseTimer) {
+                    $AutoCloseTimer.Stop()
+                    $AutoCloseTimer = $null
+                }
+
+                $AutoCloseTimer = [System.Windows.Threading.DispatcherTimer]::new()
+                $AutoCloseTimer.Interval = [TimeSpan]::FromSeconds($AutoCloseSecondsValue)
+                $null = $AutoCloseTimer.Add_Tick({
+                    try {
+                        $Sender.Resources['WPFDialogCloseReason'] = 'AutoClose'
+                        if ($null -eq $Sender.DialogResult) {
+                            $Sender.DialogResult = $false
+                        } else {
+                            $Sender.Close()
+                        }
+                    } catch {
+                        $Sender.Close()
+                    } finally {
+                        if ($AutoCloseTimer) {
+                            $AutoCloseTimer.Stop()
+                            $AutoCloseTimer = $null
+                        }
+                    }
+                }.GetNewClosure())
+
+                $AutoCloseTimer.Start()
+            } finally {
+                if ($AutoCloseHandler) {
+                    $Sender.Remove_ContentRendered($AutoCloseHandler)
+                }
+            }
+        }.GetNewClosure()
+
+        Write-Debug ("[WPF] Auto-close enabled for '{0}' with delay {1}s" -f $Name, $AutoCloseSecondsValue)
+        $Window.Add_ContentRendered($AutoCloseHandler)
+        $Window.Add_Closed({
+            if ($AutoCloseTimer) {
+                $AutoCloseTimer.Stop()
+                $AutoCloseTimer = $null
+            }
+        }.GetNewClosure())
+    }
 
     # NOTE: Allow exceptions from child objects to bubble up
     Write-Debug "Processing child elements for $Name (Window)"

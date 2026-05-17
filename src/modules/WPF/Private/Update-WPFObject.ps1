@@ -38,6 +38,9 @@ function Update-WPFObject {
     $thisName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
     $thisType = $InputObject.GetType().Name
     $PSVars = New-WPFVariableList -InputObject $InputObject
+    $strictUnexpectedChild = Test-WPFStrictUnexpectedChildMode
+
+    Write-Debug "Updating WPF object '$thisName' ($thisType)"
 
     try {
         if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
@@ -45,6 +48,17 @@ function Update-WPFObject {
         }
 
         foreach ($Child in $ChildObjects) {
+            if ($null -eq $Child) {
+                continue
+            }
+
+            # SetBinding() returns BindingExpression objects; these are side-effect
+            # results, not visual children, and should not be auto-attached.
+            if ($Child -is [System.Windows.Data.BindingExpressionBase]) {
+                Write-Debug "Ignoring binding result output '$($Child.GetType().Name)'"
+                continue
+            }
+
             $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
             $ChildType = $Child.GetType().Name
 
@@ -80,13 +94,24 @@ function Update-WPFObject {
                 }
             }
             else {
+                $message = "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
+                if ($strictUnexpectedChild) {
+                    throw $message
+                }
+
                 # Maybe instead of erroring we just pass unhandled items further up the chain?
-                Write-Warning "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
+                Write-Warning $message
             }
         }
 
         Update-WPFObjectSpec -InputObject $InputObject
+
+        Write-Debug "Finished updating '$thisName' ($thisType)"
     } catch {
+        if ($strictUnexpectedChild) {
+            throw
+        }
+
         # Get base exception and surface here?
         Write-Error "Failed to update '$thisName' ($thisType) with error: $_"
         return

@@ -6,6 +6,7 @@ function Start-ImageViewerSlideshow {
         [double] $IntervalSeconds
     )
 
+    Write-Debug "Starting slideshow with interval '$IntervalSeconds' seconds."
     $Window = Reference 'Window'
     $State = $Window.Tag
 
@@ -15,16 +16,26 @@ function Start-ImageViewerSlideshow {
 
     if (-not $State.SlideshowTimer) {
         $Timer = [System.Windows.Threading.DispatcherTimer]::new()
+        $TimerWindow = $Window
+        $TimerState = $State
 
         $null = $Timer.add_Tick({
-            $Window = Reference 'Window'
-            $State = $Window.Tag
-            if (-not $State.IsSlideshowActive -or -not $State.IsFileLoaded) {
+            if (-not $TimerState.IsSlideshowActive -or -not $TimerState.IsFileLoaded) {
                 return
             }
 
-            Invoke-ImageViewerNavigate -Direction Forward
-        })
+            if (-not $TimerWindow.IsLoaded) {
+                $this.Stop()
+                return
+            }
+
+            try {
+                Invoke-ImageViewerNavigate -Direction Forward
+            } catch {
+                # If shutdown/context teardown races this tick, stop gracefully.
+                $this.Stop()
+            }
+        }.GetNewClosure())
 
         $State.SlideshowTimer = $Timer
     }

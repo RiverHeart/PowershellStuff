@@ -7,9 +7,6 @@ Use the development log for dated progress entries and in-flight investigation n
 ## Backlog Candidates
 
 - Improve error handling so child object failures bubble up cleanly and produce a useful call stack.
-- Evaluate whether `$PSCmdlet.GetVariableValue('self')` can simplify parent/child attachment logic without breaking menu handling.
-- Give attached `ColumnDefinition` and `RowDefinition` objects stable generated names to improve debug output.
-- Rework grid row and column mapping so child placement uses actual grid coordinates rather than an index counter artifact.
 
 ## Design Notes
 
@@ -29,7 +26,14 @@ On 2026-05-09 the registry moved from a single module-scoped hashtable to contex
 
 The `Window` keyword now attaches context cleanup to the window `Closed` event so registry state does not accumulate between UI rebuilds in the same session.
 
-`Show-WPFWindow` supports an unattended smoke-test mode controlled by the `WPF_SMOKE_TEST` environment variable. When enabled (`1`, `true`, `yes`, or `on`), windows auto-close right after first render by setting `DialogResult = $false`. This allows DSL apps to run in automation and emit debug output without a human closing UI windows.
+The `Window` DSL keyword supports unattended automation via `AutoCloseSeconds`.
+If caller scope binds `AutoCloseSeconds`, the `Window` keyword applies that policy
+after first render (`ContentRendered`) instead of on `Loaded`. This preserves
+startup/render issue coverage for very small values and allows
+`AutoCloseSeconds = 0` as an immediate post-render exit.
+
+For runs that should not modify app script parameters, set
+`WPF_AUTO_CLOSE_SECONDS` to a numeric value in the environment.
 
 ### RelayCommand
 
