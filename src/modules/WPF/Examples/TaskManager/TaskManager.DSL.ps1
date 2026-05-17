@@ -31,7 +31,7 @@ Window 'Window' {
         CurrentView = 'Home'
         IsDirty = $false
         TotalCpuPercent = 0
-        TotalMemoryMB = 0
+        TotalMemoryPercent = 0
     }
 
     When Loaded {
@@ -74,6 +74,11 @@ Window 'Window' {
                     $ProcessItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
                     $CpuSamples = @{}
                     $CpuCoreCount = [Math]::Max(1, [int]$env:NUMBER_OF_PROCESSORS)
+                    # Use OS-level used physical memory for the header percent.
+                    # Summing per-process WorkingSet64 can exceed RAM because shared pages are counted per process.
+                    $OsMemory = Get-CimInstance -ClassName Win32_OperatingSystem
+                    $TotalVisibleMemoryMB = [double]([Math]::Max(1, [double]$OsMemory.TotalVisibleMemorySize / 1KB))
+                    $UsedPhysicalMemoryMB = [double]([Math]::Max(0, $TotalVisibleMemoryMB - ([double]$OsMemory.FreePhysicalMemory / 1KB)))
                     $LastSampleTime = Get-Date
 
                     $this.ItemsSource = $ProcessItems
@@ -100,7 +105,8 @@ Window 'Window' {
                     }
 
                     $InitialTotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
-                    $InitialTotalMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+                    $InitialTotalProcessMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+                    $InitialTotalMemoryPercent = [double]([Math]::Round(($UsedPhysicalMemoryMB / $TotalVisibleMemoryMB) * 100, 1))
 
                     $Window = Reference 'Window'
                     $WindowState = if ($null -ne $Window.DataContext) {
@@ -112,8 +118,8 @@ Window 'Window' {
                     }
 
                     $WindowState.TotalCpuPercent = $InitialTotalCpu
-                    $WindowState.TotalMemoryMB = $InitialTotalMemory
-                    Write-Debug ("TaskManager initial totals set: CPU={0:N1}%, Memory={1:N1}MB" -f [double]$InitialTotalCpu, [double]$InitialTotalMemory)
+                    $WindowState.TotalMemoryPercent = $InitialTotalMemoryPercent
+                    Write-Debug ("TaskManager initial totals set: CPU={0:N1}%, Memory={1:N1}% (Used={2:N1}MB/{3:N1}MB, ProcessSum={4:N1}MB)" -f [double]$InitialTotalCpu, [double]$InitialTotalMemoryPercent, [double]$UsedPhysicalMemoryMB, [double]$TotalVisibleMemoryMB, [double]$InitialTotalProcessMemory)
 
                     Invoke-TaskManagerRefreshHeaderBindings -DataGrid $this
 
@@ -186,7 +192,12 @@ Window 'Window' {
 
                           # Calculate totals
                           $TotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
-                          $TotalMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+                          $TotalProcessMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+                          # Keep memory percent based on OS-wide used memory; process sum is debug-only due to shared-page double counting.
+                          $OsMemory = Get-CimInstance -ClassName Win32_OperatingSystem
+                          $TotalVisibleMemoryMB = [double]([Math]::Max(1, [double]$OsMemory.TotalVisibleMemorySize / 1KB))
+                          $UsedPhysicalMemoryMB = [double]([Math]::Max(0, $TotalVisibleMemoryMB - ([double]$OsMemory.FreePhysicalMemory / 1KB)))
+                          $TotalMemoryPercent = [double]([Math]::Round(($UsedPhysicalMemoryMB / $TotalVisibleMemoryMB) * 100, 1))
 
                           # Update window state with totals
                           $Window = Reference 'Window'
@@ -199,8 +210,8 @@ Window 'Window' {
                           }
 
                           $WindowState.TotalCpuPercent = $TotalCpu
-                          $WindowState.TotalMemoryMB = $TotalMemory
-                          Write-Debug ("TaskManager totals updated: CPU={0:N1}%, Memory={1:N1}MB, Items={2}" -f [double]$TotalCpu, [double]$TotalMemory, $ProcessItems.Count)
+                          $WindowState.TotalMemoryPercent = $TotalMemoryPercent
+                          Write-Debug ("TaskManager totals updated: CPU={0:N1}%, Memory={1:N1}% (Used={2:N1}MB/{3:N1}MB, ProcessSum={4:N1}MB), Items={5}" -f [double]$TotalCpu, [double]$TotalMemoryPercent, [double]$UsedPhysicalMemoryMB, [double]$TotalVisibleMemoryMB, [double]$TotalProcessMemory, $ProcessItems.Count)
 
                           Invoke-TaskManagerRefreshHeaderBindings -DataGrid $ProcessList
 
@@ -247,19 +258,19 @@ Window 'Window' {
                         })
                     }
 
-                    DataGridTextColumn 'Memory (MB)' (Binding 'MemoryMB' -ScriptBlock {
+                    DataGridTextColumn 'Memory' (Binding 'MemoryMB' -ScriptBlock {
                         $this.Converter = New-WPFValueConverter {
                             param($Value)
                             if ($null -eq $Value) { return '' }
-                            return ('{0:N1}' -f [double]$Value)
+                            return ('{0:N1} MB' -f [double]$Value)
                         }
                     }) {
                         $this.Width = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
                         UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
                         UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
-                        $this.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalMemoryMB' -Label 'Memory (MB)' -ValueConverter {
+                        $this.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalMemoryPercent' -Label 'Memory' -ValueConverter {
                             param($Value)
-                            if ($null -eq $Value) { '0.0' } else { '{0:N1}' -f [double]$Value }
+                            if ($null -eq $Value) { '0.0%' } else { '{0:N1}%' -f [double]$Value }
                         })
                     }
 
@@ -277,9 +288,9 @@ Window 'Window' {
                                 Invoke-TaskManagerRefreshHeaderBindings -DataGrid (Reference 'ProcessList')
                             }, $false)
 
-                        $WindowState.AddBinding('TotalMemoryMB', {
+                        $WindowState.AddBinding('TotalMemoryPercent', {
                                 param($Value)
-                                Write-Debug ("TaskManager TotalMemoryMB changed: {0}" -f $Value)
+                            Write-Debug ("TaskManager TotalMemoryPercent changed: {0}" -f $Value)
                                 Invoke-TaskManagerRefreshHeaderBindings -DataGrid (Reference 'ProcessList')
                             }, $false)
                     }
