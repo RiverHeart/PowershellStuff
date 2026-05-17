@@ -4,6 +4,7 @@ Describe 'State keyword DataContext integration' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../../../WPF.psd1" -Force
         . "$PSScriptRoot/../functions/New-ColumnHeaderTemplate.ps1"
+        . "$PSScriptRoot/../functions/Set-TaskManagerTotals.ps1"
     }
 
     It 'Should set DataContext and Tag to the same observable state object on Window' {
@@ -49,5 +50,44 @@ Describe 'State keyword DataContext integration' {
         $binding.Path.Path | Should -Be 'DataContext.TotalCpuPercent'
         $binding.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::FindAncestor)
         $binding.RelativeSource.AncestorType | Should -Be ([System.Windows.Window])
+    }
+
+    It 'Should write totals to DataContext when DataContext is available' {
+        $window = [pscustomobject] @{
+            DataContext = [pscustomobject] @{
+                TotalCpuPercent = 0
+                TotalMemoryPercent = 0
+            }
+            Tag = [pscustomobject] @{
+                TotalCpuPercent = -1
+                TotalMemoryPercent = -1
+            }
+        }
+
+        Mock -CommandName Reference -MockWith { $window }
+
+        Set-TaskManagerTotals -TotalCpuPercent 11.1 -TotalMemoryPercent 22.2
+
+        $window.DataContext.TotalCpuPercent | Should -Be 11.1
+        $window.DataContext.TotalMemoryPercent | Should -Be 22.2
+        $window.Tag.TotalCpuPercent | Should -Be -1
+        $window.Tag.TotalMemoryPercent | Should -Be -1
+    }
+
+    It 'Should fall back to Tag totals when DataContext is unavailable' {
+        $window = [pscustomobject] @{
+            DataContext = $null
+            Tag = [pscustomobject] @{
+                TotalCpuPercent = 0
+                TotalMemoryPercent = 0
+            }
+        }
+
+        Mock -CommandName Reference -MockWith { $window }
+
+        Set-TaskManagerTotals -TotalCpuPercent 33.3 -TotalMemoryPercent 44.4
+
+        $window.Tag.TotalCpuPercent | Should -Be 33.3
+        $window.Tag.TotalMemoryPercent | Should -Be 44.4
     }
 }

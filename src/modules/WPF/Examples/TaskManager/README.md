@@ -16,3 +16,4 @@ Both are safe to leave empty while you build out the app.
 The Memory column displays per-process working set values in MB.
 The Memory header total shows overall physical memory usage percent based on OS-level values (`TotalVisibleMemorySize` and `FreePhysicalMemory`).
 This avoids overcounting shared pages that can happen when summing process `WorkingSet64` values across all processes.
+During timed refresh, these OS memory values are sampled in the background work phase and applied on completion to reduce UI-thread blocking.
