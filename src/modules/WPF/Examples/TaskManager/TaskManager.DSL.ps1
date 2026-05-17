@@ -71,6 +71,16 @@ Window 'Window' {
                     $this.CanUserResizeRows = $false
                     $this.ColumnHeaderHeight = 60
 
+                    When Sorting {
+                        param($sender, $event)
+
+                        # If the column hasn't been sorted yet, default to descending sort to show highest values at the top.
+                        if ($event.Column.SortDirection -eq $null) {
+                            $event.Column.SortDirection = 'Ascending'
+                            # Allow default handler to toggle it to descending so sorting still happens.
+                        }
+                    }
+
                     $ProcessItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
                     $CpuSamples = @{}
                     $CpuCoreCount = [Math]::Max(1, [int]$env:NUMBER_OF_PROCESSORS)
