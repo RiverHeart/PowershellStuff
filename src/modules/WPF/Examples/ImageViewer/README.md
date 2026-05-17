@@ -26,9 +26,8 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 
 * `-FilePath <string>`: Opens a file on startup.
 * `-SlideshowIntervalSeconds <double>`: Starts slideshow automatically at the specified interval.
-* `-AutoCloseSeconds <double>`: Closes the window automatically after the specified delay.
+* `-AutoCloseSeconds <double>`: Closes the window automatically after first render, then the specified delay. Use `0` to close immediately after first render.
 * `-StartFullscreen`: Enters fullscreen mode on startup.
-* `-Smoke`: Convenience flag for unattended runs; defaults auto-close to 1 second when `-AutoCloseSeconds` is not provided.
 
 Example runs:
 
@@ -36,8 +35,13 @@ Example runs:
 # Open file, start slideshow at 2.5s, close after 10s
 .\ImageViewer.DSL.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2.5 -AutoCloseSeconds 10
 
-# Quick unattended smoke run
-.\ImageViewer.DSL.ps1 -Smoke
+# Quick unattended auto-close run
+.\ImageViewer.DSL.ps1 -AutoCloseSeconds 0
+
+# Environment-driven auto-close run
+$env:WPF_AUTO_CLOSE_SECONDS = '0'
+.\ImageViewer.DSL.ps1
+Remove-Item Env:WPF_AUTO_CLOSE_SECONDS -ErrorAction SilentlyContinue
 ```
 
 For repeatable automation, use the wrapper script:

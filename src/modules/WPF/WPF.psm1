@@ -1,6 +1,7 @@
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
 $script:LastDialogResult = $false
+$script:LastDialogCloseReason = 'Unknown'
 
 # Create module var to map context ids to control tables
 if (-not $Script:WPFControlRegistry) {
@@ -8,6 +9,10 @@ if (-not $Script:WPFControlRegistry) {
         ActiveContextId = $null
         Contexts        = @{}
     }
+}
+
+if (-not $Script:WPFDialogCloseReasonByContextId) {
+    $Script:WPFDialogCloseReasonByContextId = @{}
 }
 
 if (-not $Script:WPFThemeTable) {

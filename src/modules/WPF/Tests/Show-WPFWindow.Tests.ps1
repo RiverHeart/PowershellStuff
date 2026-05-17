@@ -1,18 +1,15 @@
 Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
-        $script:OriginalSmokeValue = [Environment]::GetEnvironmentVariable('WPF_SMOKE_TEST')
     }
 
     BeforeEach {
         InModuleScope WPF {
             Clear-WPFControlRegistry
         }
-        [Environment]::SetEnvironmentVariable('WPF_SMOKE_TEST', '1')
     }
 
     AfterEach {
-        [Environment]::SetEnvironmentVariable('WPF_SMOKE_TEST', $script:OriginalSmokeValue)
         InModuleScope WPF {
             Clear-WPFControlRegistry
         }
@@ -24,6 +21,12 @@ Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
         $WindowName = 'Window'
 
         $Window = Window $WindowName {
+            When ContentRendered {
+                if ($null -eq $this.DialogResult) {
+                    $this.DialogResult = $false
+                }
+            }
+
             When Closing {
                 $null = Reference $WindowName -ErrorAction Stop
                 $global:ShowWindowClosingCount++
@@ -44,6 +47,12 @@ Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
         $ContextId = [string] $MainWindow.PSObject.Properties['_WPFContextId'].Value
         $Dialog = [System.Windows.Window]::new()
         $Dialog.Title = 'Helper'
+        $Dialog.Add_ContentRendered({
+            param($Sender, $Args)
+            if ($null -eq $Sender.DialogResult) {
+                $Sender.DialogResult = $false
+            }
+        })
 
         { $Dialog | Show-WPFWindow | Out-Null } | Should -Not -Throw
 

@@ -27,19 +27,12 @@ param (
     [double] $SlideshowIntervalSeconds,
 
     [Parameter()]
-    [ValidateRange(0.5, 600)]
+    [ValidateRange(0, 600)]
     [double] $AutoCloseSeconds,
 
     [Parameter()]
-    [switch] $StartFullscreen,
-
-    [Parameter()]
-    [switch] $Smoke
+    [switch] $StartFullscreen
 )
-
-if ($Smoke -and -not $PSBoundParameters.ContainsKey('AutoCloseSeconds')) {
-    $AutoCloseSeconds = 1.0
-}
 
 # Change to the script directory if we're not in it.
 if ($PSScriptRoot -and $PWD -ne $PSScriptRoot) {
@@ -97,7 +90,6 @@ Window 'Window' {
         # Misc State
         MouseIdleTimer = $null
         MouseMoveHandler = $null
-        AutoCloseTimer = $null
     }
 
     Use-WPFTheme -Name $this.Tag.CurrentTheme -Root $this
@@ -159,11 +151,6 @@ Window 'Window' {
     When Closing {
         Stop-ImageViewerSlideshow -Window $this
         Stop-ImageViewerMouseIdleHide -Window $this
-
-        if ($this.Tag.AutoCloseTimer) {
-            $this.Tag.AutoCloseTimer.Stop()
-            $this.Tag.AutoCloseTimer = $null
-        }
     }
 
     When DragOver {
@@ -213,20 +200,6 @@ Window 'Window' {
             Start-ImageViewerSlideshow -IntervalSeconds $SlideshowIntervalSeconds
         }
 
-        if ($PSBoundParameters.ContainsKey('AutoCloseSeconds')) {
-            $WindowOnLoad = $this
-            $AutoCloseTimer = [DispatcherTimer]::new()
-            $AutoCloseTimer.Interval = [TimeSpan]::FromSeconds($AutoCloseSeconds)
-            $null = $AutoCloseTimer.add_Tick({
-                $this.Stop()
-                if ($WindowOnLoad.IsLoaded) {
-                    $WindowOnLoad.Close()
-                }
-            }.GetNewClosure())
-
-            $this.Tag.AutoCloseTimer = $AutoCloseTimer
-            $AutoCloseTimer.Start()
-        }
     }
 
     Grid "Body" {

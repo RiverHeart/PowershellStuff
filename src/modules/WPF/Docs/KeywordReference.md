@@ -32,6 +32,16 @@ Behavior notes:
 
 Creates a WPF Window.
 
+When caller scope contains an `AutoCloseSeconds` bound parameter, auto-close is
+wired automatically after first render (`ContentRendered`).
+
+For unattended automation, set `WPF_AUTO_CLOSE_SECONDS` to a numeric value.
+Set `WPF_AUTO_CLOSE_SECONDS=0` to close immediately after first render while
+still exercising startup/render path.
+
+After `Show-WPFWindow` returns, inspect `LastDialogCloseReason` to distinguish
+between a normal/user close (`User`) and DSL auto-close (`AutoClose`).
+
 ```powershell
 Window 'MainWindow' {
     $this.Title = 'My App'
@@ -595,8 +605,6 @@ Import './functions/*.ps1'
 ### Show-WPFWindow
 
 Shows a WPF window modally and returns its dialog result.
-
-For unattended automation, set environment variable `WPF_SMOKE_TEST=1` (also accepts `true`, `yes`, `on`) to auto-close windows after first render.
 
 ```powershell
 Window 'Window' {
