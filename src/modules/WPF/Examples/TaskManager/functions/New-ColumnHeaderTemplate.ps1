@@ -43,7 +43,7 @@ function New-ColumnHeaderTemplate {
     # Build the entire tree using FrameworkElementFactory
     # Create the StackPanel factory
     $panelFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.StackPanel])
-    $panelFactory.SetValue([System.Windows.Controls.StackPanel]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Right)
+    $panelFactory.SetValue([System.Windows.Controls.StackPanel]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Stretch)
 
     # Create the total value TextBlock factory
     $totalBlockFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.TextBlock])

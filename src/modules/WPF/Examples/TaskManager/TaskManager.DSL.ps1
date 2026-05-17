@@ -244,11 +244,14 @@ Window 'Window' {
                             }
                         })
                     }
+                    UseStyle 'RightAlignedDataGridHeader' $cpuColumn -TargetType HeaderStyle
+                    UseStyle 'RightAlignedDataGridCell' $cpuColumn -TargetType ElementStyle
                     $cpuColumn.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalCpuPercent' -Label 'CPU' -ValueConverter {
                         param($Value)
                         if ($null -eq $Value) { '0.0%' } else { '{0:N1}%' -f [double]$Value }
                     })
                     $this.Columns.Add($cpuColumn)
+
                     $memoryColumn = [DataGridTextColumn]@{
                         Header  = 'Memory (MB)'
                         Width   = [DataGridLength]::new(1, [DataGridLengthUnitType]::Star)
@@ -260,6 +263,8 @@ Window 'Window' {
                             }
                         })
                     }
+                    UseStyle 'RightAlignedDataGridHeader' $memoryColumn -TargetType HeaderStyle
+                    UseStyle 'RightAlignedDataGridCell' $memoryColumn -TargetType ElementStyle
                     $memoryColumn.HeaderTemplate = (New-ColumnHeaderTemplate -TotalPropertyPath 'TotalMemoryMB' -Label 'Memory (MB)' -ValueConverter {
                         param($Value)
                         if ($null -eq $Value) { '0.0' } else { '{0:N1}' -f [double]$Value }
