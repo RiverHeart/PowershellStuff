@@ -40,8 +40,8 @@ Describe 'State' -Tag 'State' {
             Count = 0
         }
 
-        # Check that the object has the internal observable
-        $result._Observable | Should -Not -BeNullOrEmpty
+        $result -is [System.ComponentModel.INotifyPropertyChanged] | Should -BeTrue
+        $result.Count | Should -Be 0
     }
 
     It 'Should support AddBinding method for PowerShell callbacks' {
@@ -109,5 +109,89 @@ Describe 'State' -Tag 'State' {
 
         $result.Count | Should -Be 10
         $result.IsActive | Should -Be $true
+    }
+
+    It 'Should create ExpandoObject state when requested' {
+        $result = New-WPFObservableState -Properties @{
+            ItemCount = 1
+            Label = 'ok'
+        } -Implementation ExpandoObject
+
+        $result.ItemCount | Should -Be 1
+        $result.Label | Should -Be 'ok'
+        $result -is [System.ComponentModel.INotifyPropertyChanged] | Should -BeTrue
+    }
+
+    It 'Should auto-update WPF binding with ExpandoObject implementation' {
+        $result = New-WPFObservableState -Properties @{
+            ItemCount = 0
+        } -Implementation ExpandoObject
+
+        $textBlock = [System.Windows.Controls.TextBlock]::new()
+        $textBlock.DataContext = $result
+        $null = [System.Windows.Data.BindingOperations]::SetBinding(
+            $textBlock,
+            [System.Windows.Controls.TextBlock]::TextProperty,
+            [System.Windows.Data.Binding]::new('ItemCount')
+        )
+
+        $textBlock.Text | Should -Be '0'
+
+        $result.ItemCount = 25
+
+        $textBlock.Text | Should -Be '25'
+    }
+
+    It 'Should create DynamicObject state when requested' {
+        $result = New-WPFObservableState -Properties @{
+            Count = 1
+            Label = 'ok'
+        } -Implementation DynamicObject
+
+        $result.Count | Should -Be 1
+        $result.Label | Should -Be 'ok'
+        $result -is [System.ComponentModel.INotifyPropertyChanged] | Should -BeTrue
+    }
+
+    It 'Should auto-update WPF binding with DynamicObject implementation for Count' {
+        $result = New-WPFObservableState -Properties @{
+            Count = 0
+        } -Implementation DynamicObject
+
+        $textBlock = [System.Windows.Controls.TextBlock]::new()
+        $textBlock.DataContext = $result
+        $null = [System.Windows.Data.BindingOperations]::SetBinding(
+            $textBlock,
+            [System.Windows.Controls.TextBlock]::TextProperty,
+            [System.Windows.Data.Binding]::new('Count')
+        )
+
+        $textBlock.Text | Should -Be '0'
+
+        $result.Count = 17
+
+        $textBlock.Text | Should -Be '17'
+    }
+
+    It 'Should use a dynamic notifying implementation by default' {
+        $result = New-WPFObservableState @{
+            ItemCount = 0
+        }
+
+        $result -is [System.ComponentModel.INotifyPropertyChanged] | Should -BeTrue
+
+        $textBlock = [System.Windows.Controls.TextBlock]::new()
+        $textBlock.DataContext = $result
+        $null = [System.Windows.Data.BindingOperations]::SetBinding(
+            $textBlock,
+            [System.Windows.Controls.TextBlock]::TextProperty,
+            [System.Windows.Data.Binding]::new('ItemCount')
+        )
+
+        $textBlock.Text | Should -Be '0'
+
+        $result.ItemCount = 33
+
+        $textBlock.Text | Should -Be '33'
     }
 }

@@ -53,7 +53,7 @@ function New-ColumnHeaderTemplate {
     $totalBlockFactory.SetValue([System.Windows.Controls.TextBlock]::TextAlignmentProperty, [System.Windows.TextAlignment]::Right)
 
     # Create and set the binding on the factory
-    # Bind to Window.DataContext.<PropertyPath> so totals track State through standard WPF context.
+    # Bind to the window DataContext so property change notifications are observed.
     $bindingPath = "DataContext.$TotalPropertyPath"
     $binding = [System.Windows.Data.Binding]::new($bindingPath)
     $binding.RelativeSource = [System.Windows.Data.RelativeSource]::new([System.Windows.Data.RelativeSourceMode]::FindAncestor, [System.Windows.Window], 1)

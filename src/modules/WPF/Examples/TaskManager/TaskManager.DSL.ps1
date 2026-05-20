@@ -36,7 +36,6 @@ Window 'Window' {
 
     When Loaded {
         Write-Debug 'TaskManager loaded.'
-        Invoke-TaskManagerRefreshHeaderBindings -DataGrid (Reference 'ProcessList')
     }
 
     When Closed {
@@ -125,8 +124,6 @@ Window 'Window' {
                         -TotalVisibleMemoryMB $TotalVisibleMemoryMB `
                         -TotalProcessMemoryMB $InitialTotalProcessMemory `
                         -Phase initial
-
-                    Invoke-TaskManagerRefreshHeaderBindings -DataGrid $this
 
                     $LastSampleTime = Get-Date
 
@@ -223,8 +220,6 @@ Window 'Window' {
                               -TotalVisibleMemoryMB $TotalVisibleMemoryMB `
                               -TotalProcessMemoryMB $TotalProcessMemory `
                               -Phase refresh
-
-                          Invoke-TaskManagerRefreshHeaderBindings -DataGrid $ProcessList
 
                           # Restore selection
                           if ($null -ne $SelectedProcessId) {
