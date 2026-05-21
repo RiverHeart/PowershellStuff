@@ -642,6 +642,13 @@ Window 'Window' {
 
 Creates a generic WPF DSL project scaffold with a starter window script, style file, and conventional folders.
 
+Default (non-`-Bare`) scaffolds include a small starter content area with example action buttons,
+implemented using `StackPanel` layout only, and a style palette in the generated styles file:
+
+- `PrimaryButton`
+- `DangerButton`
+- `GhostButton`
+
 ```powershell
 New-WPFProject MyApp
 ```

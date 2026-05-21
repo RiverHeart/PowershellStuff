@@ -185,6 +185,21 @@ The generated project includes:
 - `images/`
 - `README.md`
 
+The starter `MyApp.Styles.ps1` now includes a native-ish default `Button` style and named palette styles:
+
+- `PrimaryButton`
+- `DangerButton`
+- `GhostButton`
+
+Apply named styles with `UseStyle`, for example:
+
+```powershell
+Button 'SaveButton' {
+    UseStyle 'PrimaryButton'
+    $this.Content = 'Save'
+}
+```
+
 Specify a parent directory as the second parameter:
 
 ```powershell
