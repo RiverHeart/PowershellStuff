@@ -80,7 +80,7 @@ Window 'Window' {
                         }
                     }
 
-                    $ProcessItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
+                    $ProcessItems = [ObservableCollection[object]]::new()
                     $CpuSamples = @{}
                     $CpuCoreCount = [Math]::Max(1, [int]$env:NUMBER_OF_PROCESSORS)
                     # Use OS-level used physical memory for the header percent.
@@ -207,11 +207,13 @@ Window 'Window' {
 
                           # Calculate totals
                           $TotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
-                          $TotalProcessMemory = ($ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
-                                                    # Keep memory percent based on OS-wide used memory; process sum is debug-only due to shared-page double counting.
-                                                    $TotalVisibleMemoryMB = [double] $RefreshData.TotalVisibleMemoryMB
-                                                    $UsedPhysicalMemoryMB = [double] $RefreshData.UsedPhysicalMemoryMB
-                          $TotalMemoryPercent = [double]([Math]::Round(($UsedPhysicalMemoryMB / $TotalVisibleMemoryMB) * 100, 1))
+                          $TotalProcessMemory = (
+                                $ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+                                # Keep memory percent based on OS-wide used memory; process sum is debug-only due to shared-page double counting.
+                                $TotalVisibleMemoryMB = [double] $RefreshData.TotalVisibleMemoryMB
+                                $UsedPhysicalMemoryMB = [double] $RefreshData.UsedPhysicalMemoryMB
+                                $TotalMemoryPercent = [double]([Math]::Round(($UsedPhysicalMemoryMB / $TotalVisibleMemoryMB) * 100, 1)
+                            )
 
                           Set-TaskManagerTotals `
                               -TotalCpuPercent $TotalCpu `
@@ -303,9 +305,9 @@ Window 'Window' {
                         BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
                     }
                     Button 'StopProcessButton' {
+                        UseStyle 'TaskManager.NativeButton'
                         [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
                         $this.Content = 'Stop Process'
-                        $this.Margin = 0, 10, 10, 10
                         Command 'StopProcessCommand' {
                             param($sender, $event)
                             $SelectedProcess = (Reference 'ProcessList').SelectedItem
