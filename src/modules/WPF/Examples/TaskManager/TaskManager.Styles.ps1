@@ -27,8 +27,8 @@ Style TextBlock {
     Setter HorizontalAlignment ([HorizontalAlignment]::Right)
 }
 
-# Windows-native style button for bottom-bar actions
-Style 'TaskManager.NativeButton' Button {
+# Chrome-based style used by StopProcessButton in TaskManager.DSL.ps1
+Style 'TaskManager.StopButton' Button {
     Setter Background '#F8FAFC'
     Setter Foreground '#111827'
     Setter BorderBrush '#8E9AAF'
@@ -40,42 +40,31 @@ Style 'TaskManager.NativeButton' Button {
     Setter Cursor ([System.Windows.Input.Cursors]::Hand)
     Setter FocusVisualStyle $null
     Setter SnapsToDevicePixels $true
-    Setter OverridesDefaultStyle $true
 
-    Template {
-        Border 'ButtonChrome' {
-            Setter Background '#F8FAFC'
-            Setter BorderBrush '#8E9AAF'
-            Setter BorderThickness 2
-            Setter CornerRadius 6
-            Setter SnapsToDevicePixels $true
+    Chrome {
+        Setter CornerRadius 6
+    }
 
-            ContentPresenter {
-                Setter Margin '14,8,14,8'
-                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
-                Setter VerticalAlignment ([VerticalAlignment]::Center)
-                Setter RecognizesAccessKey $true
-            }
-        }
+    Trigger IsMouseOver $true -Scope Chrome {
+        Setter Background '#E9EEF7'
+        Setter BorderBrush '#7D8BA3'
+    }
 
-        Trigger IsMouseOver $true {
-            Setter Background '#E9EEF7' -Target 'ButtonChrome'
-            Setter BorderBrush '#7D8BA3' -Target 'ButtonChrome'
-        }
+    Trigger IsPressed $true -Scope Chrome {
+        Setter Background '#DDE6F3'
+        Setter BorderBrush '#6D7D98'
+    }
 
-        Trigger IsPressed $true {
-            Setter Background '#DDE6F3' -Target 'ButtonChrome'
-            Setter BorderBrush '#6D7D98' -Target 'ButtonChrome'
-        }
+    Trigger IsKeyboardFocused $true -Scope Chrome {
+        Setter BorderBrush '#2563EB'
+    }
 
-        Trigger IsKeyboardFocused $true {
-            Setter BorderBrush '#2563EB' -Target 'ButtonChrome'
-        }
+    Trigger IsEnabled $false -Scope Chrome {
+        Setter Background '#F3F4F6'
+        Setter BorderBrush '#D6DCE5'
+    }
 
-        Trigger IsEnabled $false {
-            Setter Background '#F3F4F6' -Target 'ButtonChrome'
-            Setter BorderBrush '#D6DCE5' -Target 'ButtonChrome'
-            Setter Foreground '#9CA3AF'
-        }
+    Trigger IsEnabled $false {
+        Setter Foreground '#9CA3AF'
     }
 }

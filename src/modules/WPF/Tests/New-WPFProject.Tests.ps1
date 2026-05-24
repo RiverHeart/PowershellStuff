@@ -21,6 +21,7 @@ Describe 'New-WPFProject' -Tag 'New-WPFProject' {
         $DslContent | Should -Match "LastSavedTask = ''"
         $DslContent | Should -Match "State @\{"
         $DslContent | Should -Not -Match "New-WPFObservableState"
+        $DslContent | Should -Match "Import-Module WPF -ErrorAction Stop -Force"
     }
 
     It 'Seeds starter style palette in generated style file' {
@@ -32,5 +33,6 @@ Describe 'New-WPFProject' -Tag 'New-WPFProject' {
         $StyleContent | Should -Match "Style 'PrimaryButton' Button"
         $StyleContent | Should -Match "Style 'DangerButton' Button"
         $StyleContent | Should -Match "Style 'GhostButton' Button"
+        $StyleContent | Should -Match "ExtendStyle Button"
     }
 }

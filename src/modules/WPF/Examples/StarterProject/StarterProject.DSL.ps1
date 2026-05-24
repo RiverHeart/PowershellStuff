@@ -11,7 +11,7 @@ if ($PWD -ne $PSScriptRoot) {
     Set-Location -Path $PSScriptRoot
 }
 
-Import-Module ..\.. -ErrorAction Stop
+Import-Module ..\.. -ErrorAction Stop -Force
 
 Import "$PSScriptRoot/StarterProject.Styles.ps1"
 Import "$PSScriptRoot/functions"

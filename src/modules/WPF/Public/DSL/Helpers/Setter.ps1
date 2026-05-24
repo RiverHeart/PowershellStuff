@@ -3,9 +3,19 @@
     Adds a setter to the current style or trigger.
 
 .DESCRIPTION
-    Resolves a dependency property on the current style or trigger target type
-    and appends a WPF Setter. When -Resource is specified the value is stored as a
-    DynamicResourceExtension so theme swaps update styled controls.
+    Resolves a dependency property for the current context and applies a value.
+
+    Supported contexts:
+    - Style
+    - Trigger/DataTrigger/MultiTrigger
+    - Template factory elements (FrameworkElementFactory)
+
+    In trigger contexts, -Target is supported only for ControlTemplate owners.
+    When Trigger -Scope Chrome is used, Setter can use -Scope Chrome to target
+    the generated chrome part.
+
+    When -Resource is specified, the value is stored as a DynamicResourceExtension
+    so theme swaps update styled controls.
 
 .EXAMPLE
     Setter Background ButtonBackground -Resource
@@ -29,6 +39,10 @@ function Setter {
         [ValidateNotNullOrEmpty()]
         [string] $Target,
 
+        [Parameter()]
+        [ValidateSet('Chrome')]
+        [string] $Scope,
+
         [Parameter(ValueFromPipeline)]
         [object] $InputObject
     )
@@ -40,6 +54,11 @@ function Setter {
         if ($context -is [System.Windows.FrameworkElementFactory]) {
             if ($Target) {
                 Write-Error 'Setter: -Target is not supported inside a FrameworkElementFactory context.'
+                return
+            }
+
+            if ($Scope) {
+                Write-Error 'Setter: -Scope is not supported inside a FrameworkElementFactory context.'
                 return
             }
 
@@ -83,6 +102,11 @@ function Setter {
         }
 
         if ($context -is [System.Windows.Style]) {
+            if ($Scope) {
+                Write-Error 'Setter: -Scope is only supported in trigger contexts.'
+                return
+            }
+
             $targetType = $context.TargetType
             $setterCollection = $context.Setters
             $triggerOwner = $null
@@ -97,6 +121,31 @@ function Setter {
             if (-not $targetType) {
                 Write-Error 'Setter: Trigger context is missing target type metadata.'
                 return
+            }
+
+            $chromeTargetType = $context.PSObject.Properties['_WPFChromeTargetType'].Value
+            $chromeTargetName = $context.PSObject.Properties['_WPFChromeTargetName'].Value
+            $defaultScope = $context.PSObject.Properties['_WPFDefaultSetterScope'].Value
+
+            $useChromeScope = ($Scope -eq 'Chrome') -or (($defaultScope -eq 'Chrome') -and -not $PSBoundParameters.ContainsKey('Scope'))
+            if ($useChromeScope) {
+                if ($triggerOwner -ne 'ControlTemplate') {
+                    Write-Error 'Setter: -Scope Chrome is only supported for template-backed trigger contexts.'
+                    return
+                }
+
+                if ($null -eq $chromeTargetType -or [string]::IsNullOrWhiteSpace($chromeTargetName)) {
+                    Write-Error 'Setter: Trigger context is missing Chrome target metadata.'
+                    return
+                }
+
+                if ($PSBoundParameters.ContainsKey('Target')) {
+                    Write-Error 'Setter: Do not combine -Scope Chrome with -Target.'
+                    return
+                }
+
+                $targetType = $chromeTargetType
+                $Target = $chromeTargetName
             }
         } else {
             Write-Error 'Setter can only be used inside Style, Trigger, DataTrigger, MultiTrigger, or a Template factory element.'

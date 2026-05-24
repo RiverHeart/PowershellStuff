@@ -205,7 +205,7 @@ if (
     -not (Get-Module -Name WPF) -and
     (Get-Module -ListAvailable -Name WPF)
 ) {
-    Import-Module WPF -ErrorAction Stop
+    Import-Module WPF -ErrorAction Stop -Force
 }
 
 Import "`$PSScriptRoot/$Name.Styles.ps1"
@@ -312,6 +312,7 @@ Style Button {
 }
 
 Style 'PrimaryButton' Button {
+    ExtendStyle Button
     Setter Background '#0A84FF'
     Setter Foreground '#FFFFFF'
     Setter BorderBrush '#086FD5'
@@ -355,6 +356,7 @@ Style 'PrimaryButton' Button {
 }
 
 Style 'DangerButton' Button {
+    ExtendStyle Button
     Setter Background '#DC2626'
     Setter Foreground '#FFFFFF'
     Setter BorderBrush '#B91C1C'
@@ -398,6 +400,7 @@ Style 'DangerButton' Button {
 }
 
 Style 'GhostButton' Button {
+    ExtendStyle Button
     Setter Background '#FFFFFF'
     Setter Foreground '#1F2937'
     Setter BorderBrush '#B8C0CC'

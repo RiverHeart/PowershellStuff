@@ -522,13 +522,76 @@ Style Button {
 }
 ```
 
+### ExtendStyle
+
+Sets `BasedOn` for the current style.
+
+Use target type names to inherit from an implicit style:
+
+```powershell
+Style Button {
+    Setter FontSize 14
+}
+
+Style 'PrimaryButton' Button {
+    ExtendStyle Button
+    Setter Background '#0A84FF'
+}
+```
+
+Use named style keys to inherit from another named style:
+
+```powershell
+Style 'ButtonBase' Button {
+    Setter Padding '12,6,12,6'
+}
+
+Style 'ButtonAccent' Button {
+    ExtendStyle 'ButtonBase'
+    Setter Background '#0A84FF'
+}
+```
+
 ### Setter
 
-Adds a setter to the current style.
+Adds a setter in style, trigger, or template-factory contexts.
+
+`Setter` resolves dependency properties for the current target context.
+In template-backed trigger contexts, `-Target` can route values to named parts.
+With `Trigger -Scope Chrome`, use `Setter ... -Scope Chrome` to target the
+generated chrome part.
 
 ```powershell
 Setter Background ButtonBackground -Resource
 Setter Margin '0,8,0,0'
+```
+
+Template-backed trigger contexts can route setters to the generated chrome part:
+
+```powershell
+Setter BorderBrush '#2563EB' -Scope Chrome
+```
+
+`-Scope Chrome` is supported in trigger contexts created by `Trigger -Scope Chrome`.
+
+### Chrome
+
+Defines a simplified template shell for supported controls.
+
+MVP support is intentionally narrow: `Button` styles only.
+
+```powershell
+Style 'PrimaryButton' Button {
+    Setter Background '#0A84FF'
+    Setter Foreground '#FFFFFF'
+    Setter Padding '14,8,14,8'
+
+    Chrome {
+        Setter CornerRadius 6
+        Setter BorderBrush '#086FD5'
+        Setter BorderThickness 2
+    }
+}
 ```
 
 ### Trigger
@@ -547,6 +610,14 @@ Style 'PrimaryButton' Button {
 # ControlTemplate scope supports SourceName and Setter -Target
 Trigger IsEnabled $false -SourceName 'TemplateBorder' {
     Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+`Trigger` also supports `-Scope Chrome` inside `Style` blocks that define `Chrome`:
+
+```powershell
+Trigger IsEnabled $false -Scope Chrome {
+    Setter BorderBrush '#2563EB'
 }
 ```
 

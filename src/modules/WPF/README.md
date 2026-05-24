@@ -223,6 +223,7 @@ New-WPFProject MyApp -Bare
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
 - [Autocomplete Guidance](./Docs/AutoComplete.md)
 - [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
+- [Chrome Adapter Proposal](./Docs/ChromeAdapterProposal.md)
 - [Documenting This DSL](./Docs/DocumentingTheDSL.md)
 - [Keyword Reference](./Docs/KeywordReference.md)
 - [Contribution Checklist](./Docs/ContributionChecklist.md)
