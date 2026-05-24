@@ -3,7 +3,7 @@ Describe 'New-WPFProject' -Tag 'New-WPFProject' {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
-    It 'Creates non-bare scaffold with a supported horizontal starter button row' {
+    It 'Creates non-bare scaffold with a practical starter workflow' {
         $ProjectRoot = Join-Path $TestDrive 'StarterApp'
 
         $Result = New-WPFProject -Name 'StarterApp' -Path $TestDrive
@@ -13,8 +13,14 @@ Describe 'New-WPFProject' -Tag 'New-WPFProject' {
         Test-Path -Path $Result.StyleScript | Should -BeTrue
 
         $DslContent = Get-Content -Path $Result.DslScript -Raw
-        $DslContent | Should -Match "StackPanel 'StarterButtonRow'"
-        $DslContent | Should -Match "Orientation\]::Horizontal"
+        $DslContent | Should -Match "TextBox 'TaskNameInput'"
+        $DslContent | Should -Match "Button 'SaveTaskButton'"
+        $DslContent | Should -Match "Button 'ClearTaskButton'"
+        $DslContent | Should -Match "BindProperty Text CurrentView"
+        $DslContent | Should -Match "BindProperty Text IsDirty"
+        $DslContent | Should -Match "LastSavedTask = ''"
+        $DslContent | Should -Match "State @\{"
+        $DslContent | Should -Not -Match "New-WPFObservableState"
     }
 
     It 'Seeds starter style palette in generated style file' {

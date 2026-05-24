@@ -200,6 +200,12 @@ Button 'SaveButton' {
 }
 ```
 
+The generated non-bare `MyApp.DSL.ps1` also includes a tiny practical workflow starter:
+
+- A task-name input (`TaskNameInput`)
+- Save/Clear actions (`SaveTaskButton`, `ClearTaskButton`)
+- Simple observable state feedback (`CurrentView`, `IsDirty`)
+
 Specify a parent directory as the second parameter:
 
 ```powershell

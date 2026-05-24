@@ -191,3 +191,32 @@ Style 'GhostButton' Button {
         }
     }
 }
+
+Style TextBox {
+    Setter BorderBrush '#B8C0CC'
+    Setter BorderThickness 1
+    Setter Padding 12, 16
+    Setter Margin 0, 0, 0, 8
+    Setter FontSize 16
+    Setter Foreground '#111827'
+    Setter Background '#FFFFFF'
+    Setter FocusVisualStyle $null
+
+    Border {
+        Setter CornerRadius 6
+    }
+
+    Trigger IsMouseOver $true {
+        Setter BorderBrush '#9EA8B8'
+    }
+
+    Trigger IsKeyboardFocused $true {
+        Setter BorderBrush '#2563EB'
+    }
+
+    Trigger IsEnabled $false {
+        Setter Background '#F3F4F6'
+        Setter BorderBrush '#D2D9E3'
+        Setter Foreground '#A1AAB7'
+    }
+}
