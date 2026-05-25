@@ -104,4 +104,19 @@ Describe 'Invoke-WPFBulkReplace' -Tag 'Invoke-WPFBulkReplace' {
         $Result[0].MatchCount | Should -Be 2
         $Result[0].LineNumbers | Should -Be @(1, 2)
     }
+
+    It 'Applies literal ignore-case replacements when requested' {
+        $RootPath = Join-Path $TestDrive 'IgnoreCaseRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $FilePath = Join-Path $RootPath 'IgnoreCase.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "describe 'Grid' {`r`nDescribe 'grid' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = & $ScriptPath -Path $FilePath -Find "Describe 'Grid' {" -Replace "Describe 'Grid' -Tag 'Grid' {" -IgnoreCase -PassThru
+
+        (Get-Content -Path $FilePath -Raw) | Should -BeExactly "Describe 'Grid' -Tag 'Grid' {`r`nDescribe 'Grid' -Tag 'Grid' {`r`n}`r`n"
+        $Result.Count | Should -Be 1
+        $Result[0].Changed | Should -BeTrue
+        $Result[0].ReplacementCount | Should -Be 2
+    }
 }

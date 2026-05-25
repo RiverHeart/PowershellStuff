@@ -473,8 +473,21 @@ function Invoke-WPFBulkReplaceLiteral {
         $cursor = $index + [Math]::Max(1, $Pattern.Length)
     }
 
+    $updatedContent = if ($IgnoreCase) {
+        $regex = [System.Text.RegularExpressions.Regex]::new(
+            [System.Text.RegularExpressions.Regex]::Escape($Pattern),
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+        $regex.Replace(
+            $Content,
+            [System.Text.RegularExpressions.MatchEvaluator] { param($match) $Replacement }
+        )
+    } else {
+        $Content.Replace($Pattern, $Replacement)
+    }
+
     return [pscustomobject]@{
-        Content          = $Content.Replace($Pattern, $Replacement)
+        Content          = $updatedContent
         ReplacementCount = $replacementCount
     }
 }
