@@ -1,9 +1,16 @@
 Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $script:OriginalAutoCloseValue = $env:WPF_AUTO_CLOSE_SECONDS
+    }
+
+    AfterAll {
+        $env:WPF_AUTO_CLOSE_SECONDS = $script:OriginalAutoCloseValue
     }
 
     BeforeEach {
+        $env:WPF_AUTO_CLOSE_SECONDS = $null
+
         InModuleScope WPF {
             Clear-WPFControlRegistry
         }
@@ -17,14 +24,13 @@ Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
     }
 
     It 'Should not trigger a second close pass after ShowDialog returns' {
+        $env:WPF_AUTO_CLOSE_SECONDS = 0
         $global:ShowWindowClosingCount = 0
         $WindowName = 'Window'
 
         $Window = Window $WindowName {
-            When ContentRendered {
-                if ($null -eq $this.DialogResult) {
-                    $this.DialogResult = $false
-                }
+            Label 'WindowContent' {
+                $this.Content = 'Auto-close render content'
             }
 
             When Closing {
@@ -38,6 +44,7 @@ Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
     }
 
     It 'Should not clear parent registry when showing a helper dialog' {
+        $env:WPF_AUTO_CLOSE_SECONDS = 0
         $WindowName = 'Window'
 
         $MainWindow = Window $WindowName {
@@ -47,16 +54,24 @@ Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
         $ContextId = [string] $MainWindow.PSObject.Properties['_WPFContextId'].Value
         $Dialog = [System.Windows.Window]::new()
         $Dialog.Title = 'Helper'
-        $Dialog.Add_ContentRendered({
-            param($Sender, $Args)
-            if ($null -eq $Sender.DialogResult) {
-                $Sender.DialogResult = $false
-            }
-        })
+        $Dialog.Content = [System.Windows.Controls.TextBlock]::new()
+        $Dialog.Content.Text = 'Auto-close helper dialog'
 
         { $Dialog | Show-WPFWindow | Out-Null } | Should -Not -Throw
 
         $ResolvedMainWindow = Reference $WindowName -ContextId $ContextId
         $ResolvedMainWindow | Should -BeExactly -ExpectedValue $MainWindow
+    }
+
+    It 'Should honor WPF_AUTO_CLOSE_SECONDS for direct windows shown with Show-WPFWindow' {
+        $env:WPF_AUTO_CLOSE_SECONDS = 0
+
+        $Dialog = [System.Windows.Window]::new()
+        $Dialog.Title = 'Automation dialog'
+        $Dialog.Content = [System.Windows.Controls.TextBlock]::new()
+        $Dialog.Content.Text = 'Auto-close me'
+
+        { $Dialog | Show-WPFWindow | Out-Null } | Should -Not -Throw
+        $LastDialogCloseReason | Should -Be -ExpectedValue 'AutoClose'
     }
 }

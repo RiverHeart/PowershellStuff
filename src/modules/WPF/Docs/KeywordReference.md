@@ -752,6 +752,9 @@ Import './functions/*.ps1'
 
 Shows a WPF window modally and returns its dialog result.
 
+For unattended automation, `Show-WPFWindow` also honors `WPF_AUTO_CLOSE_SECONDS`
+for direct `System.Windows.Window` instances that were not created through the DSL.
+
 ```powershell
 Window 'Window' {
     $this.Title = 'Hello'

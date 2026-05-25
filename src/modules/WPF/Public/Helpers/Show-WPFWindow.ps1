@@ -26,6 +26,7 @@ function Show-WPFWindow {
 
     process {
         $ContextId = $null
+        $EnvironmentAutoCloseSeconds = $null
 
         try {
             $ContextId = Get-WPFControlContextId -InputObject $Window
@@ -33,6 +34,14 @@ function Show-WPFWindow {
                 if (-not $Window.Resources.Contains('WPFDialogCloseReason')) {
                     $Window.Resources['WPFDialogCloseReason'] = 'User'
                 }
+            } elseif (-not $Window.Resources.Contains('WPFDialogCloseReason')) {
+                $Window.Resources['WPFDialogCloseReason'] = 'User'
+            }
+
+            $EnvironmentAutoCloseSeconds = Get-WPFEnvironmentAutoCloseSeconds
+            if (($null -ne $EnvironmentAutoCloseSeconds) -and
+                (-not $Window.Resources.Contains('WPFAutoCloseConfigured') -or -not $Window.Resources['WPFAutoCloseConfigured'])) {
+                Enable-WPFAutoClose -Window $Window -AutoCloseSeconds ([double] $EnvironmentAutoCloseSeconds)
             }
 
             # Activate before entering ShowDialog so the window gets keyboard focus at startup.
