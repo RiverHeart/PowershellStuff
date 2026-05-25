@@ -100,48 +100,89 @@ function New-WPFProject {
 
                     TextBlock 'WelcomeText' {
                         `$this.Margin = 0, 0, 0, 10
-                        `$this.Text = 'Welcome to $Name. Start building your app here.'
+                        `$this.Text = 'Welcome to $Name. Build one useful interaction in under five minutes.'
                     }
 
-                    TextBlock 'StyleHint' {
+                    TextBlock 'Step1Text' {
                         `$this.Margin = 0, 0, 0, 8
-                        `$this.Text = 'Try the starter button styles:'
+                        `$this.Text = '1) Enter a task name'
                     }
 
-                    StackPanel 'StarterButtonRow' {
+                    TextBox 'TaskNameInput' {
+                        `$this.Width = 420
+                        `$this.Margin = 0, 0, 0, 8
+                        `$this.Text = 'Prepare onboarding draft'
+                        When TextChanged {
+                            `$State = (Reference 'Window').Tag
+                            if (`$null -ne `$State) {
+                                `$State.IsDirty = `$true
+                                `$State.CurrentView = 'Editing'
+                            }
+                        }
+                    }
+
+                    TextBlock 'Step2Text' {
+                        `$this.Margin = 0, 2, 0, 8
+                        `$this.Text = '2) Save or clear the draft'
+                    }
+
+                    StackPanel 'ActionRow' {
                         `$this.Orientation = [System.Windows.Controls.Orientation]::Horizontal
-                        `$this.Margin = 0, 4, 0, 0
-                        Button 'PrimaryExampleButton' {
+                        `$this.Margin = 0, 0, 0, 0
+
+                        Button 'SaveTaskButton' {
                             UseStyle 'PrimaryButton'
-                            `$this.Content = 'Primary Action'
+                            `$this.Content = 'Save Task'
                             `$this.Margin = 0, 8, 10, 0
-                            Command 'PrimaryExampleCommand' {
-                                [System.Windows.MessageBox]::Show('PrimaryButton style example clicked.', '$Name') | Out-Null
+                            Command 'SaveTaskCommand' {
+                                `$TaskName = (Reference 'TaskNameInput').Text
+                                if ([string]::IsNullOrWhiteSpace(`$TaskName)) {
+                                    (Reference 'SaveResultText').Text = 'Enter a task name before saving.'
+                                    return
+                                }
+
+                                `$State = (Reference 'Window').Tag
+                                `$State.LastSavedTask = `$TaskName
+                                `$State.CurrentView = 'Saved'
+                                `$State.IsDirty = `$false
+                                (Reference 'SaveResultText').Text = "Saved task: `$TaskName"
                             }
                         }
 
-                        Button 'DangerExampleButton' {
-                            UseStyle 'DangerButton'
-                            `$this.Content = 'Danger Action'
-                            `$this.Margin = 0, 8, 10, 0
-                            Command 'DangerExampleCommand' {
-                                [System.Windows.MessageBox]::Show('DangerButton style example clicked.', '$Name') | Out-Null
-                            }
-                        }
-
-                        Button 'GhostExampleButton' {
+                        Button 'ClearTaskButton' {
                             UseStyle 'GhostButton'
-                            `$this.Content = 'Ghost Action'
-                            `$this.Margin = 0, 8, 0, 0
-                            Command 'GhostExampleCommand' {
-                                [System.Windows.MessageBox]::Show('GhostButton style example clicked.', '$Name') | Out-Null
+                            `$this.Content = 'Clear'
+                            `$this.Margin = 0, 8, 10, 0
+                            Command 'ClearTaskCommand' {
+                                (Reference 'TaskNameInput').Text = ''
+                                `$State = (Reference 'Window').Tag
+                                `$State.LastSavedTask = ''
+                                `$State.CurrentView = 'Editing'
+                                `$State.IsDirty = `$true
+                                (Reference 'SaveResultText').Text = 'Draft cleared. Enter a new task name.'
                             }
                         }
+
                     }
 
-                    TextBlock 'NextStepText' {
-                        `$this.Margin = 0, 12, 0, 0
-                        `$this.Text = 'Replace these examples with your app workflow when ready.'
+                    TextBlock 'Step3Text' {
+                        `$this.Margin = 0, 12, 0, 4
+                        `$this.Text = '3) Observe app state changing'
+                    }
+
+                    TextBlock 'SaveResultText' {
+                        `$this.Margin = 0, 0, 0, 6
+                        `$this.Text = 'Saved task: (none yet)'
+                    }
+
+                    TextBlock 'CurrentViewText' {
+                        `$this.Margin = 0, 0, 0, 2
+                        BindProperty Text CurrentView -Source (Reference 'Window').Tag
+                    }
+
+                    TextBlock 'DirtyStateText' {
+                        `$this.Margin = 0, 0, 0, 0
+                        BindProperty Text IsDirty -Source (Reference 'Window').Tag
                     }
                 }
 
@@ -164,7 +205,7 @@ if (
     -not (Get-Module -Name WPF) -and
     (Get-Module -ListAvailable -Name WPF)
 ) {
-    Import-Module WPF -ErrorAction Stop
+    Import-Module WPF -ErrorAction Stop -Force
 }
 
 Import "`$PSScriptRoot/$Name.Styles.ps1"
@@ -175,10 +216,11 @@ Window 'Window' {
     `$this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     `$this.Width = 1000
     `$this.Height = 700
-    `$this.Tag = New-WPFObservableState @{
+    State @{
         # Add app state fields here.
         CurrentView = 'Home'
         IsDirty = `$false
+        LastSavedTask = ''
     }
 
     When Loaded {
@@ -270,6 +312,7 @@ Style Button {
 }
 
 Style 'PrimaryButton' Button {
+    ExtendStyle Button
     Setter Background '#0A84FF'
     Setter Foreground '#FFFFFF'
     Setter BorderBrush '#086FD5'
@@ -313,6 +356,7 @@ Style 'PrimaryButton' Button {
 }
 
 Style 'DangerButton' Button {
+    ExtendStyle Button
     Setter Background '#DC2626'
     Setter Foreground '#FFFFFF'
     Setter BorderBrush '#B91C1C'
@@ -356,6 +400,7 @@ Style 'DangerButton' Button {
 }
 
 Style 'GhostButton' Button {
+    ExtendStyle Button
     Setter Background '#FFFFFF'
     Setter Foreground '#1F2937'
     Setter BorderBrush '#B8C0CC'

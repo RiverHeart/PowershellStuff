@@ -29,6 +29,23 @@ function ScrollViewer {
         return
     }
 
+    # Factory mode: inside a Template block, produce a FrameworkElementFactory
+    # instead of a live ScrollViewer instance.
+    if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
+        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ScrollViewer])
+        $Factory.Name = $Name
+
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent) {
+            Add-WPFObject $Parent $Factory
+        }
+
+        Update-WPFObject $Factory $ScriptBlock
+
+        if (-not $Parent) { return $Factory }
+        return
+    }
+
     try {
         $ScrollViewer = [System.Windows.Controls.ScrollViewer] @{
             Name = $Name

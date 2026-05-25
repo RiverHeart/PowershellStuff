@@ -200,6 +200,12 @@ Button 'SaveButton' {
 }
 ```
 
+The generated non-bare `MyApp.DSL.ps1` also includes a tiny practical workflow starter:
+
+- A task-name input (`TaskNameInput`)
+- Save/Clear actions (`SaveTaskButton`, `ClearTaskButton`)
+- Simple observable state feedback (`CurrentView`, `IsDirty`)
+
 Specify a parent directory as the second parameter:
 
 ```powershell
@@ -217,6 +223,7 @@ New-WPFProject MyApp -Bare
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
 - [Autocomplete Guidance](./Docs/AutoComplete.md)
 - [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
+- [Chrome Adapter Proposal](./Docs/ChromeAdapterProposal.md)
 - [Documenting This DSL](./Docs/DocumentingTheDSL.md)
 - [Keyword Reference](./Docs/KeywordReference.md)
 - [Contribution Checklist](./Docs/ContributionChecklist.md)

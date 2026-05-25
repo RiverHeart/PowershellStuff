@@ -305,7 +305,7 @@ Window 'Window' {
                         BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
                     }
                     Button 'StopProcessButton' {
-                        UseStyle 'TaskManager.NativeButton'
+                        UseStyle 'TaskManager.StopButton'
                         [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
                         $this.Content = 'Stop Process'
                         Command 'StopProcessCommand' {
