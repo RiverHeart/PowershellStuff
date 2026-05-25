@@ -4,6 +4,8 @@
     "powershell.codeFormatting.addWhitespaceAroundPipe": true,
     "powershell.codeFormatting.useCorrectCasing": true,
     "powershell.codeFormatting.preset": "OTBS",
+    "powershell.scriptAnalysis.enable": true,
+    "powershell.scriptAnalysis.settingsPath": "./PSScriptAnalyzerSettings.psd1",
     "editor.wordBasedSuggestions": "off",
     "editor.tabCompletion": "on",
     "files.associations": {
