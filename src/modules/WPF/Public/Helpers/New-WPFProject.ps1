@@ -94,10 +94,98 @@ function New-WPFProject {
 
         Row 'Expand' {
             Column {
-                TextBlock 'WelcomeText' {
+                StackPanel 'StarterContent' {
                     `$this.Margin = 16
-                    `$this.Text = 'Welcome to $Name. Start building your app here.'
+                    `$this.VerticalAlignment = [VerticalAlignment]::Top
+
+                    TextBlock 'WelcomeText' {
+                        `$this.Margin = 0, 0, 0, 10
+                        `$this.Text = 'Welcome to $Name. Build one useful interaction in under five minutes.'
+                    }
+
+                    TextBlock 'Step1Text' {
+                        `$this.Margin = 0, 0, 0, 8
+                        `$this.Text = '1) Enter a task name'
+                    }
+
+                    TextBox 'TaskNameInput' {
+                        `$this.Width = 420
+                        `$this.Margin = 0, 0, 0, 8
+                        `$this.Text = 'Prepare onboarding draft'
+                        When TextChanged {
+                            `$State = (Reference 'Window').Tag
+                            if (`$null -ne `$State) {
+                                `$State.IsDirty = `$true
+                                `$State.CurrentView = 'Editing'
+                            }
+                        }
+                    }
+
+                    TextBlock 'Step2Text' {
+                        `$this.Margin = 0, 2, 0, 8
+                        `$this.Text = '2) Save or clear the draft'
+                    }
+
+                    StackPanel 'ActionRow' {
+                        `$this.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+                        `$this.Margin = 0, 0, 0, 0
+
+                        Button 'SaveTaskButton' {
+                            UseStyle 'PrimaryButton'
+                            `$this.Content = 'Save Task'
+                            `$this.Margin = 0, 8, 10, 0
+                            Command 'SaveTaskCommand' {
+                                `$TaskName = (Reference 'TaskNameInput').Text
+                                if ([string]::IsNullOrWhiteSpace(`$TaskName)) {
+                                    (Reference 'SaveResultText').Text = 'Enter a task name before saving.'
+                                    return
+                                }
+
+                                `$State = (Reference 'Window').Tag
+                                `$State.LastSavedTask = `$TaskName
+                                `$State.CurrentView = 'Saved'
+                                `$State.IsDirty = `$false
+                                (Reference 'SaveResultText').Text = "Saved task: `$TaskName"
+                            }
+                        }
+
+                        Button 'ClearTaskButton' {
+                            UseStyle 'GhostButton'
+                            `$this.Content = 'Clear'
+                            `$this.Margin = 0, 8, 10, 0
+                            Command 'ClearTaskCommand' {
+                                (Reference 'TaskNameInput').Text = ''
+                                `$State = (Reference 'Window').Tag
+                                `$State.LastSavedTask = ''
+                                `$State.CurrentView = 'Editing'
+                                `$State.IsDirty = `$true
+                                (Reference 'SaveResultText').Text = 'Draft cleared. Enter a new task name.'
+                            }
+                        }
+
+                    }
+
+                    TextBlock 'Step3Text' {
+                        `$this.Margin = 0, 12, 0, 4
+                        `$this.Text = '3) Observe app state changing'
+                    }
+
+                    TextBlock 'SaveResultText' {
+                        `$this.Margin = 0, 0, 0, 6
+                        `$this.Text = 'Saved task: (none yet)'
+                    }
+
+                    TextBlock 'CurrentViewText' {
+                        `$this.Margin = 0, 0, 0, 2
+                        BindProperty Text CurrentView -Source (Reference 'Window').Tag
+                    }
+
+                    TextBlock 'DirtyStateText' {
+                        `$this.Margin = 0, 0, 0, 0
+                        BindProperty Text IsDirty -Source (Reference 'Window').Tag
+                    }
                 }
+
             }
         }
 "@
@@ -117,7 +205,7 @@ if (
     -not (Get-Module -Name WPF) -and
     (Get-Module -ListAvailable -Name WPF)
 ) {
-    Import-Module WPF -ErrorAction Stop
+    Import-Module WPF -ErrorAction Stop -Force
 }
 
 Import "`$PSScriptRoot/$Name.Styles.ps1"
@@ -128,10 +216,11 @@ Window 'Window' {
     `$this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     `$this.Width = 1000
     `$this.Height = 700
-    `$this.Tag = New-WPFObservableState @{
+    State @{
         # Add app state fields here.
         CurrentView = 'Home'
         IsDirty = `$false
+        LastSavedTask = ''
     }
 
     When Loaded {
@@ -164,6 +253,195 @@ $ContentBlock
 .DESCRIPTION
     Add theme, brush, and style definitions in this file as your project grows.
 #>
+
+# Native-ish default button style for new projects.
+# Use this implicit style for standard actions, or apply one of the named styles below:
+#   UseStyle 'PrimaryButton'
+#   UseStyle 'DangerButton'
+#   UseStyle 'GhostButton'
+Style Button {
+    Setter Background '#F8FAFC'
+    Setter Foreground '#111827'
+    Setter BorderBrush '#8E9AAF'
+    Setter BorderThickness 2
+    Setter Padding '14,8,14,8'
+    Setter Margin '0,8,0,0'
+    Setter FontSize 14
+    Setter MinWidth 110
+    Setter Cursor ([System.Windows.Input.Cursors]::Hand)
+    Setter FocusVisualStyle `$null
+    Setter SnapsToDevicePixels `$true
+    Setter OverridesDefaultStyle `$true
+
+    Template {
+        Border 'ButtonChrome' {
+            Setter Background '#F8FAFC'
+            Setter BorderBrush '#8E9AAF'
+            Setter BorderThickness 2
+            Setter CornerRadius 6
+            Setter SnapsToDevicePixels `$true
+
+            ContentPresenter {
+                Setter Margin '14,8,14,8'
+                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
+                Setter VerticalAlignment ([VerticalAlignment]::Center)
+                Setter RecognizesAccessKey `$true
+            }
+        }
+
+        Trigger IsMouseOver `$true {
+            Setter Background '#E9EEF7' -Target 'ButtonChrome'
+            Setter BorderBrush '#7D8BA3' -Target 'ButtonChrome'
+        }
+
+        Trigger IsPressed `$true {
+            Setter Background '#DDE6F3' -Target 'ButtonChrome'
+            Setter BorderBrush '#6D7D98' -Target 'ButtonChrome'
+        }
+
+        Trigger IsKeyboardFocused `$true {
+            Setter BorderBrush '#2563EB' -Target 'ButtonChrome'
+        }
+
+        Trigger IsEnabled `$false {
+            Setter Background '#F3F4F6' -Target 'ButtonChrome'
+            Setter BorderBrush '#D6DCE5' -Target 'ButtonChrome'
+            Setter Foreground '#9CA3AF'
+        }
+    }
+}
+
+Style 'PrimaryButton' Button {
+    ExtendStyle Button
+    Setter Background '#0A84FF'
+    Setter Foreground '#FFFFFF'
+    Setter BorderBrush '#086FD5'
+
+    Template {
+        Border 'ButtonChrome' {
+            Setter Background '#0A84FF'
+            Setter BorderBrush '#086FD5'
+            Setter BorderThickness 2
+            Setter CornerRadius 6
+            Setter SnapsToDevicePixels `$true
+
+            ContentPresenter {
+                Setter Margin '14,8,14,8'
+                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
+                Setter VerticalAlignment ([VerticalAlignment]::Center)
+                Setter RecognizesAccessKey `$true
+            }
+        }
+
+        Trigger IsMouseOver `$true {
+            Setter Background '#0978E6' -Target 'ButtonChrome'
+            Setter BorderBrush '#075FBA' -Target 'ButtonChrome'
+        }
+
+        Trigger IsPressed `$true {
+            Setter Background '#0869C9' -Target 'ButtonChrome'
+            Setter BorderBrush '#064F97' -Target 'ButtonChrome'
+        }
+
+        Trigger IsKeyboardFocused `$true {
+            Setter BorderBrush '#1D4ED8' -Target 'ButtonChrome'
+        }
+
+        Trigger IsEnabled `$false {
+            Setter Background '#B6D7FF' -Target 'ButtonChrome'
+            Setter BorderBrush '#9FC5EF' -Target 'ButtonChrome'
+            Setter Foreground '#E8F2FF'
+        }
+    }
+}
+
+Style 'DangerButton' Button {
+    ExtendStyle Button
+    Setter Background '#DC2626'
+    Setter Foreground '#FFFFFF'
+    Setter BorderBrush '#B91C1C'
+
+    Template {
+        Border 'ButtonChrome' {
+            Setter Background '#DC2626'
+            Setter BorderBrush '#B91C1C'
+            Setter BorderThickness 2
+            Setter CornerRadius 6
+            Setter SnapsToDevicePixels `$true
+
+            ContentPresenter {
+                Setter Margin '14,8,14,8'
+                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
+                Setter VerticalAlignment ([VerticalAlignment]::Center)
+                Setter RecognizesAccessKey `$true
+            }
+        }
+
+        Trigger IsMouseOver `$true {
+            Setter Background '#C91F1F' -Target 'ButtonChrome'
+            Setter BorderBrush '#A31515' -Target 'ButtonChrome'
+        }
+
+        Trigger IsPressed `$true {
+            Setter Background '#B31B1B' -Target 'ButtonChrome'
+            Setter BorderBrush '#8F1212' -Target 'ButtonChrome'
+        }
+
+        Trigger IsKeyboardFocused `$true {
+            Setter BorderBrush '#991B1B' -Target 'ButtonChrome'
+        }
+
+        Trigger IsEnabled `$false {
+            Setter Background '#F3B0B0' -Target 'ButtonChrome'
+            Setter BorderBrush '#E39A9A' -Target 'ButtonChrome'
+            Setter Foreground '#FFF4F4'
+        }
+    }
+}
+
+Style 'GhostButton' Button {
+    ExtendStyle Button
+    Setter Background '#FFFFFF'
+    Setter Foreground '#1F2937'
+    Setter BorderBrush '#B8C0CC'
+
+    Template {
+        Border 'ButtonChrome' {
+            Setter Background '#FFFFFF'
+            Setter BorderBrush '#B8C0CC'
+            Setter BorderThickness 2
+            Setter CornerRadius 6
+            Setter SnapsToDevicePixels `$true
+
+            ContentPresenter {
+                Setter Margin '14,8,14,8'
+                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
+                Setter VerticalAlignment ([VerticalAlignment]::Center)
+                Setter RecognizesAccessKey `$true
+            }
+        }
+
+        Trigger IsMouseOver `$true {
+            Setter Background '#F8FAFC' -Target 'ButtonChrome'
+            Setter BorderBrush '#9EA8B8' -Target 'ButtonChrome'
+        }
+
+        Trigger IsPressed `$true {
+            Setter Background '#F1F5F9' -Target 'ButtonChrome'
+            Setter BorderBrush '#8B97AA' -Target 'ButtonChrome'
+        }
+
+        Trigger IsKeyboardFocused `$true {
+            Setter BorderBrush '#2563EB' -Target 'ButtonChrome'
+        }
+
+        Trigger IsEnabled `$false {
+            Setter Background '#F8FAFC' -Target 'ButtonChrome'
+            Setter BorderBrush '#D2D9E3' -Target 'ButtonChrome'
+            Setter Foreground '#A1AAB7'
+        }
+    }
+}
 "@ | Set-Content -Path $StyleScriptPath -Encoding UTF8 -Force
 
     @"

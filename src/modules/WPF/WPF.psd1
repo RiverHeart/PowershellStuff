@@ -81,6 +81,7 @@ FunctionsToExport = @(
     # Class Helpers
     'New-WPFFileNavigator'
     'New-WPFRelayCommand'
+    'New-WPFValueConverter'
 
     # Completers
     'Complete-WPFApplicationCommand'
@@ -95,6 +96,8 @@ FunctionsToExport = @(
     'Border'
     'ContentPresenter'
     'Button'
+    'DataGrid'
+    'DataGridTextColumn'
     'DatePicker'
     'DockPanel'
     'Image'
@@ -114,9 +117,12 @@ FunctionsToExport = @(
     # DSL/Helpers
     'Watch'
     'Binding'
+    'BindProperty'
     'BoundTo'
     'Brush'
+    'Chrome'
     'DataTrigger'
+    'ExtendStyle'
     'Execute'
     'CanExecute'
     'Import'
@@ -124,9 +130,11 @@ FunctionsToExport = @(
     'Reference'
     'Resource'
     'Setter'
+    'State'
     'Style'
     'Theme'
     'Template'
+    'TimedEvent'
     'Trigger'
     'UseStyle'
     'Watch'
@@ -143,6 +151,7 @@ FunctionsToExport = @(
     'Convert-SvgToXaml'
     'Convert-WPFObjectToXaml'
     'Find-WPFChildNode'
+    'Get-WPFChromeAdapter'
     'Get-WPFDarkModePreference'
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'
@@ -152,6 +161,7 @@ FunctionsToExport = @(
     'New-WPFProject'
     'New-WPFSize'
     'New-WPFVariableList'
+    'Register-WPFChromeAdapter'
     'Register-WPFObject'
     'Set-WPFClipboard'
     'Set-WPFWindowFullScreen'
@@ -165,7 +175,7 @@ FunctionsToExport = @(
 CmdletsToExport = '*'
 
 # Variables to export from this module
-VariablesToExport = @('LastDialogResult')
+VariablesToExport = @('LastDialogResult', 'LastDialogCloseReason')
 
 # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
 AliasesToExport = '*'

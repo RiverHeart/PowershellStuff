@@ -1,4 +1,4 @@
-Describe 'DockPanel' {
+Describe 'DockPanel' -Tag 'DockPanel' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

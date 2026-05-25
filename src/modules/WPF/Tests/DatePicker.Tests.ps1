@@ -1,4 +1,4 @@
-Describe 'DatePicker' {
+Describe 'DatePicker' -Tag 'DatePicker' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

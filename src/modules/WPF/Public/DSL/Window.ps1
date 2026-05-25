@@ -42,6 +42,7 @@ function Window {
         }
         Set-WPFControlContext -InputObject $Window -ContextId $ContextId
         Register-WPFObject -Name $Name -InputObject $Window -ContextId $ContextId -Overwrite
+        $Window.Resources['WPFDialogCloseReason'] = 'User'
 
         $Window.Add_Closed({
             param($Sender, $Args)
@@ -59,6 +60,30 @@ function Window {
 
     # Window is always root; do not auto-attach to parent
     # Use the Owner property to establish ownership relationships
+
+    $ShouldAutoClose = $false
+    $EffectiveAutoCloseSeconds = 0.0
+    $CallerBoundParameters = $PSCmdlet.GetVariableValue('PSBoundParameters', $null)
+    $CallerAutoCloseSeconds = $PSCmdlet.GetVariableValue('AutoCloseSeconds', $null)
+
+    # Prefer explicit caller AutoCloseSeconds. Fallback to WPF_AUTO_CLOSE_SECONDS.
+    if ($CallerBoundParameters -and
+        ($CallerBoundParameters -is [System.Collections.IDictionary]) -and
+        $CallerBoundParameters.ContainsKey('AutoCloseSeconds')
+    ) {
+        $ShouldAutoClose = $true
+        $EffectiveAutoCloseSeconds = [double] $CallerAutoCloseSeconds
+    } else {
+        $EnvironmentAutoCloseSeconds = Get-WPFEnvironmentAutoCloseSeconds
+        if ($null -ne $EnvironmentAutoCloseSeconds) {
+            $ShouldAutoClose = $true
+            $EffectiveAutoCloseSeconds = [double] $EnvironmentAutoCloseSeconds
+        }
+    }
+
+    if ($ShouldAutoClose) {
+        Enable-WPFAutoClose -Window $Window -AutoCloseSeconds ([double] $EffectiveAutoCloseSeconds)
+    }
 
     # NOTE: Allow exceptions from child objects to bubble up
     Write-Debug "Processing child elements for $Name (Window)"

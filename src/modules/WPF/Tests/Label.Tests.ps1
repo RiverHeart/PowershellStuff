@@ -1,4 +1,4 @@
-Describe 'Label' {
+Describe 'Label' -Tag 'Label' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

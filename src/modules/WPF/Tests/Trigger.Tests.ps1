@@ -1,4 +1,4 @@
-Describe 'Trigger' {
+Describe 'Trigger' -Tag 'Trigger' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

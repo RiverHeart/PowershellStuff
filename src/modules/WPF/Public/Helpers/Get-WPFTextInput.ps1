@@ -40,7 +40,10 @@ using namespace System.Windows.Media
     accepted.
 
 .EXAMPLE
-    $Name = Get-WPFTextInput -Prompt 'Enter display name:' -Title 'Profile' -DefaultValue 'alex'
+    $Name = Get-WPFTextInput `
+        -Prompt 'Enter display name:' `
+        -Title 'Profile' `
+        -DefaultValue 'John Doe'
 
 .NOTES
     Future improvements may include culture-specific live hinting,

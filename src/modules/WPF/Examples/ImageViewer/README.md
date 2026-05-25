@@ -20,6 +20,37 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Supports Dark/Light modes
 * Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
 
+## CLI Automation Flags
+
+`ImageViewer.DSL.ps1` supports optional script parameters for automation:
+
+* `-FilePath <string>`: Opens a file on startup.
+* `-SlideshowIntervalSeconds <double>`: Starts slideshow automatically at the specified interval.
+* `-AutoCloseSeconds <double>`: Closes the window automatically after first render, then the specified delay. Use `0` to close immediately after first render.
+* `-StartFullscreen`: Enters fullscreen mode on startup.
+
+Example runs:
+
+```powershell
+# Open file, start slideshow at 2.5s, close after 10s
+.\ImageViewer.DSL.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2.5 -AutoCloseSeconds 10
+
+# Quick unattended auto-close run
+.\ImageViewer.DSL.ps1 -AutoCloseSeconds 0
+
+# Environment-driven auto-close run
+$env:WPF_AUTO_CLOSE_SECONDS = '0'
+.\ImageViewer.DSL.ps1
+Remove-Item Env:WPF_AUTO_CLOSE_SECONDS -ErrorAction SilentlyContinue
+```
+
+For repeatable automation, use the wrapper script:
+
+```powershell
+# Open a file, run slideshow at 2s, auto-close after 10s
+.\Invoke-ImageViewerSmoke.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2 -AutoCloseSeconds 10
+```
+
 ## TODO
 
 * Create zoom slider
@@ -30,3 +61,4 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)
 * Show user-friendly dialogs for image load/open errors
 * Persist last opened folder between runs
+* Sometimes when an image is loaded, it seems like something is stealing focus from the window because the keyboard events for forward/back don't work.

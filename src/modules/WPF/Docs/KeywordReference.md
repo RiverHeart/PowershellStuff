@@ -32,6 +32,16 @@ Behavior notes:
 
 Creates a WPF Window.
 
+When caller scope contains an `AutoCloseSeconds` bound parameter, auto-close is
+wired automatically after first render (`ContentRendered`).
+
+For unattended automation, set `WPF_AUTO_CLOSE_SECONDS` to a numeric value.
+Set `WPF_AUTO_CLOSE_SECONDS=0` to close immediately after first render while
+still exercising startup/render path.
+
+After `Show-WPFWindow` returns, inspect `LastDialogCloseReason` to distinguish
+between a normal/user close (`User`) and DSL auto-close (`AutoClose`).
+
 ```powershell
 Window 'MainWindow' {
     $this.Title = 'My App'
@@ -184,6 +194,40 @@ DockPanel 'Layout' {
 }
 ```
 
+### DataGrid
+
+Creates a DataGrid. Use `$this.ItemsSource` to bind data and `$this.AutoGenerateColumns` to control column generation.
+
+```powershell
+DataGrid 'ProcessList' {
+    $this.AutoGenerateColumns = $false
+    $this.ItemsSource = Get-Process
+    $this.Columns.Add([System.Windows.Controls.DataGridTextColumn] @{
+        Header  = 'Name'
+        Binding = [System.Windows.Data.Binding] 'ProcessName'
+    })
+}
+```
+
+### DataGridTextColumn
+
+Creates a DataGridTextColumn and auto-attaches it when declared inside a `DataGrid` block.
+
+The second argument can be either a binding path string or a pre-built `Binding` object.
+
+```powershell
+DataGrid 'ProcessList' {
+    DataGridTextColumn 'Name' 'ProcessName' {
+        $this.Width = [System.Windows.Controls.DataGridLength]::new(3, [System.Windows.Controls.DataGridLengthUnitType]::Star)
+    }
+
+    DataGridTextColumn 'CPU' (Binding 'CpuPercent') {
+        UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
+        UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+    }
+}
+```
+
 ### DatePicker
 
 Creates a DatePicker.
@@ -276,7 +320,96 @@ When Click {
 }
 ```
 
+### TimedEvent
+
+Creates and starts a DispatcherTimer, registers it by name for `Reference`, and ensures cleanup through window lifecycle registry clearing.
+
+TimedEvent requires an explicit interval in milliseconds.
+
+In async mode, `-OnComplete` receives two parameters:
+
+- `Result`: array of objects emitted by `-Work`
+- `Sender`: the DispatcherTimer instance
+
+```powershell
+TimedEvent 'RefreshProcess' 3000 {
+    param($sender, $e)
+    # Periodic work
+}
+```
+
+```powershell
+# Async mode: run work in a background runspace and update UI on completion
+TimedEvent 'RefreshData' 3000 `
+  -Work {
+      Get-Process
+  } `
+  -OnComplete {
+      param($processes, $sender)
+      # $sender is the DispatcherTimer
+      # Update UI state here
+      $null = $processes
+      $null = $sender
+}
+```
+
 ## Binding and Resources
+
+### State
+
+Creates observable state for the current DSL parent, enabling reactive UI updates via bindings and callbacks.
+
+The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or watched via the `Watch` keyword.
+
+PowerShell-side callback hooks are also supported through `AddBinding()`, which fires when the underlying property changes.
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Count = 0
+        IsReady = $false
+        CurrentFile = $null
+    }
+
+    # Now use the state properties in bindings
+    TextBlock 'Counter' {
+        BindProperty Text Count -Self
+    }
+}
+```
+
+State properties are also accessible via `Window.Tag`:
+
+State can also be attached to other DSL parents that expose a writable `Tag` property, though the root `Window` is the typical place to keep app-level state.
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Count = 0
+    }
+
+    Button 'Increment' {
+        When Click {
+            $window = Reference 'Window'
+            $window.Tag.Count++
+        }
+    }
+}
+```
+
+Watch state changes with the `Watch` keyword:
+
+```powershell
+Window 'MyApp' {
+    State @{
+        IsLoading = $false
+    }
+
+    TextBlock 'Status' {
+        Watch Visibility Window.Tag.IsLoading -Invert
+    }
+}
+```
 
 ### Watch
 
@@ -285,6 +418,37 @@ Binds a target property to an observable state path.
 ```powershell
 Watch Visibility Window.Tag.IsFullScreen -Invert
 Watch IsEnabled Window.Tag.IsFileLoaded
+```
+
+### BindProperty
+
+Binds a dependency property to a binding path, source, or relative source.
+
+Use this to bind regular properties (like `TextBlock.Text`) to other control properties or observable sources.
+
+```powershell
+TextBlock 'ProcessCount' {
+    BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
+}
+```
+
+```powershell
+Rectangle 'Loading' {
+    BindProperty Visibility IsLoading -Self
+}
+```
+
+With a value converter:
+
+```powershell
+Label 'Status' {
+    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
+        $this.Converter = New-WPFValueConverter {
+            param($File)
+            if ($File) { "File: $($File.Name)" } else { 'No file' }
+        }
+    }
+}
 ```
 
 ### Binding
@@ -300,6 +464,19 @@ DataTrigger (Binding 'IsEnabled' -Self) $false {
 ```powershell
 DataTrigger (Binding 'IsEnabled' -TemplatedParent) $false {
     Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+### ValueConverter
+
+Creates an `IValueConverter` from PowerShell scriptblocks for use with WPF bindings.
+
+```powershell
+Binding 'WorkingSet64' -ScriptBlock {
+    $this.Converter = New-WPFValueConverter {
+        param($Value)
+        [math]::Round($Value / 1MB, 2)
+    }
 }
 ```
 
@@ -345,13 +522,88 @@ Style Button {
 }
 ```
 
+### ExtendStyle
+
+Sets `BasedOn` for the current style.
+
+Use target type names to inherit from an implicit style:
+
+```powershell
+Style Button {
+    Setter FontSize 14
+}
+
+Style 'PrimaryButton' Button {
+    ExtendStyle Button
+    Setter Background '#0A84FF'
+}
+```
+
+Use named style keys to inherit from another named style:
+
+```powershell
+Style 'ButtonBase' Button {
+    Setter Padding '12,6,12,6'
+}
+
+Style 'ButtonAccent' Button {
+    ExtendStyle 'ButtonBase'
+    Setter Background '#0A84FF'
+}
+```
+
 ### Setter
 
-Adds a setter to the current style.
+Adds a setter in style, trigger, or template-factory contexts.
+
+`Setter` resolves dependency properties for the current target context.
+In template-backed trigger contexts, `-Target` can route values to named parts.
+With `Trigger -Scope Chrome`, use `Setter ... -Scope Chrome` to target the
+generated chrome part.
 
 ```powershell
 Setter Background ButtonBackground -Resource
 Setter Margin '0,8,0,0'
+```
+
+Template-backed trigger contexts can route setters to the generated chrome part:
+
+```powershell
+Setter BorderBrush '#2563EB' -Scope Chrome
+```
+
+`-Scope Chrome` is supported in trigger contexts created by `Trigger -Scope Chrome`.
+
+### Chrome
+
+Defines a simplified template shell for supported controls.
+
+The module includes a default adapter for `Button` styles. Additional target
+types can be enabled by registering adapters with `Register-WPFChromeAdapter`.
+Module-provided adapters are defined in dedicated adapter files under
+`src/modules/WPF/Private/ChromeAdapters`.
+Module-provided adapter factory functions use the `New-WPFFooChromeAdapter`
+naming convention.
+
+When a control is unsupported, the error reports that no adapter is registered
+and lists currently registered adapter names.
+
+Set `WPF_CHROME_WARN_UNMAPPED_SETTERS=1` to emit warnings for style setters that
+are not copied into the generated chrome shell/content mapping. This is intended
+as an opt-in debugging aid while keeping default output quiet.
+
+```powershell
+Style 'PrimaryButton' Button {
+    Setter Background '#0A84FF'
+    Setter Foreground '#FFFFFF'
+    Setter Padding '14,8,14,8'
+
+    Chrome {
+        Setter CornerRadius 6
+        Setter BorderBrush '#086FD5'
+        Setter BorderThickness 2
+    }
+}
 ```
 
 ### Trigger
@@ -370,6 +622,14 @@ Style 'PrimaryButton' Button {
 # ControlTemplate scope supports SourceName and Setter -Target
 Trigger IsEnabled $false -SourceName 'TemplateBorder' {
     Setter Opacity 0.6 -Target 'TemplateBorder'
+}
+```
+
+`Trigger` also supports `-Scope Chrome` inside `Style` blocks that define `Chrome`:
+
+```powershell
+Trigger IsEnabled $false -Scope Chrome {
+    Setter BorderBrush '#2563EB'
 }
 ```
 
@@ -422,7 +682,51 @@ Applies a named style to the current object.
 UseStyle 'PrimaryButton'
 ```
 
+`UseStyle` also supports applying styles to `DataGridTextColumn` style slots:
+
+```powershell
+UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
+UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+```
+
 ## Lookup and Composition Helpers
+
+### Get-WPFChromeAdapter
+
+Returns currently registered Chrome adapters.
+
+```powershell
+Get-WPFChromeAdapter
+Get-WPFChromeAdapter -TargetType ([System.Windows.Controls.Button])
+```
+
+### Register-WPFChromeAdapter
+
+Registers or replaces a Chrome adapter mapping for a target control type.
+
+```powershell
+$adapterParams = @{
+    TargetType = [System.Windows.Controls.Primitives.ToggleButton]
+    ShellType = [System.Windows.Controls.Border]
+    PartName = 'ToggleChrome'
+    ShellPropertyMap = @{
+        Background = [System.Windows.Controls.Border]::BackgroundProperty
+        BorderBrush = [System.Windows.Controls.Border]::BorderBrushProperty
+        BorderThickness = [System.Windows.Controls.Border]::BorderThicknessProperty
+    }
+    ContentPropertyMap = @{
+        Padding = [System.Windows.FrameworkElement]::MarginProperty
+        HorizontalContentAlignment = [System.Windows.FrameworkElement]::HorizontalAlignmentProperty
+        VerticalContentAlignment = [System.Windows.FrameworkElement]::VerticalAlignmentProperty
+    }
+    ContentDefaults = @{
+        HorizontalContentAlignment = [System.Windows.HorizontalAlignment]::Center
+        VerticalContentAlignment = [System.Windows.VerticalAlignment]::Center
+    }
+}
+
+Register-WPFChromeAdapter @adapterParams
+```
 
 ### Reference
 
@@ -448,7 +752,8 @@ Import './functions/*.ps1'
 
 Shows a WPF window modally and returns its dialog result.
 
-For unattended automation, set environment variable `WPF_SMOKE_TEST=1` (also accepts `true`, `yes`, `on`) to auto-close windows after first render.
+For unattended automation, `Show-WPFWindow` also honors `WPF_AUTO_CLOSE_SECONDS`
+for direct `System.Windows.Window` instances that were not created through the DSL.
 
 ```powershell
 Window 'Window' {
@@ -459,6 +764,13 @@ Window 'Window' {
 ### New-WPFProject
 
 Creates a generic WPF DSL project scaffold with a starter window script, style file, and conventional folders.
+
+Default (non-`-Bare`) scaffolds include a small starter content area with example action buttons,
+implemented using `StackPanel` layout only, and a style palette in the generated styles file:
+
+- `PrimaryButton`
+- `DangerButton`
+- `GhostButton`
 
 ```powershell
 New-WPFProject MyApp
@@ -493,3 +805,4 @@ The keyword contract is intentionally simple:
 - Prefer $this for current-object configuration.
 
 If behavior changes are needed, update examples and tests in the same change.
+

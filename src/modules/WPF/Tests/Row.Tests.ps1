@@ -1,4 +1,4 @@
-Describe 'Row' {
+Describe 'Row' -Tag 'Row' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

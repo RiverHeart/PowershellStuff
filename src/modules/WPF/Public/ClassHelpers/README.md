@@ -1,0 +1,1 @@
+Class helpers are cmdlets that wrap and expose classes. This is desirable because the only way to import a class in Powershell is with `using module Foobar` and but cmdlets are exported with a simple `Import-Module Foobar`. The cmdlets are able to reference the unexported classes by virtue of living in the same module.

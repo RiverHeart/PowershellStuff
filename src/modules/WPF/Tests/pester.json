@@ -1,0 +1,15 @@
+{
+  "TestSuite": "WPF",
+  "Run": {
+    "Path": [
+      "."
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  },
+  "Filter": {
+    "Tag": [],
+    "ExcludeTag": []
+  }
+}

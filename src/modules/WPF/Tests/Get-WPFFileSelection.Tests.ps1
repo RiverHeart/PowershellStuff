@@ -1,4 +1,4 @@
-Describe 'Get-WPFFileSelection' {
+Describe 'Get-WPFFileSelection' -Tag 'Get-WPFFileSelection' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

@@ -4,10 +4,8 @@
 
 .DESCRIPTION
     Activates the given window, calls ShowDialog(), stores the returned value in
-    $global:LastDialogResult, and outputs the dialog result.
-
-    In smoke-test mode (WPF_SMOKE_TEST enabled), the window auto-closes after first
-    render so UI scripts can run unattended in automation.
+    $global:LastDialogResult, stores the close reason in
+    $global:LastDialogCloseReason, and outputs the dialog result.
 
 .PARAMETER Window
     The WPF window instance to display.
@@ -27,27 +25,23 @@ function Show-WPFWindow {
     )
 
     process {
-        $SmokeAutoCloseHandler = $null
+        $ContextId = $null
+        $EnvironmentAutoCloseSeconds = $null
 
         try {
-            if (Test-WPFSmokeTestMode) {
-                Write-Debug "Smoke test mode enabled: Adding auto-close handler to '$($Window.Name)'"
-                $SmokeAutoCloseHandler = {
-                    param($Sender, $Args)
-
-                    try {
-                        if ($null -eq $Sender.DialogResult) {
-                            # Closing via DialogResult keeps ShowDialog semantics intact.
-                            $Sender.DialogResult = $false
-                        } else {
-                            $Sender.Close()
-                        }
-                    } catch {
-                        $Sender.Close()
-                    }
+            $ContextId = Get-WPFControlContextId -InputObject $Window
+            if ($ContextId) {
+                if (-not $Window.Resources.Contains('WPFDialogCloseReason')) {
+                    $Window.Resources['WPFDialogCloseReason'] = 'User'
                 }
+            } elseif (-not $Window.Resources.Contains('WPFDialogCloseReason')) {
+                $Window.Resources['WPFDialogCloseReason'] = 'User'
+            }
 
-                $Window.Add_ContentRendered($SmokeAutoCloseHandler)
+            $EnvironmentAutoCloseSeconds = Get-WPFEnvironmentAutoCloseSeconds
+            if (($null -ne $EnvironmentAutoCloseSeconds) -and
+                (-not $Window.Resources.Contains('WPFAutoCloseConfigured') -or -not $Window.Resources['WPFAutoCloseConfigured'])) {
+                Enable-WPFAutoClose -Window $Window -AutoCloseSeconds ([double] $EnvironmentAutoCloseSeconds)
             }
 
             # Activate before entering ShowDialog so the window gets keyboard focus at startup.
@@ -56,13 +50,24 @@ function Show-WPFWindow {
             # Set globally so you can reference `$LastDialogResult` plainly from the main script.
             $DialogResult = $Window.ShowDialog()
             $global:LastDialogResult = $DialogResult
+
+            if ($Window.Resources.Contains('WPFDialogCloseReason')) {
+                $global:LastDialogCloseReason = [string] $Window.Resources['WPFDialogCloseReason']
+            } else {
+                $global:LastDialogCloseReason = 'User'
+            }
             Write-Output $DialogResult
         } finally {
-            if ($SmokeAutoCloseHandler) {
-                $Window.Remove_ContentRendered($SmokeAutoCloseHandler)
+            if ($Window.IsLoaded) {
+                $Window.Close()
             }
 
-            $Window.Close()
+            # Only remove the shown window's context when it actually has one.
+            # Helper dialogs created outside the DSL are not registered and must
+            # not trigger active-context fallback removal.
+            if ($ContextId) {
+                Remove-WPFControlContext -ContextId $ContextId
+            }
         }
     }
 }

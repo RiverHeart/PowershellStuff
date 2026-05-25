@@ -1,4 +1,4 @@
-Describe 'Get-WPFTextInput' {
+Describe 'Get-WPFTextInput' -Tag 'Get-WPFTextInput' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }

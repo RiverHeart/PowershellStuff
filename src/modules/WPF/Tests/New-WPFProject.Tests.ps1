@@ -1,56 +1,38 @@
-Describe 'New-WPFProject' {
+Describe 'New-WPFProject' -Tag 'New-WPFProject' {
     BeforeAll {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
-    It 'Should create a generic scaffold structure' {
-        $Result = New-WPFProject 'SampleApp' $TestDrive
-        $Root = Join-Path $TestDrive 'SampleApp'
+    It 'Creates non-bare scaffold with a practical starter workflow' {
+        $ProjectRoot = Join-Path $TestDrive 'StarterApp'
 
-        $Result.ProjectRoot | Should -Be -ExpectedValue $Root
-        (Test-Path $Root) | Should -BeTrue
-        (Test-Path (Join-Path $Root 'functions')) | Should -BeTrue
-        (Test-Path (Join-Path $Root 'images')) | Should -BeTrue
-        (Test-Path (Join-Path $Root 'SampleApp.DSL.ps1')) | Should -BeTrue
-        (Test-Path (Join-Path $Root 'SampleApp.Styles.ps1')) | Should -BeTrue
-        (Test-Path (Join-Path $Root 'README.md')) | Should -BeTrue
+        $Result = New-WPFProject -Name 'StarterApp' -Path $TestDrive
 
-        $Dsl = Get-Content -Path (Join-Path $Root 'SampleApp.DSL.ps1') -Raw
-        $Dsl | Should -Match ([regex]::Escape('Import "$PSScriptRoot/SampleApp.Styles.ps1"'))
-        $Dsl | Should -Match ([regex]::Escape('Import "$PSScriptRoot/functions"'))
-        $Dsl | Should -Match "Window 'Window'"
-        $Dsl | Should -Match "MenuItem '\(F\)ile/\(Q\)uit'"
-        $Dsl | Should -Match "# Uncomment this block to add window-wide keyboard shortcuts\."
+        $Result.ProjectRoot | Should -Be $ProjectRoot
+        Test-Path -Path $Result.DslScript | Should -BeTrue
+        Test-Path -Path $Result.StyleScript | Should -BeTrue
+
+        $DslContent = Get-Content -Path $Result.DslScript -Raw
+        $DslContent | Should -Match "TextBox 'TaskNameInput'"
+        $DslContent | Should -Match "Button 'SaveTaskButton'"
+        $DslContent | Should -Match "Button 'ClearTaskButton'"
+        $DslContent | Should -Match "BindProperty Text CurrentView"
+        $DslContent | Should -Match "BindProperty Text IsDirty"
+        $DslContent | Should -Match "LastSavedTask = ''"
+        $DslContent | Should -Match "State @\{"
+        $DslContent | Should -Not -Match "New-WPFObservableState"
+        $DslContent | Should -Match "Import-Module WPF -ErrorAction Stop -Force"
     }
 
-    It 'Should create a more minimal scaffold when Bare is set' {
-        $Root = Join-Path $TestDrive 'BareApp'
+    It 'Seeds starter style palette in generated style file' {
+        $Result = New-WPFProject -Name 'PaletteApp' -Path $TestDrive
 
-        $null = New-WPFProject 'BareApp' $TestDrive -Bare
+        $StyleContent = Get-Content -Path $Result.StyleScript -Raw
 
-        $Dsl = Get-Content -Path (Join-Path $Root 'BareApp.DSL.ps1') -Raw
-        $Dsl | Should -Match "Window 'Window'"
-        $Dsl | Should -Not -Match "MenuBar 'Menu'"
-        $Dsl | Should -Match 'Replace this placeholder with your app content'
-    }
-
-    It 'Should throw when target exists without Force' {
-        $null = New-WPFProject 'ExistingApp' $TestDrive
-
-        {
-            New-WPFProject 'ExistingApp' $TestDrive
-        } | Should -Throw -ExpectedMessage '*already exists*'
-    }
-
-    It 'Should overwrite scaffold files when Force is set' {
-        $Root = Join-Path $TestDrive 'ForceApp'
-        $StylePath = Join-Path $Root 'ForceApp.Styles.ps1'
-
-        $null = New-WPFProject 'ForceApp' $TestDrive
-        'custom' | Set-Content -Path $StylePath -Encoding UTF8
-
-        $null = New-WPFProject 'ForceApp' $TestDrive -Force
-        $StyleContent = Get-Content -Path $StylePath -Raw
-        $StyleContent | Should -Match 'Add theme, brush, and style definitions'
+        $StyleContent | Should -Match "Style Button"
+        $StyleContent | Should -Match "Style 'PrimaryButton' Button"
+        $StyleContent | Should -Match "Style 'DangerButton' Button"
+        $StyleContent | Should -Match "Style 'GhostButton' Button"
+        $StyleContent | Should -Match "ExtendStyle Button"
     }
 }

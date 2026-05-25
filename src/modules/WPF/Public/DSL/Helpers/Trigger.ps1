@@ -38,6 +38,10 @@ function Trigger {
         [scriptblock] $ScriptBlock,
 
         [Parameter()]
+        [ValidateSet('Chrome')]
+        [string] $Scope,
+
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [string] $SourceName,
 
@@ -53,9 +57,29 @@ function Trigger {
         }
 
         if ($target -is [System.Windows.Style]) {
-            $targetType = $target.TargetType
-            $triggerOwner = 'Style'
+            if ($Scope -eq 'Chrome') {
+                $chromeTemplate = $target.PSObject.Properties['_WPFChromeTemplate'].Value
+                $chromeTargetName = $target.PSObject.Properties['_WPFChromeTargetName'].Value
+                $chromeTargetType = $target.PSObject.Properties['_WPFChromeTargetType'].Value
+
+                if ($null -eq $chromeTemplate -or [string]::IsNullOrWhiteSpace($chromeTargetName) -or $null -eq $chromeTargetType) {
+                    Write-Error 'Trigger: -Scope Chrome requires a Chrome block in the same style.'
+                    return
+                }
+
+                $target = $chromeTemplate
+                $targetType = $target.TargetType
+                $triggerOwner = 'ControlTemplate'
+            } else {
+                $targetType = $target.TargetType
+                $triggerOwner = 'Style'
+            }
         } elseif ($target -is [System.Windows.Controls.ControlTemplate]) {
+            if ($Scope) {
+                Write-Error 'Trigger: -Scope is only supported when Trigger is used inside Style.'
+                return
+            }
+
             $targetType = $target.TargetType
             $triggerOwner = 'ControlTemplate'
         } else {
@@ -115,6 +139,12 @@ function Trigger {
 
         $trigger | Add-Member -NotePropertyName '_WPFTriggerTargetType' -NotePropertyValue $targetType -Force
         $trigger | Add-Member -NotePropertyName '_WPFTriggerOwnerType' -NotePropertyValue $triggerOwner -Force
+
+        if ($Scope -eq 'Chrome') {
+            $trigger | Add-Member -NotePropertyName '_WPFChromeTargetName' -NotePropertyValue $chromeTargetName -Force
+            $trigger | Add-Member -NotePropertyName '_WPFChromeTargetType' -NotePropertyValue $chromeTargetType -Force
+            $trigger | Add-Member -NotePropertyName '_WPFDefaultSetterScope' -NotePropertyValue 'Chrome' -Force
+        }
 
         $PSVars = New-WPFVariableList -InputObject $trigger
         $null = $ScriptBlock.InvokeWithContext($null, $PSVars)

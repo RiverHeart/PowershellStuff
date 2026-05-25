@@ -15,12 +15,14 @@ function UseStyle {
     [CmdletBinding()]
     [OutputType([void])]
     param(
-        [Parameter(Mandatory, Position = 0)]
+        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
 
-        [Parameter(ValueFromPipeline)]
-        [object] $InputObject
+        [object] $InputObject,
+
+        [ValidateSet('Style', 'HeaderStyle', 'ElementStyle')]
+        [string] $TargetType = 'Style'
     )
 
     process {
@@ -35,11 +37,24 @@ function UseStyle {
             return
         }
 
+        $style = $script:WPFStyleTable[$Name]
+
+        # Special handling for DataGridTextColumn
+        $isDataGridTextColumn = $target.GetType().FullName -eq 'System.Windows.Controls.DataGridTextColumn'
+        if ($isDataGridTextColumn -and $TargetType -in @('HeaderStyle','ElementStyle')) {
+            if ($TargetType -eq 'HeaderStyle') {
+                $target.HeaderStyle = $style
+            } elseif ($TargetType -eq 'ElementStyle') {
+                $target.ElementStyle = $style
+            }
+            return
+        }
+
+        # Default: assign to Style property
         if (-not $target.PSObject.Properties['Style']) {
             Write-Error "UseStyle: Target type '$($target.GetType().FullName)' does not expose a Style property."
             return
         }
-
-        $target.Style = $script:WPFStyleTable[$Name]
+        $target.Style = $style
     }
 }
