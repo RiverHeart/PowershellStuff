@@ -11,10 +11,6 @@ if (-not $Script:WPFControlRegistry) {
     }
 }
 
-if (-not $Script:WPFDialogCloseReasonByContextId) {
-    $Script:WPFDialogCloseReasonByContextId = @{}
-}
-
 if (-not $Script:WPFThemeTable) {
     $Script:WPFThemeTable = @{}
 }
