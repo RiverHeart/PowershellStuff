@@ -104,10 +104,11 @@ public class ScriptValueConverter : IValueConverter
 }
 "@ -ReferencedAssemblies @(
         'System'
-    'System.Collections'
+        'System.Collections'
         'System.Core'
         'System.Management.Automation'
-    'System.ObjectModel'
+        'System.ObjectModel'
+        'System.Xaml'
         'PresentationFramework'
     )
 }

@@ -32,6 +32,10 @@ using namespace System.Windows.Controls
     (for example, Count) automatically fall back to GeneratedClr unless you
     explicitly request ExpandoObject.
 
+.NOTES
+    Any C# code generation in this function must be compatible with Windows PowerShell 5.1.
+    Do not use any syntax or APIs that are not supported in that version of PowerShell.
+
 .EXAMPLE
     $state = New-WPFObservableState @{ IsFullScreen = $false; Count = 0 }
     $state.IsFullScreen = $true  # automatically updates any WPF bindings and callbacks
@@ -165,7 +169,11 @@ $($setSwitchBuilder.ToString())
 
     protected void OnPropertyChanged(string propertyName)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        var handler = PropertyChanged;
+        if (handler != null)
+        {
+            handler(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }
 "@
@@ -232,7 +240,11 @@ public class WPFDynamicObservableState : DynamicObject, INotifyPropertyChanged
             return;
 
         _storage[propertyName] = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        PropertyChangedEventHandler handler = PropertyChanged;
+        if (handler != null)
+        {
+            handler(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }
 "@

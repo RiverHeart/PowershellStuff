@@ -659,38 +659,47 @@ if ($SearchOnly) {
 if ($PassThru) {
     if ($SearchOnly) {
         if ($PassThruFormat -eq 'Detailed') {
-            $searchHits
+            Write-Output -NoEnumerate ($searchHits.ToArray())
             return
         }
 
-        $searchHits |
-            Group-Object -Property FilePath, RuleName |
-            ForEach-Object {
-                $first = $_.Group | Select-Object -First 1
-                [pscustomobject]@{
-                    FilePath    = $first.FilePath
-                    RuleName    = $first.RuleName
-                    MatchCount  = $_.Count
-                    LineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
+        $summarySearchHits = @(
+            $searchHits |
+                Group-Object -Property FilePath, RuleName |
+                ForEach-Object {
+                    $first = $_.Group | Select-Object -First 1
+                    [pscustomobject]@{
+                        FilePath    = $first.FilePath
+                        RuleName    = $first.RuleName
+                        MatchCount  = $_.Count
+                        LineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
+                    }
                 }
-            }
+        )
+
+        Write-Output -NoEnumerate $summarySearchHits
         return
     }
 
     if ($PassThruFormat -eq 'Detailed') {
-        $reports
+        Write-Output -NoEnumerate ($reports.ToArray())
         return
     }
 
-    $reports | ForEach-Object {
-        [pscustomobject]@{
-            Path             = $_.Path
-            Changed          = $_.Changed
-            WouldChange      = $_.WouldChange
-            ReplacementCount = $_.ReplacementCount
-            AppliedRuleCount = @($_.AppliedRules).Count
+    $summaryReports = @(
+        $reports | ForEach-Object {
+            [pscustomobject]@{
+                Path             = $_.Path
+                Changed          = $_.Changed
+                WouldChange      = $_.WouldChange
+                ReplacementCount = $_.ReplacementCount
+                AppliedRuleCount = @($_.AppliedRules).Count
+            }
         }
-    }
+    )
+
+    Write-Output -NoEnumerate $summaryReports
+    return
 }
 
 function Read-WPFBulkReplaceRuleFile {
