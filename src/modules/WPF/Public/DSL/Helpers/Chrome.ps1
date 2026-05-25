@@ -7,7 +7,8 @@
     a named Border part and a ContentPresenter. This hides common template
     boilerplate for controls where rounded chrome styling is frequently needed.
 
-    MVP support is intentionally narrow: Button styles only.
+    The module ships with a default adapter for Button styles. Additional
+    control target types can be enabled via Register-WPFChromeAdapter.
 
 .EXAMPLE
     Style 'PrimaryButton' Button {
@@ -35,6 +36,26 @@ function Chrome {
         [scriptblock] $ScriptBlock
     )
 
+    function Set-ChromeFactoryProperty {
+        param(
+            [Parameter(Mandatory)]
+            [System.Windows.FrameworkElementFactory] $Factory,
+
+            [Parameter(Mandatory)]
+            [System.Windows.DependencyProperty] $Property,
+
+            [Parameter()]
+            [object] $Value
+        )
+
+        if ($Value -is [System.Windows.DynamicResourceExtension]) {
+            $Factory.SetResourceReference($Property, $Value.ResourceKey)
+            return
+        }
+
+        $Factory.SetValue($Property, $Value)
+    }
+
     $style = $PSCmdlet.GetVariableValue('this')
     if (-not ($style -is [System.Windows.Style])) {
         Write-Error 'Chrome: Must be used directly inside a Style block.'
@@ -46,8 +67,12 @@ function Chrome {
         return
     }
 
-    if (-not [System.Windows.Controls.Button].IsAssignableFrom($style.TargetType)) {
-        Write-Error "Chrome: TargetType '$($style.TargetType.FullName)' is not supported. MVP currently supports Button styles only."
+    $registeredAdapters = @(Get-WPFChromeAdapter)
+    $adapter = @(Get-WPFChromeAdapter -TargetType $style.TargetType) | Select-Object -First 1
+
+    if ($null -eq $adapter) {
+        $registeredAdapterNames = ($registeredAdapters | ForEach-Object { $_.Name }) -join ', '
+        Write-Error "Chrome: TargetType '$($style.TargetType.FullName)' is not supported. No Chrome adapter is registered for this type. Registered adapters: $registeredAdapterNames."
         return
     }
 
@@ -70,8 +95,8 @@ function Chrome {
 
     $template = [System.Windows.Controls.ControlTemplate]::new($style.TargetType)
 
-    $chromeFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border])
-    $chromeFactory.Name = 'ButtonChrome'
+    $chromeFactory = [System.Windows.FrameworkElementFactory]::new($adapter.ShellType)
+    $chromeFactory.Name = $adapter.PartName
 
     $styleSetterTable = @{}
     $styleChain = [System.Collections.Generic.List[System.Windows.Style]]::new()
@@ -93,41 +118,55 @@ function Chrome {
         }
     }
 
-    if ($styleSetterTable.ContainsKey('Background')) {
-        $chromeFactory.SetValue([System.Windows.Controls.Border]::BackgroundProperty, $styleSetterTable['Background'])
+    foreach ($mappedProperty in $adapter.ShellPropertyMap.GetEnumerator()) {
+        if ($styleSetterTable.ContainsKey($mappedProperty.Key)) {
+            Set-ChromeFactoryProperty -Factory $chromeFactory -Property $mappedProperty.Value -Value $styleSetterTable[$mappedProperty.Key]
+        }
     }
 
-    if ($styleSetterTable.ContainsKey('BorderBrush')) {
-        $chromeFactory.SetValue([System.Windows.Controls.Border]::BorderBrushProperty, $styleSetterTable['BorderBrush'])
+    $warnOnUnmapped = $false
+    $warnRaw = [System.Environment]::GetEnvironmentVariable('WPF_CHROME_WARN_UNMAPPED_SETTERS')
+    if (-not [string]::IsNullOrWhiteSpace($warnRaw)) {
+        $normalizedWarnValue = $warnRaw.Trim().ToLowerInvariant()
+        if ($normalizedWarnValue -in @('1', 'true', 'yes', 'on')) {
+            $warnOnUnmapped = $true
+        }
     }
 
-    if ($styleSetterTable.ContainsKey('BorderThickness')) {
-        $chromeFactory.SetValue([System.Windows.Controls.Border]::BorderThicknessProperty, $styleSetterTable['BorderThickness'])
+    if ($warnOnUnmapped) {
+        $mappedSourceProperties = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($sourceProperty in $adapter.ShellPropertyMap.Keys) {
+            $mappedSourceProperties.Add([string] $sourceProperty) | Out-Null
+        }
+
+        foreach ($sourceProperty in $adapter.ContentPropertyMap.Keys) {
+            $mappedSourceProperties.Add([string] $sourceProperty) | Out-Null
+        }
+
+        $unmappedProperties = @(
+            $styleSetterTable.Keys |
+                Where-Object { -not $mappedSourceProperties.Contains([string] $_) } |
+                Sort-Object
+        )
+
+        if ($unmappedProperties.Count -gt 0) {
+            $unmappedList = $unmappedProperties -join ', '
+            Write-Warning "Chrome: The following style setters were not mapped into adapter '$($adapter.Name)' for target type '$($style.TargetType.FullName)': $unmappedList. Set these in Chrome { ... } if they belong to the generated part, or use Template for full template control."
+        }
     }
 
-    if ($styleSetterTable.ContainsKey('SnapsToDevicePixels')) {
-        $chromeFactory.SetValue([System.Windows.UIElement]::SnapsToDevicePixelsProperty, $styleSetterTable['SnapsToDevicePixels'])
-    }
 
     $chromeVars = New-WPFVariableList -InputObject $chromeFactory
     $ScriptBlock.InvokeWithContext($null, $chromeVars) | Out-Null
 
     $contentPresenterFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
 
-    if ($styleSetterTable.ContainsKey('Padding')) {
-        $contentPresenterFactory.SetValue([System.Windows.FrameworkElement]::MarginProperty, $styleSetterTable['Padding'])
-    }
-
-    if ($styleSetterTable.ContainsKey('HorizontalContentAlignment')) {
-        $contentPresenterFactory.SetValue([System.Windows.FrameworkElement]::HorizontalAlignmentProperty, $styleSetterTable['HorizontalContentAlignment'])
-    } else {
-        $contentPresenterFactory.SetValue([System.Windows.FrameworkElement]::HorizontalAlignmentProperty, [System.Windows.HorizontalAlignment]::Center)
-    }
-
-    if ($styleSetterTable.ContainsKey('VerticalContentAlignment')) {
-        $contentPresenterFactory.SetValue([System.Windows.FrameworkElement]::VerticalAlignmentProperty, $styleSetterTable['VerticalContentAlignment'])
-    } else {
-        $contentPresenterFactory.SetValue([System.Windows.FrameworkElement]::VerticalAlignmentProperty, [System.Windows.VerticalAlignment]::Center)
+    foreach ($mappedProperty in $adapter.ContentPropertyMap.GetEnumerator()) {
+        if ($styleSetterTable.ContainsKey($mappedProperty.Key)) {
+            Set-ChromeFactoryProperty -Factory $contentPresenterFactory -Property $mappedProperty.Value -Value $styleSetterTable[$mappedProperty.Key]
+        } elseif ($adapter.ContentDefaults.Contains($mappedProperty.Key)) {
+            Set-ChromeFactoryProperty -Factory $contentPresenterFactory -Property $mappedProperty.Value -Value $adapter.ContentDefaults[$mappedProperty.Key]
+        }
     }
 
     $contentPresenterFactory.SetValue([System.Windows.Controls.ContentPresenter]::RecognizesAccessKeyProperty, $true)
@@ -144,6 +183,6 @@ function Chrome {
 
     $style | Add-Member -NotePropertyName '_WPFHasChrome' -NotePropertyValue $true -Force
     $style | Add-Member -NotePropertyName '_WPFChromeTemplate' -NotePropertyValue $template -Force
-    $style | Add-Member -NotePropertyName '_WPFChromeTargetName' -NotePropertyValue 'ButtonChrome' -Force
-    $style | Add-Member -NotePropertyName '_WPFChromeTargetType' -NotePropertyValue ([System.Windows.Controls.Border]) -Force
+    $style | Add-Member -NotePropertyName '_WPFChromeTargetName' -NotePropertyValue $adapter.PartName -Force
+    $style | Add-Member -NotePropertyName '_WPFChromeTargetType' -NotePropertyValue $adapter.ShellType -Force
 }

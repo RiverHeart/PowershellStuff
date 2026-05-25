@@ -578,7 +578,19 @@ Setter BorderBrush '#2563EB' -Scope Chrome
 
 Defines a simplified template shell for supported controls.
 
-MVP support is intentionally narrow: `Button` styles only.
+The module includes a default adapter for `Button` styles. Additional target
+types can be enabled by registering adapters with `Register-WPFChromeAdapter`.
+Module-provided adapters are defined in dedicated adapter files under
+`src/modules/WPF/Private/ChromeAdapters`.
+Module-provided adapter factory functions use the `New-WPFFooChromeAdapter`
+naming convention.
+
+When a control is unsupported, the error reports that no adapter is registered
+and lists currently registered adapter names.
+
+Set `WPF_CHROME_WARN_UNMAPPED_SETTERS=1` to emit warnings for style setters that
+are not copied into the generated chrome shell/content mapping. This is intended
+as an opt-in debugging aid while keeping default output quiet.
 
 ```powershell
 Style 'PrimaryButton' Button {
@@ -678,6 +690,43 @@ UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
 ```
 
 ## Lookup and Composition Helpers
+
+### Get-WPFChromeAdapter
+
+Returns currently registered Chrome adapters.
+
+```powershell
+Get-WPFChromeAdapter
+Get-WPFChromeAdapter -TargetType ([System.Windows.Controls.Button])
+```
+
+### Register-WPFChromeAdapter
+
+Registers or replaces a Chrome adapter mapping for a target control type.
+
+```powershell
+$adapterParams = @{
+    TargetType = [System.Windows.Controls.Primitives.ToggleButton]
+    ShellType = [System.Windows.Controls.Border]
+    PartName = 'ToggleChrome'
+    ShellPropertyMap = @{
+        Background = [System.Windows.Controls.Border]::BackgroundProperty
+        BorderBrush = [System.Windows.Controls.Border]::BorderBrushProperty
+        BorderThickness = [System.Windows.Controls.Border]::BorderThicknessProperty
+    }
+    ContentPropertyMap = @{
+        Padding = [System.Windows.FrameworkElement]::MarginProperty
+        HorizontalContentAlignment = [System.Windows.FrameworkElement]::HorizontalAlignmentProperty
+        VerticalContentAlignment = [System.Windows.FrameworkElement]::VerticalAlignmentProperty
+    }
+    ContentDefaults = @{
+        HorizontalContentAlignment = [System.Windows.HorizontalAlignment]::Center
+        VerticalContentAlignment = [System.Windows.VerticalAlignment]::Center
+    }
+}
+
+Register-WPFChromeAdapter @adapterParams
+```
 
 ### Reference
 
