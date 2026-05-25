@@ -65,15 +65,15 @@ Describe 'Invoke-WPFBulkReplace' -Tag 'Invoke-WPFBulkReplace' {
         $Result[0].Changes.Count | Should -Be 1
     }
 
-        It 'Loads rules from a json file' {
-                $RootPath = Join-Path $TestDrive 'RulePathRoot'
-                New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+    It 'Loads rules from a json file' {
+        $RootPath = Join-Path $TestDrive 'RulePathRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
 
-                $FilePath = Join-Path $RootPath 'Theme.Tests.ps1'
-                [System.IO.File]::WriteAllText($FilePath, "Describe 'Theme' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+        $FilePath = Join-Path $RootPath 'Theme.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "Describe 'Theme' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
 
-                $RuleFilePath = Join-Path $RootPath 'rules.json'
-                @'
+        $RuleFilePath = Join-Path $RootPath 'rules.json'
+@'
 [
     {
         "Name": "Tag Theme",
@@ -83,25 +83,25 @@ Describe 'Invoke-WPFBulkReplace' -Tag 'Invoke-WPFBulkReplace' {
 ]
 '@ | Set-Content -Path $RuleFilePath -Encoding utf8
 
-                $Result = & $ScriptPath -Path $FilePath -RulePath $RuleFilePath -PassThru
+        $Result = & $ScriptPath -Path $FilePath -RulePath $RuleFilePath -PassThru
 
-                (Get-Content -Path $FilePath -Raw) | Should -BeExactly "Describe 'Theme' -Tag 'Theme' {`r`n}`r`n"
-                $Result.Count | Should -Be 1
-                $Result[0].Changed | Should -BeTrue
-                $Result[0].AppliedRuleCount | Should -Be 1
-        }
+        (Get-Content -Path $FilePath -Raw) | Should -BeExactly "Describe 'Theme' -Tag 'Theme' {`r`n}`r`n"
+        $Result.Count | Should -Be 1
+        $Result[0].Changed | Should -BeTrue
+        $Result[0].AppliedRuleCount | Should -Be 1
+    }
 
-        It 'Returns compact search results by default' {
-                $RootPath = Join-Path $TestDrive 'SearchSummaryRoot'
-                New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+    It 'Returns compact search results by default' {
+        $RootPath = Join-Path $TestDrive 'SearchSummaryRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
 
-                $FilePath = Join-Path $RootPath 'Grid.Tests.ps1'
-                [System.IO.File]::WriteAllText($FilePath, "Describe 'Grid' {`r`nDescribe 'Grid' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+        $FilePath = Join-Path $RootPath 'Grid.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "Describe 'Grid' {`r`nDescribe 'Grid' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
 
-                $Result = & $ScriptPath -Path $FilePath -SearchOnly -Find "Describe 'Grid' {" -PassThru
+        $Result = & $ScriptPath -Path $FilePath -SearchOnly -Find "Describe 'Grid' {" -PassThru
 
-                $Result.Count | Should -Be 1
-                $Result[0].MatchCount | Should -Be 2
-                $Result[0].LineNumbers | Should -Be @(1, 2)
-        }
+        $Result.Count | Should -Be 1
+        $Result[0].MatchCount | Should -Be 2
+        $Result[0].LineNumbers | Should -Be @(1, 2)
+    }
 }
