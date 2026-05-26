@@ -1,120 +1,201 @@
 <#
 .SYNOPSIS
-    Updated version of the System.UriBuilder class with improved support for query params.
+   Version of the UriBuilder class with improved support for Query Params.
 
 .DESCRIPTION
-    Version of the UriBuilder class with improved support for Query Params.
+   Version of the UriBuilder class with improved support for Query Params.
 
-    Provides the following benefits over the base class:
-      * Automatically escapes the value part of the key/value pair.
-
-      * Enables the addition of multiple parameters with the same key.
-        Consider that other, pure hashtable solutions, may not account
-        for this use case and that hashtables do not allow duplicate keys.
-
-      * Enables conversion of an array of values into a string, joined
-        by choice of char/string, for value part of the key/value pair.
-
-      * Enables addition of parameters only when a given constant/scriptblock evaluates to true.
+   Provides the following benefits over the base class:
+       * Automatically escapes query parameters.
+       * Implicitly converts array values into multiple key=value pairs when adding
+         multiple parameters (`AddParameters`), or into a CSV string when adding
+         a single parameter (`AddParameter`).
+       * Enables addition of paths/parameters only when a given predicate evaluates to true.
 
 .NOTES
-    Like the base class, removing the port from ToString() output requires setting the
-    port to -1. I don't care for the default behaviour but we'll stick with it for compatibility.
+   Like the base class, removing the port from ToString() output requires setting the
+   port to -1. I don't care for the default behaviour but we'll stick with it for compatibility.
 
 .EXAMPLE
-    Add simple key/value pair.
+   A simple key/value pair.
 
-    $Builder = [UriBuilderPro]::new('https://this.example.com')
-    $Builder.AddParameter('one', 'two')
-    $Builder.Parameters  # Display Parameters
-    $Builder.Query       # Display Query
-
-.EXAMPLE
-    Add parameters based on predicate logic, either a constant
-    or scriptblock that resolves to True/False.
-
-    $Builder = [UriBuilderPro]::new('https://this.example.com')
-    $exists = 'exists'
-    $Builder.AddParameter('exists', $exists, $exists)  # Evals true and added
-    $Builder.AddParameter('notExists', $notexists, $notexists)  # Evals false and not added
-    $Builder.AddParameter('mayExist', $notexists, { $exists -eq 'notexists' })  # Evals false and not added
-    $Builder.Parameters  # Display Parameters
-    $Builder.Query       # Display Query
+   $Builder = [UriBuilderPro]::new('https://localhost')
+   $Builder.AddParameter('one', 'two')
+   $Builder.Parameters  # Display Parameters
+   $Builder.Query       # Display Query
 
 .EXAMPLE
-    Add parameter with array values
+   Append path segments with optional predicate logic.
 
-    $Builder = [UriBuilderPro]::new('https://this.example.com')
-    $Builder.AddParameter('foo', @('foo', 'fubar'))  # Implicit conversion of array value into multiple key=value pairs.
-    $Builder.AddParameter('bar', @('bar', 'barfu'), $True, ',')  # Join array on string value. Pass $True just to satisfy overload.
-    $Builder.Parameters  # Display Parameters
-    $Builder.Query       # Display Query
+   $Builder = [UriBuilderPro]::new('https://localhost')
+   $Builder.AppendPath('base')
+   $Builder.AppendPathIf($false, 'optional')  # Ignored
+   $Builder.AppendPathIf({ 1 -eq 1 }, 'conditional')  # Appended
+   $Builder.Path  # Display Path
+
+.EXAMPLE
+   Add parameters with optional predicate logic.
+
+   $Builder = [UriBuilderPro]::new('https://localhost')
+   $exists = 'exists'
+   $Builder.AddParameter($exists, 'exists')  # Adds parameter
+   $Builder.AddParameterIf($exists, 'exists', $exists)  # Evals true and passes
+   $Builder.AddParameterIf($notexists, 'notExists', $notexists)  # Evals false and ignored
+   $Builder.AddParameterIf({ $exists -eq 'notexists' }, 'mayExist', $notexists)  # Evals false and ignored
+   $Builder.Parameters  # Display Parameters
+   $Builder.Query       # Display Query
+
+.EXAMPLE
+   Add parameters using array values.
+
+   $Builder = [UriBuilderPro]::new('https://localhost')
+   $Builder.AddParameter('bar', @('bar', 'barfu'))  # Implicit conversion of array to CSV when adding single parameter.
+   $Builder.AddParameters('foo', @('foo', 'fubar'))  # Implicit conversion of array into multiple key=value pairs when adding multiple parameters.
+   $Builder.Parameters  # Display Parameters
+   $Builder.Query       # Display Query
+
+.EXAMPLE
+   Lazily evaluate parameter value using scriptblock after predicate passes.
+
+   $Builder = [UriBuilderPro]::new('https://localhost')
+   $Builder.AddParameterIf($date, 'date', { $date.ToUniversalTime().ToString('o') })
 #>
 class UriBuilderPro : System.UriBuilder {
-    [hashtable] $Parameters = @{}
+    $Parameters = [System.Collections.ArrayList]::new()
 
-    UriBuilderPro() : base() { }
+    UriBuilderPro() : base() { $this.Init() }
 
-    UriBuilderPro([string] $Uri) : base([string] $Uri) {}
+    UriBuilderPro([string] $Uri) : base([string] $Uri) { $this.Init() }
 
-    UriBuilderPro([uri] $uri) : base($args) {}
+    UriBuilderPro([uri] $uri) : base([uri] $uri) { $this.Init() }
 
     UriBuilderPro([string] $schemeName, [string] $hostName) :
-        base([string] $schemeName, [string] $hostName) {}
+        base([string] $schemeName, [string] $hostName) {
+            $this.Init()
+        }
 
     UriBuilderPro([string] $scheme, [string] $hostname, [int] $portNumber) :
-        base([string] $scheme, [string] $hostname, [int] $portNumber) {}
+        base([string] $scheme, [string] $hostname, [int] $portNumber) {
+            $this.Init()
+        }
 
     UriBuilderPro([string] $scheme, [string] $hostname, [int] $port, [string] $pathValue) :
-        base($args) {
-            [string] $scheme, [string] $hostname, [int] $port, [string] $pathValue
+        base([string] $scheme, [string] $hostname, [int] $port, [string] $pathValue) {
+            $this.Init()
         }
 
     UriBuilderPro([string] $scheme, [string] $hostname, [int] $port, [string] $path, [string] $extraValue) :
-        base([string] $scheme, [string] $hostname, [int] $port, [string] $path, [string] $extraValue) {}
-
-    AddParameter([string] $Key, [object] $Value) {
-        if ($this.Parameters.ContainsKey($Key)) {
-            throw [System.IO.InvalidDataException] "Cannot add duplicate key '$Key'"
+        base([string] $scheme, [string] $hostname, [int] $port, [string] $path, [string] $extraValue) {
+            $this.Init()
         }
-        $this.Parameters[$Key] = $Value
+
+    # MARK: PRIVATE METHODS
+    #=======================
+
+    hidden [void] Init() {
+        $this | Add-Member -MemberType ScriptProperty -Name PathAndQuery -Value {
+            if ($this.Query) {
+                return ("{0}?{1}" -f $this.Path, $this.Query.TrimStart('?'))
+            } else {
+                return $this.Path
+            }
+        }
+    }
+
+    hidden [bool] EvalPredicate([object] $Predicate) {
+        if ($null -ne $Predicate -and $Predicate -is [scriptblock]) {
+            return $Predicate.InvokeReturnAsIs()
+        }
+        return [bool] $Predicate
+    }
+
+    hidden [object] ResolveParameterValue([object] $Value) {
+        if ($Value -is [scriptblock]) {
+            return $Value.InvokeReturnAsIs()
+        }
+
+        return $Value
+    }
+
+    # MARK: PUBLIC METHODS
+    #=======================
+
+    [void] AddParameter([string] $Key, [object] $Value) {
+        $Value = $this.ResolveParameterValue($Value)
+
+        # Convert arrays to CSV strings when adding a single parameter.
+        if ($Value -is [array]) {
+            $Value = $Value -join ','
+        }
+
+        [void] $this.Parameters.Add([pscustomobject]@{
+            Key = $Key
+            Value = $Value
+        })
         $this.UpdateQuery()
     }
 
-    AddParameter([string] $Key, [object] $Value, [string] $Join) {
-        $this.AddParameter($Key, ($Value -join $Join))
-    }
-
-    AddParameter([string] $Key, [object] $Value, [object] $Predicate) {
-        if ($null -ne $Predicate -and
-            $Predicate.GetType().Name -eq "Scriptblock" -and
-            $Predicate.InvokeReturnAsIs()
-        ) {
-            $this.AddParameter($Key, $Value)
+    [void] AddParameterIf([object] $Predicate, [string] $Key, [object] $Value) {
+        if ($this.EvalPredicate($Predicate)) {
+             $this.AddParameter($Key, $Value)
         }
     }
 
-    AddParameter([string] $Key, [object] $Value, [object] $Predicate, [string] $Join) {
-        if ($null -ne $Predicate -and
-            $Predicate.GetType().Name -eq "Scriptblock" -and
-            $Predicate.InvokeReturnAsIs()
-        ) {
-            $this.AddParameter($Key, $Value, $Join)
-        } elseif ($Predicate) {
-            $this.AddParameter($Key, $Value, $Join)
+    [void] AddParameters([string] $Key, [object[]] $Values) {
+        $AddEntries = $null
+        $AddEntries = {
+            param([object] $EntryValue)
+
+            $ResolvedValue = $this.ResolveParameterValue($EntryValue)
+
+            if ($null -ne $ResolvedValue -and $ResolvedValue -is [System.Collections.IEnumerable] -and $ResolvedValue -isnot [string]) {
+                foreach ($NestedValue in $ResolvedValue) {
+                    & $AddEntries $NestedValue
+                }
+                return
+            }
+
+            [void] $this.Parameters.Add([pscustomobject]@{
+                Key = $Key
+                Value = $ResolvedValue
+            })
+        }
+
+        foreach ($Value in $Values) {
+            & $AddEntries $Value
+        }
+
+        $this.UpdateQuery()
+    }
+
+    [void] AddParametersIf([object] $Predicate, [string] $Key, [object[]] $Values) {
+        if ($this.EvalPredicate($Predicate)) {
+            $this.AddParameters($Key, $Values)
         }
     }
 
-    UpdateQuery() {
+    [void] AppendPath([string] $Path) {
+        if ($this.Path.EndsWith('/')) {
+            $this.Path += $Path.TrimStart('/')
+        } else {
+            $this.Path += '/' + $Path.TrimStart('/')
+        }
+    }
+
+    [void] AppendPathIf([object] $Predicate, [string] $Path) {
+        if ($this.EvalPredicate($Predicate)) {
+            $this.AppendPath($Path)
+        }
+    }
+
+    [void] UpdateQuery() {
         $TempQuery = ''
-        foreach($Param in $this.Parameters.GetEnumerator()) {
+        foreach($Param in $this.Parameters) {
             # Regarding encoding of the parens, some markdown
             # parsers stop evaluating url syntax (ie [text](link) )
             # on the first occurence of a closing parens.
             # We don't want that so just encode them for safety.
-            foreach ($Value in $Param.Value) {
-                $TempQuery += "{0}={1}&" -f $Param.Key, [uri]::EscapeDataString($Value).Replace('(', '%28').Replace(')', '%29')
-            }
+            $TempQuery += "{0}={1}&" -f $Param.Key, [uri]::EscapeDataString([string] $Param.Value).Replace('(', '%28').Replace(')', '%29')
         }
         # UriBuilder implicitly adds a leading ? mark when setting Query
         $this.Query = $TempQuery.TrimEnd('&')
