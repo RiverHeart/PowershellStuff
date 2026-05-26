@@ -18,3 +18,9 @@ Use the bundled script asset at:
 ```powershell
 ./.github/skills/bulk-replace/scripts/Invoke-BulkReplace.ps1
 ```
+
+Instead of reading the entire script, discover capabilities and usage with:
+
+```powershell
+Get-Help ./.github/skills/bulk-replace/scripts/Invoke-BulkReplace.ps1 -Detailed
+```
