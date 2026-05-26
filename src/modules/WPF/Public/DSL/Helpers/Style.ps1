@@ -96,125 +96,14 @@ function Style {
     $style = [System.Windows.Style]::new($resolvedType)
     $PSVars = New-WPFVariableList -InputObject $style
 
-    $styleDslCommands = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($dslCommandName in @('Setter', 'Trigger', 'DataTrigger', 'MultiTrigger', 'Chrome', 'ExtendStyle', 'Template')) {
-        $null = $styleDslCommands.Add($dslCommandName)
-    }
+    $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+        -ScriptBlock $ScriptBlock `
+        -TargetType $resolvedType `
+        -ReservedCommands @('Setter', 'Trigger', 'DataTrigger', 'MultiTrigger', 'Chrome', 'ExtendStyle', 'Template') `
+        -ContextName 'Style'
 
-    $implicitSetterCommandMap = [Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
-
-    $isStyleDependencyProperty = {
-        param(
-            [Parameter(Mandatory)]
-            [string] $PropertyName
-        )
-
-        $descriptor = [DependencyPropertyDescriptor]::FromName($PropertyName, $resolvedType, $resolvedType)
-        return ($null -ne $descriptor)
-    }
-
-    # MARK: PROCESS
-
-    # Phase 1: inspect command AST nodes and decide which names should behave like
-    # implicit Setters in this style scope.
-    $commandAsts = $ScriptBlock.Ast.FindAll({
-            param($Ast)
-            $Ast -is [CommandAst]
-        }, $true)
-
-    foreach ($commandAst in $commandAsts) {
-        $commandName = $commandAst.GetCommandName()
-        if ([string]::IsNullOrWhiteSpace($commandName)) {
-            continue
-        }
-
-        $isExplicitProperty = $commandName.EndsWith(':')
-        $propertyName = if ($isExplicitProperty) {
-            $commandName.Substring(0, $commandName.Length - 1)
-        } else {
-            $commandName
-        }
-
-        if ([string]::IsNullOrWhiteSpace($propertyName)) {
-            continue
-        }
-
-        $treatAsImplicitSetter = $false
-
-        # Apply property resolution rules.
-        if ($isExplicitProperty) {
-            $treatAsImplicitSetter = $true
-        } elseif ($styleDslCommands.Contains($propertyName)) {
-            # Reserved style keywords are explicit unless caller opts into
-            # property mode via the trailing ':' delimiter.
-            $treatAsImplicitSetter = $false
-        } elseif (& $isStyleDependencyProperty -PropertyName $propertyName) {
-            # Prefer dependency properties over command names to reduce DSL collisions.
-            $treatAsImplicitSetter = $true
-        } elseif ($null -ne (Get-Command -Name $commandName -ErrorAction SilentlyContinue)) {
-            $treatAsImplicitSetter = $false
-        } else {
-            $treatAsImplicitSetter = $true
-        }
-
-        if ($treatAsImplicitSetter -and -not $implicitSetterCommandMap.ContainsKey($commandName)) {
-            $implicitSetterCommandMap[$commandName] = $propertyName
-        }
-    }
-
-    # Phase 2: create transient helper functions for each implicit command.
-    # These run in the caller's style scriptblock and delegate to Setter.
-    $implicitSetterFunctions = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($commandName in $implicitSetterCommandMap.Keys) {
-        $propertyName = $implicitSetterCommandMap[$commandName]
-        $functionBody = [scriptblock]::Create(@"
-param(
-    [Parameter(Mandatory, Position = 0)]
-    [AllowNull()]
-    [object]`$Value,
-
-    [Parameter()]
-    [switch]`$Resource,
-
-    [Parameter()]
-    [string]`$Target,
-
-    [Parameter()]
-    [ValidateSet('Chrome')]
-    [string]`$Scope,
-
-    [Parameter(ValueFromRemainingArguments = `$true)]
-    [object[]]`$Remaining
-)
-
-if (`$null -ne `$Remaining -and `$Remaining.Count -gt 0) {
-    throw "Style shorthand for property '$propertyName' received unsupported trailing arguments: `$(`$Remaining -join ', ')"
-}
-
-`$setterArgs = @{
-    Property = '$propertyName'
-    Value = `$Value
-}
-
-if (`$PSBoundParameters.ContainsKey('Resource')) {
-    `$setterArgs['Resource'] = `$Resource
-}
-
-if (`$PSBoundParameters.ContainsKey('Target')) {
-    `$setterArgs['Target'] = `$Target
-}
-
-if (`$PSBoundParameters.ContainsKey('Scope')) {
-    `$setterArgs['Scope'] = `$Scope
-}
-
-Setter @setterArgs
-"@)
-    $implicitSetterFunctions[$commandName] = $functionBody
-    }
-
-    # Phase 3: Execute once with injected helpers and WPF DSL variables. This keeps normal
-    # scriptblock behavior intact while enabling shorthand property commands.
+    # Execute once with injected helpers and WPF DSL variables. This keeps
+    # normal scriptblock behavior intact while enabling shorthand commands.
     $null = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
 
     if ($isNamedStyle) {
