@@ -37,7 +37,7 @@ Describe 'Export-PowershellDataFile' {
         $Path = Join-Path -Path $TestDrive -ChildPath 'quoted-keys.psd1'
         $InputObject = @{
             'Thread Job' = '^2.0.3'
-            "Owner's Name" = 'alex'
+            "Owner's Name" = 'John Doe'
         }
 
         Export-PowershellDataFile -InputObject $InputObject -Path $Path
