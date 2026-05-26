@@ -11,7 +11,7 @@ Definitely still rough around the edges, lacks a lot of niceties but is servicea
 * Lists all processes in a datagrid with column sorting.
 * Refreshes CPU and memory usage automatically.
 * Calculates total CPU and memory usage in the headers for those columns.
-* Support stopping tasks
+* Supports stopping tasks
 
 ## Memory Header Nuance
 
@@ -23,7 +23,7 @@ During timed refresh, these OS memory values are sampled in the background work 
 ## TODO
 
 * Headers are a bit on the large side.
-* Ensure stopped processes are removed from the list without resorting
+* Ensure stopped processes are removed from the list without needing to call resort logic.
 * Add filtering capability
 * Add "Options" menu item and sub items
     * Always on Top

@@ -20,7 +20,7 @@
     }
 
     ExcludeRules = @(
-        # Well meaning but antiquated and dogmatic to fault.
+        # Well meaning but antiquated and dogmatic to a fault.
         #
         # Verb conventions are good and should be followed when applicable, but modern-day
         # cmdlet discovery is driven by internet searches rather than `Get-Command`, so strict
@@ -53,7 +53,7 @@
         # event handlers is more beneficial than hiding them.
         'PSReviewUnusedParameter'
 
-        # Basically useless when working with Powershell classes in modules as class definitions
+        # Basically useless when working with PowerShell classes in modules as class definitions
         # defined in separate files are not analyzed and will never be found.
         'TypeNotFound',
 

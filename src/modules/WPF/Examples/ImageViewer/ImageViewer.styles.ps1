@@ -58,7 +58,7 @@ Style 'ImageViewer.IconButton' Button {
             Padding: $IconPadding
             BorderThickness: 1
             Background: ButtonBackground -Resource
-            BorderBrush: DisabledForeground: -Resource
+            BorderBrush: DisabledForeground -Resource
 
             ContentPresenter {
                 HorizontalAlignment: ([HorizontalAlignment]::Stretch)
