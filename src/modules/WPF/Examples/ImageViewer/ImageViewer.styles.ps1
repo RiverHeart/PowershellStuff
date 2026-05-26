@@ -1,44 +1,44 @@
 using namespace System.Windows.Media
 
 Theme 'Light' {
-    Brush 'WindowBackground' '#FFFFFF'
-    Brush 'SurfaceBackground' '#F8F8F8'
-    Brush 'Foreground' '#111111'
-    Brush 'DisabledForeground' '#7A7A7A'
-    Brush 'ScrollBackground' '#1A1A1A'
-    Brush 'ButtonBackground' '#EDEDED'
-    Brush 'ButtonHoverBackground' '#D0D0D0'
+    WindowBackground: '#FFFFFF'
+    SurfaceBackground: '#F8F8F8'
+    Foreground: '#111111'
+    DisabledForeground: '#7A7A7A'
+    ScrollBackground: '#1A1A1A'
+    ButtonBackground: '#EDEDED'
+    ButtonHoverBackground: '#D0D0D0'
 }
 
 Theme 'Dark' {
-    Brush 'WindowBackground' '#1E1E1E'
-    Brush 'SurfaceBackground' '#111111'
-    Brush 'Foreground' '#F0F0F0'
-    Brush 'DisabledForeground' '#8F8F8F'
-    Brush 'ScrollBackground' '#050505'
-    Brush 'ButtonBackground' '#2A2A2A'
-    Brush 'ButtonHoverBackground' '#3E3E3E'
+    WindowBackground: '#1E1E1E'
+    SurfaceBackground: '#111111'
+    Foreground: '#F0F0F0'
+    DisabledForeground: '#8F8F8F'
+    ScrollBackground: '#050505'
+    ButtonBackground: '#2A2A2A'
+    ButtonHoverBackground: '#3E3E3E'
 }
 
 Style Window {
-    Setter Background WindowBackground -Resource
-    Setter Foreground Foreground -Resource
+    Background: WindowBackground -Resource
+    Foreground: Foreground -Resource
 }
 
 Style Button {
-    Setter Background ButtonBackground -Resource
-    Setter Foreground Foreground -Resource
+    Background: ButtonBackground -Resource
+    Foreground: Foreground -Resource
 }
 
 Style 'ImageViewer.IconButton' Button {
-    Setter Background 'Transparent'
-    Setter BorderBrush 'Transparent'
-    Setter BorderThickness 0
-    Setter Padding 0
-    Setter FocusVisualStyle $null
-    Setter HorizontalContentAlignment ([HorizontalAlignment]::Stretch)
-    Setter VerticalContentAlignment ([VerticalAlignment]::Stretch)
-    Setter OverridesDefaultStyle $true
+    Background: 'Transparent'
+    BorderBrush: 'Transparent'
+    BorderThickness: 0
+    Padding: 0
+    FocusVisualStyle: $null
+    HorizontalContentAlignment: ([HorizontalAlignment]::Stretch)
+    VerticalContentAlignment: ([VerticalAlignment]::Stretch)
+    OverridesDefaultStyle: $true
 
     # Icon sizing: the icon occupies $IconScale of the button's interior.
     # Padding fills the remaining space equally on all sides.
@@ -48,60 +48,60 @@ Style 'ImageViewer.IconButton' Button {
     $CornerRadius = 8
     $IconButtonMargin = 5
 
-    Setter Width $ButtonSize
-    Setter Height $ButtonSize
-    Setter Margin $IconButtonMargin
+    Width: $ButtonSize
+    Height: $ButtonSize
+    Margin: $IconButtonMargin
 
     Template {
         Border 'TemplateBorder' {
-            Setter CornerRadius $CornerRadius
-            Setter Padding $IconPadding
-            Setter BorderThickness 1
-            Setter Background ButtonBackground -Resource
-            Setter BorderBrush DisabledForeground -Resource
+            CornerRadius: $CornerRadius
+            Padding: $IconPadding
+            BorderThickness: 1
+            Background: ButtonBackground -Resource
+            BorderBrush: DisabledForeground: -Resource
 
             ContentPresenter {
-                Setter HorizontalAlignment ([HorizontalAlignment]::Stretch)
-                Setter VerticalAlignment ([VerticalAlignment]::Stretch)
-                Setter SnapsToDevicePixels $true
+                HorizontalAlignment: ([HorizontalAlignment]::Stretch)
+                VerticalAlignment: ([VerticalAlignment]::Stretch)
+                SnapsToDevicePixels: $true
             }
         }
 
         # Hover trigger — highlights TemplateBorder when the pointer is over the button.
         Trigger IsMouseOver $true {
-            Setter Background ButtonHoverBackground -Resource -Target 'TemplateBorder'
+            Background: ButtonHoverBackground -Resource -Target 'TemplateBorder'
         }
     }
 }
 
 Style 'ImageViewer.IconPath' Path {
-    Setter Stretch ([Stretch]::Uniform)
-    Setter StrokeThickness 0
-    Setter Fill DisabledForeground -Resource
-    Setter Stroke DisabledForeground -Resource
+    Stretch: ([Stretch]::Uniform)
+    StrokeThickness: 0
+    Fill: DisabledForeground -Resource
+    Stroke: DisabledForeground -Resource
 
     Trigger IsEnabled $true {
-        Setter Fill Foreground -Resource
-        Setter Stroke Foreground -Resource
+        Fill: Foreground -Resource
+        Stroke: Foreground -Resource
     }
 }
 
 Style ScrollViewer {
-    Setter Background ScrollBackground -Resource
+    Background: ScrollBackground -Resource
 }
 
 Style Menu {
-    Setter Background WindowBackground -Resource
-    Setter Foreground Foreground -Resource
+    Background: WindowBackground -Resource
+    Foreground: Foreground -Resource
 }
 
 Style 'ImageViewer.UnthemedMenuItem' MenuItem {
     # Use OS system brushes so MenuItem stays unthemed and does not inherit Menu foreground.
-    Setter Background ([System.Windows.SystemColors]::MenuBrush)
-    Setter Foreground ([System.Windows.SystemColors]::MenuTextBrush)
+    Background: ([System.Windows.SystemColors]::MenuBrush)
+    Foreground: ([System.Windows.SystemColors]::MenuTextBrush)
 }
 
 Style Label {
-    Setter Background 'Transparent'
-    Setter Foreground Foreground -Resource
+    Background: 'Transparent'
+    Foreground: Foreground -Resource
 }

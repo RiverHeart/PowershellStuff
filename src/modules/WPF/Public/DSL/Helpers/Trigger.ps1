@@ -9,16 +9,18 @@
     The scriptblock runs with `$this` bound to the created Trigger so Setter can
     add triggered values.
 
+    Trigger blocks also support property command shorthand that maps to Setter.
+
 .EXAMPLE
     Style 'PrimaryButton' Button {
         Trigger IsMouseOver $true {
-            Setter Opacity 0.85
+            Opacity: 0.85
         }
     }
 
 .EXAMPLE
     Trigger IsEnabled $false {
-        Setter Opacity 0.6 -Target 'TemplateBorder'
+        Opacity: 0.6 -Target 'TemplateBorder'
     }
 #>
 function Trigger {
@@ -146,8 +148,117 @@ function Trigger {
             $trigger | Add-Member -NotePropertyName '_WPFDefaultSetterScope' -NotePropertyValue 'Chrome' -Force
         }
 
+        $triggerDslCommands = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($dslCommandName in @('Setter')) {
+            $null = $triggerDslCommands.Add($dslCommandName)
+        }
+
+        $isTriggerDependencyProperty = {
+            param(
+                [Parameter(Mandatory)]
+                [string] $PropertyName
+            )
+
+            $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($PropertyName, $targetType, $targetType)
+            return ($null -ne $descriptor)
+        }
+
+        $implicitSetterCommandMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $commandAsts = $ScriptBlock.Ast.FindAll({
+                param($Ast)
+                $Ast -is [System.Management.Automation.Language.CommandAst]
+            }, $true)
+
+        foreach ($commandAst in $commandAsts) {
+            $commandName = $commandAst.GetCommandName()
+            if ([string]::IsNullOrWhiteSpace($commandName)) {
+                continue
+            }
+
+            $isExplicitProperty = $commandName.EndsWith(':')
+            $propertyName = if ($isExplicitProperty) {
+                $commandName.Substring(0, $commandName.Length - 1)
+            } else {
+                $commandName
+            }
+
+            if ([string]::IsNullOrWhiteSpace($propertyName)) {
+                continue
+            }
+
+            $treatAsImplicitSetter = $false
+
+            if ($isExplicitProperty) {
+                $treatAsImplicitSetter = $true
+            } elseif ($triggerDslCommands.Contains($propertyName)) {
+                # Reserved DSL keywords remain explicit unless caller opts into
+                # property mode with a trailing ':'.
+                $treatAsImplicitSetter = $false
+            } elseif (& $isTriggerDependencyProperty -PropertyName $propertyName) {
+                # Prefer dependency properties over command names to reduce collisions.
+                $treatAsImplicitSetter = $true
+            } elseif ($null -ne (Get-Command -Name $commandName -ErrorAction SilentlyContinue)) {
+                $treatAsImplicitSetter = $false
+            } else {
+                $treatAsImplicitSetter = $true
+            }
+
+            if ($treatAsImplicitSetter -and -not $implicitSetterCommandMap.ContainsKey($commandName)) {
+                $implicitSetterCommandMap[$commandName] = $propertyName
+            }
+        }
+
+        $implicitSetterFunctions = [System.Collections.Generic.Dictionary[string, scriptblock]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($triggerCommandName in $implicitSetterCommandMap.Keys) {
+            $propertyName = $implicitSetterCommandMap[$triggerCommandName]
+            $functionBody = [scriptblock]::Create(@"
+param(
+    [Parameter(Mandatory, Position = 0)]
+    [AllowNull()]
+    [object]`$Value,
+
+    [Parameter()]
+    [switch]`$Resource,
+
+    [Parameter()]
+    [string]`$Target,
+
+    [Parameter()]
+    [ValidateSet('Chrome')]
+    [string]`$Scope,
+
+    [Parameter(ValueFromRemainingArguments = `$true)]
+    [object[]]`$Remaining
+)
+
+if (`$null -ne `$Remaining -and `$Remaining.Count -gt 0) {
+    throw "Trigger shorthand for property '$propertyName' received unsupported trailing arguments: `$(`$Remaining -join ', ')"
+}
+
+`$setterArgs = @{
+    Property = '$propertyName'
+    Value = `$Value
+}
+
+if (`$PSBoundParameters.ContainsKey('Resource')) {
+    `$setterArgs['Resource'] = `$Resource
+}
+
+if (`$PSBoundParameters.ContainsKey('Target')) {
+    `$setterArgs['Target'] = `$Target
+}
+
+if (`$PSBoundParameters.ContainsKey('Scope')) {
+    `$setterArgs['Scope'] = `$Scope
+}
+
+Setter @setterArgs
+"@)
+            $implicitSetterFunctions[$triggerCommandName] = $functionBody
+        }
+
         $PSVars = New-WPFVariableList -InputObject $trigger
-        $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
+        $null = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
 
         $target.Triggers.Add($trigger) | Out-Null
     }

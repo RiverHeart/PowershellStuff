@@ -44,7 +44,122 @@ function Update-WPFObject {
 
     try {
         if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
-            $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
+            if ($InputObject -is [System.Windows.FrameworkElementFactory]) {
+                $factoryDslCommands = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                foreach ($dslCommandName in @('Setter')) {
+                    $null = $factoryDslCommands.Add($dslCommandName)
+                }
+
+                $factoryType = $InputObject.Type
+
+                $isFactoryDependencyProperty = {
+                    param(
+                        [Parameter(Mandatory)]
+                        [string] $PropertyName
+                    )
+
+                    $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($PropertyName, $factoryType, $factoryType)
+                    return ($null -ne $descriptor)
+                }
+
+                $implicitSetterCommandMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                $commandAsts = $ScriptBlock.Ast.FindAll({
+                        param($Ast)
+                        $Ast -is [System.Management.Automation.Language.CommandAst]
+                    }, $true)
+
+                foreach ($commandAst in $commandAsts) {
+                    $commandName = $commandAst.GetCommandName()
+                    if ([string]::IsNullOrWhiteSpace($commandName)) {
+                        continue
+                    }
+
+                    $isExplicitProperty = $commandName.EndsWith(':')
+                    $propertyName = if ($isExplicitProperty) {
+                        $commandName.Substring(0, $commandName.Length - 1)
+                    } else {
+                        $commandName
+                    }
+
+                    if ([string]::IsNullOrWhiteSpace($propertyName)) {
+                        continue
+                    }
+
+                    $treatAsImplicitSetter = $false
+
+                    if ($isExplicitProperty) {
+                        $treatAsImplicitSetter = $true
+                    } elseif ($factoryDslCommands.Contains($propertyName)) {
+                        # Reserved DSL keywords remain explicit unless caller
+                        # requests property mode using a trailing ':'.
+                        $treatAsImplicitSetter = $false
+                    } elseif (& $isFactoryDependencyProperty -PropertyName $propertyName) {
+                        # Prefer dependency properties over commands to reduce collisions.
+                        $treatAsImplicitSetter = $true
+                    } elseif ($null -ne (Get-Command -Name $commandName -ErrorAction SilentlyContinue)) {
+                        $treatAsImplicitSetter = $false
+                    } else {
+                        $treatAsImplicitSetter = $true
+                    }
+
+                    if ($treatAsImplicitSetter -and -not $implicitSetterCommandMap.ContainsKey($commandName)) {
+                        $implicitSetterCommandMap[$commandName] = $propertyName
+                    }
+                }
+
+                $implicitSetterFunctions = [System.Collections.Generic.Dictionary[string, scriptblock]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                foreach ($factoryCommandName in $implicitSetterCommandMap.Keys) {
+                    $propertyName = $implicitSetterCommandMap[$factoryCommandName]
+                    $functionBody = [scriptblock]::Create(@"
+param(
+    [Parameter(Mandatory, Position = 0)]
+    [AllowNull()]
+    [object]`$Value,
+
+    [Parameter()]
+    [switch]`$Resource,
+
+    [Parameter()]
+    [string]`$Target,
+
+    [Parameter()]
+    [ValidateSet('Chrome')]
+    [string]`$Scope,
+
+    [Parameter(ValueFromRemainingArguments = `$true)]
+    [object[]]`$Remaining
+)
+
+if (`$null -ne `$Remaining -and `$Remaining.Count -gt 0) {
+    throw "Factory shorthand for property '$propertyName' received unsupported trailing arguments: `$(`$Remaining -join ', ')"
+}
+
+`$setterArgs = @{
+    Property = '$propertyName'
+    Value = `$Value
+}
+
+if (`$PSBoundParameters.ContainsKey('Resource')) {
+    `$setterArgs['Resource'] = `$Resource
+}
+
+if (`$PSBoundParameters.ContainsKey('Target')) {
+    `$setterArgs['Target'] = `$Target
+}
+
+if (`$PSBoundParameters.ContainsKey('Scope')) {
+    `$setterArgs['Scope'] = `$Scope
+}
+
+Setter @setterArgs
+"@)
+                    $implicitSetterFunctions[$factoryCommandName] = $functionBody
+                }
+
+                $ChildObjects = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
+            } else {
+                $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
+            }
         }
 
         foreach ($Child in $ChildObjects) {

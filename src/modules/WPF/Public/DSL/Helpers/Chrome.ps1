@@ -7,24 +7,28 @@
     a named Border part and a ContentPresenter. This hides common template
     boilerplate for controls where rounded chrome styling is frequently needed.
 
+    Inside Chrome blocks, property command shorthand is supported and maps to
+    Setter in the current chrome factory context.
+
     The module ships with a default adapter for Button styles. Additional
     control target types can be enabled via Register-WPFChromeAdapter.
 
+
 .EXAMPLE
     Style 'PrimaryButton' Button {
-        Setter Background '#0A84FF'
-        Setter Foreground '#FFFFFF'
-        Setter Padding '14,8,14,8'
+        Background: '#0A84FF'
+        Foreground: '#FFFFFF'
+        Padding: '14,8,14,8'
 
         Chrome {
-            Setter CornerRadius 6
-            Setter BorderBrush '#086FD5'
-            Setter BorderThickness 2
+            CornerRadius: 6
+            BorderBrush: '#086FD5'
+            BorderThickness: 2
         }
 
         Trigger IsEnabled $false -Scope Chrome {
-            Setter BorderBrush '#9FC5EF'
-            Setter Background '#B6D7FF'
+            BorderBrush: '#9FC5EF'
+            Background: '#B6D7FF'
         }
     }
 #>
@@ -157,7 +161,119 @@ function Chrome {
 
 
     $chromeVars = New-WPFVariableList -InputObject $chromeFactory
-    $ScriptBlock.InvokeWithContext($null, $chromeVars) | Out-Null
+
+    $chromeDslCommands = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($dslCommandName in @('Setter')) {
+        $null = $chromeDslCommands.Add($dslCommandName)
+    }
+
+    $chromeFactoryType = $adapter.ShellType
+
+    $isChromeDependencyProperty = {
+        param(
+            [Parameter(Mandatory)]
+            [string] $PropertyName
+        )
+
+        $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($PropertyName, $chromeFactoryType, $chromeFactoryType)
+        return ($null -ne $descriptor)
+    }
+
+    $implicitSetterCommandMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $commandAsts = $ScriptBlock.Ast.FindAll({
+            param($Ast)
+            $Ast -is [System.Management.Automation.Language.CommandAst]
+        }, $true)
+
+    foreach ($commandAst in $commandAsts) {
+        $commandName = $commandAst.GetCommandName()
+        if ([string]::IsNullOrWhiteSpace($commandName)) {
+            continue
+        }
+
+        $isExplicitProperty = $commandName.EndsWith(':')
+        $propertyName = if ($isExplicitProperty) {
+            $commandName.Substring(0, $commandName.Length - 1)
+        } else {
+            $commandName
+        }
+
+        if ([string]::IsNullOrWhiteSpace($propertyName)) {
+            continue
+        }
+
+        $treatAsImplicitSetter = $false
+
+        if ($isExplicitProperty) {
+            $treatAsImplicitSetter = $true
+        } elseif ($chromeDslCommands.Contains($propertyName)) {
+            # Reserved DSL keywords remain explicit unless caller opts into
+            # property mode with a trailing ':'.
+            $treatAsImplicitSetter = $false
+        } elseif (& $isChromeDependencyProperty -PropertyName $propertyName) {
+            # Prefer dependency properties over command names to reduce collisions.
+            $treatAsImplicitSetter = $true
+        } elseif ($null -ne (Get-Command -Name $commandName -ErrorAction SilentlyContinue)) {
+            $treatAsImplicitSetter = $false
+        } else {
+            $treatAsImplicitSetter = $true
+        }
+
+        if ($treatAsImplicitSetter -and -not $implicitSetterCommandMap.ContainsKey($commandName)) {
+            $implicitSetterCommandMap[$commandName] = $propertyName
+        }
+    }
+
+    $implicitSetterFunctions = [System.Collections.Generic.Dictionary[string, scriptblock]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($chromeCommandName in $implicitSetterCommandMap.Keys) {
+        $propertyName = $implicitSetterCommandMap[$chromeCommandName]
+        $functionBody = [scriptblock]::Create(@"
+param(
+    [Parameter(Mandatory, Position = 0)]
+    [AllowNull()]
+    [object]`$Value,
+
+    [Parameter()]
+    [switch]`$Resource,
+
+    [Parameter()]
+    [string]`$Target,
+
+    [Parameter()]
+    [ValidateSet('Chrome')]
+    [string]`$Scope,
+
+    [Parameter(ValueFromRemainingArguments = `$true)]
+    [object[]]`$Remaining
+)
+
+if (`$null -ne `$Remaining -and `$Remaining.Count -gt 0) {
+    throw "Chrome shorthand for property '$propertyName' received unsupported trailing arguments: `$(`$Remaining -join ', ')"
+}
+
+`$setterArgs = @{
+    Property = '$propertyName'
+    Value = `$Value
+}
+
+if (`$PSBoundParameters.ContainsKey('Resource')) {
+    `$setterArgs['Resource'] = `$Resource
+}
+
+if (`$PSBoundParameters.ContainsKey('Target')) {
+    `$setterArgs['Target'] = `$Target
+}
+
+if (`$PSBoundParameters.ContainsKey('Scope')) {
+    `$setterArgs['Scope'] = `$Scope
+}
+
+Setter @setterArgs
+"@)
+        $implicitSetterFunctions[$chromeCommandName] = $functionBody
+    }
+
+    $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $chromeVars, @()) | Out-Null
 
     $contentPresenterFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
 
