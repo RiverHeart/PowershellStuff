@@ -1,6 +1,6 @@
-Describe 'Invoke-WPFBulkReplace' -Tag 'Invoke-WPFBulkReplace' {
+Describe 'Invoke-BulkReplace' -Tag 'Invoke-BulkReplace' {
     BeforeAll {
-        $ScriptPath = Join-Path $PSScriptRoot '../Scripts/Invoke-WPFBulkReplace.ps1'
+        $ScriptPath = Join-Path $PSScriptRoot '../Scripts/Invoke-BulkReplace.ps1'
     }
 
     It 'Applies literal replacement rules across matching files' {

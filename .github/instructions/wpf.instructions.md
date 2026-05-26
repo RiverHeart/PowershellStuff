@@ -71,7 +71,6 @@ Use this mental model when making edits:
 * `Private/`: helper logic and object-processing internals.
 * `Examples/`: executable scenarios used as behavior references.
 * `Tests/`: regression protection for DSL behavior.
-* `Scripts/Invoke-WPFTestSummary.ps1`: utility to run pester tests with minimal output and a final summary of test results.
 
 # Validation
 

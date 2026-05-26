@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Invokes Pester using PassThru so results can be summarized without parsing noisy console output.
-    By default, only failing/non-passing tests are printed, followed by stable summary lines:
+    By default, only failing or non-passing tests are printed, followed by stable summary lines:
 
     Tests completed in <seconds>s
     Tests Passed: X, Failed: Y, Skipped: Z, Inconclusive: A, NotRun: B
@@ -12,8 +12,7 @@
     Debug preference is scoped to this script invocation and restored in a finally block.
 
 .NOTES
-    This is geared towards AI agent use reduce token consumption and provide a clear summary of test results
-    without them needing to parse it.
+    This is geared towards agent use to reduce token consumption and provide a clear summary of test results.
 
 .PARAMETER TestSuite
     Name of the configured test suite to run.
@@ -40,19 +39,19 @@
     Returns the full Pester result object after printing the summary.
 
 .EXAMPLE
-    ./Scripts/Invoke-WPFTestSummary.ps1 -TestSuite WPF
+    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF
 
 .EXAMPLE
-    ./Scripts/Invoke-WPFTestSummary.ps1 -DebugOutput
+    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -DebugOutput
 
 .EXAMPLE
-    ./Scripts/Invoke-WPFTestSummary.ps1 -TestSuite WPF -Tag DataGrid -PassThru
+    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -Tag DataGrid -PassThru
 
 .EXAMPLE
-    ./Scripts/Invoke-WPFTestSummary.ps1 -ListSuites
+    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -ListSuites
 
 .EXAMPLE
-    ./Scripts/Invoke-WPFTestSummary.ps1 -TestSuite WPF -ListTags
+    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -ListTags
 #>
 [CmdletBinding()]
 
