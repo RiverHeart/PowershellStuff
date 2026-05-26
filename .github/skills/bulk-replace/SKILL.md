@@ -16,11 +16,11 @@ This skill aims to give agents the ability to make large-scale text changes acro
 Use the bundled script asset at:
 
 ```powershell
-./.github/skills/bulk-replace/scripts/Invoke-BulkReplace.ps1
+"$(git rev-parse --show-toplevel)/.github/skills/bulk-replace/scripts/Invoke-BulkReplace.ps1"
 ```
 
 Instead of reading the entire script, discover capabilities and usage with:
 
 ```powershell
-Get-Help ./.github/skills/bulk-replace/scripts/Invoke-BulkReplace.ps1 -Detailed
+Get-Help "$(git rev-parse --show-toplevel)/.github/skills/bulk-replace/scripts/Invoke-BulkReplace.ps1" -Detailed
 ```

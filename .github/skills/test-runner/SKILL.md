@@ -21,13 +21,13 @@ This is the preferred path for any project in the workspace unless the user expl
 Use the bundled script asset at:
 
 ```powershell
-./.github/skills/test-runner/scripts/Invoke-Test.ps1
+"$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/Invoke-Test.ps1"
 ```
 
 Instead of reading the entire script, discover capabilities and usage with:
 
 ```powershell
-Get-Help ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -Detailed
+Get-Help "$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/Invoke-Test.ps1" -Detailed
 ```
 
 ## Workflow
