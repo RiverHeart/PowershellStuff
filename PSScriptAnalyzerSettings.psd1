@@ -1,5 +1,8 @@
 @{
     IncludeDefaultRules = $true
+
+    # Note: These rules are geared towards the WPF module and should probably be removed
+    # if/when that module is migrated to a separate repository.
     Rules = @{
         PSUseCompatibleSyntax = @{
             Enable = $true
@@ -16,31 +19,45 @@
         }
     }
 
-    # Disable stupid rules
     ExcludeRules = @(
-        # Dogmatic nonsense
+        # Well meaning but antiquated and dogmatic to a fault.
+        #
+        # Verb conventions are good and should be followed when applicable, but modern-day
+        # cmdlet discovery is driven by internet searches rather than `Get-Command`, so strict
+        # adherence to this rule is more posturing than practical.
+        #
+        # The lack of an exhaustive list of approved verbs also contributes to hacks such as
+        # using 'Invoke' for everything or using the semantic meaning of a verb over its
+        # official meaning.
         'PSUseApprovedVerbs'
 
         # Used to be an issue in earlier versions of PowerShell, but is no longer a problem in modern versions.
         'PSAvoidUsingWriteHost'
 
-        # Proxy functions are a legitimate use case this rule fails to account for.
+        # Proxy functions are a legitimate use case.
         'PSAvoidOverwritingBuiltInCmdlets'
 
-        # Not everything using 'New' changes state
+        # Not everything using 'New' changes state, sometimes it's just a factory method.
         'PSUseShouldProcessForStateChangingFunctions'
 
-        # $Sender and $Event are the expected parameters for event handlers.
+        # $Sender and $Event are the expected parameter names for event handlers.
+        #
+        # In the context of the WPF module, using conventional parameter names for
+        # event handlers is more beneficial than not.
         'PSAvoidAssignmentToAutomaticVariable'
 
         # Explicit parameters may be required or provide clarity on availability
-        # despite not being used in the function body
+        # despite not being used in the function body.
+        #
+        # In the context of the WPF module, showing the available parameters for
+        # event handlers is more beneficial than hiding them.
         'PSReviewUnusedParameter'
 
-        # Useless when working with powershell classes in modules
+        # Basically useless when working with PowerShell classes in modules as class definitions
+        # defined in separate files are not analyzed and will never be found.
         'TypeNotFound',
 
-        # Produces false positive for the 'Command' DSL keyword
+        # Produces false positive for the 'Command' DSL keyword.
         'PSAvoidUsingCmdletAliases'
     )
 }

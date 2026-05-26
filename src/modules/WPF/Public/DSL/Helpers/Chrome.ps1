@@ -7,24 +7,28 @@
     a named Border part and a ContentPresenter. This hides common template
     boilerplate for controls where rounded chrome styling is frequently needed.
 
+    Inside Chrome blocks, property command shorthand is supported and maps to
+    Setter in the current chrome factory context.
+
     The module ships with a default adapter for Button styles. Additional
     control target types can be enabled via Register-WPFChromeAdapter.
 
+
 .EXAMPLE
     Style 'PrimaryButton' Button {
-        Setter Background '#0A84FF'
-        Setter Foreground '#FFFFFF'
-        Setter Padding '14,8,14,8'
+        Background: '#0A84FF'
+        Foreground: '#FFFFFF'
+        Padding: '14,8,14,8'
 
         Chrome {
-            Setter CornerRadius 6
-            Setter BorderBrush '#086FD5'
-            Setter BorderThickness 2
+            CornerRadius: 6
+            BorderBrush: '#086FD5'
+            BorderThickness: 2
         }
 
         Trigger IsEnabled $false -Scope Chrome {
-            Setter BorderBrush '#9FC5EF'
-            Setter Background '#B6D7FF'
+            BorderBrush: '#9FC5EF'
+            Background: '#B6D7FF'
         }
     }
 #>
@@ -157,7 +161,14 @@ function Chrome {
 
 
     $chromeVars = New-WPFVariableList -InputObject $chromeFactory
-    $ScriptBlock.InvokeWithContext($null, $chromeVars) | Out-Null
+
+    $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+        -ScriptBlock $ScriptBlock `
+        -TargetType $adapter.ShellType `
+        -ReservedCommands @('Setter') `
+        -ContextName 'Chrome'
+
+    $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $chromeVars, @()) | Out-Null
 
     $contentPresenterFactory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
 

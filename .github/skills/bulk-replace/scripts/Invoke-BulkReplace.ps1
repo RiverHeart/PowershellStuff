@@ -3,7 +3,7 @@
     Applies structured bulk text replacements across files.
 
 .DESCRIPTION
-    Invoke-WPFBulkReplace resolves target files from one or more paths, applies one or more
+    Invoke-BulkReplace resolves target files from one or more paths, applies one or more
     replacement rules in order, and writes only the files that actually change.
     Use -WhatIf to preview, -PassThru to inspect reports, and explicit rules to keep
     replacements auditable and repeatable.
@@ -56,7 +56,7 @@
     Search for matching lines and return line-numbered hits without writing changes.
 
 .EXAMPLE
-    Invoke-WPFBulkReplace -Path .\src\modules\WPF\Tests -Recurse -Rule @(
+    Invoke-BulkReplace -Path .\src\modules\WPF\Tests -Recurse -Rule @(
         @{
             Name = 'Tag Binding test'
             FilePattern = 'Binding.Tests.ps1'
@@ -422,7 +422,7 @@ function Get-WPFBulkReplaceTargetFile {
     $resolvedFiles | Sort-Object -Property FullName -Unique
 }
 
-function Invoke-WPFBulkReplaceLiteral {
+function Invoke-BulkReplaceLiteral {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
@@ -492,7 +492,7 @@ function Invoke-WPFBulkReplaceLiteral {
     }
 }
 
-function Invoke-WPFBulkReplaceRegex {
+function Invoke-BulkReplaceRegex {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
@@ -585,9 +585,9 @@ foreach ($file in $targetFiles) {
         $appliedRules.Add($ruleItem.Name)
 
         $result = if ($ruleItem.Regex) {
-            Invoke-WPFBulkReplaceRegex -Content $workingContent -Pattern $ruleItem.Pattern -Replacement $ruleItem.Replacement -FirstOnly:$ruleItem.FirstOnly -IgnoreCase:$ruleItem.IgnoreCase
+            Invoke-BulkReplaceRegex -Content $workingContent -Pattern $ruleItem.Pattern -Replacement $ruleItem.Replacement -FirstOnly:$ruleItem.FirstOnly -IgnoreCase:$ruleItem.IgnoreCase
         } else {
-            Invoke-WPFBulkReplaceLiteral -Content $workingContent -Pattern $ruleItem.Pattern -Replacement $ruleItem.Replacement -FirstOnly:$ruleItem.FirstOnly -IgnoreCase:$ruleItem.IgnoreCase
+            Invoke-BulkReplaceLiteral -Content $workingContent -Pattern $ruleItem.Pattern -Replacement $ruleItem.Replacement -FirstOnly:$ruleItem.FirstOnly -IgnoreCase:$ruleItem.IgnoreCase
         }
 
         if ($result.Content -ne $workingContent) {

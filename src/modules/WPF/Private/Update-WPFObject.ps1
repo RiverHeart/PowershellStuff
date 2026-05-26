@@ -44,7 +44,19 @@ function Update-WPFObject {
 
     try {
         if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
-            $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
+            if ($InputObject -is [System.Windows.FrameworkElementFactory]) {
+                $factoryType = $InputObject.Type
+
+                $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+                    -ScriptBlock $ScriptBlock `
+                    -TargetType $factoryType `
+                    -ReservedCommands @('Setter') `
+                    -ContextName 'Factory'
+
+                $ChildObjects = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
+            } else {
+                $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
+            }
         }
 
         foreach ($Child in $ChildObjects) {

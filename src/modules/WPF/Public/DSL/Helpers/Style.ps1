@@ -1,3 +1,8 @@
+using namespace System
+using namespace System.Collections.Generic
+using namespace System.ComponentModel
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Defines a WPF style.
@@ -7,20 +12,28 @@
 
     Supports two forms:
 
-    * Named style: Style 'App.Button' Button { ... }
-    * Implicit style: Style Button { ... }
+    * Named Style: Style 'App.Button' Button { ... }
+    * Typed Style: Style Button { ... }
 
-    Named styles are applied using UseStyle. Implicit styles are registered by
+    Named styles are applied using UseStyle. Typed styles are registered by
     target type and auto-applied during control creation.
+
+    To support implicit style syntax (for example: Background: 'Red'), Style
+    performs a lightweight AST pass first to identify candidate command names,
+    then injects temporary helper functions into the scriptblock execution
+    scope. Each helper forwards to Setter with the original arguments.
+
+    This preserves normal scriptblock execution semantics (variables,
+    expressions, and control flow) while allowing property-like shorthand.
 
 .EXAMPLE
     Style 'App.Button' Button {
-        Setter Background ButtonBackground -Resource
+        Background: ButtonBackground -Resource
     }
 
 .EXAMPLE
     Style Button {
-        Setter Background ButtonBackground -Resource
+        Background: ButtonBackground -Resource
     }
 #>
 function Style {
@@ -36,6 +49,8 @@ function Style {
         [Parameter(Position = 2)]
         [scriptblock] $ScriptBlock
     )
+
+    # MARK: SETUP
 
     $isNamedStyle = $true
     if (
@@ -81,7 +96,15 @@ function Style {
     $style = [System.Windows.Style]::new($resolvedType)
     $PSVars = New-WPFVariableList -InputObject $style
 
-    $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
+    $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+        -ScriptBlock $ScriptBlock `
+        -TargetType $resolvedType `
+        -ReservedCommands @('Setter', 'Trigger', 'DataTrigger', 'MultiTrigger', 'Chrome', 'ExtendStyle', 'Template') `
+        -ContextName 'Style'
+
+    # Execute once with injected helpers and WPF DSL variables. This keeps
+    # normal scriptblock behavior intact while enabling shorthand commands.
+    $null = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
 
     if ($isNamedStyle) {
         $script:WPFStyleTable[$Name] = $style

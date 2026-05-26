@@ -25,6 +25,28 @@ Describe 'Trigger' -Tag 'Trigger' {
         $button.Opacity | Should -Be -ExpectedValue 0.4
     }
 
+    It 'Should support implicit setter shorthand inside Trigger blocks' {
+        $id = [guid]::NewGuid().ToString('N')
+        $styleName = "TriggerShorthandButton_$id"
+        $button = [System.Windows.Controls.Button]::new()
+
+        Style $styleName Button {
+            Opacity 1.0
+
+            Trigger IsEnabled $false {
+                Opacity: 0.4
+            }
+        }
+
+        $psVars = New-WPFVariableList -InputObject $button
+        { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $button.Opacity | Should -Be -ExpectedValue 1.0
+
+        $button.IsEnabled = $false
+        $button.Opacity | Should -Be -ExpectedValue 0.4
+    }
+
     It 'Should add control template triggers and support setter target names' {
         $template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
         $psVars = New-WPFVariableList -InputObject $template

@@ -44,4 +44,100 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $ContentHost | Should -Not -BeNullOrEmpty
         $ContentHost.GetType().FullName | Should -Be -ExpectedValue 'System.Windows.Controls.ScrollViewer'
     }
+
+    It 'Should support implicit setter shorthand in Border and ContentPresenter template factory blocks' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "ButtonTemplateShorthand_$Id"
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    Padding '3,4,5,6'
+
+                    ContentPresenter {
+                        HorizontalAlignment ([System.Windows.HorizontalAlignment]::Stretch)
+                        VerticalAlignment ([System.Windows.VerticalAlignment]::Stretch)
+                        SnapsToDevicePixels $true
+                    }
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateBorder = $Button.Template.FindName('TemplateBorder', $Button)
+
+        $TemplateBorder | Should -Not -BeNullOrEmpty
+        $TemplateBorder.Padding.Left | Should -Be -ExpectedValue 3
+        $TemplateBorder.Padding.Top | Should -Be -ExpectedValue 4
+        $TemplateBorder.Padding.Right | Should -Be -ExpectedValue 5
+        $TemplateBorder.Padding.Bottom | Should -Be -ExpectedValue 6
+    }
+
+    It 'Should forward -Resource in template factory shorthand statements' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $ThemeName = "FactoryResourceTheme_$Id"
+        $StyleName = "FactoryResourceStyle_$Id"
+        $Window = [System.Windows.Window]::new()
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Theme $ThemeName {
+            ButtonBackground '#223344'
+        }
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    Background ButtonBackground -Resource
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Window.Content = $Button
+        Use-WPFTheme -Name $ThemeName -Root $Window
+
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateBorder = $Button.Template.FindName('TemplateBorder', $Button)
+
+        $TemplateBorder | Should -Not -BeNullOrEmpty
+        $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue '#FF223344'
+    }
+
+    It 'Should support explicit property delimiter syntax in template factory statements' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $ThemeName = "FactoryDelimiterTheme_$Id"
+        $StyleName = "FactoryDelimiterStyle_$Id"
+        $Window = [System.Windows.Window]::new()
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Theme $ThemeName {
+            ButtonBackground '#334455'
+        }
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    Background: ButtonBackground -Resource
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Window.Content = $Button
+        Use-WPFTheme -Name $ThemeName -Root $Window
+
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateBorder = $Button.Template.FindName('TemplateBorder', $Button)
+
+        $TemplateBorder | Should -Not -BeNullOrEmpty
+        $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue '#FF334455'
+    }
 }

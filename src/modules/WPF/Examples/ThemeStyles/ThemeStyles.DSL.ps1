@@ -8,7 +8,7 @@ using namespace System.Windows.Controls
 .DESCRIPTION
     Demonstrates:
 
-    - Theme and Brush definitions
+    - Theme and Style definitions
     - Implicit target-type styles
     - Named style overrides with UseStyle
     - Runtime Light/Dark toggling
@@ -52,40 +52,40 @@ function Toggle-ExampleTheme {
 }
 
 Theme 'Light' {
-    Brush 'WindowBackground' '#FFFFFF'
-    Brush 'Foreground' '#111111'
-    Brush 'ButtonBackground' '#ECECEC'
+    WindowBackground: '#FFFFFF'
+    Foreground: '#111111'
+    ButtonBackground: '#ECECEC'
 }
 
 Theme 'Dark' {
-    Brush 'WindowBackground' '#1E1E1E'
-    Brush 'Foreground' '#F0F0F0'
-    Brush 'ButtonBackground' '#2A2A2A'
+    WindowBackground: '#1E1E1E'
+    Foreground: '#F0F0F0'
+    ButtonBackground: '#2A2A2A'
 }
 
 # Implicit styles
 Style Window {
-    Setter Background WindowBackground -Resource
-    Setter Foreground Foreground -Resource
+    Background: WindowBackground -Resource
+    Foreground: Foreground -Resource
 }
 
 Style Label {
-    Setter Foreground Foreground -Resource
+    Foreground: Foreground -Resource
 }
 
 Style Button {
-    Setter Background ButtonBackground -Resource
-    Setter Foreground Foreground -Resource
-    Setter Margin '0,8,0,0'
+    Background: ButtonBackground -Resource
+    Foreground: Foreground -Resource
+    Margin: '0,8,0,0'
 }
 
 # Named style override
 Style 'PrimaryButton' Button {
-    Setter Background ButtonBackground -Resource
-    Setter Foreground Foreground -Resource
-    Setter FontWeight ([System.Windows.FontWeights]::SemiBold)
-    Setter Padding '14,6,14,6'
-    Setter Margin '0,12,0,0'
+    Background: ButtonBackground -Resource
+    Foreground: Foreground -Resource
+    FontWeight: ([System.Windows.FontWeights]::SemiBold)
+    Padding: '14,6,14,6'
+    Margin: '0,12,0,0'
 }
 
 Window 'Window' {

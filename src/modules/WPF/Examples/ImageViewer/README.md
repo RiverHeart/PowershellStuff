@@ -33,7 +33,10 @@ Example runs:
 
 ```powershell
 # Open file, start slideshow at 2.5s, close after 10s
-.\ImageViewer.DSL.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2.5 -AutoCloseSeconds 10
+.\ImageViewer.DSL.ps1 `
+    -FilePath 'C:\Images\sample.jpg' `
+    -SlideshowIntervalSeconds 2.5 `
+    -AutoCloseSeconds 10
 
 # Quick unattended auto-close run
 .\ImageViewer.DSL.ps1 -AutoCloseSeconds 0
@@ -48,7 +51,10 @@ For repeatable automation, use the wrapper script:
 
 ```powershell
 # Open a file, run slideshow at 2s, auto-close after 10s
-.\Invoke-ImageViewerSmoke.ps1 -FilePath 'C:\Images\sample.jpg' -SlideshowIntervalSeconds 2 -AutoCloseSeconds 10
+.\Invoke-ImageViewerSmoke.ps1 `
+    -FilePath 'C:\Images\sample.jpg' `
+    -SlideshowIntervalSeconds 2 `
+    -AutoCloseSeconds 10
 ```
 
 ## TODO

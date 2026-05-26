@@ -92,6 +92,37 @@ Describe 'Chrome' -Tag 'Chrome' {
         $chromeBorder.BorderBrush.Color.ToString() | Should -Be -ExpectedValue '#FF2563EB'
     }
 
+    It 'Supports implicit setter shorthand in Chrome and Chrome-scoped Trigger blocks' {
+        $id = [guid]::NewGuid().ToString('N')
+        $styleName = "ChromeTriggerShorthandButton_$id"
+        $button = [System.Windows.Controls.Button]::new()
+
+        Style $styleName Button {
+            BorderBrush '#B8C0CC'
+            BorderThickness 1
+
+            Chrome {
+                CornerRadius: 6
+            }
+
+            Trigger IsEnabled $false -Scope Chrome {
+                BorderBrush '#2563EB'
+            }
+        }
+
+        $psVars = New-WPFVariableList -InputObject $button
+        { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $button.ApplyTemplate() | Out-Null
+        $chromeBorder = $button.Template.FindName('ButtonChrome', $button)
+        $chromeBorder | Should -Not -BeNullOrEmpty
+
+        $chromeBorder.BorderBrush.Color.ToString() | Should -Be -ExpectedValue '#FFB8C0CC'
+
+        $button.IsEnabled = $false
+        $chromeBorder.BorderBrush.Color.ToString() | Should -Be -ExpectedValue '#FF2563EB'
+    }
+
     It 'Inherits chrome shell baseline setters from ExtendStyle base style' {
         $id = [guid]::NewGuid().ToString('N')
         $styleName = "ChromeInheritedButton_$id"

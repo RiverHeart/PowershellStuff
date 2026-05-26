@@ -9,16 +9,18 @@
     The scriptblock runs with `$this` bound to the created Trigger so Setter can
     add triggered values.
 
+    Trigger blocks also support property command shorthand that maps to Setter.
+
 .EXAMPLE
     Style 'PrimaryButton' Button {
         Trigger IsMouseOver $true {
-            Setter Opacity 0.85
+            Opacity: 0.85
         }
     }
 
 .EXAMPLE
     Trigger IsEnabled $false {
-        Setter Opacity 0.6 -Target 'TemplateBorder'
+        Opacity: 0.6 -Target 'TemplateBorder'
     }
 #>
 function Trigger {
@@ -146,8 +148,14 @@ function Trigger {
             $trigger | Add-Member -NotePropertyName '_WPFDefaultSetterScope' -NotePropertyValue 'Chrome' -Force
         }
 
+        $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+            -ScriptBlock $ScriptBlock `
+            -TargetType $targetType `
+            -ReservedCommands @('Setter') `
+            -ContextName 'Trigger'
+
         $PSVars = New-WPFVariableList -InputObject $trigger
-        $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
+        $null = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
 
         $target.Triggers.Add($trigger) | Out-Null
     }

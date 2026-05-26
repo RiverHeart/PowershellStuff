@@ -6,9 +6,17 @@
     Creates a ResourceDictionary and stores it in module state under the
     provided theme name. Use Brush inside the script block to populate values.
 
+    To support implicit theme syntax (for example: WindowBackground: '#FFFFFF'),
+    Theme performs a lightweight AST pass to identify candidate command names,
+    then injects temporary helper functions into the scriptblock execution
+    scope. Each helper forwards to Brush with the resolved resource key.
+
+    This preserves normal scriptblock execution semantics (variables,
+    expressions, and control flow) while allowing key-like shorthand.
+
 .EXAMPLE
     Theme 'Dark' {
-        Brush 'WindowBackground' '#1E1E1E'
+        WindowBackground: '#1E1E1E'
     }
 #>
 function Theme {
@@ -30,7 +38,14 @@ function Theme {
     $dictionary = [System.Windows.ResourceDictionary]::new()
     $PSVars = New-WPFVariableList -InputObject $dictionary
 
-    $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
+    $implicitBrushFunctions = New-WPFImplicitBrushFunctionMap `
+        -ScriptBlock $ScriptBlock `
+        -ReservedCommands @('Brush') `
+        -ContextName 'Theme'
+
+    # Execute once with injected helpers and WPF DSL variables. This keeps normal
+    # scriptblock behavior intact while enabling shorthand theme keys.
+    $null = $ScriptBlock.InvokeWithContext($implicitBrushFunctions, $PSVars, @())
     $dictionary['__WPFThemeName'] = $Name
     $script:WPFThemeTable[$Name] = $dictionary
 }
