@@ -260,185 +260,188 @@ $ContentBlock
 #   UseStyle 'DangerButton'
 #   UseStyle 'GhostButton'
 Style Button {
-    Setter Background '#F8FAFC'
-    Setter Foreground '#111827'
-    Setter BorderBrush '#8E9AAF'
-    Setter BorderThickness 2
-    Setter Padding '14,8,14,8'
-    Setter Margin '0,8,0,0'
-    Setter FontSize 14
-    Setter MinWidth 110
-    Setter Cursor ([System.Windows.Input.Cursors]::Hand)
-    Setter FocusVisualStyle `$null
-    Setter SnapsToDevicePixels `$true
-    Setter OverridesDefaultStyle `$true
+    Background: '#F8FAFC'
+    Foreground: '#111827'
+    BorderBrush: '#8E9AAF'
+    BorderThickness: 2
+    Padding: 14, 8, 14, 8
+    Margin: 0, 8, 0, 0
+    FontSize: 14
+    MinWidth: 110
+    Cursor: ([System.Windows.Input.Cursors]::Hand)
+    FocusVisualStyle: $null
+    SnapsToDevicePixels: $true
+    OverridesDefaultStyle: $true
 
-    Template {
-        Border 'ButtonChrome' {
-            Setter Background '#F8FAFC'
-            Setter BorderBrush '#8E9AAF'
-            Setter BorderThickness 2
-            Setter CornerRadius 6
-            Setter SnapsToDevicePixels `$true
+    Chrome {
+        CornerRadius: 6
+    }
 
-            ContentPresenter {
-                Setter Margin '14,8,14,8'
-                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
-                Setter VerticalAlignment ([VerticalAlignment]::Center)
-                Setter RecognizesAccessKey `$true
-            }
-        }
+    Trigger IsMouseOver $true -Scope Chrome {
+        Background: '#E9EEF7'
+        BorderBrush: '#7D8BA3'
+    }
 
-        Trigger IsMouseOver `$true {
-            Setter Background '#E9EEF7' -Target 'ButtonChrome'
-            Setter BorderBrush '#7D8BA3' -Target 'ButtonChrome'
-        }
+    Trigger IsPressed $true -Scope Chrome {
+        Background: '#DDE6F3'
+        BorderBrush: '#6D7D98'
+    }
 
-        Trigger IsPressed `$true {
-            Setter Background '#DDE6F3' -Target 'ButtonChrome'
-            Setter BorderBrush '#6D7D98' -Target 'ButtonChrome'
-        }
+    Trigger IsKeyboardFocused $true -Scope Chrome {
+        BorderBrush: '#2563EB'
+    }
 
-        Trigger IsKeyboardFocused `$true {
-            Setter BorderBrush '#2563EB' -Target 'ButtonChrome'
-        }
+    Trigger IsEnabled $false -Scope Chrome {
+        Background: '#F3F4F6'
+        BorderBrush: '#D6DCE5'
+    }
 
-        Trigger IsEnabled `$false {
-            Setter Background '#F3F4F6' -Target 'ButtonChrome'
-            Setter BorderBrush '#D6DCE5' -Target 'ButtonChrome'
-            Setter Foreground '#9CA3AF'
-        }
+    Trigger IsEnabled $false {
+        Foreground: '#9CA3AF'
     }
 }
 
 Style 'PrimaryButton' Button {
     ExtendStyle Button
-    Setter Background '#0A84FF'
-    Setter Foreground '#FFFFFF'
-    Setter BorderBrush '#086FD5'
+    Background: '#0A84FF'
+    Foreground: '#FFFFFF'
+    BorderBrush: '#086FD5'
 
-    Template {
-        Border 'ButtonChrome' {
-            Setter Background '#0A84FF'
-            Setter BorderBrush '#086FD5'
-            Setter BorderThickness 2
-            Setter CornerRadius 6
-            Setter SnapsToDevicePixels `$true
+    Chrome {
+        CornerRadius: 6
+    }
 
-            ContentPresenter {
-                Setter Margin '14,8,14,8'
-                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
-                Setter VerticalAlignment ([VerticalAlignment]::Center)
-                Setter RecognizesAccessKey `$true
-            }
-        }
+    Trigger IsMouseOver $true -Scope Chrome {
+        Background: '#0978E6'
+        BorderBrush: '#075FBA'
+    }
 
-        Trigger IsMouseOver `$true {
-            Setter Background '#0978E6' -Target 'ButtonChrome'
-            Setter BorderBrush '#075FBA' -Target 'ButtonChrome'
-        }
+    Trigger IsPressed $true -Scope Chrome {
+        Background: '#0869C9'
+        BorderBrush: '#064F97'
+    }
 
-        Trigger IsPressed `$true {
-            Setter Background '#0869C9' -Target 'ButtonChrome'
-            Setter BorderBrush '#064F97' -Target 'ButtonChrome'
-        }
+    Trigger IsKeyboardFocused $true -Scope Chrome {
+        BorderBrush: '#1D4ED8'
+    }
 
-        Trigger IsKeyboardFocused `$true {
-            Setter BorderBrush '#1D4ED8' -Target 'ButtonChrome'
-        }
+    Trigger IsEnabled $false -Scope Chrome {
+        Background: '#B6D7FF'
+        BorderBrush: '#9FC5EF'
+    }
 
-        Trigger IsEnabled `$false {
-            Setter Background '#B6D7FF' -Target 'ButtonChrome'
-            Setter BorderBrush '#9FC5EF' -Target 'ButtonChrome'
-            Setter Foreground '#E8F2FF'
-        }
+    Trigger IsEnabled $false {
+        Foreground: '#E8F2FF'
     }
 }
 
 Style 'DangerButton' Button {
     ExtendStyle Button
-    Setter Background '#DC2626'
-    Setter Foreground '#FFFFFF'
-    Setter BorderBrush '#B91C1C'
+    Background: '#DC2626'
+    Foreground: '#FFFFFF'
+    BorderBrush: '#B91C1C'
 
-    Template {
-        Border 'ButtonChrome' {
-            Setter Background '#DC2626'
-            Setter BorderBrush '#B91C1C'
-            Setter BorderThickness 2
-            Setter CornerRadius 6
-            Setter SnapsToDevicePixels `$true
+    Chrome {
+        CornerRadius: 6
+    }
 
-            ContentPresenter {
-                Setter Margin '14,8,14,8'
-                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
-                Setter VerticalAlignment ([VerticalAlignment]::Center)
-                Setter RecognizesAccessKey `$true
-            }
-        }
+    Trigger IsMouseOver $true -Scope Chrome {
+        Background: '#C91F1F'
+        BorderBrush: '#A31515'
+    }
 
-        Trigger IsMouseOver `$true {
-            Setter Background '#C91F1F' -Target 'ButtonChrome'
-            Setter BorderBrush '#A31515' -Target 'ButtonChrome'
-        }
+    Trigger IsPressed $true -Scope Chrome {
+        Background: '#B31B1B'
+        BorderBrush: '#8F1212'
+    }
 
-        Trigger IsPressed `$true {
-            Setter Background '#B31B1B' -Target 'ButtonChrome'
-            Setter BorderBrush '#8F1212' -Target 'ButtonChrome'
-        }
+    Trigger IsKeyboardFocused $true -Scope Chrome {
+        BorderBrush: '#991B1B'
+    }
 
-        Trigger IsKeyboardFocused `$true {
-            Setter BorderBrush '#991B1B' -Target 'ButtonChrome'
-        }
+    Trigger IsEnabled $false -Scope Chrome {
+        Background: '#F3B0B0'
+        BorderBrush: '#E39A9A'
+    }
 
-        Trigger IsEnabled `$false {
-            Setter Background '#F3B0B0' -Target 'ButtonChrome'
-            Setter BorderBrush '#E39A9A' -Target 'ButtonChrome'
-            Setter Foreground '#FFF4F4'
-        }
+    Trigger IsEnabled $false {
+        Foreground: '#FFF4F4'
     }
 }
 
 Style 'GhostButton' Button {
     ExtendStyle Button
-    Setter Background '#FFFFFF'
-    Setter Foreground '#1F2937'
-    Setter BorderBrush '#B8C0CC'
+    Background: '#FFFFFF'
+    Foreground: '#1F2937'
+    BorderBrush: '#B8C0CC'
+
+    Chrome {
+        CornerRadius: 6
+    }
+
+    Trigger IsMouseOver $true -Scope Chrome {
+        Background: '#F8FAFC'
+        BorderBrush: '#9EA8B8'
+    }
+
+    Trigger IsPressed $true -Scope Chrome {
+        Background: '#F1F5F9'
+        BorderBrush: '#8B97AA'
+    }
+
+    Trigger IsKeyboardFocused $true -Scope Chrome {
+        BorderBrush: '#2563EB'
+    }
+
+    Trigger IsEnabled $false -Scope Chrome {
+        Background: '#F8FAFC'
+        BorderBrush: '#D2D9E3'
+    }
+
+    Trigger IsEnabled $false {
+        Foreground: '#A1AAB7'
+    }
+}
+
+Style TextBox {
+    BorderBrush: '#B8C0CC'
+    BorderThickness: 1
+    Padding: 10, 8
+    Margin: 0, 0, 0, 8
+    MinHeight: 38
+    FontSize: 16
+    Foreground: '#111827'
+    Background: '#FFFFFF'
+    FocusVisualStyle: $null
 
     Template {
-        Border 'ButtonChrome' {
-            Setter Background '#FFFFFF'
-            Setter BorderBrush '#B8C0CC'
-            Setter BorderThickness 2
-            Setter CornerRadius 6
-            Setter SnapsToDevicePixels `$true
+        Border 'InputChrome' {
+            CornerRadius: 6
+            Background: '#FFFFFF'
+            BorderBrush: '#B8C0CC'
+            BorderThickness: 1
+            SnapsToDevicePixels: $true
 
-            ContentPresenter {
-                Setter Margin '14,8,14,8'
-                Setter HorizontalAlignment ([HorizontalAlignment]::Center)
-                Setter VerticalAlignment ([VerticalAlignment]::Center)
-                Setter RecognizesAccessKey `$true
+            ScrollViewer 'PART_ContentHost' {
+                Margin: 10, 8, 10, 8
+                Focusable: $false
+                HorizontalAlignment: ([HorizontalAlignment]::Stretch)
+                VerticalAlignment: ([VerticalAlignment]::Stretch)
             }
         }
 
-        Trigger IsMouseOver `$true {
-            Setter Background '#F8FAFC' -Target 'ButtonChrome'
-            Setter BorderBrush '#9EA8B8' -Target 'ButtonChrome'
+        Trigger IsMouseOver $true {
+            BorderBrush: '#9EA8B8' -Target 'InputChrome'
         }
 
-        Trigger IsPressed `$true {
-            Setter Background '#F1F5F9' -Target 'ButtonChrome'
-            Setter BorderBrush '#8B97AA' -Target 'ButtonChrome'
+        Trigger IsKeyboardFocused $true {
+            BorderBrush: '#2563EB' -Target 'InputChrome'
         }
 
-        Trigger IsKeyboardFocused `$true {
-            Setter BorderBrush '#2563EB' -Target 'ButtonChrome'
-        }
-
-        Trigger IsEnabled `$false {
-            Setter Background '#F8FAFC' -Target 'ButtonChrome'
-            Setter BorderBrush '#D2D9E3' -Target 'ButtonChrome'
-            Setter Foreground '#A1AAB7'
+        Trigger IsEnabled $false {
+            Background: '#F3F4F6' -Target 'InputChrome'
+            BorderBrush: '#D2D9E3' -Target 'InputChrome'
+            Foreground: '#A1AAB7'
         }
     }
 }
