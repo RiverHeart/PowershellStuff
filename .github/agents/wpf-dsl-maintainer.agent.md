@@ -16,12 +16,12 @@ Execution policy:
 
 - Update code, tests, and docs together in one change.
 - When adding public commands, update exports in src/modules/WPF/WPF.psd1.
-- Validate with Pester before completion.
+- Validate with the repository test runner before completion.
 
 Default checklist:
 
 1. Implement change in DSL/helper code.
 2. Add or update tests in src/modules/WPF/Tests.
 3. Update src/modules/WPF/Docs/KeywordReference.md.
-4. Run Invoke-Pester -Path "src/modules/WPF/Tests" -Output Detailed.
+4. Run ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF.
 5. Report behavior changes and any compatibility impacts.
