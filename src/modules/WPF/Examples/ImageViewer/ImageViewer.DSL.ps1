@@ -102,9 +102,9 @@ Window 'Window' {
         }
     }
 
-    # Window doesn't have a Command property like button so
-    # you need to wire up an event.
-    When KeyDown {
+    # Use PreviewKeyDown so navigation keys still work when focused controls
+    # like ScrollViewer handle KeyDown internally.
+    When PreviewKeyDown {
         param($sender, $event)
 
         switch ($event.Key) {
@@ -131,13 +131,17 @@ Window 'Window' {
                 break
             }
             'Left' {
-                Invoke-ImageViewerNavigate -Direction Back
-                $event.Handled = $True
+                if (Test-ImageViewerShouldNavigate) {
+                    Invoke-ImageViewerNavigate -Direction Back
+                    $event.Handled = $True
+                }
                 break
             }
             { $_ -in @('Right', 'Space') } {
-                Invoke-ImageViewerNavigate -Direction Forward
-                $event.Handled = $True
+                if ($event.Key -eq [Key]::Space -or (Test-ImageViewerShouldNavigate)) {
+                    Invoke-ImageViewerNavigate -Direction Forward
+                    $event.Handled = $True
+                }
                 break
             }
             { $_ -in @('D0', 'NumPad0') -and ([Keyboard]::Modifiers -band [ModifierKeys]::Control) } {
