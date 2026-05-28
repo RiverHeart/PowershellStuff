@@ -1,3 +1,6 @@
+using namespace System.Collections.Generic
+using namespace System.Text.RegularExpressions
+
 <#
 .SYNOPSIS
     Applies structured bulk text replacements across files.
@@ -56,14 +59,70 @@
     Search for matching lines and return line-numbered hits without writing changes.
 
 .EXAMPLE
-    Invoke-BulkReplace -Path .\src\modules\WPF\Tests -Recurse -Rule @(
-        @{
-            Name = 'Tag Binding test'
-            FilePattern = 'Binding.Tests.ps1'
-            Pattern = "Describe 'Binding' {"
-            Replacement = "Describe 'Binding' -Tag 'Binding' {"
-        }
-    ) -WhatIf
+    Search Only (compact output)
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Recurse `
+        -Include '*.Tests.ps1' `
+        -SearchOnly `
+        -Find "Describe '([^']+)' \{" `
+        -UseRegex `
+        -PassThru
+
+.EXAMPLE
+    Search Only (line-level details)
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests/BindProperty.Tests.ps1' `
+        -SearchOnly `
+        -Find "Describe 'BindProperty'" `
+        -PassThru `
+        -PassThruFormat Detailed
+
+.EXAMPLE
+    Preview replacement with WhatIf
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests/BindProperty.Tests.ps1' `
+        -Find "Describe 'BindProperty' {" `
+        -Replace "Describe 'BindProperty' -Tag 'BindProperty' {" `
+        -WhatIf `
+        -PassThru
+
+.EXAMPLE
+    Apply replacement
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests/BindProperty.Tests.ps1' `
+        -Find "Describe 'BindProperty' {" `
+        -Replace "Describe 'BindProperty' -Tag 'BindProperty' {" `
+        -PassThru
+
+.EXAMPLE
+    Load rules from a file
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Recurse `
+        -Include '*.Tests.ps1' `
+        -RulePath './src/modules/WPF/Scripts/rules/tagging.json' `
+        -WhatIf `
+        -PassThru
+
+.EXAMPLE
+    Regex capture replacement (generic pattern rewrite)
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Recurse `
+        -Include '*.Tests.ps1' `
+        -Find "^Describe '([^']+)' \{$" `
+        -Replace "Describe '$1' -Tag '$1' {" `
+        -UseRegex `
+        -WhatIf `
+        -PassThru `
+        -PassThruFormat Detailed
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 
@@ -103,7 +162,7 @@ param (
     [string] $PassThruFormat = 'Summary'
 )
 
-function ConvertTo-WPFBulkReplaceRule {
+function ConvertTo-BulkReplaceRule {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
@@ -157,8 +216,9 @@ function ConvertTo-WPFBulkReplaceRule {
     }
 }
 
-function Read-WPFBulkReplaceRuleFile {
+function Read-BulkReplaceRuleFile {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param (
         [Parameter(Mandatory)]
         [string] $Path
@@ -183,8 +243,9 @@ function Read-WPFBulkReplaceRuleFile {
     return @($parsed)
 }
 
-function Resolve-WPFBulkReplaceRuleInput {
+function Resolve-BulkReplaceRuleInput {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param (
         [Parameter()]
         [object[]] $Rule,
@@ -225,7 +286,7 @@ function Resolve-WPFBulkReplaceRuleInput {
     }
 
     if ($sources[0] -eq 'RulePath') {
-        return @(Read-WPFBulkReplaceRuleFile -Path $RulePath)
+        return @(Read-BulkReplaceRuleFile -Path $RulePath)
     }
 
     if ([string]::IsNullOrWhiteSpace($Find)) {
@@ -249,7 +310,7 @@ function Resolve-WPFBulkReplaceRuleInput {
     )
 }
 
-function Test-WPFBulkReplaceFilePattern {
+function Test-BulkReplaceFilePattern {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
@@ -273,8 +334,9 @@ function Test-WPFBulkReplaceFilePattern {
     return $false
 }
 
-function ConvertTo-WPFBulkReplaceLineArray {
+function Split-BulkReplaceContentLine {
     [CmdletBinding()]
+    [OutputType([string[]])]
     param (
         [Parameter(Mandatory)]
         [string] $Content
@@ -287,7 +349,7 @@ function ConvertTo-WPFBulkReplaceLineArray {
     return [regex]::Split($Content, '\r\n|\n|\r')
 }
 
-function Get-WPFBulkReplaceLineHit {
+function Get-BulkReplaceLineHit {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
@@ -300,18 +362,18 @@ function Get-WPFBulkReplaceLineHit {
         [string] $FilePath
     )
 
-    $lines = @(ConvertTo-WPFBulkReplaceLineArray -Content $Content)
-    $hits = New-Object System.Collections.Generic.List[object]
+    $lines = @(Split-BulkReplaceContentLine -Content $Content)
+    $hits = [List[object]]::new()
 
     for ($index = 0; $index -lt $lines.Count; $index++) {
         $line = $lines[$index]
         $matched = if ($Rule.Regex) {
-            $regexOptions = [System.Text.RegularExpressions.RegexOptions]::None
+            $regexOptions = [RegexOptions]::None
             if ($Rule.IgnoreCase) {
-                $regexOptions = $regexOptions -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+                $regexOptions = $regexOptions -bor [RegexOptions]::IgnoreCase
             }
 
-            [System.Text.RegularExpressions.Regex]::IsMatch($line, $Rule.Pattern, $regexOptions)
+            [Regex]::IsMatch($line, $Rule.Pattern, $regexOptions)
         } else {
             if ($Rule.IgnoreCase) {
                 $line.IndexOf($Rule.Pattern, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
@@ -334,8 +396,9 @@ function Get-WPFBulkReplaceLineHit {
     return $hits
 }
 
-function Get-WPFBulkReplaceLineDiff {
+function Get-BulkReplaceLineDiff {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param (
         [Parameter(Mandatory)]
         [string] $Before,
@@ -350,10 +413,10 @@ function Get-WPFBulkReplaceLineDiff {
         [string] $FilePath
     )
 
-    $beforeLines = @(ConvertTo-WPFBulkReplaceLineArray -Content $Before)
-    $afterLines = @(ConvertTo-WPFBulkReplaceLineArray -Content $After)
+    $beforeLines = @(Split-BulkReplaceContentLine -Content $Before)
+    $afterLines = @(Split-BulkReplaceContentLine -Content $After)
     $lineCount = [Math]::Max($beforeLines.Count, $afterLines.Count)
-    $changes = New-Object System.Collections.Generic.List[object]
+    $changes = [List[object]]::new()
 
     for ($index = 0; $index -lt $lineCount; $index++) {
         $beforeLine = if ($index -lt $beforeLines.Count) { $beforeLines[$index] } else { $null }
@@ -373,8 +436,9 @@ function Get-WPFBulkReplaceLineDiff {
     return $changes
 }
 
-function Get-WPFBulkReplaceTargetFile {
+function Get-BulkReplaceTargetFile {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param (
         [Parameter(Mandatory)]
         [string[]] $Path,
@@ -386,7 +450,7 @@ function Get-WPFBulkReplaceTargetFile {
         [switch] $Recurse
     )
 
-    $resolvedFiles = New-Object System.Collections.Generic.List[object]
+    $resolvedFiles = [List[object]]::new()
 
     foreach ($targetPath in $Path) {
         $resolvedTargets = Resolve-Path -Path $targetPath -ErrorAction Stop
@@ -474,13 +538,13 @@ function Invoke-BulkReplaceLiteral {
     }
 
     $updatedContent = if ($IgnoreCase) {
-        $regex = [System.Text.RegularExpressions.Regex]::new(
-            [System.Text.RegularExpressions.Regex]::Escape($Pattern),
-            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        $regex = [Regex]::new(
+            [Regex]::Escape($Pattern),
+            [RegexOptions]::IgnoreCase
         )
         $regex.Replace(
             $Content,
-            [System.Text.RegularExpressions.MatchEvaluator] { param($match) $Replacement }
+            [MatchEvaluator] { param($match) $Replacement }
         )
     } else {
         $Content.Replace($Pattern, $Replacement)
@@ -509,12 +573,12 @@ function Invoke-BulkReplaceRegex {
         [switch] $IgnoreCase
     )
 
-    $options = [System.Text.RegularExpressions.RegexOptions]::Multiline
+    $options = [RegexOptions]::Multiline
     if ($IgnoreCase) {
-        $options = $options -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        $options = $options -bor [RegexOptions]::IgnoreCase
     }
 
-    $regex = [System.Text.RegularExpressions.Regex]::new($Pattern, $options)
+    $regex = [Regex]::new($Pattern, $options)
     if ($FirstOnly) {
         $replacementCount = if ($regex.IsMatch($Content)) { 1 } else { 0 }
         $updatedContent = $regex.Replace($Content, $Replacement, 1)
@@ -530,11 +594,23 @@ function Invoke-BulkReplaceRegex {
 }
 
 $rawRules = @(
-    Resolve-WPFBulkReplaceRuleInput -Rule $Rule -RulePath $RulePath -Find $Find -Replace $Replace -UseRegex:$UseRegex -FirstOnly:$FirstOnly -IgnoreCase:$IgnoreCase -FilePattern $FilePattern -SearchOnly:$SearchOnly
+    Resolve-BulkReplaceRuleInput `
+        -Rule $Rule `
+        -RulePath $RulePath `
+        -Find $Find `
+        -Replace $Replace `
+        -UseRegex:$UseRegex `
+        -FirstOnly:$FirstOnly `
+        -IgnoreCase:$IgnoreCase `
+        -FilePattern $FilePattern `
+        -SearchOnly:$SearchOnly
 )
 
 $normalizedRules = for ($index = 0; $index -lt $rawRules.Count; $index++) {
-    ConvertTo-WPFBulkReplaceRule -InputRule $rawRules[$index] -Index ($index + 1) -SearchOnly:$SearchOnly
+    ConvertTo-BulkReplaceRule `
+        -InputRule $rawRules[$index] `
+        -Index ($index + 1) `
+        -SearchOnly:$SearchOnly
 }
 
 if ($normalizedRules.Count -eq 0) {
@@ -542,7 +618,7 @@ if ($normalizedRules.Count -eq 0) {
 }
 
 $targetFiles = @(
-    Get-WPFBulkReplaceTargetFile -Path $Path -Include $Include -Exclude $Exclude -Recurse:$Recurse
+    Get-BulkReplaceTargetFile -Path $Path -Include $Include -Exclude $Exclude -Recurse:$Recurse
 )
 
 if ($targetFiles.Count -eq 0) {
@@ -550,8 +626,8 @@ if ($targetFiles.Count -eq 0) {
 }
 
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-$reports = New-Object System.Collections.Generic.List[object]
-$searchHits = New-Object System.Collections.Generic.List[object]
+$reports = [List[object]]::new()
+$searchHits = [List[object]]::new()
 $totalReplacementCount = 0
 $changedFileCount = 0
 $previewFileCount = 0
@@ -560,16 +636,16 @@ foreach ($file in $targetFiles) {
     $currentContent = [System.IO.File]::ReadAllText($file.FullName)
     $workingContent = $currentContent
     $fileReplacementCount = 0
-    $appliedRules = New-Object System.Collections.Generic.List[string]
-    $fileChanges = New-Object System.Collections.Generic.List[object]
+    $appliedRules = [List[string]]::new()
+    $fileChanges = [List[object]]::new()
 
     if ($SearchOnly) {
         foreach ($ruleItem in $normalizedRules) {
-            if (-not (Test-WPFBulkReplaceFilePattern -FilePath $file.FullName -FilePattern $ruleItem.FilePattern)) {
+            if (-not (Test-BulkReplaceFilePattern -FilePath $file.FullName -FilePattern $ruleItem.FilePattern)) {
                 continue
             }
 
-            foreach ($hit in @(Get-WPFBulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)) {
+            foreach ($hit in @(Get-BulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)) {
                 $searchHits.Add($hit)
             }
         }
@@ -578,20 +654,34 @@ foreach ($file in $targetFiles) {
     }
 
     foreach ($ruleItem in $normalizedRules) {
-        if (-not (Test-WPFBulkReplaceFilePattern -FilePath $file.FullName -FilePattern $ruleItem.FilePattern)) {
+        if (-not (Test-BulkReplaceFilePattern -FilePath $file.FullName -FilePattern $ruleItem.FilePattern)) {
             continue
         }
 
         $appliedRules.Add($ruleItem.Name)
 
+        $ReplaceParams = @{
+            Content     = $workingContent
+            Pattern     = $ruleItem.Pattern
+            Replacement = $ruleItem.Replacement
+            FirstOnly   = $ruleItem.FirstOnly
+            IgnoreCase  = $ruleItem.IgnoreCase
+        }
+
         $result = if ($ruleItem.Regex) {
-            Invoke-BulkReplaceRegex -Content $workingContent -Pattern $ruleItem.Pattern -Replacement $ruleItem.Replacement -FirstOnly:$ruleItem.FirstOnly -IgnoreCase:$ruleItem.IgnoreCase
+            Invoke-BulkReplaceRegex @ReplaceParams
         } else {
-            Invoke-BulkReplaceLiteral -Content $workingContent -Pattern $ruleItem.Pattern -Replacement $ruleItem.Replacement -FirstOnly:$ruleItem.FirstOnly -IgnoreCase:$ruleItem.IgnoreCase
+            Invoke-BulkReplaceLiteral @ReplaceParams
         }
 
         if ($result.Content -ne $workingContent) {
-            foreach ($change in @(Get-WPFBulkReplaceLineDiff -Before $workingContent -After $result.Content -RuleName $ruleItem.Name -FilePath $file.FullName)) {
+            $Changes = Get-BulkReplaceLineDiff `
+                -Before $workingContent `
+                -After $result.Content `
+                -RuleName $ruleItem.Name `
+                -FilePath $file.FullName
+
+            foreach ($change in $Changes) {
                 $fileChanges.Add($change)
             }
         }
@@ -659,7 +749,7 @@ if ($SearchOnly) {
 if ($PassThru) {
     if ($SearchOnly) {
         if ($PassThruFormat -eq 'Detailed') {
-            Write-Output -NoEnumerate ($searchHits.ToArray())
+            Write-Output ($searchHits.ToArray()) -NoEnumerate
             return
         }
 
@@ -677,12 +767,12 @@ if ($PassThru) {
                 }
         )
 
-        Write-Output -NoEnumerate $summarySearchHits
+        Write-Output $summarySearchHits -NoEnumerate
         return
     }
 
     if ($PassThruFormat -eq 'Detailed') {
-        Write-Output -NoEnumerate ($reports.ToArray())
+        Write-Output ($reports.ToArray()) -NoEnumerate
         return
     }
 
@@ -698,12 +788,13 @@ if ($PassThru) {
         }
     )
 
-    Write-Output -NoEnumerate $summaryReports
+    Write-Output $summaryReports -NoEnumerate
     return
 }
 
-function Read-WPFBulkReplaceRuleFile {
+function Read-BulkReplaceRuleFile {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param (
         [Parameter(Mandatory)]
         [string] $Path
@@ -728,8 +819,9 @@ function Read-WPFBulkReplaceRuleFile {
     return @($parsed)
 }
 
-function Resolve-WPFBulkReplaceRuleInput {
+function Resolve-BulkReplaceRuleInput {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param (
         [Parameter()]
         [object[]] $Rule,
@@ -770,7 +862,7 @@ function Resolve-WPFBulkReplaceRuleInput {
     }
 
     if ($sources[0] -eq 'RulePath') {
-        return @(Read-WPFBulkReplaceRuleFile -Path $RulePath)
+        return @(Read-BulkReplaceRuleFile -Path $RulePath)
     }
 
     if ([string]::IsNullOrWhiteSpace($Find)) {
