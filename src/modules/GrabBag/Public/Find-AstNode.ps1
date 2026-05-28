@@ -11,6 +11,18 @@
     Find the CommandAst in the given scriptblock.
 
     Find-AstNode { Write-Host 'Foobar' } -Type CommandAst
+
+.EXAMPLE
+    Find all CommandAsts in the given scriptblock.
+
+    Find-AstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -All
+
+.EXAMPLE
+    Find a CommandAst with a specific command name using the Query parameter.
+
+    Find-AstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -Query {
+        $_.GetCommandName() -eq 'Get-Date'
+    }
 #>
 function Find-AstNode {
     [CmdletBinding(DefaultParameterSetName='ByScriptBlock')]
@@ -65,20 +77,52 @@ function Find-AstNode {
         $Ast = $ScriptBlock.Ast
     }
 
-    if (-not $Query) {
-        $Query = {
-            param($AstNode)
-            if ($Type) {
-                foreach($T in $Type) {
-                    if ($AstNode.GetType().Name -eq $T) {
-                        $true
-                        break
-                    }
-                }
-            } else {
-                $true  # Return everything
+    $HasCallerQuery = $PSBoundParameters.ContainsKey('Query')
+    $TypeNames = if ($Type) { $Type } else { @() }
+
+    if ($HasCallerQuery) {
+        $OriginalQuery = $Query
+
+        # Pass to Foreach-Object so query scriptblocks can reference $_.
+        $HasParamBlockParameters =
+            $null -ne $OriginalQuery.Ast.ParamBlock -and
+            $OriginalQuery.Ast.ParamBlock.Parameters.Count -gt 0
+
+        if ($HasParamBlockParameters) {
+            $EvaluateQuery = {
+                param($AstNode)
+                & $OriginalQuery $AstNode
+            }
+        } else {
+            $EvaluateQuery = {
+                param($AstNode)
+                $AstNode | ForEach-Object $OriginalQuery
             }
         }
+    }
+
+    $Query = {
+        param($AstNode)
+
+        if ($TypeNames.Count -gt 0) {
+            $IsExpectedType = $false
+            foreach ($T in $TypeNames) {
+                if ($AstNode.GetType().Name -eq $T) {
+                    $IsExpectedType = $true
+                    break
+                }
+            }
+
+            if (-not $IsExpectedType) {
+                return $false
+            }
+        }
+
+        if ($HasCallerQuery) {
+            return (& $EvaluateQuery $AstNode)
+        }
+
+        return $true
     }
 
     if ($All) {
