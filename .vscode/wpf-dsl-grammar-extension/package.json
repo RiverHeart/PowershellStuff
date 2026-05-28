@@ -1,0 +1,48 @@
+{
+    "name": "wpf-dsl-grammar-extension",
+    "displayName": "WPF DSL Grammar Injection",
+    "description": "Injects TextMate scopes for WPF DSL property assignments in PowerShell files.",
+    "version": "0.0.1",
+    "publisher": "local",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "grammars": [
+            {
+                "scopeName": "source.powershell.wpf-dsl-property.injection",
+                "path": "./syntaxes/wpf-dsl-property.injection.tmLanguage.json",
+                "injectTo": [
+                    "source.powershell"
+                ]
+            }
+        ],
+        "configurationDefaults": {
+            "editor.tokenColorCustomizations": {
+                "textMateRules": [
+                    {
+                        "scope": "entity.other.attribute-name.wpf-dsl",
+                        "settings": {
+                            "foreground": "#9CDCFE"
+                        }
+                    },
+                    {
+                        "scope": "punctuation.separator.key-value.wpf-dsl",
+                        "settings": {
+                            "foreground": "#9AA0A6"
+                        }
+                    },
+                    {
+                        "scope": "variable",
+                        "settings": {
+                            "foreground": "#D79334"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
