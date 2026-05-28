@@ -8,14 +8,14 @@ $RepoRoot = Split-Path -Parent $ProjectRoot
 $SourcePath = Join-Path $RepoRoot 'modules/WPF/Examples/ImageViewer/ImageViewer.DSL.ps1'
 $OutputPath = Join-Path $PSScriptRoot 'ImageViewer.DSL.mutated.ps1'
 
-$Document = New-AstOverlay -Path $SourcePath
+$Document = New-AstDocument -Path $SourcePath
 
 $Inserted = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'Loaded handler from AstOverlayLab.'"
 if (-not $Inserted) {
     Write-Host 'Loaded handler already exists in source. Use -Force in Add-WpfDslLoadedHandler to reinsert.'
 }
 
-$Validation = Test-AstOverlay -Document $Document -PassThruText
+$Validation = Resolve-AstDocument -Document $Document -PassThruText
 if ($Validation.ParseErrorCount -gt 0) {
     Write-Host "Validation failed with $($Validation.ParseErrorCount) parse errors."
     $Validation.ParseErrors | ForEach-Object {
