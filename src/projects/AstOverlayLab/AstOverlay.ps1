@@ -530,10 +530,10 @@ function Save-AstDocument {
     overlay pipeline.
 
 .EXAMPLE
-    $doc = New-AstOverlay -Path '.\ImageViewer.DSL.ps1'
+    $doc = New-AstDocument -Path '.\ImageViewer.DSL.ps1'
     $changed = Add-WpfDslLoadedHandler -Document $doc
     if ($changed) {
-        Save-AstOverlay -Document $doc -OutPath '.\ImageViewer.DSL.mutated.ps1'
+        Save-AstDocument -Document $doc -OutPath '.\ImageViewer.DSL.mutated.ps1'
     }
 
     Adds a Loaded handler only when it does not already exist, then saves the result.
@@ -634,6 +634,13 @@ function Add-WpfDslLoadedHandler {
 
     $ContainsLoadedWhen = $LoadedWhenCommands.Count -gt 0
 
+    $HandlerBodyScriptBlock = [ScriptBlock]::Create($HandlerBody)
+    $HandlerBodyStatementTexts = @(
+        $HandlerBodyScriptBlock.Ast.EndBlock.Statements | ForEach-Object {
+            $_.Extent.Text.Trim()
+        }
+    )
+
     $HandlerBodyAlreadyPresent = $false
     foreach ($LoadedWhenCommand in $LoadedWhenCommands) {
         $LoadedHandlerScriptBlockExpression = $LoadedWhenCommand.CommandElements | Where-Object {
@@ -644,9 +651,23 @@ function Add-WpfDslLoadedHandler {
             continue
         }
 
-        $LoadedHandlerScriptBlockText = $LoadedHandlerScriptBlockExpression.ScriptBlock.Extent.Text
-        $LoadedHandlerContainsBody = $LoadedHandlerScriptBlockText.Contains($HandlerBody)
-        if ($LoadedHandlerContainsBody) {
+        $LoadedHandlerStatementTexts = @(
+            $LoadedHandlerScriptBlockExpression.ScriptBlock.EndBlock.Statements | ForEach-Object {
+                $_.Extent.Text.Trim()
+            }
+        )
+
+        $StatementsMatch = $LoadedHandlerStatementTexts.Count -eq $HandlerBodyStatementTexts.Count
+        if ($StatementsMatch) {
+            for ($Index = 0; $Index -lt $HandlerBodyStatementTexts.Count; $Index++) {
+                if ($LoadedHandlerStatementTexts[$Index] -ne $HandlerBodyStatementTexts[$Index]) {
+                    $StatementsMatch = $false
+                    break
+                }
+            }
+        }
+
+        if ($StatementsMatch) {
             $HandlerBodyAlreadyPresent = $true
             break
         }

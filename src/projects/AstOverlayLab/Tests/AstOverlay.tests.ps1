@@ -283,6 +283,29 @@ Window Main {
         $Validation.RenderedText | Should -Be $Source
     }
 
+    It 'does not treat a matching comment as an existing handler body' {
+        $Source = @"
+Window Main {
+    When 'Loaded' {
+        # Write-Verbose 'commented AstOverlayLab insertion'
+        Write-Verbose 'already there'
+    }
+}
+"@
+
+        $Document = New-AstDocument -InputObject $Source
+        $Changed = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'commented AstOverlayLab insertion'"
+        $Validation = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Changed | Should -BeTrue
+        $Validation.ParseErrorCount | Should -Be 0
+        $Validation.EditCount | Should -Be 1
+        $Validation.RenderedText | Should -Match 'commented AstOverlayLab insertion'
+
+        $MatchCount = ([regex]::Matches($Validation.RenderedText, 'When ''Loaded''')).Count
+        $MatchCount | Should -Be 2
+    }
+
     It 'can still insert duplicate bodies when AllowDuplicateHandlerBody is set' {
         $Source = @"
 Window Main {

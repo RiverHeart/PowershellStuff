@@ -13,13 +13,18 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 ## Files
 
 - `AstOverlay.ps1`: core classes and helper functions
+- `Run-SimpleExample.ps1`: minimal demo showing prepend/replace/append line edits
 - `Run-ImageViewerMutation.ps1`: end-to-end demo against the WPF ImageViewer DSL script
+- `Tests/AstOverlay.tests.ps1`: Pester coverage for document parsing, line helpers, diff output, and WPF transform behavior
 
 ## Core Model
 
 - `AstTextEdit`: single replacement/insertion operation
-- `AstMutationPlan`: ordered collection of edits with overlap conflict detection
-- `AstOverlayDocument`: immutable parse data plus mutable edit plan
+- `AstDocument`: immutable parse data plus a queued list of `AstTextEdit` edits
+- `New-AstDocument`: factory for parsing input and creating an `AstDocument`
+- `Resolve-AstDocument`: renders queued edits and validates parse correctness
+- `Show-AstDiff`: displays all or selected queued edits by index
+- `Save-AstDocument`: writes rendered output after parse validation
 
 ## WPF DSL Transform (first pass)
 
