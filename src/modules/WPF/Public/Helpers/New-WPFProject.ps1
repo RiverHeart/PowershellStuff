@@ -275,25 +275,25 @@ Style Button {
 
     Chrome {
         CornerRadius: 6
-    }
 
-    Trigger IsMouseOver $true -Scope Chrome {
-        Background: '#E9EEF7'
-        BorderBrush: '#7D8BA3'
-    }
+        Trigger IsMouseOver $true {
+            Background: '#E9EEF7'
+            BorderBrush: '#7D8BA3'
+        }
 
-    Trigger IsPressed $true -Scope Chrome {
-        Background: '#DDE6F3'
-        BorderBrush: '#6D7D98'
-    }
+        Trigger IsPressed $true {
+            Background: '#DDE6F3'
+            BorderBrush: '#6D7D98'
+        }
 
-    Trigger IsKeyboardFocused $true -Scope Chrome {
-        BorderBrush: '#2563EB'
-    }
+        Trigger IsKeyboardFocused $true {
+            BorderBrush: '#2563EB'
+        }
 
-    Trigger IsEnabled $false -Scope Chrome {
-        Background: '#F3F4F6'
-        BorderBrush: '#D6DCE5'
+        Trigger IsEnabled $false {
+            Background: '#F3F4F6'
+            BorderBrush: '#D6DCE5'
+        }
     }
 
     Trigger IsEnabled $false {
@@ -309,25 +309,25 @@ Style 'PrimaryButton' Button {
 
     Chrome {
         CornerRadius: 6
-    }
 
-    Trigger IsMouseOver $true -Scope Chrome {
-        Background: '#0978E6'
-        BorderBrush: '#075FBA'
-    }
+        Trigger IsMouseOver $true {
+            Background: '#0978E6'
+            BorderBrush: '#075FBA'
+        }
 
-    Trigger IsPressed $true -Scope Chrome {
-        Background: '#0869C9'
-        BorderBrush: '#064F97'
-    }
+        Trigger IsPressed $true {
+            Background: '#0869C9'
+            BorderBrush: '#064F97'
+        }
 
-    Trigger IsKeyboardFocused $true -Scope Chrome {
-        BorderBrush: '#1D4ED8'
-    }
+        Trigger IsKeyboardFocused $true {
+            BorderBrush: '#1D4ED8'
+        }
 
-    Trigger IsEnabled $false -Scope Chrome {
-        Background: '#B6D7FF'
-        BorderBrush: '#9FC5EF'
+        Trigger IsEnabled $false {
+            Background: '#B6D7FF'
+            BorderBrush: '#9FC5EF'
+        }
     }
 
     Trigger IsEnabled $false {
@@ -343,25 +343,25 @@ Style 'DangerButton' Button {
 
     Chrome {
         CornerRadius: 6
-    }
 
-    Trigger IsMouseOver $true -Scope Chrome {
-        Background: '#C91F1F'
-        BorderBrush: '#A31515'
-    }
+        Trigger IsMouseOver $true {
+            Background: '#C91F1F'
+            BorderBrush: '#A31515'
+        }
 
-    Trigger IsPressed $true -Scope Chrome {
-        Background: '#B31B1B'
-        BorderBrush: '#8F1212'
-    }
+        Trigger IsPressed $true {
+            Background: '#B31B1B'
+            BorderBrush: '#8F1212'
+        }
 
-    Trigger IsKeyboardFocused $true -Scope Chrome {
-        BorderBrush: '#991B1B'
-    }
+        Trigger IsKeyboardFocused $true {
+            BorderBrush: '#991B1B'
+        }
 
-    Trigger IsEnabled $false -Scope Chrome {
-        Background: '#F3B0B0'
-        BorderBrush: '#E39A9A'
+        Trigger IsEnabled $false {
+            Background: '#F3B0B0'
+            BorderBrush: '#E39A9A'
+        }
     }
 
     Trigger IsEnabled $false {
@@ -377,25 +377,25 @@ Style 'GhostButton' Button {
 
     Chrome {
         CornerRadius: 6
-    }
 
-    Trigger IsMouseOver $true -Scope Chrome {
-        Background: '#F8FAFC'
-        BorderBrush: '#9EA8B8'
-    }
+        Trigger IsMouseOver $true {
+            Background: '#F8FAFC'
+            BorderBrush: '#9EA8B8'
+        }
 
-    Trigger IsPressed $true -Scope Chrome {
-        Background: '#F1F5F9'
-        BorderBrush: '#8B97AA'
-    }
+        Trigger IsPressed $true {
+            Background: '#F1F5F9'
+            BorderBrush: '#8B97AA'
+        }
 
-    Trigger IsKeyboardFocused $true -Scope Chrome {
-        BorderBrush: '#2563EB'
-    }
+        Trigger IsKeyboardFocused $true {
+            BorderBrush: '#2563EB'
+        }
 
-    Trigger IsEnabled $false -Scope Chrome {
-        Background: '#F8FAFC'
-        BorderBrush: '#D2D9E3'
+        Trigger IsEnabled $false {
+            Background: '#F8FAFC'
+            BorderBrush: '#D2D9E3'
+        }
     }
 
     Trigger IsEnabled $false {

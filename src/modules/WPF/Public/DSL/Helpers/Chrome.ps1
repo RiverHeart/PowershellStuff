@@ -24,11 +24,10 @@
             CornerRadius: 6
             BorderBrush: '#086FD5'
             BorderThickness: 2
-        }
-
-        Trigger IsEnabled $false -Scope Chrome {
-            BorderBrush: '#9FC5EF'
-            Background: '#B6D7FF'
+            Trigger IsEnabled $false {
+                BorderBrush: '#9FC5EF'
+                Background: '#B6D7FF'
+            }
         }
     }
 #>
@@ -161,6 +160,10 @@ function Chrome {
 
 
     $chromeVars = New-WPFVariableList -InputObject $chromeFactory
+
+    $chromeFactory | Add-Member -NotePropertyName '_WPFChromeTemplate' -NotePropertyValue $template -Force
+    $chromeFactory | Add-Member -NotePropertyName '_WPFChromeTargetName' -NotePropertyValue $adapter.PartName -Force
+    $chromeFactory | Add-Member -NotePropertyName '_WPFChromeTargetType' -NotePropertyValue $adapter.ShellType -Force
 
     $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
         -ScriptBlock $ScriptBlock `

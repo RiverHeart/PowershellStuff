@@ -1,0 +1,20 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "WPF DSL Property Name Injection",
+    "scopeName": "source.powershell.wpf-dsl-property.injection",
+    "injectionSelector": "L:source.powershell -comment -string",
+    "patterns": [
+        {
+            "name": "meta.property-assignment.wpf-dsl",
+            "match": "^([\\t ]*)([A-Z][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)(\\s*):(?!:)",
+            "captures": {
+                "2": {
+                    "name": "entity.other.attribute-name.wpf-dsl"
+                },
+                "3": {
+                    "name": "punctuation.separator.key-value.wpf-dsl"
+                }
+            }
+        }
+    ]
+}

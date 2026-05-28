@@ -75,4 +75,5 @@ Describe 'Trigger' -Tag 'Trigger' {
             { Trigger IsEnabled $false { Setter Opacity 0.5 } -ErrorAction Stop }.InvokeWithContext($null, $psVars) | Out-Null
         } | Should -Throw
     }
+
 }
