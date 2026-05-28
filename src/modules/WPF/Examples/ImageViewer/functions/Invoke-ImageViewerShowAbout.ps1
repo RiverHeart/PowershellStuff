@@ -53,7 +53,7 @@ function Invoke-ImageViewerShowAbout {
                 $this.Margin = 20, 0, 0, 15
                 $this.TextWrapping = [TextWrapping]::Wrap
                 $this.Text = @"
-• Navigate with arrow keys or buttons
+• Arrow keys pan when ScrollViewer is scrollable, navigate images when not
 • Zoom with Ctrl + Mouse Wheel
 • Press F11 to toggle fullscreen
 • Drag and drop images to open

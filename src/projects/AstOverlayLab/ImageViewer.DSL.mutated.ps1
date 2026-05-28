@@ -102,9 +102,9 @@ Window 'Window' {
         }
     }
 
-    # Use PreviewKeyDown so navigation keys still work when focused controls
-    # like ScrollViewer handle KeyDown internally.
-    When PreviewKeyDown {
+    # Window doesn't have a Command property like button so
+    # you need to wire up an event.
+    When KeyDown {
         param($sender, $event)
 
         switch ($event.Key) {
@@ -131,17 +131,13 @@ Window 'Window' {
                 break
             }
             'Left' {
-                if (Test-ImageViewerShouldNavigate) {
-                    Invoke-ImageViewerNavigate -Direction Back
-                    $event.Handled = $True
-                }
+                Invoke-ImageViewerNavigate -Direction Back
+                $event.Handled = $True
                 break
             }
             { $_ -in @('Right', 'Space') } {
-                if ($event.Key -eq [Key]::Space -or (Test-ImageViewerShouldNavigate)) {
-                    Invoke-ImageViewerNavigate -Direction Forward
-                    $event.Handled = $True
-                }
+                Invoke-ImageViewerNavigate -Direction Forward
+                $event.Handled = $True
                 break
             }
             { $_ -in @('D0', 'NumPad0') -and ([Keyboard]::Modifiers -band [ModifierKeys]::Control) } {
@@ -205,6 +201,10 @@ Window 'Window' {
         }
 
     }
+    When 'Loaded' {
+        Write-Verbose 'Loaded handler from AstOverlayLab.'
+    }
+
 
     Grid "Body" {
         $this.Margin = 5

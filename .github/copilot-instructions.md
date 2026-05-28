@@ -13,4 +13,4 @@ This repository contains a collection of PowerShell modules and scripts for vari
 
 # Skills
 
-- `.github/skills/test-runner`: A skill for discovering, listing, and running tests across the repository, including Pester suite discovery, tag discovery, and execution. Before any test execution, load this skill and follow its workflow.
+- `.github/skills/test-runner`: A skill for discovering, listing, and running tests across the repository, including Pester suite discovery, tag discovery, and execution. Before any test execution, load this skill and follow its workflow, using `./.github/skills/test-runner/scripts/Invoke-Test.ps1` as the default test entrypoint.

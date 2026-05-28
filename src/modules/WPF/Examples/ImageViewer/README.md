@@ -19,6 +19,7 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Fullscreen mode with mouse auto-hide on idle
 * Supports Dark/Light modes
 * Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
+* Arrow keys pan zoomed images while scrolling is possible; image navigation remains available via Spacebar and on-screen buttons
 
 ## CLI Automation Flags
 
@@ -67,4 +68,3 @@ For repeatable automation, use the wrapper script:
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)
 * Show user-friendly dialogs for image load/open errors
 * Persist last opened folder between runs
-* Sometimes when an image is loaded, it seems like something is stealing focus from the window because the keyboard events for forward/back don't work.

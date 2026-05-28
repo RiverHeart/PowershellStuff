@@ -21,10 +21,11 @@ PowerShell 5.1 compatibility is a project goal. Treat Windows PowerShell 5.1 as 
 
 1. Confirm the change runs under Windows PowerShell 5.1 first.
 2. Run the same tests under PowerShell 7 after 5.1 validation.
-3. Keep test syntax and helpers compatible with 5.1 unless runtime-specific behavior is intentional.
-4. If behavior differs by runtime, use narrowly scoped skips/branches and document why.
-5. Ensure compatibility messaging in docs matches actual test coverage.
-6. Verify `src/modules/WPF/WPF.psd1` declares a compatible `PowerShellVersion` floor.
+3. Use `./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF` as the default test invocation path.
+4. Keep test syntax and helpers compatible with 5.1 unless runtime-specific behavior is intentional.
+5. If behavior differs by runtime, use narrowly scoped skips/branches and document why.
+6. Ensure compatibility messaging in docs matches actual test coverage.
+7. Verify `src/modules/WPF/WPF.psd1` declares a compatible `PowerShellVersion` floor.
 
 ## Pester Policy
 
@@ -32,7 +33,13 @@ PowerShell 5.1 compatibility is a project goal. Treat Windows PowerShell 5.1 as 
 - Require `Pester` version `5.7.1` or newer in both Windows PowerShell 5.1 and PowerShell 7.
 - Use a known Pester version in test automation so local and CI runs are consistent.
 - In Windows PowerShell 5.1, explicitly import the required version to avoid accidentally running the inbox Pester.
-- Keep test invocation explicit, for example:
+- Use the repository test runner as the default entrypoint:
+
+```powershell
+./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF
+```
+
+- Use direct `Invoke-Pester` only when explicitly validating Pester version pinning behavior, for example:
 
 ```powershell
 Remove-Module Pester -ErrorAction SilentlyContinue
@@ -54,10 +61,10 @@ Run tests in this order when validating a change:
 
 ```powershell
 # Primary gate
-powershell.exe -NoProfile -Command "Remove-Module Pester -ErrorAction SilentlyContinue; Import-Module Pester -MinimumVersion 5.7.1 -Force; Invoke-Pester -Path 'src/modules/WPF/Tests' -Output Detailed"
+powershell.exe -NoProfile -File ".github/skills/test-runner/scripts/Invoke-Test.ps1" -TestSuite WPF
 
 # Secondary gate
-pwsh.exe -NoProfile -Command "Remove-Module Pester -ErrorAction SilentlyContinue; Import-Module Pester -MinimumVersion 5.7.1 -Force; Invoke-Pester -Path 'src/modules/WPF/Tests' -Output Detailed"
+pwsh.exe -NoProfile -File ".github/skills/test-runner/scripts/Invoke-Test.ps1" -TestSuite WPF
 ```
 
 If PowerShell 7 passes but PowerShell 5.1 fails, treat the change as incompatible.
