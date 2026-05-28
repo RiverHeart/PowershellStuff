@@ -153,7 +153,7 @@ Both forms are supported and equivalent for top-level style property setters.
 - Trigger and Chrome blocks also support property command shorthand that maps to `Setter`.
 - Shorthand forwards remaining arguments to `Setter`, including supported flags such as `-Resource`.
 - `Setter` flags that are context-specific remain context-specific with shorthand.
-  - Example: `-Target` and `-Scope Chrome` are trigger/template-context features and are not valid on top-level style shorthand statements.
+  - Example: `-Target` and `-Scope Chrome` are trigger/template-context features and are not valid on top-level style shorthand statements. Chrome trigger targeting is inferred by nesting `Trigger` inside `Chrome { ... }`.
 - In template factory element blocks (for example `Border { ... }`, `ContentPresenter { ... }`, `ScrollViewer { ... }` inside `Template`), property command shorthand also maps to `Setter`.
 - Template root blocks still use explicit DSL keywords (`Border`, `Trigger`, etc.); shorthand applies to factory element property statements, not Template-level orchestration.
 

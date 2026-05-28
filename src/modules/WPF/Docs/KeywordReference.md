@@ -558,8 +558,7 @@ Adds a setter in style, trigger, or template-factory contexts.
 
 `Setter` resolves dependency properties for the current target context.
 In template-backed trigger contexts, `-Target` can route values to named parts.
-With `Trigger -Scope Chrome`, use `Setter ... -Scope Chrome` to target the
-generated chrome part.
+In triggers nested under `Chrome`, setters default to the generated chrome part.
 
 ```powershell
 Setter Background ButtonBackground -Resource
@@ -572,7 +571,7 @@ Template-backed trigger contexts can route setters to the generated chrome part:
 Setter BorderBrush '#2563EB' -Scope Chrome
 ```
 
-`-Scope Chrome` is supported in trigger contexts created by `Trigger -Scope Chrome`.
+`-Scope Chrome` remains available for explicit setter routing in template-backed trigger contexts.
 
 ### Chrome
 
@@ -608,7 +607,7 @@ Style 'PrimaryButton' Button {
 
 ### Trigger
 
-Adds a property trigger to the current Style or ControlTemplate.
+Adds a property trigger to the current Style, ControlTemplate, or Chrome block.
 
 ```powershell
 Style 'PrimaryButton' Button {
@@ -625,11 +624,15 @@ Trigger IsEnabled $false -SourceName 'TemplateBorder' {
 }
 ```
 
-`Trigger` also supports `-Scope Chrome` inside `Style` blocks that define `Chrome`:
+Triggers can be nested in `Chrome` to target the generated chrome part:
 
 ```powershell
-Trigger IsEnabled $false -Scope Chrome {
-    Setter BorderBrush '#2563EB'
+Style 'PrimaryButton' Button {
+    Chrome {
+        Trigger IsEnabled $false {
+            Setter BorderBrush '#2563EB'
+        }
+    }
 }
 ```
 

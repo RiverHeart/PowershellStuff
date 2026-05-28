@@ -62,7 +62,7 @@ Describe 'Chrome' -Tag 'Chrome' {
         $repeatButtonAdapter.Name | Should -Be -ExpectedValue 'ButtonBase'
     }
 
-    It 'Routes Trigger -Scope Chrome setters to the generated chrome part' {
+    It 'Routes nested Chrome Trigger setters to the generated chrome part' {
         $id = [guid]::NewGuid().ToString('N')
         $styleName = "ChromeTriggerButton_$id"
         $button = [System.Windows.Controls.Button]::new()
@@ -74,10 +74,10 @@ Describe 'Chrome' -Tag 'Chrome' {
                 Setter BorderBrush '#B8C0CC'
                 Setter BorderThickness 1
                 Setter CornerRadius 6
-            }
 
-            Trigger IsEnabled $false -Scope Chrome {
-                Setter BorderBrush '#2563EB'
+                Trigger IsEnabled $false {
+                    Setter BorderBrush '#2563EB'
+                }
             }
         }
 
@@ -92,7 +92,7 @@ Describe 'Chrome' -Tag 'Chrome' {
         $chromeBorder.BorderBrush.Color.ToString() | Should -Be -ExpectedValue '#FF2563EB'
     }
 
-    It 'Supports implicit setter shorthand in Chrome and Chrome-scoped Trigger blocks' {
+    It 'Supports implicit setter shorthand in Chrome and nested Chrome Trigger blocks' {
         $id = [guid]::NewGuid().ToString('N')
         $styleName = "ChromeTriggerShorthandButton_$id"
         $button = [System.Windows.Controls.Button]::new()
@@ -103,10 +103,10 @@ Describe 'Chrome' -Tag 'Chrome' {
 
             Chrome {
                 CornerRadius: 6
-            }
 
-            Trigger IsEnabled $false -Scope Chrome {
-                BorderBrush '#2563EB'
+                Trigger IsEnabled $false {
+                    BorderBrush '#2563EB'
+                }
             }
         }
 

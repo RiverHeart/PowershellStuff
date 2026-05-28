@@ -43,25 +43,25 @@ Style 'TaskManager.StopButton' Button {
 
     Chrome {
         CornerRadius: 6
-    }
 
-    Trigger IsMouseOver $true -Scope Chrome {
-        Background: '#E9EEF7'
-        BorderBrush: '#7D8BA3'
-    }
+        Trigger IsMouseOver $true {
+            Background: '#E9EEF7'
+            BorderBrush: '#7D8BA3'
+        }
 
-    Trigger IsPressed $true -Scope Chrome {
-        Background: '#DDE6F3'
-        BorderBrush: '#6D7D98'
-    }
+        Trigger IsPressed $true {
+            Background: '#DDE6F3'
+            BorderBrush: '#6D7D98'
+        }
 
-    Trigger IsKeyboardFocused $true -Scope Chrome {
-        BorderBrush: '#2563EB'
-    }
+        Trigger IsKeyboardFocused $true {
+            BorderBrush: '#2563EB'
+        }
 
-    Trigger IsEnabled $false -Scope Chrome {
-        Background: '#F3F4F6'
-        BorderBrush: '#D6DCE5'
+        Trigger IsEnabled $false {
+            Background: '#F3F4F6'
+            BorderBrush: '#D6DCE5'
+        }
     }
 
     Trigger IsEnabled $false {

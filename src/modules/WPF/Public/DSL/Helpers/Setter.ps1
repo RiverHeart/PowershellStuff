@@ -11,8 +11,8 @@
     - Template factory elements (FrameworkElementFactory)
 
     In trigger contexts, -Target is supported only for ControlTemplate owners.
-    When Trigger -Scope Chrome is used, Setter can use -Scope Chrome to target
-    the generated chrome part.
+    In triggers nested inside Chrome, Setter defaults to the generated chrome
+    part and can still use -Scope Chrome explicitly.
 
     When -Resource is specified, the value is stored as a DynamicResourceExtension
     so theme swaps update styled controls.
