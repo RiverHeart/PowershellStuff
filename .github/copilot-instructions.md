@@ -10,3 +10,7 @@ This repository contains a collection of PowerShell modules and scripts for vari
 - `src/scripts/`: Contains standalone PowerShell scripts that can be executed directly.
 - `src/projects/`: Contains project-specific code and resources. All code in this directory should be considered experimental and may not follow the same coding style guidelines as the modules.
 - `PSScriptAnalyzerSettings.psd1`: Contains the configuration for PSScriptAnalyzer, which enforces the coding style guidelines across the project.
+
+# Skills
+
+- `.github/skills/test-runner`: A skill for discovering, listing, and running tests across the repository, including Pester suite discovery, tag discovery, and execution. Before any test execution, load this skill and follow its workflow.
