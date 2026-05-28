@@ -257,6 +257,69 @@ class AstDocument {
 
 <#
 .SYNOPSIS
+    Gets trimmed statement text from a script block AST.
+
+.DESCRIPTION
+    Returns the top-level statement text from the EndBlock of a script block AST.
+    This keeps semantic comparisons focused on parsed statements instead of raw text.
+#>
+function Get-ScriptBlockStatementText {
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param (
+        [Parameter(Mandatory)]
+        [ScriptBlockAst] $ScriptBlockAst
+    )
+
+    if ($null -eq $ScriptBlockAst.EndBlock) {
+        return @()
+    }
+
+    $StatementText = [List[string]]::new()
+    foreach ($Statement in $ScriptBlockAst.EndBlock.Statements) {
+        [void] $StatementText.Add($Statement.Extent.Text.Trim())
+    }
+
+    Write-Output -NoEnumerate $StatementText.ToArray()
+}
+
+<#
+.SYNOPSIS
+    Compares two script block ASTs by their top-level statement text.
+
+.DESCRIPTION
+    Returns $true only when both script blocks contain the same number of
+    statements and each statement has identical trimmed text in order.
+#>
+function Test-ScriptBlockStatementTextEquivalent {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param (
+        [Parameter(Mandatory)]
+        [ScriptBlockAst] $Left,
+
+        [Parameter(Mandatory)]
+        [ScriptBlockAst] $Right
+    )
+
+    $LeftStatementText = Get-ScriptBlockStatementText -ScriptBlockAst $Left
+    $RightStatementText = Get-ScriptBlockStatementText -ScriptBlockAst $Right
+
+    if ($LeftStatementText.Count -ne $RightStatementText.Count) {
+        return $false
+    }
+
+    for ($Index = 0; $Index -lt $LeftStatementText.Count; $Index++) {
+        if ($LeftStatementText[$Index] -ne $RightStatementText[$Index]) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+<#
+.SYNOPSIS
     Parses script content into an AstDocument ready to receive edits.
 
 .DESCRIPTION
@@ -635,11 +698,6 @@ function Add-WpfDslLoadedHandler {
     $ContainsLoadedWhen = $LoadedWhenCommands.Count -gt 0
 
     $HandlerBodyScriptBlock = [ScriptBlock]::Create($HandlerBody)
-    $HandlerBodyStatementTexts = @(
-        $HandlerBodyScriptBlock.Ast.EndBlock.Statements | ForEach-Object {
-            $_.Extent.Text.Trim()
-        }
-    )
 
     $HandlerBodyAlreadyPresent = $false
     foreach ($LoadedWhenCommand in $LoadedWhenCommands) {
@@ -651,23 +709,7 @@ function Add-WpfDslLoadedHandler {
             continue
         }
 
-        $LoadedHandlerStatementTexts = @(
-            $LoadedHandlerScriptBlockExpression.ScriptBlock.EndBlock.Statements | ForEach-Object {
-                $_.Extent.Text.Trim()
-            }
-        )
-
-        $StatementsMatch = $LoadedHandlerStatementTexts.Count -eq $HandlerBodyStatementTexts.Count
-        if ($StatementsMatch) {
-            for ($Index = 0; $Index -lt $HandlerBodyStatementTexts.Count; $Index++) {
-                if ($LoadedHandlerStatementTexts[$Index] -ne $HandlerBodyStatementTexts[$Index]) {
-                    $StatementsMatch = $false
-                    break
-                }
-            }
-        }
-
-        if ($StatementsMatch) {
+        if (Test-ScriptBlockStatementTextEquivalent -Left $LoadedHandlerScriptBlockExpression.ScriptBlock -Right $HandlerBodyScriptBlock.Ast) {
             $HandlerBodyAlreadyPresent = $true
             break
         }
