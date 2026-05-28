@@ -257,6 +257,126 @@ class AstDocument {
 
 <#
 .SYNOPSIS
+    Returns one or more AST nodes, optionally filterable by type.
+
+.DESCRIPTION
+    Lightweight local copy of GrabBag's Find-AstNode so AstOverlayLab remains
+    self-contained while still using consistent AST query semantics.
+#>
+function Find-AstNode {
+    [CmdletBinding(DefaultParameterSetName = 'ByScriptBlock')]
+    param (
+        [Parameter(Mandatory, ParameterSetName = 'ByScriptBlock', Position = 0)]
+        [scriptblock] $ScriptBlock,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByAst', Position = 0)]
+        [System.Management.Automation.Language.Ast] $Ast,
+
+        [Parameter(ParameterSetName = 'ByScriptBlock', Position = 1)]
+        [Parameter(ParameterSetName = 'ByAst', Position = 1)]
+        [ArgumentCompleter({
+                param(
+                    [string] $CommandName,
+                    [string] $ParameterName,
+                    [string] $WordToComplete,
+                    [System.Management.Automation.Language.CommandAst] $CommandAst,
+                    [System.Collections.IDictionary] $FakeBoundParameters
+                )
+
+                if (-not $script:FindAstNodeCompletionCache) {
+                    $script:FindAstNodeCompletionCache =
+                    [System.Management.Automation.Language.Ast].Assembly.ExportedTypes |
+                    Where-Object {
+                        $_.BaseType -and (
+                            $_.BaseType -eq [System.Management.Automation.Language.Ast] -or
+                            $_.BaseType.IsSubclassOf([System.Management.Automation.Language.Ast])
+                        )
+                    } |
+                    Select-Object -ExpandProperty Name |
+                    Sort-Object
+                }
+
+                $Completions = $script:FindAstNodeCompletionCache |
+                Where-Object {
+                    $_.StartsWith($WordToComplete, [System.StringComparison]::InvariantCultureIgnoreCase)
+                }
+
+                if ($Completions.Count -gt 0) {
+                    return $Completions
+                }
+
+                return $null
+            })]
+        [string[]] $Type,
+
+        [scriptblock] $Query,
+
+        [switch] $All,
+
+        [switch] $Recurse
+    )
+
+    if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
+        $Ast = $ScriptBlock.Ast
+    }
+
+    $HasCallerQuery = $PSBoundParameters.ContainsKey('Query')
+    $TypeNames = if ($Type) { $Type } else { @() }
+
+    if ($HasCallerQuery) {
+        $OriginalQuery = $Query
+
+        # Pass to Foreach-Object so query scriptblocks can reference $_.
+        $HasParamBlockParameters =
+        $null -ne $OriginalQuery.Ast.ParamBlock -and
+        $OriginalQuery.Ast.ParamBlock.Parameters.Count -gt 0
+
+        if ($HasParamBlockParameters) {
+            $EvaluateQuery = {
+                param($AstNode)
+                & $OriginalQuery $AstNode
+            }
+        } else {
+            $EvaluateQuery = {
+                param($AstNode)
+                $AstNode | ForEach-Object $OriginalQuery
+            }
+        }
+    }
+
+    $Query = {
+        param($AstNode)
+
+        if ($TypeNames.Count -gt 0) {
+            $IsExpectedType = $false
+            foreach ($T in $TypeNames) {
+                if ($AstNode.GetType().Name -eq $T) {
+                    $IsExpectedType = $true
+                    break
+                }
+            }
+
+            if (-not $IsExpectedType) {
+                return $false
+            }
+        }
+
+        if ($HasCallerQuery) {
+            return (& $EvaluateQuery $AstNode)
+        }
+
+        return $true
+    }
+
+    if ($All) {
+        return $Ast.FindAll($Query, $Recurse)
+    }
+
+    return $Ast.Find($Query, $Recurse)
+}
+
+<#
+.SYNOPSIS
     Gets trimmed statement text from a script block AST.
 
 .DESCRIPTION
@@ -280,7 +400,7 @@ function Get-ScriptBlockStatementText {
         [void] $StatementText.Add($Statement.Extent.Text.Trim())
     }
 
-    Write-Output -NoEnumerate $StatementText.ToArray()
+    Write-Output $StatementText.ToArray() -NoEnumerate
 }
 
 <#
@@ -316,6 +436,204 @@ function Test-ScriptBlockStatementTextEquivalent {
     }
 
     return $true
+}
+
+<#
+.SYNOPSIS
+    Builds a minimal rewrite plan for the WPF Loaded-handler transform.
+
+.DESCRIPTION
+    Produces a small semantic descriptor that tells the emitter what to do.
+    The plan keeps target selection and rewrite intent separate from text emission.
+#>
+function New-WpfDslLoadedHandlerRewritePlan {
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param (
+        [Parameter(Mandatory)]
+        [AstDocument] $Document,
+
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string] $HandlerBody = "Write-Verbose 'Loaded handler inserted by AST overlay prototype.'",
+
+        [Parameter()]
+        [ValidateSet('Skip', 'InsertAfterExisting', 'AppendToExistingBody')]
+        [string] $OnExistingHandler = 'Skip',
+
+        [switch] $AllowDuplicateHandlerBody,
+
+        [switch] $Force
+    )
+
+    $WindowCommand = Find-AstNode -Ast $Document.Ast -Recurse -Query {
+        param($Node)
+
+        if (-not ($Node -is [CommandAst])) {
+            return $false
+        }
+
+        if ($Node.GetCommandName() -ne 'Window') {
+            return $false
+        }
+
+        return ($Node.CommandElements | Where-Object { $_ -is [ScriptBlockExpressionAst] }).Count -gt 0
+    }
+
+    if (-not $WindowCommand) {
+        throw 'No WPF DSL Window command was found.'
+    }
+
+    $WindowScriptBlockExpression = $WindowCommand.CommandElements | Where-Object {
+        $_ -is [ScriptBlockExpressionAst]
+    } | Select-Object -First 1
+
+    if (-not $WindowScriptBlockExpression) {
+        throw 'Window command found but no scriptblock argument was detected.'
+    }
+
+    $WindowScriptBlockAst = $WindowScriptBlockExpression.ScriptBlock
+    $LoadedWhenCommands = Find-AstNode -Ast $WindowScriptBlockAst -Recurse -All -Query {
+        param($Node)
+
+        if (-not ($Node -is [CommandAst])) {
+            return $false
+        }
+
+        if ($Node.GetCommandName() -ne 'When') {
+            return $false
+        }
+
+        if ($Node.CommandElements.Count -lt 2) {
+            return $false
+        }
+
+        $Literal = $Node.CommandElements[1]
+        if (-not ($Literal -is [StringConstantExpressionAst])) {
+            return $false
+        }
+
+        return $Literal.Value -eq 'Loaded'
+    }
+
+    $HandlerBodyScriptBlock = [ScriptBlock]::Create($HandlerBody)
+
+    $ExistingLoadedHandler = $null
+    $HandlerBodyAlreadyPresent = $false
+    foreach ($LoadedWhenCommand in $LoadedWhenCommands) {
+        $LoadedHandlerScriptBlockExpression = $LoadedWhenCommand.CommandElements | Where-Object {
+            $_ -is [ScriptBlockExpressionAst]
+        } | Select-Object -First 1
+
+        if (-not $LoadedHandlerScriptBlockExpression) {
+            continue
+        }
+
+        if (Test-ScriptBlockStatementTextEquivalent -Left $LoadedHandlerScriptBlockExpression.ScriptBlock -Right $HandlerBodyScriptBlock.Ast) {
+            $ExistingLoadedHandler = $LoadedWhenCommand
+            $HandlerBodyAlreadyPresent = $true
+            break
+        }
+    }
+
+    $ContainsLoadedWhen = $LoadedWhenCommands.Count -gt 0
+    if ($ContainsLoadedWhen -and $Force -and $OnExistingHandler -eq 'Skip') {
+        $OnExistingHandler = 'InsertAfterExisting'
+    }
+
+    $Action = 'None'
+    $TargetAst = $null
+    $Text = $null
+    $Reason = $null
+
+    if ($ContainsLoadedWhen -and -not $AllowDuplicateHandlerBody -and $HandlerBodyAlreadyPresent) {
+        $Reason = 'Handler body already present.'
+    } elseif ($ContainsLoadedWhen -and $OnExistingHandler -eq 'Skip') {
+        $Reason = 'Existing handler policy is Skip.'
+    } elseif ($ContainsLoadedWhen -and $OnExistingHandler -eq 'InsertAfterExisting') {
+        $Action = 'InsertAfterExisting'
+        $TargetAst = $LoadedWhenCommands | Select-Object -First 1
+        $Text = "`r`n    When 'Loaded' {`r`n        $HandlerBody`r`n    }`r`n"
+        $Reason = 'Insert sibling When Loaded handler after existing handler.'
+    } elseif ($ContainsLoadedWhen -and $OnExistingHandler -eq 'AppendToExistingBody') {
+        $Action = 'AppendToExistingBody'
+        $TargetAst = $LoadedWhenCommands | Select-Object -First 1
+        $ExistingHandlerScriptBlockExpression = $TargetAst.CommandElements | Where-Object {
+            $_ -is [ScriptBlockExpressionAst]
+        } | Select-Object -First 1
+
+        if (-not $ExistingHandlerScriptBlockExpression) {
+            throw "Loaded handler was detected but no scriptblock body was found."
+        }
+
+        $WhenIndent = ' ' * ($TargetAst.Extent.StartColumnNumber - 1)
+        $BodyIndent = "$WhenIndent    "
+        $Text = "`r`n$BodyIndent$HandlerBody`r`n$WhenIndent"
+        $Reason = 'Append text to existing When Loaded handler body.'
+    } else {
+        $Action = 'InsertMissingHandler'
+        $TargetAst = $WindowScriptBlockAst
+        $Text = "`r`n    When 'Loaded' {`r`n        $HandlerBody`r`n    }`r`n"
+        $Reason = 'Add missing When Loaded handler.'
+    }
+
+    return [pscustomobject] @{
+        Action = $Action
+        TargetAst = $TargetAst
+        Text = $Text
+        Reason = $Reason
+        HasLoadedWhen = $ContainsLoadedWhen
+        HandlerBodyAlreadyPresent = $HandlerBodyAlreadyPresent
+    }
+}
+
+<#
+.SYNOPSIS
+    Applies a Loaded-handler rewrite plan to an AstDocument.
+
+.DESCRIPTION
+    Converts the rewrite plan into the existing text-edit primitives.
+    The emitter stays intentionally small so the semantic decision is explicit.
+#>
+function Invoke-WpfDslLoadedHandlerRewritePlan {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param (
+        [Parameter(Mandatory)]
+        [AstDocument] $Document,
+
+        [Parameter(Mandatory)]
+        [pscustomobject] $Plan
+    )
+
+    switch ($Plan.Action) {
+        'InsertAfterExisting' {
+            $Document.Append($Plan.TargetAst, $Plan.Text, $Plan.Reason)
+            return $true
+        }
+
+        'AppendToExistingBody' {
+            $ExistingHandlerScriptBlockExpression = $Plan.TargetAst.CommandElements | Where-Object {
+                $_ -is [ScriptBlockExpressionAst]
+            } | Select-Object -First 1
+
+            if (-not $ExistingHandlerScriptBlockExpression) {
+                throw "Loaded handler was detected but no scriptblock body was found."
+            }
+
+            $Document.InsertBeforeScriptBlockClose($ExistingHandlerScriptBlockExpression.ScriptBlock, $Plan.Text, $Plan.Reason)
+            return $true
+        }
+
+        'InsertMissingHandler' {
+            $Document.InsertBeforeScriptBlockClose($Plan.TargetAst, $Plan.Text, $Plan.Reason)
+            return $true
+        }
+
+        default {
+            return $false
+        }
+    }
 }
 
 <#
@@ -631,144 +949,10 @@ function Add-WpfDslLoadedHandler {
         [switch] $Force
     )
 
-    $WindowCommand = $Document.Ast.Find({
-            param($Node)
-
-            $IsCommandNode = $Node -is [CommandAst]
-            if (-not $IsCommandNode) {
-                return $false
-            }
-
-            $Name = $Node.GetCommandName()
-            $IsWindowCommand = $Name -eq 'Window'
-            if (-not $IsWindowCommand) {
-                return $false
-            }
-
-            $ScriptBlockArguments = $Node.CommandElements | Where-Object {
-                $_ -is [ScriptBlockExpressionAst]
-            }
-            $HasScriptBlockArgument = $null -ne $ScriptBlockArguments
-
-            return $HasScriptBlockArgument
-        }, $true)
-
-    if (-not $WindowCommand) {
-        throw 'No WPF DSL Window command was found.'
-    }
-
-    $WindowScriptBlockExpression = $WindowCommand.CommandElements | Where-Object {
-        $_ -is [ScriptBlockExpressionAst]
-    } | Select-Object -First 1
-
-    if (-not $WindowScriptBlockExpression) {
-        throw 'Window command found but no scriptblock argument was detected.'
-    }
-
-    $WindowScriptBlockAst = $WindowScriptBlockExpression.ScriptBlock
-    $LoadedWhenCommands = $WindowScriptBlockAst.FindAll({
-            param($Node)
-
-            $IsCommandNode = $Node -is [CommandAst]
-            if (-not $IsCommandNode) {
-                return $false
-            }
-
-            $IsWhenCommand = $Node.GetCommandName() -eq 'When'
-            if (-not $IsWhenCommand) {
-                return $false
-            }
-
-            $TooFewArgumentsGiven = $Node.CommandElements.Count -lt 2
-            if ($TooFewArgumentsGiven) {
-                return $false
-            }
-
-            $Literal = $Node.CommandElements[1]
-
-            $HasStringLiteralEventName = $Literal -is [StringConstantExpressionAst]
-            if (-not $HasStringLiteralEventName) {
-                return $false
-            }
-
-            $IsLoadedEvent = $Literal.Value -eq 'Loaded'
-            return $IsLoadedEvent
-        }, $true)
-
-    $ContainsLoadedWhen = $LoadedWhenCommands.Count -gt 0
-
-    $HandlerBodyScriptBlock = [ScriptBlock]::Create($HandlerBody)
-
-    $HandlerBodyAlreadyPresent = $false
-    foreach ($LoadedWhenCommand in $LoadedWhenCommands) {
-        $LoadedHandlerScriptBlockExpression = $LoadedWhenCommand.CommandElements | Where-Object {
-            $_ -is [ScriptBlockExpressionAst]
-        } | Select-Object -First 1
-
-        if (-not $LoadedHandlerScriptBlockExpression) {
-            continue
-        }
-
-        if (Test-ScriptBlockStatementTextEquivalent -Left $LoadedHandlerScriptBlockExpression.ScriptBlock -Right $HandlerBodyScriptBlock.Ast) {
-            $HandlerBodyAlreadyPresent = $true
-            break
-        }
-    }
-
-    if ($ContainsLoadedWhen -and $Force -and $OnExistingHandler -eq 'Skip') {
-        $OnExistingHandler = 'InsertAfterExisting'
-    }
-
-    if ($ContainsLoadedWhen -and -not $AllowDuplicateHandlerBody -and $HandlerBodyAlreadyPresent) {
+    $Plan = New-WpfDslLoadedHandlerRewritePlan -Document $Document -HandlerBody $HandlerBody -OnExistingHandler $OnExistingHandler -AllowDuplicateHandlerBody:$AllowDuplicateHandlerBody -Force:$Force
+    if ($Plan.Action -eq 'None') {
         return $false
     }
 
-    if ($ContainsLoadedWhen -and $OnExistingHandler -eq 'Skip') {
-        return $false
-    }
-
-    $NewWhenText = "`r`n    When 'Loaded' {`r`n        $HandlerBody`r`n    }`r`n"
-
-    if ($ContainsLoadedWhen -and $OnExistingHandler -eq 'InsertAfterExisting') {
-        $FirstLoadedWhenCommand = $LoadedWhenCommands | Select-Object -First 1
-        $Document.Append(
-            $FirstLoadedWhenCommand,
-            $NewWhenText,
-            'Insert sibling When Loaded handler after existing handler'
-        )
-
-        return $true
-    }
-
-    if ($ContainsLoadedWhen -and $OnExistingHandler -eq 'AppendToExistingBody') {
-        $FirstLoadedWhenCommand = $LoadedWhenCommands | Select-Object -First 1
-        $ExistingHandlerScriptBlockExpression = $FirstLoadedWhenCommand.CommandElements | Where-Object {
-            $_ -is [ScriptBlockExpressionAst]
-        } | Select-Object -First 1
-
-        if (-not $ExistingHandlerScriptBlockExpression) {
-            throw "Loaded handler was detected but no scriptblock body was found."
-        }
-
-        $ExistingHandlerScriptBlock = $ExistingHandlerScriptBlockExpression.ScriptBlock
-        $WhenIndent = ' ' * ($FirstLoadedWhenCommand.Extent.StartColumnNumber - 1)
-        $BodyIndent = "$WhenIndent    "
-        $AppendText = "`r`n$BodyIndent$HandlerBody`r`n$WhenIndent"
-
-        $Document.InsertBeforeScriptBlockClose(
-            $ExistingHandlerScriptBlock,
-            $AppendText,
-            'Append text to existing When Loaded handler body'
-        )
-
-        return $true
-    }
-
-    $Document.InsertBeforeScriptBlockClose(
-        $WindowScriptBlockAst,
-        $NewWhenText,
-        'Add missing When Loaded handler'
-    )
-
-    return $true
+    return Invoke-WpfDslLoadedHandlerRewritePlan -Document $Document -Plan $Plan
 }

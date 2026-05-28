@@ -330,3 +330,47 @@ Window Main {
         $MatchCount | Should -Be 2
     }
 }
+
+Describe 'WPF Loaded-handler rewrite plan MVP' {
+    It 'builds an InsertMissingHandler plan and emits one edit' {
+        $Source = @"
+Window Main {
+    StackPanel {
+        TextBlock 'Hello'
+    }
+}
+"@
+
+        $Document = New-AstDocument -InputObject $Source
+        $Plan = New-WpfDslLoadedHandlerRewritePlan -Document $Document -HandlerBody "Write-Verbose 'plan AstOverlayLab insertion'"
+        $Changed = Invoke-WpfDslLoadedHandlerRewritePlan -Document $Document -Plan $Plan
+        $Validation = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.Action | Should -Be 'InsertMissingHandler'
+        $Changed | Should -BeTrue
+        $Validation.EditCount | Should -Be 1
+        $Validation.ParseErrorCount | Should -Be 0
+        $Validation.RenderedText | Should -Match 'plan AstOverlayLab insertion'
+    }
+
+    It 'builds a None plan when identical Loaded body already exists' {
+        $Source = @"
+Window Main {
+    When 'Loaded' {
+        Write-Verbose 'already planned'
+    }
+}
+"@
+
+        $Document = New-AstDocument -InputObject $Source
+        $Plan = New-WpfDslLoadedHandlerRewritePlan -Document $Document -HandlerBody "Write-Verbose 'already planned'"
+        $Changed = Invoke-WpfDslLoadedHandlerRewritePlan -Document $Document -Plan $Plan
+        $Validation = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.Action | Should -Be 'None'
+        $Plan.HandlerBodyAlreadyPresent | Should -BeTrue
+        $Changed | Should -BeFalse
+        $Validation.EditCount | Should -Be 0
+        $Validation.ParseErrorCount | Should -Be 0
+    }
+}
