@@ -22,4 +22,4 @@ Only the `PropertyName` token before `:` is scoped as `entity.other.attribute-na
 
 - No npm, Node.js, or build step is required for local install.
 - Node tooling is only needed if you want to package/publish the extension.
-- The extension sets a default token color of `#D79334` for WPF DSL property names.
+- This is a Work-In-Progress. I'm not sure what the true coloring should be. The light blue given to variables is what is used for json/css keys but when used together clashes hard. Recoloring variables to a distinct color helps but breaks a default people would be used to.
