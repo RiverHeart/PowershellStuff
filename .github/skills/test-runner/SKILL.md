@@ -35,5 +35,8 @@ Get-Help "$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/In
 1. Resolve the repository root from the current location or the script location.
 2. Read the root pester.json manifest and validate the configured suite entry.
 3. Resolve the suite config and test paths relative to the suite manifest.
-4. Run Pester with PassThru and print a compact summary.
-5. Use ListSuites and ListTags when the user needs discovery rather than execution.
+4. Run targeted tests for changed code first (for example by IncludeTag, specific path, or focused filter).
+5. If there are known failures from a prior run, re-run those failing tests before broad runs.
+6. Run full suite validation only after focused and known-failing tests pass.
+7. Run Pester with PassThru and print a compact summary for each run.
+8. Use ListSuites and ListTags when the user needs discovery rather than execution.
