@@ -30,6 +30,7 @@ Window 'Window' {
         # Add app state fields here.
         CurrentView = 'Home'
         IsDirty = $false
+        SelectedProcess = $null
         TotalCpuPercent = 0
         TotalMemoryPercent = 0
     }
@@ -70,6 +71,10 @@ Window 'Window' {
                     $this.CanUserResizeRows = $false
                     $this.ColumnHeaderHeight = 60
 
+                    BindProperty SelectedItem SelectedProcess -Source (Reference 'Window').Tag -ScriptBlock {
+                        $this.Mode = [System.Windows.Data.BindingMode]::TwoWay
+                    }
+
                     When Sorting {
                         param($sender, $event)
 
@@ -78,6 +83,10 @@ Window 'Window' {
                             $event.Column.SortDirection = 'Ascending'
                             # Allow default handler to toggle it to descending so sorting still happens.
                         }
+                    }
+
+                    When SelectionChanged {
+                        Invoke-TaskManagerRefreshStopProcessCommand
                     }
 
                     $ProcessItems = [ObservableCollection[object]]::new()
@@ -309,14 +318,20 @@ Window 'Window' {
                         [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
                         $this.Content = 'Stop Process'
                         Command 'StopProcessCommand' {
-                            param($sender, $event)
-                            $SelectedProcess = (Reference 'ProcessList').SelectedItem
-                            if ($null -ne $SelectedProcess) {
-                                try {
-                                    Stop-Process -Id $SelectedProcess.Id -ErrorAction Stop
-                                } catch {
-                                    [System.Windows.MessageBox]::Show("Failed to stop process: $_", "Error", [MessageBoxButton]::OK, [MessageBoxImage]::Error)
+                            Execute {
+                                param($sender, $event)
+                                $SelectedProcess = (Reference 'ProcessList').SelectedItem
+                                if ($null -ne $SelectedProcess) {
+                                    try {
+                                        Stop-Process -Id $SelectedProcess.Id -ErrorAction Stop
+                                    } catch {
+                                        [System.Windows.MessageBox]::Show("Failed to stop process: $_", "Error", [MessageBoxButton]::OK, [MessageBoxImage]::Error)
+                                    }
                                 }
+                            }
+
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.SelectedProcess
                             }
                         }
                     }

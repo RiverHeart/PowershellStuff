@@ -11,7 +11,7 @@ Definitely still rough around the edges, lacks a lot of niceties but is servicea
 * Lists all processes in a datagrid with column sorting.
 * Refreshes CPU and memory usage automatically.
 * Calculates total CPU and memory usage in the headers for those columns.
-* Supports stopping tasks
+* Supports stopping tasks and disables the Stop Process button until a process is selected.
 
 ## Memory Header Nuance
 
