@@ -14,8 +14,8 @@
     Runs directly on the UI thread.
 
     ASYNC MODE (Background work with UI result handler):
-    The -Work scriptblock runs in a background runspace and should return data.
-    The -OnComplete scriptblock runs on the UI thread and receives the work result as a parameter.
+    The Work scriptblock (contextual child keyword) runs in a background runspace and should return data.
+    The OnComplete scriptblock (contextual child keyword) runs on the UI thread and receives the work result as a parameter.
     An implicit IsRefreshing guard prevents overlapping work execution.
 
 .PARAMETER Name
@@ -25,16 +25,10 @@
     The interval in milliseconds between timer ticks.
 
 .PARAMETER ScriptBlock
-    (Sync mode) The scriptblock to execute on each timer tick on the UI thread.
-    Incompatible with -Work and -OnComplete.
+    The scriptblock body for TimedEvent.
 
-.PARAMETER Work
-    (Async mode) A scriptblock that performs background work and returns data.
-    Must be used together with -OnComplete. The scriptblock runs on a background thread.
-
-.PARAMETER OnComplete
-    (Async mode) A scriptblock that handles the result of -Work on the UI thread.
-    Receives the work result as a single parameter. Must be used together with -Work.
+    Sync mode: provide normal scriptblock contents that execute on the UI thread.
+    Async mode: provide contextual child keywords Work { } and OnComplete { }.
 
 .EXAMPLE
     Sync mode (UI thread):
@@ -48,24 +42,25 @@
 .EXAMPLE
     Async mode (background work, UI-safe update):
     Window 'MainWindow' {
-        TimedEvent 'RefreshData' 3000 `
-          -Work {
-              # Runs on background thread, can be slow
-              [System.Diagnostics.Process]::GetProcesses()
-          } `
-          -OnComplete {
-              param($Processes)
-              # Runs on UI thread, safe to update controls
-              $ProcessList.Clear()
-              foreach ($p in $Processes) { $ProcessList.Add($p) }
-          }
+        TimedEvent 'RefreshData' 3000 {
+            Work {
+                # Runs on background thread, can be slow
+                [System.Diagnostics.Process]::GetProcesses()
+            }
+            OnComplete {
+                param($Processes)
+                # Runs on UI thread, safe to update controls
+                $ProcessList.Clear()
+                foreach ($p in $Processes) { $ProcessList.Add($p) }
+            }
+        }
     }
 
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.threading.dispatchertimer
 #>
 function TimedEvent {
-    [CmdletBinding(DefaultParameterSetName='Sync')]
+    [CmdletBinding()]
     [Alias('-TimedEvent')]
     [OutputType([void])]
     param(
@@ -78,19 +73,41 @@ function TimedEvent {
         [ValidateRange(1, [int]::MaxValue)]
         [int] $IntervalMilliseconds,
 
-        [Parameter(Mandatory, Position=2, ParameterSetName='Sync')]
-        [scriptblock] $ScriptBlock,
-
-        [Parameter(Mandatory, ParameterSetName='Async')]
-        [scriptblock] $Work,
-
-        [Parameter(Mandatory, ParameterSetName='Async')]
-        [scriptblock] $OnComplete
+        [Parameter(Mandatory, Position=2)]
+        [scriptblock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
         Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
         return
+    }
+
+    $KeywordMatches = @(
+        Get-WPFKeyword `
+            -ScriptBlock $ScriptBlock `
+            -Name 'Work', 'OnComplete' `
+            -ParentContext 'TimedEvent' `
+            -Mode Strict
+    )
+
+    $UseAsyncMode = $KeywordMatches.Count -gt 0
+    $Work = $null
+    $OnComplete = $null
+
+    if ($UseAsyncMode) {
+        $PSVars = New-WPFVariableList -InputObject $this
+        $Children = @($ScriptBlock.InvokeWithContext($null, $PSVars))
+
+        $WorkSpecs = @($Children | Where-Object { 'WPF.WorkSpec' -in $_.PSTypeNames })
+        $OnCompleteSpecs = @($Children | Where-Object { 'WPF.OnCompleteSpec' -in $_.PSTypeNames })
+
+        if ($WorkSpecs.Count -ne 1 -or $OnCompleteSpecs.Count -ne 1) {
+            Write-Error "TimedEvent '$Name' async scriptblock mode requires exactly one Work block and one OnComplete block."
+            return
+        }
+
+        $Work = $WorkSpecs[0].ScriptBlock
+        $OnComplete = $OnCompleteSpecs[0].ScriptBlock
     }
 
     Write-Debug "Creating TimedEvent '$Name' with interval ${IntervalMilliseconds}ms"
@@ -101,7 +118,7 @@ function TimedEvent {
         $Timer.Interval = [System.TimeSpan]::FromMilliseconds($IntervalMilliseconds)
 
         # SYNC MODE: Direct scriptblock on UI thread
-        if ($PSCmdlet.ParameterSetName -eq 'Sync') {
+        if (-not $UseAsyncMode) {
             Write-Debug "  Using sync mode (UI thread execution)"
 
             $TickHandler = $ScriptBlock
