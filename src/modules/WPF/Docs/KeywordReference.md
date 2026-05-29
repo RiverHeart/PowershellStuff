@@ -8,6 +8,64 @@ Scope of this page:
 - Keep behavioral details brief
 - Point to examples for deeper usage
 
+## Table of Contents
+
+* [Core Pattern](#core-pattern)
+* [Controls](#controls)
+    * [Window](#window)
+    * [Grid](#grid)
+    * [Row](#row)
+    * [Column](#column)
+    * [Border](#grid)
+    * [Button](#button)
+    * [Label](#label)
+    * [TextBlock](#textblock)
+    * [TextBox](#textbox)
+    * [Image](#image)
+    * [ScrollViewer](#scrollviewer)
+    * [StackPanel](#stackpanel)
+    * [DockPanel](#dockpanel)
+    * [DataGrid](#datagrid)
+    * [DataGridTextColumn](#datagridtextcolumn)
+    * [DatePicker](#datepicker)
+    * [Menu](#menu)
+    * [MenuBar](#menubar)
+    * [MenuItem](#menuitem)
+* [Shapes](#shapes)
+    * [Path](#path)
+* [Commands and Events](#commands-and-events)
+    * [Command](#command)
+    * [When](#when)
+    * [TimedEvent](#timedevent)
+* [Binding and Resources](#binding-and-resources)
+    * [State](#state)
+    * [Watch](#watch)
+    * [BindProperty](#bindproperty)
+    * [Binding](#binding)
+    * [ValueConverter](#valueconverter)
+    * [Resource](#resource)
+    * [Theme](#theme)
+    * [Brush](#brush)
+* [Styles](#styles)
+    * [Style](#style)
+    * [ExtendStyle](#extendstyle)
+    * [Setter](#setter)
+    * [Chrome](#chrome)
+    * [Trigger](#trigger)
+    * [DataTrigger](#datatrigger)
+    * [MultiTrigger](#multitrigger)
+    * [UseStyle](#usestyle)
+* [Lookup and Composition Helpers](#lookup-and-composition-helpers)
+    * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
+    * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
+    * [Reference](#reference)
+    * [Import](#import)
+    * [Show-WPFWindow](#show-wpfwindow)
+    * [New-WPFProject](#new-wpfproject)
+    * [Get-WPFTextInput](#get-wpftextinput)
+* [Compatibility Note](#compatibility-note)
+
+
 ## Core Pattern
 
 Most control keywords follow this shape:
@@ -288,9 +346,12 @@ Path 'images/arrow-left.svg' {
 
 ## Commands and Events
 
-### Shortcut
+### Command
 
 Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
+
+`Execute` and `CanExecute` are contextual child keywords of `Command`.
+They are intended to be used inside a `Command { ... }` specification block.
 
 ```powershell
 Command 'Open' {
@@ -324,11 +385,14 @@ When Click {
 
 Creates and starts a DispatcherTimer, registers it by name for `Reference`, and ensures cleanup through window lifecycle registry clearing.
 
+`Work` and `OnComplete` are contextual children of `TimedEvent` in async mode.
+They are supplied as contextual child blocks inside the trailing scriptblock.
+
 TimedEvent requires an explicit interval in milliseconds.
 
-In async mode, `-OnComplete` receives two parameters:
+In async mode, `OnComplete` receives two parameters:
 
-- `Result`: array of objects emitted by `-Work`
+- `Result`: array of objects emitted by `Work`
 - `Sender`: the DispatcherTimer instance
 
 ```powershell
@@ -339,17 +403,16 @@ TimedEvent 'RefreshProcess' 3000 {
 ```
 
 ```powershell
-# Async mode: run work in a background runspace and update UI on completion
-TimedEvent 'RefreshData' 3000 `
-  -Work {
-      Get-Process
-  } `
-  -OnComplete {
-      param($processes, $sender)
-      # $sender is the DispatcherTimer
-      # Update UI state here
-      $null = $processes
-      $null = $sender
+# Async mode using contextual child keywords
+TimedEvent 'RefreshData' 3000 {
+    Work {
+        Get-Process
+    }
+    OnComplete {
+        param($processes, $sender)
+        $null = $processes
+        $null = $sender
+    }
 }
 ```
 
