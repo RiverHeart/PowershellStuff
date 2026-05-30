@@ -160,6 +160,10 @@ Column 'Expand*3' {
 
 Creates a Border. Supports named and nameless forms.
 
+When used inside `Grid -> Row -> Column` specs, `Border` participates in
+grid placement like other controls, so row and column coordinates are applied
+as expected.
+
 ```powershell
 Border 'Card' {
     Label 'Header' {}

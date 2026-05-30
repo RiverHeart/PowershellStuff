@@ -130,6 +130,32 @@ Describe 'Grid' -Tag 'Grid' {
         $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 4
     }
 
+    It 'Should place Border children in their declared grid columns' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "GridBorder_$Id" {
+            Row {
+                Column {
+                    Border "LeftBorder_$Id" {
+                        Label "LeftLabel_$Id" {}
+                    }
+                }
+                Column {
+                    Border "RightBorder_$Id" {
+                        Label "RightLabel_$Id" {}
+                    }
+                }
+            }
+        }
+
+        $LeftBorder = Reference "LeftBorder_$Id"
+        $RightBorder = Reference "RightBorder_$Id"
+
+        [System.Windows.Controls.Grid]::GetRow($LeftBorder) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($LeftBorder) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetRow($RightBorder) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($RightBorder) | Should -Be 1
+    }
+
     It 'Should honor explicit row and column sizes from first declaration' {
         $Id = [guid]::NewGuid().ToString('N')
         $Grid = Grid "Grid_$Id" {

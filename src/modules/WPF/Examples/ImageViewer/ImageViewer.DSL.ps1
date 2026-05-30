@@ -67,11 +67,16 @@ Window 'Window' {
 
         IsSlideshowActive = $false
         IsFigureDrawingMode = $false
+        IsFigureDrawingPaused = $false
         FigureDrawingPreset = 'Balanced'
         FigureDrawingTotalMinutes = 0
         FigureDrawingLimiter = $null
         FigureDrawingPoseIndex = -1
+        FigureDrawingPoseRemainingSeconds = 0.0
+        FigureDrawingPoseEndsAtUtc = $null
         FigureDrawingPoseDurationsSeconds = $null
+        FigureDrawingCountdownText = '00:00:00'
+        FigureDrawingCountdownTimer = $null
 
         IsAutoForwardActive = $false
         AutoForwardTimer = $null
@@ -403,7 +408,7 @@ Window 'Window' {
 
         # MARK: IMG VIEWER
         Row 'Expand' {
-            Column {
+            Column 'Expand' {
                 # In case the image is larger than the window, use the ScrollViewer
                 # to adjust the view window.
                 ScrollViewer 'ScrollViewer' {
@@ -429,11 +434,110 @@ Window 'Window' {
                     }
                 }
             }
+
+            Column 'Fit' {
+                Border 'FigureDrawingSidebar' {
+                    $this.Width = 260
+                    $this.Padding = 16
+                    $this.Margin = 6, 0, 0, 0
+                    $this.Background = '#E61C1C1C'
+                    $this.BorderThickness = 1
+                    $this.BorderBrush = '#FF4A4A4A'
+                    Watch Visibility Window.Tag.IsFigureDrawingMode -Converter {
+                        if ($_) { 'Visible' } else { 'Collapsed' }
+                    }
+
+                    StackPanel 'FigureDrawingSidebarStack' {
+                        $this.VerticalAlignment = [VerticalAlignment]::Center
+                        $this.HorizontalAlignment = [HorizontalAlignment]::Stretch
+
+                        Label 'FigureDrawingCountdownLabel' {
+                            $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                            $this.FontFamily = 'Consolas'
+                            $this.FontSize = 46
+                            $this.FontWeight = [FontWeights]::Bold
+                            $this.Foreground = '#FFF8F8F8'
+                            Watch Content Window.Tag.FigureDrawingCountdownText
+                        }
+
+                        Label 'FigureDrawingMetaLabel' {
+                            $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                            $this.Foreground = '#FFD3D3D3'
+                            Watch Content Window.Tag.IsFigureDrawingPaused -Converter {
+                                if ($_) { 'Paused' } else { 'Running' }
+                            }
+                        }
+
+                        Button 'FigureDrawingPauseButton' {
+                            UseStyle 'ImageViewer.IconButton'
+                            $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                            $this.Margin = 0, 20, 0, 0
+                            Watch ToolTip Window.Tag.IsFigureDrawingPaused -Converter {
+                                if ($_) { 'Resume figure drawing' } else { 'Pause figure drawing' }
+                            }
+                            Watch Content Window.Tag.IsFigureDrawingPaused -Converter {
+                                if ($_) {
+                                    Path 'images/play-solid-full.svg' {
+                                        UseStyle 'ImageViewer.IconPath'
+                                    }
+                                } else {
+                                    Path 'images/pause-solid-full.svg' {
+                                        UseStyle 'ImageViewer.IconPath'
+                                    }
+                                }
+                            }
+
+                            When Click {
+                                Invoke-ImageViewerToggleFigureDrawingPause
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         # MARK: TOOLBAR
         Row {
             Column {
+                # StackPanel 'FigureDrawingToolbar' {
+                #     $this.Orientation = [Orientation]::Horizontal
+                #     $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                #     Watch Visibility Window.Tag.IsFigureDrawingMode -Converter {
+                #         if ($_) { 'Visible' } else { 'Collapsed' }
+                #     }
+
+                #     Label 'CountdownLabel' {
+                #         TimedEvent 'ProcessRefresh' 3000 `
+                #             -When { Reference 'Window'.Tag.FigureDrawingCountdownActive } `
+                #             -Execute {
+                #                 $this.Content =
+                #             }
+                #     }
+
+                #     Button 'PauseButton' {
+                #         UseStyle 'ImageViewer.IconButton'
+                #         Watch IsEnabled Window.Tag.IsFileLoaded
+                #         Watch ToolTip Window.Tag.IsAutoForwardActive -Converter {
+                #             if ($_) { 'Pause' } else { 'Start' }
+                #         }
+                #         Watch Content Window.Tag.IsAutoForwardActive -Converter {
+                #             if ($_) {
+                #                 Path 'images/pause-solid-full.svg' {
+                #                     UseStyle 'ImageViewer.IconPath'
+                #                 }
+                #             } else {
+                #                 Path 'images/play-solid-full.svg' {
+                #                     UseStyle 'ImageViewer.IconPath'
+                #                 }
+                #             }
+                #         }
+
+                #         When 'Click' {
+                #             Invoke-ImageViewerToggleAutoForward
+                #         }
+                #     }
+                # }
+
                 StackPanel 'ButtonPanel' {
                     $this.Orientation = [Orientation]::Horizontal
                     $this.HorizontalAlignment = [HorizontalAlignment]::Center

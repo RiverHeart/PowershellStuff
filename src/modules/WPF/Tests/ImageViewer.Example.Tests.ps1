@@ -82,4 +82,26 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $ToggleContent | Should -Match 'Enter figure drawing session minutes \(1 to 600\)'
         $ToggleContent | Should -Match 'Start-ImageViewerFigureDrawingMode\s+-TotalMinutes\s+\$totalMinutes\s+-Preset\s+\$preset'
     }
+
+    It 'Shows a right sidebar in figure drawing mode with countdown and pause/play controls' {
+        $DslPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/ImageViewer.DSL.ps1'
+        $DslContent = Get-Content -Path $DslPath -Raw
+
+        $DslContent | Should -Match "Border 'FigureDrawingSidebar'"
+        $DslContent | Should -Match 'Watch Visibility Window.Tag.IsFigureDrawingMode'
+        $DslContent | Should -Match "Label 'FigureDrawingCountdownLabel'"
+        $DslContent | Should -Match 'Watch Content Window.Tag.FigureDrawingCountdownText'
+        $DslContent | Should -Match 'Invoke-ImageViewerToggleFigureDrawingPause'
+    }
+
+    It 'Formats figure drawing countdown values using TimeSpan text output' {
+        $CountdownPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerUpdateFigureDrawingCountdown.ps1'
+        $CountdownContent = Get-Content -Path $CountdownPath -Raw
+
+        $CountdownContent | Should -Match 'TimeSpan\]::FromSeconds'
+        $CountdownContent | Should -Match "ToString\('hh\\:mm\\:ss'\)"
+        $CountdownContent | Should -Match 'FigureDrawingCountdownText\s*='
+
+        ([TimeSpan]::FromSeconds(65)).ToString('hh\:mm\:ss') | Should -Be '00:01:05'
+    }
 }

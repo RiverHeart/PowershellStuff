@@ -58,8 +58,11 @@ function Start-ImageViewerFigureDrawingMode {
                     Invoke-ImageViewerNavigate -Direction Forward
                     $TimerState.FigureDrawingPoseIndex = $NextPoseIndex
                     $NextDuration = [double] $TimerState.FigureDrawingPoseDurationsSeconds[$NextPoseIndex]
+                    $TimerState.FigureDrawingPoseRemainingSeconds = $NextDuration
+                    $TimerState.FigureDrawingPoseEndsAtUtc = [DateTime]::UtcNow.AddSeconds($NextDuration)
                     $TimerState.AutoForwardIntervalSeconds = $NextDuration
                     $TimerState.AutoForwardTimer.Interval = [TimeSpan]::FromSeconds($NextDuration)
+                    Invoke-ImageViewerUpdateFigureDrawingCountdown
                     return
                 }
 
@@ -73,7 +76,19 @@ function Start-ImageViewerFigureDrawingMode {
         $State.AutoForwardTimer = $Timer
     }
 
+    if (-not $State.FigureDrawingCountdownTimer) {
+        $CountdownTimer = [System.Windows.Threading.DispatcherTimer]::new()
+        $CountdownTimer.Interval = [TimeSpan]::FromMilliseconds(250)
+
+        $null = $CountdownTimer.add_Tick({
+            Invoke-ImageViewerUpdateFigureDrawingCountdown
+        }.GetNewClosure())
+
+        $State.FigureDrawingCountdownTimer = $CountdownTimer
+    }
+
     $State.IsFigureDrawingMode = $true
+    $State.IsFigureDrawingPaused = $false
     $State.FigureDrawingPreset = $Preset
     $State.FigureDrawingLimiter = $Schedule.Limiter
     $State.FigureDrawingTotalMinutes = $TotalMinutes
@@ -85,12 +100,17 @@ function Start-ImageViewerFigureDrawingMode {
     }
 
     $FirstDuration = [double] $State.FigureDrawingPoseDurationsSeconds[0]
+    $State.FigureDrawingPoseRemainingSeconds = $FirstDuration
+    $State.FigureDrawingPoseEndsAtUtc = [DateTime]::UtcNow.AddSeconds($FirstDuration)
     $State.AutoForwardIntervalSeconds = $FirstDuration
     $State.AutoForwardTimer.Interval = [TimeSpan]::FromSeconds($FirstDuration)
     $State.IsSlideshowActive = $true
 
     $State.AutoForwardTimer.Stop()
     $State.AutoForwardTimer.Start()
+    $State.FigureDrawingCountdownTimer.Stop()
+    $State.FigureDrawingCountdownTimer.Start()
+    Invoke-ImageViewerUpdateFigureDrawingCountdown
 
     if (-not $State.IsFullScreen) {
         Set-WPFWindowFullScreen -IsFullScreen $true

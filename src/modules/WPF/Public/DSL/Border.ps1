@@ -117,6 +117,12 @@ function Border {
     Write-Debug "Processing child elements for $BorderName (Border)"
     Update-WPFObject $Border $ScriptBlock
 
+    # Grid row/column specs need child controls returned so Grid can assign
+    # coordinates even when controls auto-attach during creation.
+    if ($Parent -is [System.Windows.Controls.Grid]) {
+        return $Border
+    }
+
     if (-not $WasAutoAttached) {
         return $Border
     }
