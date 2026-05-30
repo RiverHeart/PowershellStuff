@@ -16,7 +16,7 @@ Scope of this page:
     * [Grid](#grid)
     * [Row](#row)
     * [Column](#column)
-    * [Border](#grid)
+    * [Border](#border)
     * [Button](#button)
     * [Label](#label)
     * [TextBlock](#textblock)
@@ -83,7 +83,7 @@ Behavior notes:
 - Inside the scriptblock, $this is the object currently being configured.
 - Controls created inside another control are auto-attached to the parent.
 - Most controls return nothing when auto-attached, otherwise they return the created object.
-- Return behavior is based on the created control's parent state and whether the `WPFCollectingChildren` is set to true in the caller scope.
+- Return behavior is based on the created control's parent state and whether the `WPFCollectChildren` is set to true in the caller scope.
 
 ## Controls
 
