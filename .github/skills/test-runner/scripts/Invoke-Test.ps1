@@ -12,7 +12,14 @@
     Debug preference is scoped to this script invocation and restored in a finally block.
 
 .NOTES
-    This is geared towards agent use to reduce token consumption and provide a clear summary of test results.
+    This is geared towards agent use to reduce token consumption and provide a clear
+    summary of test results.
+
+    TODO: Rather than trying to get the Agent to follow a specific workflow, I should
+    explore using test result history and last successful commit to automatically determine
+    which tests to run for a given change. The agent can then be given more generic instructions
+    to run the script until all tests are passing. Additionally, I need to figure out how to
+    require coverage for code so that the agent doesn't forget to add a test for new code.
 
 .PARAMETER TestSuite
     Name of the configured test suite to run.
