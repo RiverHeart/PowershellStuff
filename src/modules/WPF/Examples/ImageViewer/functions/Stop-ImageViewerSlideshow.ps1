@@ -18,9 +18,13 @@ function Stop-ImageViewerSlideshow {
         return
     }
 
-    if ($State.SlideshowTimer) {
-        $State.SlideshowTimer.Stop()
+    if ($State.AutoForwardTimer) {
+        $State.AutoForwardTimer.Stop()
     }
 
     $State.IsSlideshowActive = $false
+    $State.IsFigureDrawingMode = $false
+    $State.FigureDrawingPoseDurationsSeconds = $null
+    $State.FigureDrawingPoseIndex = -1
+    $State.FigureDrawingLimiter = $null
 }

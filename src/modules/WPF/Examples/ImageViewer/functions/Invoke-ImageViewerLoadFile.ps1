@@ -28,6 +28,10 @@ function Invoke-ImageViewerLoadFile {
         if ($State.SlideshowCommand -and $State.SlideshowCommand -is [RelayCommand]) {
             $State.SlideshowCommand.NotifyCanExecuteChanged()
         }
+
+        if ($State.FigureDrawingCommand -and $State.FigureDrawingCommand -is [RelayCommand]) {
+            $State.FigureDrawingCommand.NotifyCanExecuteChanged()
+        }
     } catch {
         Write-Error "Failed to load image '$FileName': $_"
         return

@@ -65,6 +65,17 @@ Window 'Window' {
         ZoomLevel      = 1.0
         RotationAngle  = 0
 
+        IsSlideshowActive = $false
+        IsFigureDrawingMode = $false
+        FigureDrawingTotalMinutes = 0
+        FigureDrawingLimiter = $null
+        FigureDrawingPoseIndex = -1
+        FigureDrawingPoseDurationsSeconds = $null
+
+        IsAutoForwardActive = $false
+        AutoForwardTimer = $null
+        AutoForwardIntervalSeconds = 3.0
+
         # Copy State
         IsCopyFeedbackActive = $false
         CopyFeedbackTimer = $null
@@ -79,13 +90,11 @@ Window 'Window' {
 
         # Navigation State
         FileNavigator  = $null
-        IsSlideshowActive = $false
-        SlideshowTimer = $null
-        SlideshowIntervalSeconds = 3.0
 
         # Command References
         SaveAsCommand  = $null
         SlideshowCommand = $null
+        FigureDrawingCommand = $null
 
         # Misc State
         MouseIdleTimer = $null
@@ -338,6 +347,22 @@ Window 'Window' {
 
                         # RelayCommand does not auto-requery in this module.
                         (Reference 'Window').Tag.SlideshowCommand = $this.Command
+                    }
+
+                    MenuItem '(V)iew/Figure (D)rawing Mode' {
+                        UseStyle 'ImageViewer.UnthemedMenuItem'
+
+                        Command 'FigureDrawingMode' 'F6' {
+                            Execute {
+                                Invoke-ImageViewerToggleFigureDrawingMode
+                            }
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                            }
+                        }
+
+                        # RelayCommand does not auto-requery in this module.
+                        (Reference 'Window').Tag.FigureDrawingCommand = $this.Command
                     }
 
                     MenuItem '(V)iew/Image Fit to (W)indow' {

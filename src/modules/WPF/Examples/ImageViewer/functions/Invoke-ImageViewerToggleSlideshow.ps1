@@ -14,7 +14,7 @@ function Invoke-ImageViewerToggleSlideshow {
         return
     }
 
-    $defaultInterval = if ($State.SlideshowIntervalSeconds) { [double] $State.SlideshowIntervalSeconds } else { 3.0 }
+    $defaultInterval = if ($State.AutoForwardIntervalSeconds) { [double] $State.AutoForwardIntervalSeconds } else { 3.0 }
 
     $intervalInput = Get-WPFTextInput `
         -Prompt 'Enter slideshow interval in seconds (0.5 to 600).' `
