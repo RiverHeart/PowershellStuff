@@ -41,7 +41,8 @@ function DatePicker {
 
     # Auto-attach if parent exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $DatePicker.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (DatePicker)"
         Update-WPFObject $Parent $DatePicker
     }
@@ -50,6 +51,9 @@ function DatePicker {
     Write-Debug "Processing child elements for $Name (DatePicker)"
     Update-WPFObject $DatePicker $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $DatePicker
+    $IsParentedAfter = [bool] $DatePicker.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $DatePicker
+    }
 }

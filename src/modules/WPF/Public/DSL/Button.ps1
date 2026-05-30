@@ -45,7 +45,8 @@ function Button {
 
     # Auto-attach if parent exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $Button.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Button)"
         Update-WPFObject $Parent $Button
     }
@@ -54,6 +55,9 @@ function Button {
     Write-Debug "Processing child elements for $Name (Button)"
     Update-WPFObject $Button $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $Button
+    $IsParentedAfter = [bool] $Button.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $Button
+    }
 }

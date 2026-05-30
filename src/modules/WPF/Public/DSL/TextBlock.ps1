@@ -41,7 +41,8 @@ function TextBlock {
 
     # Attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $TextBlock.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (TextBlock)"
         Update-WPFObject $Parent $TextBlock
     }
@@ -50,6 +51,9 @@ function TextBlock {
     Write-Debug "Processing child elements for $Name (TextBlock)"
     Update-WPFObject $TextBlock $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $TextBlock
+    $IsParentedAfter = [bool] $TextBlock.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $TextBlock
+    }
 }

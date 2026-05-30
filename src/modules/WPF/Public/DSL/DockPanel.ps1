@@ -41,7 +41,8 @@ function DockPanel {
 
     # Auto-attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $DockPanel.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (DockPanel)"
         Update-WPFObject $Parent $DockPanel
     }
@@ -50,6 +51,9 @@ function DockPanel {
     Write-Debug "Processing child elements for $Name (DockPanel)"
     Update-WPFObject $DockPanel $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $DockPanel
+    $IsParentedAfter = [bool] $DockPanel.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $DockPanel
+    }
 }

@@ -58,7 +58,8 @@ function ScrollViewer {
 
     # Attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $ScrollViewer.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (ScrollViewer)"
         Update-WPFObject $Parent $ScrollViewer
     }
@@ -67,6 +68,9 @@ function ScrollViewer {
     Write-Debug "Processing child elements for $Name (ScrollViewer)"
     Update-WPFObject $ScrollViewer $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $ScrollViewer
+    $IsParentedAfter = [bool] $ScrollViewer.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $ScrollViewer
+    }
 }

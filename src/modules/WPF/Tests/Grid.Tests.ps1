@@ -156,6 +156,32 @@ Describe 'Grid' -Tag 'Grid' {
         [System.Windows.Controls.Grid]::GetColumn($RightBorder) | Should -Be 1
     }
 
+    It 'Should place TextBox children in their declared grid columns' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "GridTextBox_$Id" {
+            Row {
+                Column {
+                    TextBox "LeftTextBox_$Id" {
+                        $this.Text = 'Left'
+                    }
+                }
+                Column {
+                    TextBox "RightTextBox_$Id" {
+                        $this.Text = 'Right'
+                    }
+                }
+            }
+        }
+
+        $LeftTextBox = Reference "LeftTextBox_$Id"
+        $RightTextBox = Reference "RightTextBox_$Id"
+
+        [System.Windows.Controls.Grid]::GetRow($LeftTextBox) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($LeftTextBox) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetRow($RightTextBox) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($RightTextBox) | Should -Be 1
+    }
+
     It 'Should honor explicit row and column sizes from first declaration' {
         $Id = [guid]::NewGuid().ToString('N')
         $Grid = Grid "Grid_$Id" {

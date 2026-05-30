@@ -104,12 +104,11 @@ function Border {
 
     # Auto-attach if parent exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    $WasAutoAttached = $false
-    if ($Parent -and -not $Border.Parent) {
+    $IsParentedBefore = [bool] $Border.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         $BorderName = if ($Name) { $Name } else { '__Nameless__' }
         Write-Debug "Beginning auto-attach for $BorderName (Border)"
         Update-WPFObject $Parent $Border
-        $WasAutoAttached = $true
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
@@ -117,13 +116,9 @@ function Border {
     Write-Debug "Processing child elements for $BorderName (Border)"
     Update-WPFObject $Border $ScriptBlock
 
-    # Grid row/column specs need child controls returned so Grid can assign
-    # coordinates even when controls auto-attach during creation.
-    if ($Parent -is [System.Windows.Controls.Grid]) {
-        return $Border
-    }
-
-    if (-not $WasAutoAttached) {
+    $IsParentedAfter = [bool] $Border.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
         return $Border
     }
 }

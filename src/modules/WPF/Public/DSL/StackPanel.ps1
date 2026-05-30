@@ -41,7 +41,8 @@ function StackPanel {
 
     # Attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if (-not $NoAutoAttach -and $Parent -and -not $StackPanel.Parent) {
+    $IsParentedBefore = [bool] $StackPanel.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (StackPanel)"
         Update-WPFObject $Parent $StackPanel
     }
@@ -50,6 +51,9 @@ function StackPanel {
     Write-Debug "Processing child elements for $Name (StackPanel)"
     Update-WPFObject $StackPanel $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $StackPanel
+    $IsParentedAfter = [bool] $StackPanel.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $StackPanel
+    }
 }

@@ -41,7 +41,8 @@ function DataGrid {
 
     # Attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $DataGrid.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (DataGrid)"
         Update-WPFObject $Parent $DataGrid
     }
@@ -50,6 +51,9 @@ function DataGrid {
     Write-Debug "Processing child elements for $Name (DataGrid)"
     Update-WPFObject $DataGrid $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $DataGrid
+    $IsParentedAfter = [bool] $DataGrid.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $DataGrid
+    }
 }

@@ -83,6 +83,7 @@ Behavior notes:
 - Inside the scriptblock, $this is the object currently being configured.
 - Controls created inside another control are auto-attached to the parent.
 - Most controls return nothing when auto-attached, otherwise they return the created object.
+- Return behavior is based on the created control's parent state and whether the `WPFCollectingChildren` is set to true in the caller scope.
 
 ## Controls
 
