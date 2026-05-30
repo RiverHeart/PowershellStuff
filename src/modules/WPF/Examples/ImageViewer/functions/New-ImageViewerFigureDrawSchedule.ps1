@@ -7,15 +7,40 @@ function New-ImageViewerFigureDrawSchedule {
 
         [Parameter(Mandatory)]
         [ValidateRange(1, 100000)]
-        [int] $ImageCount
+        [int] $ImageCount,
+
+        [Parameter()]
+        [ValidateSet('Warmup', 'Balanced', 'StudyHeavy')]
+        [string] $Preset = 'Balanced'
     )
 
     $totalSeconds = [double] ($TotalMinutes * 60)
-    $phaseDefinitions = @(
-        @{ Name = 'Short'; DurationSeconds = 30.0; Ratio = 0.25 }
-        @{ Name = 'Medium'; DurationSeconds = 120.0; Ratio = 0.45 }
-        @{ Name = 'Long'; DurationSeconds = 300.0; Ratio = 0.30 }
-    )
+    $phaseDefinitions = switch ($Preset) {
+        'Warmup' {
+            @(
+                @{ Name = 'Short'; DurationSeconds = 30.0; Ratio = 0.40 }
+                @{ Name = 'Medium'; DurationSeconds = 120.0; Ratio = 0.40 }
+                @{ Name = 'Long'; DurationSeconds = 300.0; Ratio = 0.20 }
+            )
+            break
+        }
+        'StudyHeavy' {
+            @(
+                @{ Name = 'Short'; DurationSeconds = 30.0; Ratio = 0.15 }
+                @{ Name = 'Medium'; DurationSeconds = 120.0; Ratio = 0.35 }
+                @{ Name = 'Long'; DurationSeconds = 300.0; Ratio = 0.50 }
+            )
+            break
+        }
+        default {
+            @(
+                @{ Name = 'Short'; DurationSeconds = 30.0; Ratio = 0.25 }
+                @{ Name = 'Medium'; DurationSeconds = 120.0; Ratio = 0.45 }
+                @{ Name = 'Long'; DurationSeconds = 300.0; Ratio = 0.30 }
+            )
+            break
+        }
+    }
 
     $durations = [System.Collections.Generic.List[double]]::new()
     $phaseCounts = [ordered] @{}
@@ -76,6 +101,7 @@ function New-ImageViewerFigureDrawSchedule {
     $remainingSeconds = [Math]::Max(0.0, $totalSeconds - $plannedSeconds)
 
     [pscustomobject] @{
+        Preset           = $Preset
         TotalMinutes      = $TotalMinutes
         TotalSeconds      = $totalSeconds
         PlannedSeconds    = $plannedSeconds

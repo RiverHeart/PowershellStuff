@@ -3,10 +3,14 @@ function Start-ImageViewerFigureDrawingMode {
     param(
         [Parameter(Mandatory)]
         [ValidateRange(1, 600)]
-        [int] $TotalMinutes
+        [int] $TotalMinutes,
+
+        [Parameter()]
+        [ValidateSet('Warmup', 'Balanced', 'StudyHeavy')]
+        [string] $Preset = 'Balanced'
     )
 
-    Write-Debug "Starting figure drawing mode with session length '$TotalMinutes' minutes."
+    Write-Debug "Starting figure drawing mode with preset '$Preset' and session length '$TotalMinutes' minutes."
     $Window = Reference 'Window'
     $State = $Window.Tag
 
@@ -19,7 +23,7 @@ function Start-ImageViewerFigureDrawingMode {
         return
     }
 
-    $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes $TotalMinutes -ImageCount $ImageCount
+    $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes $TotalMinutes -ImageCount $ImageCount -Preset $Preset
     if (-not $Schedule -or $Schedule.PoseCount -lt 1) {
         return
     }
@@ -70,6 +74,7 @@ function Start-ImageViewerFigureDrawingMode {
     }
 
     $State.IsFigureDrawingMode = $true
+    $State.FigureDrawingPreset = $Preset
     $State.FigureDrawingLimiter = $Schedule.Limiter
     $State.FigureDrawingTotalMinutes = $TotalMinutes
     $State.FigureDrawingPoseIndex = 0

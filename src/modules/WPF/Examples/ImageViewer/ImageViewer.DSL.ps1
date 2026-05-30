@@ -67,6 +67,7 @@ Window 'Window' {
 
         IsSlideshowActive = $false
         IsFigureDrawingMode = $false
+        FigureDrawingPreset = 'Balanced'
         FigureDrawingTotalMinutes = 0
         FigureDrawingLimiter = $null
         FigureDrawingPoseIndex = -1

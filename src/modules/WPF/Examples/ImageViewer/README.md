@@ -20,6 +20,7 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Supports Dark/Light modes
 * Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
 * Figure drawing mode with time-first scheduling (F6) that adapts pose durations to session minutes and available images
+* Figure drawing presets: Warmup, Balanced, and StudyHeavy
 * Arrow keys pan zoomed images while scrolling is possible; image navigation remains available via Spacebar and on-screen buttons
 
 ## CLI Automation Flags

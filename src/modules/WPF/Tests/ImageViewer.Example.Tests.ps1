@@ -29,8 +29,9 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $SchedulePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/New-ImageViewerFigureDrawSchedule.ps1'
         . $SchedulePath
 
-        $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 20
+        $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 20 -Preset Balanced
 
+        $Schedule.Preset | Should -Be 'Balanced'
         $Schedule.TotalSeconds | Should -Be 1200
         $Schedule.PlannedSeconds | Should -Be 1200
         $Schedule.RemainingSeconds | Should -Be 0
@@ -44,11 +45,29 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $SchedulePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/New-ImageViewerFigureDrawSchedule.ps1'
         . $SchedulePath
 
-        $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 6
+        $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 6 -Preset Balanced
 
         $Schedule.PoseCount | Should -Be 6
         $Schedule.Limiter | Should -Be 'Images'
         $Schedule.RemainingSeconds | Should -BeGreaterThan 0
+    }
+
+    It 'Uses warmer timing in Warmup than StudyHeavy for equal session length' {
+        $SchedulePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/New-ImageViewerFigureDrawSchedule.ps1'
+        . $SchedulePath
+
+        $Warmup = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 200 -Preset Warmup
+        $StudyHeavy = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 200 -Preset StudyHeavy
+
+        $WarmupShortCount = ($Warmup.DurationsSeconds | Where-Object { $_ -eq 30 }).Count
+        $WarmupLongCount = ($Warmup.DurationsSeconds | Where-Object { $_ -ge 300 }).Count
+        $StudyHeavyShortCount = ($StudyHeavy.DurationsSeconds | Where-Object { $_ -eq 30 }).Count
+        $StudyHeavyLongCount = ($StudyHeavy.DurationsSeconds | Where-Object { $_ -ge 300 }).Count
+
+        $Warmup.Preset | Should -Be 'Warmup'
+        $StudyHeavy.Preset | Should -Be 'StudyHeavy'
+        $WarmupShortCount | Should -BeGreaterThan $StudyHeavyShortCount
+        $WarmupLongCount | Should -BeLessThan $StudyHeavyLongCount
     }
 
     It 'Uses F6 to toggle figure drawing mode through the time-based prompt flow' {
@@ -59,7 +78,8 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $ToggleContent = Get-Content -Path $TogglePath -Raw
 
         $DslContent | Should -Match 'Invoke-ImageViewerToggleFigureDrawingMode'
+        $ToggleContent | Should -Match 'Select figure drawing preset: 1=Warmup, 2=Balanced, 3=StudyHeavy'
         $ToggleContent | Should -Match 'Enter figure drawing session minutes \(1 to 600\)'
-        $ToggleContent | Should -Match 'Start-ImageViewerFigureDrawingMode\s+-TotalMinutes'
+        $ToggleContent | Should -Match 'Start-ImageViewerFigureDrawingMode\s+-TotalMinutes\s+\$totalMinutes\s+-Preset\s+\$preset'
     }
 }
