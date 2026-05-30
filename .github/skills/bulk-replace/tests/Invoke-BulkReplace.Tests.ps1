@@ -122,4 +122,84 @@ Describe 'Invoke-BulkReplace' -Tag 'Invoke-BulkReplace' {
         $Result[0].Changed | Should -BeTrue
         $Result[0].ReplacementCount | Should -Be 2
     }
+
+    It 'Returns changed files only by default in summary pass-through' {
+        $RootPath = Join-Path $TestDrive 'OnlyChangedDefaultRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $ChangedFilePath = Join-Path $RootPath 'Changed.Tests.ps1'
+        $UnchangedFilePath = Join-Path $RootPath 'Unchanged.Tests.ps1'
+        [System.IO.File]::WriteAllText($ChangedFilePath, "Describe 'Changed' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($UnchangedFilePath, "Describe 'Unchanged' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = & $ScriptPath -Path $RootPath -Recurse -Find "Describe 'Changed' {" -Replace "Describe 'Changed' -Tag 'Changed' {" -PassThru
+
+        $Result.Count | Should -Be 1
+        $Result[0].Path | Should -Be $ChangedFilePath
+        $Result[0].Changed | Should -BeTrue
+    }
+
+    It 'Can include unchanged files when OnlyChanged is disabled' {
+        $RootPath = Join-Path $TestDrive 'OnlyChangedDisabledRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $ChangedFilePath = Join-Path $RootPath 'Changed.Tests.ps1'
+        $UnchangedFilePath = Join-Path $RootPath 'Unchanged.Tests.ps1'
+        [System.IO.File]::WriteAllText($ChangedFilePath, "Describe 'Changed' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($UnchangedFilePath, "Describe 'Unchanged' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = & $ScriptPath -Path $RootPath -Recurse -Find "Describe 'Changed' {" -Replace "Describe 'Changed' -Tag 'Changed' {" -PassThru -OnlyChanged:$false
+
+        $Result.Count | Should -Be 2
+        @($Result | Where-Object { $_.Path -eq $ChangedFilePath }).Count | Should -Be 1
+        @($Result | Where-Object { $_.Path -eq $UnchangedFilePath }).Count | Should -Be 1
+    }
+
+    It 'Caps detailed search output with MaxMatchesPerFile' {
+        $RootPath = Join-Path $TestDrive 'SearchCapRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $FilePath = Join-Path $RootPath 'SearchCap.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "Describe 'SearchCap' {`r`nDescribe 'SearchCap' {`r`nDescribe 'SearchCap' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = & $ScriptPath -Path $FilePath -SearchOnly -Find "Describe 'SearchCap' {" -PassThru -PassThruFormat Detailed -MaxMatchesPerFile 2
+
+        $Result.Count | Should -Be 2
+        $Result[0].LineNumber | Should -Be 1
+        $Result[1].LineNumber | Should -Be 2
+    }
+
+    It 'Can emit a run summary object before replace pass-through rows' {
+        $RootPath = Join-Path $TestDrive 'ReplaceSummaryRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $FilePath = Join-Path $RootPath 'ReplaceSummaryCase.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "Describe 'ReplaceSummaryCase' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = @(& $ScriptPath -Path $FilePath -Find "Describe 'ReplaceSummaryCase' {" -Replace "Describe 'ReplaceSummaryCase' -Tag 'ReplaceSummaryCase' {" -PassThru -IncludeSummaryObject)
+
+        $Result.Count | Should -Be 2
+        $Result[0].RecordType | Should -Be 'RunSummary'
+        $Result[0].Mode | Should -Be 'Replace'
+        $Result[0].ScannedFileCount | Should -Be 1
+        $Result[0].ChangedFileCount | Should -Be 1
+        $Result[1].Changed | Should -BeTrue
+    }
+
+    It 'Can emit a run summary object before search pass-through rows' {
+        $RootPath = Join-Path $TestDrive 'SearchSummaryObjectRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $FilePath = Join-Path $RootPath 'SearchSummaryObject.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "Describe 'SearchSummaryObject' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = @(& $ScriptPath -Path $FilePath -SearchOnly -Find "Describe 'SearchSummaryObject' {" -PassThru -IncludeSummaryObject)
+
+        $Result.Count | Should -Be 2
+        $Result[0].RecordType | Should -Be 'RunSummary'
+        $Result[0].Mode | Should -Be 'SearchOnly'
+        $Result[0].ScannedFileCount | Should -Be 1
+        $Result[0].MatchedFileCount | Should -Be 1
+        $Result[1].MatchCount | Should -Be 1
+    }
 }

@@ -55,6 +55,16 @@ using namespace System.Text.RegularExpressions
 .PARAMETER PassThruFormat
     Selects pass-through verbosity. Summary returns compact objects. Detailed includes line-level changes.
 
+.PARAMETER OnlyChanged
+    When true, pass-through results include only files that changed or would change.
+
+.PARAMETER MaxMatchesPerFile
+    Caps the number of line-level matches emitted per file for preview-oriented outputs.
+    Use 0 for no cap.
+
+.PARAMETER IncludeSummaryObject
+    When set with -PassThru, emits a compact run-level summary object before file-level rows.
+
 .PARAMETER SearchOnly
     Search for matching lines and return line-numbered hits without writing changes.
 
@@ -157,6 +167,13 @@ param (
     [switch] $SearchOnly,
 
     [switch] $PassThru,
+
+    [bool] $OnlyChanged = $true,
+
+    [ValidateRange(0, [int]::MaxValue)]
+    [int] $MaxMatchesPerFile = 0,
+
+    [switch] $IncludeSummaryObject,
 
     [ValidateSet('Summary', 'Detailed')]
     [string] $PassThruFormat = 'Summary'
@@ -631,6 +648,7 @@ $searchHits = [List[object]]::new()
 $totalReplacementCount = 0
 $changedFileCount = 0
 $previewFileCount = 0
+$statusMessage = $null
 
 foreach ($file in $targetFiles) {
     $currentContent = [System.IO.File]::ReadAllText($file.FullName)
@@ -640,13 +658,24 @@ foreach ($file in $targetFiles) {
     $fileChanges = [List[object]]::new()
 
     if ($SearchOnly) {
+        $fileSearchHitCount = 0
+
         foreach ($ruleItem in $normalizedRules) {
             if (-not (Test-BulkReplaceFilePattern -FilePath $file.FullName -FilePattern $ruleItem.FilePattern)) {
                 continue
             }
 
             foreach ($hit in @(Get-BulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)) {
+                if ($MaxMatchesPerFile -gt 0 -and $fileSearchHitCount -ge $MaxMatchesPerFile) {
+                    break
+                }
+
                 $searchHits.Add($hit)
+                $fileSearchHitCount++
+            }
+
+            if ($MaxMatchesPerFile -gt 0 -and $fileSearchHitCount -ge $MaxMatchesPerFile) {
+                break
             }
         }
 
@@ -712,12 +741,17 @@ foreach ($file in $targetFiles) {
     }
 
     $lineNumbers = @()
-    foreach ($change in $fileChanges) {
+    $changesForReport = @($fileChanges)
+    if ($MaxMatchesPerFile -gt 0 -and $changesForReport.Count -gt $MaxMatchesPerFile) {
+        $changesForReport = @($changesForReport | Select-Object -First $MaxMatchesPerFile)
+    }
+
+    foreach ($change in $changesForReport) {
         $lineNumbers += $change.LineNumber
     }
 
     $changeReports = @()
-    foreach ($change in $fileChanges) {
+    foreach ($change in $changesForReport) {
         $changeReports += $change
     }
 
@@ -734,60 +768,104 @@ foreach ($file in $targetFiles) {
 
 if ($SearchOnly) {
     if ($searchHits.Count -eq 0) {
-        Write-Host 'No matching lines found.'
+        $statusMessage = 'No matching lines found.'
     } else {
-        Write-Host ("Found {0} matching line(s)." -f $searchHits.Count)
+        $statusMessage = ("Found {0} matching line(s)." -f $searchHits.Count)
     }
 } elseif ($previewFileCount -eq 0) {
-    Write-Host 'No files required changes.'
+    $statusMessage = 'No files required changes.'
 } elseif ($changedFileCount -gt 0) {
-    Write-Host ("Updated {0} file(s) with {1} replacement(s)." -f $changedFileCount, $totalReplacementCount)
+    $statusMessage = ("Updated {0} file(s) with {1} replacement(s)." -f $changedFileCount, $totalReplacementCount)
 } else {
-    Write-Host ("Previewed {0} file(s); {1} replacement(s) would be applied." -f $previewFileCount, ($reports | Measure-Object -Property ReplacementCount -Sum).Sum)
+    $statusMessage = ("Previewed {0} file(s); {1} replacement(s) would be applied." -f $previewFileCount, ($reports | Measure-Object -Property ReplacementCount -Sum).Sum)
 }
 
 if ($PassThru) {
     if ($SearchOnly) {
+        if ($IncludeSummaryObject) {
+            $matchedFileCount = @($searchHits | Select-Object -ExpandProperty FilePath -Unique).Count
+            Write-Output ([pscustomobject]@{
+                    RecordType      = 'RunSummary'
+                    Mode            = 'SearchOnly'
+                    ScannedFileCount = $targetFiles.Count
+                    MatchedFileCount = $matchedFileCount
+                    MatchCount      = $searchHits.Count
+                })
+        }
+
         if ($PassThruFormat -eq 'Detailed') {
             Write-Output ($searchHits.ToArray()) -NoEnumerate
-            return
+        } else {
+            $summarySearchHits = @(
+                $searchHits |
+                    Group-Object -Property FilePath, RuleName |
+                    ForEach-Object {
+                        $first = $_.Group | Select-Object -First 1
+                        [pscustomobject]@{
+                            FilePath    = $first.FilePath
+                            RuleName    = $first.RuleName
+                            MatchCount  = $_.Count
+                            LineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
+                        }
+                    }
+            )
+
+            Write-Output $summarySearchHits -NoEnumerate
+        }
+    } elseif ($PassThruFormat -eq 'Detailed') {
+        if ($IncludeSummaryObject) {
+            $wouldReplacementCount = ($reports | Measure-Object -Property ReplacementCount -Sum).Sum
+            Write-Output ([pscustomobject]@{
+                    RecordType           = 'RunSummary'
+                    Mode                 = 'Replace'
+                    ScannedFileCount     = $targetFiles.Count
+                    ReportedFileCount    = $reports.Count
+                    WouldChangeFileCount = $previewFileCount
+                    ChangedFileCount     = $changedFileCount
+                    ReplacementCount     = if ($null -eq $wouldReplacementCount) { 0 } else { [int] $wouldReplacementCount }
+                })
         }
 
-        $summarySearchHits = @(
-            $searchHits |
-                Group-Object -Property FilePath, RuleName |
-                ForEach-Object {
-                    $first = $_.Group | Select-Object -First 1
-                    [pscustomobject]@{
-                        FilePath    = $first.FilePath
-                        RuleName    = $first.RuleName
-                        MatchCount  = $_.Count
-                        LineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
-                    }
+        $detailedReports = @($reports)
+        if ($OnlyChanged) {
+            $detailedReports = @($detailedReports | Where-Object { $_.Changed -or $_.WouldChange })
+        }
+
+        Write-Output $detailedReports -NoEnumerate
+    } else {
+        if ($IncludeSummaryObject) {
+            $wouldReplacementCount = ($reports | Measure-Object -Property ReplacementCount -Sum).Sum
+            Write-Output ([pscustomobject]@{
+                    RecordType           = 'RunSummary'
+                    Mode                 = 'Replace'
+                    ScannedFileCount     = $targetFiles.Count
+                    ReportedFileCount    = $reports.Count
+                    WouldChangeFileCount = $previewFileCount
+                    ChangedFileCount     = $changedFileCount
+                    ReplacementCount     = if ($null -eq $wouldReplacementCount) { 0 } else { [int] $wouldReplacementCount }
+                })
+        }
+
+        $summaryReports = @(
+            $reports | ForEach-Object {
+                [pscustomobject]@{
+                    Path             = $_.Path
+                    Changed          = $_.Changed
+                    WouldChange      = $_.WouldChange
+                    ReplacementCount = $_.ReplacementCount
+                    AppliedRuleCount = @($_.AppliedRules).Count
                 }
+            }
         )
 
-        Write-Output $summarySearchHits -NoEnumerate
-        return
-    }
-
-    if ($PassThruFormat -eq 'Detailed') {
-        Write-Output ($reports.ToArray()) -NoEnumerate
-        return
-    }
-
-    $summaryReports = @(
-        $reports | ForEach-Object {
-            [pscustomobject]@{
-                Path             = $_.Path
-                Changed          = $_.Changed
-                WouldChange      = $_.WouldChange
-                ReplacementCount = $_.ReplacementCount
-                AppliedRuleCount = @($_.AppliedRules).Count
-            }
+        if ($OnlyChanged) {
+            $summaryReports = @($summaryReports | Where-Object { $_.Changed -or $_.WouldChange })
         }
-    )
 
-    Write-Output $summaryReports -NoEnumerate
-    return
+        Write-Output $summaryReports -NoEnumerate
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($statusMessage)) {
+    Write-Host $statusMessage
 }
