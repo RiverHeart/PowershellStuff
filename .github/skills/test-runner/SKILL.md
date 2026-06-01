@@ -30,6 +30,8 @@ Instead of reading the entire script, discover capabilities and usage with:
 Get-Help "$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/Invoke-Test.ps1" -Detailed
 ```
 
+Use compact output by default. Only enable detailed Pester console output when needed with `-DetailedOutput`.
+
 ## Workflow
 
 1. Resolve the repository root from the current location or the script location.

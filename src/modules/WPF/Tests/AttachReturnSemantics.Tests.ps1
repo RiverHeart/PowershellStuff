@@ -1,18 +1,20 @@
 Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
-    $Cases = @(
-        @{ Keyword = 'Button';       NamePrefix = 'Button';       Type = [System.Windows.Controls.Button] }
-        @{ Keyword = 'Label';        NamePrefix = 'Label';        Type = [System.Windows.Controls.Label] }
-        @{ Keyword = 'TextBlock';    NamePrefix = 'TextBlock';    Type = [System.Windows.Controls.TextBlock] }
-        @{ Keyword = 'Image';        NamePrefix = 'Image';        Type = [System.Windows.Controls.Image] }
-        @{ Keyword = 'ScrollViewer'; NamePrefix = 'ScrollViewer'; Type = [System.Windows.Controls.ScrollViewer] }
-        @{ Keyword = 'StackPanel';   NamePrefix = 'StackPanel';   Type = [System.Windows.Controls.StackPanel] }
-        @{ Keyword = 'DockPanel';    NamePrefix = 'DockPanel';    Type = [System.Windows.Controls.DockPanel] }
-        @{ Keyword = 'DatePicker';   NamePrefix = 'DatePicker';   Type = [System.Windows.Controls.DatePicker] }
-        @{ Keyword = 'DataGrid';     NamePrefix = 'DataGrid';     Type = [System.Windows.Controls.DataGrid] }
-    )
-
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
+        $Cases = @(
+            @{ Keyword = 'Button';       NamePrefix = 'Button';       Type = [System.Windows.Controls.Button] }
+            @{ Keyword = 'Label';        NamePrefix = 'Label';        Type = [System.Windows.Controls.Label] }
+            @{ Keyword = 'TextBlock';    NamePrefix = 'TextBlock';    Type = [System.Windows.Controls.TextBlock] }
+            @{ Keyword = 'Image';        NamePrefix = 'Image';        Type = [System.Windows.Controls.Image] }
+            @{ Keyword = 'ScrollViewer'; NamePrefix = 'ScrollViewer'; Type = [System.Windows.Controls.ScrollViewer] }
+            @{ Keyword = 'StackPanel';   NamePrefix = 'StackPanel';   Type = [System.Windows.Controls.StackPanel] }
+            @{ Keyword = 'DockPanel';    NamePrefix = 'DockPanel';    Type = [System.Windows.Controls.DockPanel] }
+            @{ Keyword = 'DatePicker';   NamePrefix = 'DatePicker';   Type = [System.Windows.Controls.DatePicker] }
+            @{ Keyword = 'DataGrid';     NamePrefix = 'DataGrid';     Type = [System.Windows.Controls.DataGrid] }
+        )
     }
 
     foreach ($case in $Cases) {

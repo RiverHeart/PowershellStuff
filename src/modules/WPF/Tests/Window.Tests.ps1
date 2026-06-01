@@ -1,6 +1,9 @@
 Describe 'Window' -Tag 'Window' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF" -Force
+    }
+
+    BeforeAll {
         $script:OriginalAutoCloseValue = $env:WPF_AUTO_CLOSE_SECONDS
     }
 

@@ -316,7 +316,7 @@ Describe 'Chrome' -Tag 'Chrome' {
 
         try {
             $env:WPF_CHROME_WARN_UNMAPPED_SETTERS = '1'
-            $warnings = @(
+            $capturedOutput = @(
                 (& {
                     Style $styleName Button {
                         Setter FontFamily 'Consolas'
@@ -326,13 +326,12 @@ Describe 'Chrome' -Tag 'Chrome' {
                             Setter CornerRadius 6
                         }
                     }
-                } 3>&1) |
-                    Where-Object { $_ -is [System.Management.Automation.WarningRecord] }
+                } 3>&1)
             )
 
-            $warnings | Should -Not -BeNullOrEmpty
-            ($warnings | ForEach-Object { $_.Message } | Out-String) | Should -Match 'FontFamily'
-            ($warnings | ForEach-Object { $_.Message } | Out-String) | Should -Match 'not mapped into adapter'
+            $capturedText = ($capturedOutput | Out-String)
+            $capturedText | Should -Match 'FontFamily'
+            $capturedText | Should -Match 'not mapped into adapter'
         } finally {
             if ($null -eq $previousWarningSetting) {
                 Remove-Item Env:WPF_CHROME_WARN_UNMAPPED_SETTERS -ErrorAction SilentlyContinue

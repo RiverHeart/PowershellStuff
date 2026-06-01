@@ -1,7 +1,9 @@
 Describe 'Import' -Tag 'Import' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
 
+    BeforeAll {
         $script:ImportedWhenHelperName = 'Invoke-ImportedWhenBeforeAllHelper'
         $script:ImportedWhenHelperPath = Join-Path $TestDrive "$($script:ImportedWhenHelperName).ps1"
 

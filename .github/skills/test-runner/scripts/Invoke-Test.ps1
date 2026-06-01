@@ -42,6 +42,9 @@
 .PARAMETER ShowPassed
     Also prints passing tests in addition to non-passing tests.
 
+.PARAMETER DetailedOutput
+    Enables detailed Pester console output. By default, compact summary output is used.
+
 .PARAMETER IncludeCoverage
     Runs coverage-enabled test execution.
     Intended for completion checks and CI validation, not the default edit/test loop.
@@ -60,6 +63,9 @@
 
 .EXAMPLE
     ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -IncludeCoverage
+
+.EXAMPLE
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -DetailedOutput
 
 .EXAMPLE
     ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -ListSuites
@@ -89,6 +95,7 @@ param (
 
     [switch] $DebugOutput,
     [switch] $ShowPassed,
+    [switch] $DetailedOutput,
     [Parameter(ParameterSetName = 'Run')]
     [switch] $IncludeCoverage,
     [switch] $PassThru
@@ -524,7 +531,12 @@ try {
     $configuration = [PesterConfiguration]::Default
     $configuration.Run.Path = $resolvedPath
     $configuration.Run.PassThru = $true
-    $configuration.Output.Verbosity = if ($suiteConfig.Output.Verbosity) { [string] $suiteConfig.Output.Verbosity } else { 'None' }
+    # Keep agent output compact unless detailed output is explicitly requested.
+    if ($DetailedOutput) {
+        $configuration.Output.Verbosity = if ($suiteConfig.Output.Verbosity) { [string] $suiteConfig.Output.Verbosity } else { 'Normal' }
+    } else {
+        $configuration.Output.Verbosity = 'None'
+    }
 
     $effectiveIncludeTags = if ($null -ne $Tag -and $Tag.Count -gt 0) { $Tag } else { @($suiteConfig.Filter.Tag) }
     if ($effectiveIncludeTags.Count -gt 0) {
