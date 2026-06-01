@@ -50,22 +50,22 @@
     Returns the full Pester result object after printing the summary.
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -DebugOutput
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -DebugOutput
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -Tag DataGrid -PassThru
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -Tag DataGrid -PassThru
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -IncludeCoverage
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -IncludeCoverage
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -ListSuites
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -ListSuites
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -ListTags
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -ListTags
 #>
 [CmdletBinding()]
 
@@ -94,13 +94,22 @@ param (
     [switch] $PassThru
 )
 
-if (-not (Get-Module -Name Pester)) {
+$loadedPester = Get-Module -Name Pester | Sort-Object Version -Descending | Select-Object -First 1
+if ($null -ne $loadedPester -and $loadedPester.Version.Major -lt 5) {
+    Write-Error (
+        "Pester 5 or newer is required. Currently loaded version is $($loadedPester.Version). " +
+        'Remove the loaded module and run again.'
+    )
+    exit 2
+}
+
+if ($null -eq $loadedPester) {
     $pesterModule = Get-Module -ListAvailable -Name Pester |
         Sort-Object Version -Descending |
         Where-Object { $_.Version.Major -ge 5 } |
         Select-Object -First 1
     if ($null -eq $pesterModule) {
-        Write-Error 'Pester module was not found. Install Pester to run tests.'
+        Write-Error 'Pester module was not found. Install Pester 5 or newer to run tests.'
         exit 2
     }
 
@@ -299,7 +308,7 @@ function Write-TestRunSummary {
     )
 }
 
-function Resolve-CoveragePaths {
+function Resolve-CoveragePath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -355,7 +364,24 @@ if ($null -eq $repoRoot) {
     exit 2
 }
 
-Set-Location -Path $repoRoot
+$locationPushed = $false
+Push-Location -Path $repoRoot
+$locationPushed = $true
+
+function Exit-Script {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [int] $Code
+    )
+
+    if ($script:locationPushed) {
+        Pop-Location
+        $script:locationPushed = $false
+    }
+
+    exit $Code
+}
 
 $rootConfigPath = Join-Path $repoRoot 'pester.json'
 try {
@@ -363,7 +389,7 @@ try {
     Test-RootManifest -RootConfig $rootConfig -Path $rootConfigPath
 } catch {
     Write-Error $_
-    exit 2
+    Exit-Script -Code 2
 }
 
 if ($ListSuites) {
@@ -372,14 +398,14 @@ if ($ListSuites) {
     foreach ($configuredSuite in @($rootConfig.TestSuites)) {
         Write-Host ("  {0} -> {1}" -f $configuredSuite.Name, $configuredSuite.ConfigPath)
     }
-    exit 0
+    Exit-Script -Code 0
 }
 
 $suite = @($rootConfig.TestSuites | Where-Object { $_.Name -eq $TestSuite } | Select-Object -First 1)
 if ($suite.Count -eq 0) {
     $availableSuites = @($rootConfig.TestSuites | ForEach-Object { $_.Name }) -join ', '
     Write-Error "Unknown test suite '$TestSuite'. Available suites: $availableSuites"
-    exit 2
+    Exit-Script -Code 2
 }
 
 $suiteConfigPath = if ([System.IO.Path]::IsPathRooted($suite[0].ConfigPath)) {
@@ -390,7 +416,7 @@ $suiteConfigPath = if ([System.IO.Path]::IsPathRooted($suite[0].ConfigPath)) {
 
 if (-not (Test-Path -Path $suiteConfigPath)) {
     Write-Error "Suite config was not found: $suiteConfigPath"
-    exit 2
+    Exit-Script -Code 2
 }
 
 try {
@@ -398,7 +424,7 @@ try {
     Test-SuiteManifest -SuiteConfig $suiteConfig -Path $suiteConfigPath
 } catch {
     Write-Error $_
-    exit 2
+    Exit-Script -Code 2
 }
 
 $suiteBaseDirectory = Split-Path -Path $suiteConfigPath -Parent
@@ -412,7 +438,7 @@ foreach ($pathEntry in @($suiteConfig.Run.Path)) {
 
     if ($null -eq $resolved) {
         Write-Error "Suite path was not found: $pathEntry (from $suiteConfigPath)"
-        exit 2
+        Exit-Script -Code 2
     }
 
     $resolvedPath += $resolved.Path
@@ -477,7 +503,7 @@ if ($ListTags) {
         }
     }
 
-    exit 0
+    Exit-Script -Code 0
 }
 
 $previousDebugPreference = $DebugPreference
@@ -513,7 +539,7 @@ try {
     }
 
     if ($IncludeCoverage) {
-        $resolvedCoveragePaths = Resolve-CoveragePaths -SuiteConfig $suiteConfig -SuiteBaseDirectory $suiteBaseDirectory -SuiteConfigPath $suiteConfigPath
+        $resolvedCoveragePaths = Resolve-CoveragePath -SuiteConfig $suiteConfig -SuiteBaseDirectory $suiteBaseDirectory -SuiteConfigPath $suiteConfigPath
 
         $configuration.CodeCoverage.Enabled = $true
         $configuration.CodeCoverage.Path = @($resolvedCoveragePaths)
@@ -566,7 +592,7 @@ try {
 
 if ($null -eq $result) {
     Write-Error 'Pester did not return a result object.'
-    exit 2
+    Exit-Script -Code 2
 }
 
 if ($PassThru) {
@@ -574,7 +600,7 @@ if ($PassThru) {
 }
 
 if ($result.FailedCount -gt 0) {
-    exit 1
+    Exit-Script -Code 1
 }
 
-exit 0
+Exit-Script -Code 0
