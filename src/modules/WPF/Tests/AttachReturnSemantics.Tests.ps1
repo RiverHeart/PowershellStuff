@@ -11,7 +11,7 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
         @{ Keyword = 'DataGrid';     NamePrefix = 'DataGrid';     Type = [System.Windows.Controls.DataGrid] }
     )
 
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

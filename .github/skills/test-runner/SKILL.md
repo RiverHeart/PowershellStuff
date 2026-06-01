@@ -37,6 +37,9 @@ Get-Help "$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/In
 3. Resolve the suite config and test paths relative to the suite manifest.
 4. Run targeted tests for changed code first (for example by IncludeTag, specific path, or focused filter).
 5. If there are known failures from a prior run, re-run those failing tests before broad runs.
-6. Run full suite validation only after focused and known-failing tests pass.
-7. Run Pester with PassThru and print a compact summary for each run.
-8. Use ListSuites and ListTags when the user needs discovery rather than execution.
+6. Keep the default edit/test loop fast by running tests without coverage.
+7. Only run coverage when explicitly requested with `-IncludeCoverage` (for example, feature-complete validation or CI).
+8. Keep tests and coverage as separate commands: finish the green test loop first, confirm feature completion with the user, then run a dedicated `-IncludeCoverage` execution.
+9. Run full suite validation only after focused and known-failing tests pass.
+10. Run Pester with PassThru and print a compact summary for each run.
+11. Use ListSuites and ListTags when the user needs discovery rather than execution.

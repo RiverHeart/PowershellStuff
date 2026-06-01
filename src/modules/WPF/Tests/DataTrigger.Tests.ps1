@@ -1,5 +1,5 @@
 Describe 'DataTrigger' -Tag 'DataTrigger' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

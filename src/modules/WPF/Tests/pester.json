@@ -11,5 +11,21 @@
   "Filter": {
     "Tag": [],
     "ExcludeTag": []
+  },
+  "Coverage": {
+    "Enabled": true,
+    "Path": [
+      "../WPF.psm1",
+      "../Public",
+      "../Private",
+      "../TypeConverters"
+    ],
+    "CoveragePercentTarget": 70,
+    "OutputFormat": "JaCoCo",
+    "OutputPath": "coverage.xml",
+    "ExcludeTests": true,
+    "RecursePaths": true,
+    "UseBreakpoints": false,
+    "SingleHitBreakpoints": true
   }
 }

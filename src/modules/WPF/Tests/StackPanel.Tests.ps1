@@ -1,5 +1,5 @@
 Describe 'StackPanel' -Tag 'StackPanel' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

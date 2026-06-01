@@ -1,5 +1,5 @@
 Describe 'Chrome' -Tag 'Chrome' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

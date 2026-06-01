@@ -1,5 +1,5 @@
 Describe 'Resolve-WPFFileDialogFilter' -Tag 'Resolve-WPFFileDialogFilter' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

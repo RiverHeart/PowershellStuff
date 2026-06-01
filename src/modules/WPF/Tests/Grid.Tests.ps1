@@ -1,5 +1,5 @@
 Describe 'Grid' -Tag 'Grid' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
@@ -249,7 +249,7 @@ Describe 'Grid' -Tag 'Grid' {
 }
 
 Describe 'New-WPFGrid' -Tag 'New-WPFGrid' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

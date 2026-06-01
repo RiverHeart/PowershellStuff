@@ -1,5 +1,5 @@
 Describe 'ExtendStyle' -Tag 'ExtendStyle' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

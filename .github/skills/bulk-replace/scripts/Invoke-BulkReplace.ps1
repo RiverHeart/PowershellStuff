@@ -68,6 +68,14 @@ using namespace System.Text.RegularExpressions
 .PARAMETER SearchOnly
     Search for matching lines and return line-numbered hits without writing changes.
 
+.PARAMETER SearchMultiline
+    When used with -SearchOnly, searches the full file content and reports regex matches that
+    can span multiple lines. This mode is designed for structural patterns like full blocks.
+
+.PARAMETER LiteralReplacement
+    In regex replacement mode, treats the replacement text as a literal string. This disables
+    regex replacement token expansion such as $1 and ${name}.
+
 .EXAMPLE
     Search Only (compact output)
 
@@ -89,6 +97,19 @@ using namespace System.Text.RegularExpressions
         -Find "Describe 'BindProperty'" `
         -PassThru `
         -PassThruFormat Detailed
+
+.EXAMPLE
+    Search Only (multiline regex)
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Recurse `
+        -Include '*.Tests.ps1' `
+        -SearchOnly `
+        -SearchMultiline `
+        -Find "(?ms)^\s*BeforeAll\s*\{.*?^\s*\}" `
+        -UseRegex `
+        -PassThru
 
 .EXAMPLE
     Preview replacement with WhatIf
@@ -133,6 +154,17 @@ using namespace System.Text.RegularExpressions
         -WhatIf `
         -PassThru `
         -PassThruFormat Detailed
+
+.EXAMPLE
+    Regex replacement with literal replacement text
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Find '(?m)^\s*# TODO: .*' `
+        -Replace '# TODO: ${keep}' `
+        -UseRegex `
+        -LiteralReplacement `
+        -WhatIf
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 
@@ -165,6 +197,10 @@ param (
     [switch] $Recurse,
 
     [switch] $SearchOnly,
+
+    [switch] $SearchMultiline,
+
+    [switch] $LiteralReplacement,
 
     [switch] $PassThru,
 
@@ -413,6 +449,92 @@ function Get-BulkReplaceLineHit {
     return $hits
 }
 
+function Get-BulkReplaceMultilineHit {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string] $Content,
+
+        [Parameter(Mandatory)]
+        [pscustomobject] $Rule,
+
+        [Parameter(Mandatory)]
+        [string] $FilePath
+    )
+
+    $hits = [List[object]]::new()
+
+    if (-not $Rule.Regex) {
+        $comparison = if ($Rule.IgnoreCase) {
+            [System.StringComparison]::OrdinalIgnoreCase
+        } else {
+            [System.StringComparison]::Ordinal
+        }
+
+        $offset = 0
+        while ($offset -le $Content.Length) {
+            $matchIndex = $Content.IndexOf($Rule.Pattern, $offset, $comparison)
+            if ($matchIndex -lt 0) {
+                break
+            }
+
+            $matchedValue = $Rule.Pattern
+            $startLine = ([Regex]::Matches($Content.Substring(0, $matchIndex), '\r\n|\n|\r').Count) + 1
+            $endLine = ([Regex]::Matches($Content.Substring(0, $matchIndex + $matchedValue.Length), '\r\n|\n|\r').Count) + 1
+
+            $hits.Add([pscustomobject]@{
+                    FilePath        = $FilePath
+                    RuleName        = $Rule.Name
+                    Pattern         = $Rule.Pattern
+                    LineNumber      = $startLine
+                    StartLineNumber = $startLine
+                    EndLineNumber   = $endLine
+                    MatchText       = $matchedValue
+                })
+
+            if ($matchedValue.Length -eq 0) {
+                $offset = $matchIndex + 1
+            } else {
+                $offset = $matchIndex + $matchedValue.Length
+            }
+
+            if ($Rule.FirstOnly) {
+                break
+            }
+        }
+
+        return $hits
+    }
+
+    $regexOptions = [RegexOptions]::Multiline
+    if ($Rule.IgnoreCase) {
+        $regexOptions = $regexOptions -bor [RegexOptions]::IgnoreCase
+    }
+
+    $regex = [Regex]::new($Rule.Pattern, $regexOptions)
+    $matches = @($regex.Matches($Content))
+    if ($Rule.FirstOnly -and $matches.Count -gt 1) {
+        $matches = @($matches | Select-Object -First 1)
+    }
+
+    foreach ($match in $matches) {
+        $startLine = ([Regex]::Matches($Content.Substring(0, $match.Index), '\r\n|\n|\r').Count) + 1
+        $endLine = ([Regex]::Matches($Content.Substring(0, $match.Index + $match.Length), '\r\n|\n|\r').Count) + 1
+
+        $hits.Add([pscustomobject]@{
+                FilePath        = $FilePath
+                RuleName        = $Rule.Name
+                Pattern         = $Rule.Pattern
+                LineNumber      = $startLine
+                StartLineNumber = $startLine
+                EndLineNumber   = $endLine
+                MatchText       = $match.Value
+            })
+    }
+
+    return $hits
+}
+
 function Get-BulkReplaceLineDiff {
     [CmdletBinding()]
     [OutputType([object[]])]
@@ -517,7 +639,9 @@ function Invoke-BulkReplaceLiteral {
 
         [switch] $FirstOnly,
 
-        [switch] $IgnoreCase
+        [switch] $IgnoreCase,
+
+        [switch] $LiteralReplacement
     )
 
     $comparison = if ($IgnoreCase) {
@@ -587,7 +711,9 @@ function Invoke-BulkReplaceRegex {
 
         [switch] $FirstOnly,
 
-        [switch] $IgnoreCase
+        [switch] $IgnoreCase,
+
+        [switch] $LiteralReplacement
     )
 
     $options = [RegexOptions]::Multiline
@@ -598,10 +724,26 @@ function Invoke-BulkReplaceRegex {
     $regex = [Regex]::new($Pattern, $options)
     if ($FirstOnly) {
         $replacementCount = if ($regex.IsMatch($Content)) { 1 } else { 0 }
-        $updatedContent = $regex.Replace($Content, $Replacement, 1)
+        if ($LiteralReplacement) {
+            $updatedContent = $regex.Replace(
+                $Content,
+                [MatchEvaluator] { param($match) $Replacement },
+                1,
+                0
+            )
+        } else {
+            $updatedContent = $regex.Replace($Content, $Replacement, 1)
+        }
     } else {
         $replacementCount = $regex.Matches($Content).Count
-        $updatedContent = $regex.Replace($Content, $Replacement)
+        if ($LiteralReplacement) {
+            $updatedContent = $regex.Replace(
+                $Content,
+                [MatchEvaluator] { param($match) $Replacement }
+            )
+        } else {
+            $updatedContent = $regex.Replace($Content, $Replacement)
+        }
     }
 
     return [pscustomobject]@{
@@ -628,6 +770,10 @@ $normalizedRules = for ($index = 0; $index -lt $rawRules.Count; $index++) {
         -InputRule $rawRules[$index] `
         -Index ($index + 1) `
         -SearchOnly:$SearchOnly
+}
+
+if ($SearchMultiline -and -not $SearchOnly) {
+    throw '-SearchMultiline can only be used with -SearchOnly.'
 }
 
 if ($normalizedRules.Count -eq 0) {
@@ -665,7 +811,13 @@ foreach ($file in $targetFiles) {
                 continue
             }
 
-            foreach ($hit in @(Get-BulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)) {
+            $searchHitsForRule = if ($SearchMultiline) {
+                @(Get-BulkReplaceMultilineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)
+            } else {
+                @(Get-BulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)
+            }
+
+            foreach ($hit in $searchHitsForRule) {
                 if ($MaxMatchesPerFile -gt 0 -and $fileSearchHitCount -ge $MaxMatchesPerFile) {
                     break
                 }
@@ -695,6 +847,7 @@ foreach ($file in $targetFiles) {
             Replacement = $ruleItem.Replacement
             FirstOnly   = $ruleItem.FirstOnly
             IgnoreCase  = $ruleItem.IgnoreCase
+            LiteralReplacement = $LiteralReplacement
         }
 
         $result = if ($ruleItem.Regex) {
@@ -768,9 +921,9 @@ foreach ($file in $targetFiles) {
 
 if ($SearchOnly) {
     if ($searchHits.Count -eq 0) {
-        $statusMessage = 'No matching lines found.'
+        $statusMessage = 'No matches found.'
     } else {
-        $statusMessage = ("Found {0} matching line(s)." -f $searchHits.Count)
+        $statusMessage = ("Found {0} match(es)." -f $searchHits.Count)
     }
 } elseif ($previewFileCount -eq 0) {
     $statusMessage = 'No files required changes.'
@@ -801,11 +954,16 @@ if ($PassThru) {
                     Group-Object -Property FilePath, RuleName |
                     ForEach-Object {
                         $first = $_.Group | Select-Object -First 1
+                        $lineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
+                        $startLineNumbers = @($_.Group | Where-Object { $_.PSObject.Properties.Name -contains 'StartLineNumber' } | ForEach-Object { $_.StartLineNumber })
+                        $endLineNumbers = @($_.Group | Where-Object { $_.PSObject.Properties.Name -contains 'EndLineNumber' } | ForEach-Object { $_.EndLineNumber })
                         [pscustomobject]@{
                             FilePath    = $first.FilePath
                             RuleName    = $first.RuleName
                             MatchCount  = $_.Count
-                            LineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
+                            LineNumbers = $lineNumbers
+                            StartLineNumbers = if ($startLineNumbers.Count -gt 0) { $startLineNumbers } else { $lineNumbers }
+                            EndLineNumbers = if ($endLineNumbers.Count -gt 0) { $endLineNumbers } else { $lineNumbers }
                         }
                     }
             )

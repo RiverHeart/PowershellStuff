@@ -13,7 +13,7 @@ class TestWPFThrowingDisposable : System.IDisposable {
 }
 
 Describe 'TimedEvent' -Tag 'TimedEvent' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
