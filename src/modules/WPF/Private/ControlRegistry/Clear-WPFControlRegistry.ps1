@@ -38,6 +38,7 @@ function Clear-WPFControlRegistry {
                             try {
                                 $PendingPowerShell.Stop()
                             } catch {
+                                Write-Debug "Failed to stop pending PowerShell for timer '$ObjectName' in context '$ContextId': $($_.Exception.Message)"
                             }
 
                             $PendingPowerShell.Dispose()
@@ -47,6 +48,7 @@ function Clear-WPFControlRegistry {
                             try {
                                 $PendingRunspace.Close()
                             } catch {
+                                Write-Debug "Failed to close pending runspace for timer '$ObjectName' in context '$ContextId': $($_.Exception.Message)"
                             }
 
                             $PendingRunspace.Dispose()
