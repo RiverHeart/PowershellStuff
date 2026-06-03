@@ -3,7 +3,11 @@
   "TestSuites": [
     {
       "Name": "WPF",
-      "ConfigPath": "src/modules/WPF/Tests/pester.json"
+      "ConfigPath": "src/modules/WPF/pester.json"
+    },
+    {
+      "Name": "TestRunnerSkills",
+      "ConfigPath": ".github/skills/test-runner/tests/pester.json"
     }
   ]
 }

@@ -45,9 +45,10 @@
 .PARAMETER DetailedOutput
     Enables detailed Pester console output. By default, compact summary output is used.
 
-.PARAMETER IncludeCoverage
-    Runs coverage-enabled test execution.
-    Intended for completion checks and CI validation, not the default edit/test loop.
+.PARAMETER CoverageMode
+    Coverage execution mode.
+    - None: run tests without coverage (default).
+    - Full: run tests with configured coverage settings.
 
 .PARAMETER PassThru
     Returns the full Pester result object after printing the summary.
@@ -62,7 +63,7 @@
     ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -Tag DataGrid -PassThru
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -IncludeCoverage
+    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -CoverageMode Full
 
 .EXAMPLE
     ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -DetailedOutput
@@ -97,7 +98,8 @@ param (
     [switch] $ShowPassed,
     [switch] $DetailedOutput,
     [Parameter(ParameterSetName = 'Run')]
-    [switch] $IncludeCoverage,
+    [ValidateSet('None', 'Full')]
+    [string] $CoverageMode = 'None',
     [switch] $PassThru
 )
 
@@ -365,6 +367,78 @@ function Resolve-CoveragePath {
     return $resolvedCoveragePaths
 }
 
+function Resolve-CoverageOutputPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object] $SuiteConfig,
+
+        [Parameter(Mandatory)]
+        [string] $RepositoryRoot,
+
+        [Parameter(Mandatory)]
+        [string] $TestSuite
+    )
+
+    $resolvedOutputPath = $null
+    if (
+        ($SuiteConfig.Coverage.PSObject.Properties.Name -contains 'OutputPath') -and
+        -not [string]::IsNullOrWhiteSpace([string] $SuiteConfig.Coverage.OutputPath)
+    ) {
+        $configuredOutputPath = [string] $SuiteConfig.Coverage.OutputPath
+        if ([System.IO.Path]::IsPathRooted($configuredOutputPath)) {
+            $resolvedOutputPath = $configuredOutputPath
+        } else {
+            $resolvedOutputPath = Join-Path -Path $RepositoryRoot -ChildPath $configuredOutputPath
+        }
+    } else {
+        $defaultOutputDirectory = Join-Path -Path $RepositoryRoot -ChildPath 'artifacts/coverage'
+        $resolvedOutputPath = Join-Path -Path $defaultOutputDirectory -ChildPath ("{0}.coverage.xml" -f $TestSuite)
+    }
+
+    $outputDirectory = Split-Path -Path $resolvedOutputPath -Parent
+    if (-not [string]::IsNullOrWhiteSpace($outputDirectory) -and -not (Test-Path -Path $outputDirectory)) {
+        [void] (New-Item -Path $outputDirectory -ItemType Directory -Force)
+    }
+
+    return $resolvedOutputPath
+}
+
+function Get-JaCoCoLineCoverageSummary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $CoverageOutputPath
+    )
+
+    if (-not (Test-Path -Path $CoverageOutputPath)) {
+        return $null
+    }
+
+    try {
+        [xml] $coverageReport = Get-Content -Path $CoverageOutputPath -Raw -ErrorAction Stop
+        $lineCounter = @($coverageReport.report.counter | Where-Object { $_.type -eq 'LINE' } | Select-Object -First 1)
+        if ($lineCounter.Count -eq 0) {
+            return $null
+        }
+
+        $coveredLines = [int] $lineCounter[0].covered
+        $missedLines = [int] $lineCounter[0].missed
+        $totalLines = $coveredLines + $missedLines
+        $coveragePercent = if ($totalLines -eq 0) { 0 } else { [math]::Round(($coveredLines / $totalLines) * 100, 2) }
+
+        return [pscustomobject] @{
+            CoveredLines = $coveredLines
+            MissedLines = $missedLines
+            TotalLines = $totalLines
+            CoveragePercent = $coveragePercent
+        }
+    } catch {
+        return $null
+    }
+}
+
 $repoRoot = Get-RepositoryRoot -StartDirectories @((Get-Location).Path, $PSScriptRoot)
 if ($null -eq $repoRoot) {
     Write-Error 'Could not locate repository root. Add a pester.json file with isRoot=true or ensure .git exists.'
@@ -550,11 +624,15 @@ try {
         Write-Host ("Exclude Tags: {0}" -f (@($effectiveExcludeTags) -join ', '))
     }
 
-    if ($IncludeCoverage) {
+    if ($CoverageMode -eq 'Full') {
         $resolvedCoveragePaths = Resolve-CoveragePath -SuiteConfig $suiteConfig -SuiteBaseDirectory $suiteBaseDirectory -SuiteConfigPath $suiteConfigPath
+        $resolvedCoverageOutputPath = Resolve-CoverageOutputPath -SuiteConfig $suiteConfig -RepositoryRoot $repoRoot -TestSuite $TestSuite
 
         $configuration.CodeCoverage.Enabled = $true
         $configuration.CodeCoverage.Path = @($resolvedCoveragePaths)
+
+        # Default to non-breakpoint coverage unless suite config opts in.
+        $configuration.CodeCoverage.UseBreakpoints = $false
 
         if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'CoveragePercentTarget') {
             $configuration.CodeCoverage.CoveragePercentTarget = [double] $suiteConfig.Coverage.CoveragePercentTarget
@@ -564,9 +642,7 @@ try {
             $configuration.CodeCoverage.OutputFormat = [string] $suiteConfig.Coverage.OutputFormat
         }
 
-        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'OutputPath') {
-            $configuration.CodeCoverage.OutputPath = [string] $suiteConfig.Coverage.OutputPath
-        }
+        $configuration.CodeCoverage.OutputPath = $resolvedCoverageOutputPath
 
         if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'ExcludeTests') {
             $configuration.CodeCoverage.ExcludeTests = [bool] $suiteConfig.Coverage.ExcludeTests
@@ -587,12 +663,27 @@ try {
         Write-Host 'Coverage Path(s):'
         $resolvedCoveragePaths | ForEach-Object { Write-Host "  $_" }
 
+        Write-Host ("Coverage OutputPath: {0}" -f [string] $configuration.CodeCoverage.OutputPath.Value)
+
+        Write-Host ("Coverage UseBreakpoints: {0}" -f [bool] $configuration.CodeCoverage.UseBreakpoints)
+
         if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'CoveragePercentTarget') {
             Write-Host ("Coverage Target: {0}%" -f [double] $suiteConfig.Coverage.CoveragePercentTarget)
         }
 
         $result = Invoke-Pester -Configuration $configuration
         Write-TestRunSummary -Result $result -RunLabel 'Coverage Validation Run:' -ShowPassedTests:$ShowPassed
+
+        $coverageSummary = Get-JaCoCoLineCoverageSummary -CoverageOutputPath ([string] $configuration.CodeCoverage.OutputPath.Value)
+        if ($null -ne $coverageSummary) {
+            Write-Host (
+                "Coverage Actual: {0}% ({1}/{2} lines covered, {3} missed)" -f
+                $coverageSummary.CoveragePercent,
+                $coverageSummary.CoveredLines,
+                $coverageSummary.TotalLines,
+                $coverageSummary.MissedLines
+            )
+        }
     } else {
         $result = Invoke-Pester -Configuration $configuration
         Write-TestRunSummary -Result $result -RunLabel 'Test Run:' -ShowPassedTests:$ShowPassed

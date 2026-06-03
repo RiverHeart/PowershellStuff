@@ -2,7 +2,7 @@
   "TestSuite": "WPF",
   "Run": {
     "Path": [
-      "."
+      "Tests"
     ]
   },
   "Output": {
@@ -15,10 +15,10 @@
   "Coverage": {
     "Enabled": true,
     "Path": [
-      "../WPF.psm1",
-      "../Public",
-      "../Private",
-      "../TypeConverters"
+      "WPF.psm1",
+      "Public",
+      "Private",
+      "TypeConverters"
     ],
     "CoveragePercentTarget": 70,
     "OutputFormat": "JaCoCo",

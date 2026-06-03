@@ -325,7 +325,7 @@ Describe 'Chrome' -Tag 'Chrome' {
                         Chrome {
                             Setter CornerRadius 6
                         }
-                    }
+                    } -WarningAction Continue
                 } 3>&1)
             )
 

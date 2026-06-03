@@ -1,3 +1,5 @@
-coverage.xml
+artifacts/
+bin/
+
 kicker.ps1
 *.kicker.ps1

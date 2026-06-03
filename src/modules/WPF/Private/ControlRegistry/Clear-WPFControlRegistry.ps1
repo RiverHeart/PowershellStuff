@@ -7,9 +7,19 @@ function Clear-WPFControlRegistry {
     $State = Get-WPFControlRegistry
 
     # Dispose all IDisposable objects before clearing the registry
-    foreach ($ContextId in $State.Contexts.Keys) {
+    # Snapshot keys up front because disposing objects can indirectly mutate
+    # registry tables (for example via events) while we are clearing.
+    foreach ($ContextId in @($State.Contexts.Keys)) {
+        if (-not $State.Contexts.ContainsKey($ContextId)) {
+            continue
+        }
+
         $Context = $State.Contexts[$ContextId]
-        foreach ($ObjectName in $Context.Objects.Keys) {
+        foreach ($ObjectName in @($Context.Objects.Keys)) {
+            if (-not $Context.Objects.ContainsKey($ObjectName)) {
+                continue
+            }
+
             $Object = $Context.Objects[$ObjectName]
 
             if ($Object -is [System.Windows.Threading.DispatcherTimer]) {
