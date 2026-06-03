@@ -1,7 +1,10 @@
 Describe 'Set-WPFClipboard' -Tag 'Set-WPFClipboard' {
+    BeforeDiscovery {
+        Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
     BeforeAll {
         Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-        Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
 
         $Script:ModulePath = Join-Path $PSScriptRoot '../WPF.psd1'
         $Script:PowerShellPath = (Get-Process -Id $PID).Path

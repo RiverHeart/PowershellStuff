@@ -1,3 +1,7 @@
+using namespace System.Management.Automation.Language
+using namespace System.Windows.Controls
+using namespace System.Windows.Input
+
 <#
 .SYNOPSIS
     Keyword for defining a command on a WPF control.
@@ -129,11 +133,10 @@ function Command {
         # scanning the AST rather than executing the block. This avoids side-effects
         # (e.g. opening dialogs) for plain scriptblocks that have no sub-keywords.
         $SubKeywords = 'Execute', 'CanExecute', 'BoundTo'
-        $HasSubKeyword = [bool] $ScriptBlock.Ast.FindAll({
-            param($Node)
-            $Node -is [System.Management.Automation.Language.CommandAst] -and
-            $Node.GetCommandName() -in $SubKeywords
-        }, $false)
+        $HasSubKeyword =
+        Find-AstNode $ScriptBlock -Type CommandAst -All -Query {
+            $_.GetCommandName() -in $SubKeywords
+        }
 
         if (-not $HasSubKeyword) {
             $ExecuteSpec = [pscustomobject] @{
@@ -175,37 +178,37 @@ function Command {
             }
 
             $GestureStrings = @($GesturesOrScriptBlock)
-            $Converter = [System.Windows.Input.KeyGestureConverter]::new()
+            $Converter = [KeyGestureConverter]::new()
             $Window = Get-WPFRegisteredObject 'Window'
             foreach ($GestureStr in $GestureStrings) {
-                $Gesture = [System.Windows.Input.KeyGesture] $Converter.ConvertFromString($GestureStr)
+                $Gesture = [KeyGesture] $Converter.ConvertFromString($GestureStr)
                 $Window.InputBindings.Add(
-                    [System.Windows.Input.KeyBinding]::new($Command, $Gesture)
+                    [KeyBinding]::new($Command, $Gesture)
                 ) | Out-Null
             }
 
-            if ($Parent -is [System.Windows.Controls.MenuItem] -and $GestureStrings.Count -gt 0) {
+            if ($Parent -is [MenuItem] -and $GestureStrings.Count -gt 0) {
                 $Parent.InputGestureText = [string] $GestureStrings[0]
             }
 
         } elseif ($BoundToTarget) {
             # --- Routed / Application command path ---
-            $AppProperty = [System.Windows.Input.ApplicationCommands].GetProperty($Name)
+            $AppProperty = [ApplicationCommands].GetProperty($Name)
             $GestureStrings = @($GesturesOrScriptBlock)
-            $InputGestures = [System.Windows.Input.InputGestureCollection]::new()
+            $InputGestures = [InputGestureCollection]::new()
             if ($GesturesOrScriptBlock) {
-                $Converter = [System.Windows.Input.KeyGestureConverter]::new()
+                $Converter = [KeyGestureConverter]::new()
                 foreach ($Item in $GestureStrings) {
                     [void] $InputGestures.Add(
-                        [System.Windows.Input.InputGesture] $Converter.ConvertFromString($Item)
+                        [InputGesture] $Converter.ConvertFromString($Item)
                     )
                 }
             }
 
             $Command = if ($AppProperty) {
-                $AppCommand = [System.Windows.Input.RoutedUICommand] $AppProperty.GetValue($null, $null)
+                $AppCommand = [RoutedUICommand] $AppProperty.GetValue($null, $null)
                 if ($InputGestures.Count -gt 0) {
-                    [System.Windows.Input.RoutedUICommand]::new(
+                    [RoutedUICommand]::new(
                         <# Text          #> $AppCommand.Text,
                         <# Name          #> $AppCommand.Name,
                         <# OwnerType     #> $AppCommand.OwnerType,
@@ -219,7 +222,7 @@ function Command {
                     throw "Command '$Name' is not a built-in ApplicationCommand. Provide at least one keyboard gesture."
                 }
 
-                [System.Windows.Input.RoutedUICommand]::new(
+                [RoutedUICommand]::new(
                     <# Text          #> $Name,
                     <# Name          #> $Name,
                     <# OwnerType     #> $Parent.GetType(),
@@ -227,7 +230,7 @@ function Command {
                 )
             }
 
-            if ($Parent -is [System.Windows.Controls.MenuItem] -and $GestureStrings.Count -gt 0) {
+            if ($Parent -is [MenuItem] -and $GestureStrings.Count -gt 0) {
                 $Parent.InputGestureText = [string] $GestureStrings[0]
             }
 
@@ -237,7 +240,7 @@ function Command {
 
             $BindingTarget = Get-WPFRegisteredObject $BoundToTarget
             $BindingTarget.CommandBindings.Add(
-                [System.Windows.Input.CommandBinding]::new($Command, $ExecuteSpec.ScriptBlock)
+                [CommandBinding]::new($Command, $ExecuteSpec.ScriptBlock)
             ) | Out-Null
 
         } else {

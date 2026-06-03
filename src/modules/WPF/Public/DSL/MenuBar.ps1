@@ -39,9 +39,7 @@ function MenuBar {
         [string] $Name,
 
         [Parameter(Mandatory)]
-        [ScriptBlock] $ScriptBlock,
-
-        [switch] $NoAutoAttach
+        [ScriptBlock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
@@ -61,18 +59,19 @@ function MenuBar {
 
     # Auto-attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    $WasAutoAttached = $False
-    if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
+    $IsParentedBefore = [bool] $WPFObject.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Menu)"
         Update-WPFObject $Parent $WPFObject
-        $WasAutoAttached = $True
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
     Write-Debug "Processing child elements for $Name (Menu)"
     Update-WPFObject $WPFObject $ScriptBlock
 
-    if (-not $WasAutoAttached) {
+    $IsParentedAfter = [bool] $WPFObject.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
         return $WPFObject
     }
 }

@@ -1,5 +1,5 @@
 Describe 'Grid' -Tag 'Grid' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
@@ -130,6 +130,58 @@ Describe 'Grid' -Tag 'Grid' {
         $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 4
     }
 
+    It 'Should place Border children in their declared grid columns' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "GridBorder_$Id" {
+            Row {
+                Column {
+                    Border "LeftBorder_$Id" {
+                        Label "LeftLabel_$Id" {}
+                    }
+                }
+                Column {
+                    Border "RightBorder_$Id" {
+                        Label "RightLabel_$Id" {}
+                    }
+                }
+            }
+        }
+
+        $LeftBorder = Reference "LeftBorder_$Id"
+        $RightBorder = Reference "RightBorder_$Id"
+
+        [System.Windows.Controls.Grid]::GetRow($LeftBorder) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($LeftBorder) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetRow($RightBorder) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($RightBorder) | Should -Be 1
+    }
+
+    It 'Should place TextBox children in their declared grid columns' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Grid = Grid "GridTextBox_$Id" {
+            Row {
+                Column {
+                    TextBox "LeftTextBox_$Id" {
+                        $this.Text = 'Left'
+                    }
+                }
+                Column {
+                    TextBox "RightTextBox_$Id" {
+                        $this.Text = 'Right'
+                    }
+                }
+            }
+        }
+
+        $LeftTextBox = Reference "LeftTextBox_$Id"
+        $RightTextBox = Reference "RightTextBox_$Id"
+
+        [System.Windows.Controls.Grid]::GetRow($LeftTextBox) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($LeftTextBox) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetRow($RightTextBox) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($RightTextBox) | Should -Be 1
+    }
+
     It 'Should honor explicit row and column sizes from first declaration' {
         $Id = [guid]::NewGuid().ToString('N')
         $Grid = Grid "Grid_$Id" {
@@ -197,7 +249,7 @@ Describe 'Grid' -Tag 'Grid' {
 }
 
 Describe 'New-WPFGrid' -Tag 'New-WPFGrid' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

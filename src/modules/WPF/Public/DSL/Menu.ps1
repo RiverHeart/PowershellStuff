@@ -59,7 +59,8 @@ function Menu {
 
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $Menu.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Menu)"
         Update-WPFObject $Parent $Menu
     }
@@ -68,7 +69,10 @@ function Menu {
     Write-Debug "Processing child elements for $Name (Menu)"
     Update-WPFObject $Menu $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $Menu
+    $IsParentedAfter = [bool] $Menu.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $Menu
+    }
 }
 

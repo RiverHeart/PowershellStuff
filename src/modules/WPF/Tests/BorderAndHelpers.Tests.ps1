@@ -1,6 +1,9 @@
 Describe 'Border DSL' -Tag 'Border' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 
@@ -54,11 +57,31 @@ Describe 'Border DSL' -Tag 'Border' {
 
         $Parent.Content | Should -BeNullOrEmpty
     }
+
+    It 'Should return border object when grid child-collection context is active' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $Parent = [System.Windows.Controls.Grid]::new()
+        $PSVars = New-WPFVariableList -InputObject $Parent
+
+        $Result = {
+            Border "Border_$Id" {
+                $this.Padding = 2
+            }
+        }.InvokeWithContext($null, $PSVars)
+
+        @($Result).Count | Should -Be 1
+        @($Result)[0] | Should -BeOfType [System.Windows.Controls.Border]
+        @($Result)[0].Name | Should -Be "Border_$Id"
+        $Parent.Children | Should -HaveCount 1
+    }
 }
 
 Describe 'Find-WPFChildNode' -Tag 'Find-WPFChildNode' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 
@@ -111,8 +134,11 @@ Describe 'Find-WPFChildNode' -Tag 'Find-WPFChildNode' {
 }
 
 Describe 'When' -Tag 'When' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 
@@ -135,8 +161,11 @@ Describe 'When' -Tag 'When' {
 }
 
 Describe 'Set-WPFWindowFullScreen' -Tag 'Set-WPFWindowFullScreen' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 

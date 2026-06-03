@@ -13,4 +13,11 @@ This repository contains a collection of PowerShell modules and scripts for vari
 
 # Skills
 
-- `.github/skills/test-runner`: A skill for discovering, listing, and running tests across the repository, including Pester suite discovery, tag discovery, and execution. Before any test execution, load this skill and follow its workflow, using `./.github/skills/test-runner/scripts/Invoke-Test.ps1` as the default test entrypoint.
+- `.github/skills/pwsh-test-runner`: A skill for discovering, listing, and running tests across the repository, including Pester suite discovery, tag discovery, and execution. Before any test execution, load this skill and follow its workflow, using `./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1` as the default test entrypoint.
+
+# Test Execution Order
+
+- Always run targeted tests first for files changed in the current task.
+- If there are known failing tests from a previous run, re-run those failures first.
+- Run the full suite only after targeted tests and previously failing tests pass.
+- If full suite execution is required by mode instructions, keep that as the final validation step, not the first step.

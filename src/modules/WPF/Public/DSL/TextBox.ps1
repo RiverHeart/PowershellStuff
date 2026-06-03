@@ -41,7 +41,8 @@ function TextBox {
 
     # Attach to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $HadParentBeforeAttach = [bool] $TextBox.Parent
+    if ($Parent -and -not $HadParentBeforeAttach) {
         Write-Debug "Beginning auto-attach for $Name (TextBox)"
         Update-WPFObject $Parent $TextBox
     }
@@ -50,6 +51,10 @@ function TextBox {
     Write-Debug "Processing child elements for $Name (TextBox)"
     Update-WPFObject $TextBox $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $TextBox
+    $IsParented = [bool] $TextBox.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+
+    if ($IsCollectingChildren -or -not $IsParented) {
+        return $TextBox
+    }
 }

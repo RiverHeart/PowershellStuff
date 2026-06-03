@@ -55,8 +55,26 @@ using namespace System.Text.RegularExpressions
 .PARAMETER PassThruFormat
     Selects pass-through verbosity. Summary returns compact objects. Detailed includes line-level changes.
 
+.PARAMETER OnlyChanged
+    When true, pass-through results include only files that changed or would change.
+
+.PARAMETER MaxMatchesPerFile
+    Caps the number of line-level matches emitted per file for preview-oriented outputs.
+    Use 0 for no cap.
+
+.PARAMETER IncludeSummaryObject
+    When set with -PassThru, emits a compact run-level summary object before file-level rows.
+
 .PARAMETER SearchOnly
     Search for matching lines and return line-numbered hits without writing changes.
+
+.PARAMETER SearchMultiline
+    When used with -SearchOnly, searches the full file content and reports regex matches that
+    can span multiple lines. This mode is designed for structural patterns like full blocks.
+
+.PARAMETER LiteralReplacement
+    In regex replacement mode, treats the replacement text as a literal string. This disables
+    regex replacement token expansion such as $1 and ${name}.
 
 .EXAMPLE
     Search Only (compact output)
@@ -79,6 +97,19 @@ using namespace System.Text.RegularExpressions
         -Find "Describe 'BindProperty'" `
         -PassThru `
         -PassThruFormat Detailed
+
+.EXAMPLE
+    Search Only (multiline regex)
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Recurse `
+        -Include '*.Tests.ps1' `
+        -SearchOnly `
+        -SearchMultiline `
+        -Find "(?ms)^\s*BeforeAll\s*\{.*?^\s*\}" `
+        -UseRegex `
+        -PassThru
 
 .EXAMPLE
     Preview replacement with WhatIf
@@ -123,6 +154,17 @@ using namespace System.Text.RegularExpressions
         -WhatIf `
         -PassThru `
         -PassThruFormat Detailed
+
+.EXAMPLE
+    Regex replacement with literal replacement text
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src/modules/WPF/Tests' `
+        -Find '(?m)^\s*# TODO: .*' `
+        -Replace '# TODO: ${keep}' `
+        -UseRegex `
+        -LiteralReplacement `
+        -WhatIf
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 
@@ -156,7 +198,18 @@ param (
 
     [switch] $SearchOnly,
 
+    [switch] $SearchMultiline,
+
+    [switch] $LiteralReplacement,
+
     [switch] $PassThru,
+
+    [bool] $OnlyChanged = $true,
+
+    [ValidateRange(0, [int]::MaxValue)]
+    [int] $MaxMatchesPerFile = 0,
+
+    [switch] $IncludeSummaryObject,
 
     [ValidateSet('Summary', 'Detailed')]
     [string] $PassThruFormat = 'Summary'
@@ -396,6 +449,92 @@ function Get-BulkReplaceLineHit {
     return $hits
 }
 
+function Get-BulkReplaceMultilineHit {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string] $Content,
+
+        [Parameter(Mandatory)]
+        [pscustomobject] $Rule,
+
+        [Parameter(Mandatory)]
+        [string] $FilePath
+    )
+
+    $hits = [List[object]]::new()
+
+    if (-not $Rule.Regex) {
+        $comparison = if ($Rule.IgnoreCase) {
+            [System.StringComparison]::OrdinalIgnoreCase
+        } else {
+            [System.StringComparison]::Ordinal
+        }
+
+        $offset = 0
+        while ($offset -le $Content.Length) {
+            $matchIndex = $Content.IndexOf($Rule.Pattern, $offset, $comparison)
+            if ($matchIndex -lt 0) {
+                break
+            }
+
+            $matchedValue = $Rule.Pattern
+            $startLine = ([Regex]::Matches($Content.Substring(0, $matchIndex), '\r\n|\n|\r').Count) + 1
+            $endLine = ([Regex]::Matches($Content.Substring(0, $matchIndex + $matchedValue.Length), '\r\n|\n|\r').Count) + 1
+
+            $hits.Add([pscustomobject]@{
+                    FilePath        = $FilePath
+                    RuleName        = $Rule.Name
+                    Pattern         = $Rule.Pattern
+                    LineNumber      = $startLine
+                    StartLineNumber = $startLine
+                    EndLineNumber   = $endLine
+                    MatchText       = $matchedValue
+                })
+
+            if ($matchedValue.Length -eq 0) {
+                $offset = $matchIndex + 1
+            } else {
+                $offset = $matchIndex + $matchedValue.Length
+            }
+
+            if ($Rule.FirstOnly) {
+                break
+            }
+        }
+
+        return $hits
+    }
+
+    $regexOptions = [RegexOptions]::Multiline
+    if ($Rule.IgnoreCase) {
+        $regexOptions = $regexOptions -bor [RegexOptions]::IgnoreCase
+    }
+
+    $regex = [Regex]::new($Rule.Pattern, $regexOptions)
+    $matches = @($regex.Matches($Content))
+    if ($Rule.FirstOnly -and $matches.Count -gt 1) {
+        $matches = @($matches | Select-Object -First 1)
+    }
+
+    foreach ($match in $matches) {
+        $startLine = ([Regex]::Matches($Content.Substring(0, $match.Index), '\r\n|\n|\r').Count) + 1
+        $endLine = ([Regex]::Matches($Content.Substring(0, $match.Index + $match.Length), '\r\n|\n|\r').Count) + 1
+
+        $hits.Add([pscustomobject]@{
+                FilePath        = $FilePath
+                RuleName        = $Rule.Name
+                Pattern         = $Rule.Pattern
+                LineNumber      = $startLine
+                StartLineNumber = $startLine
+                EndLineNumber   = $endLine
+                MatchText       = $match.Value
+            })
+    }
+
+    return $hits
+}
+
 function Get-BulkReplaceLineDiff {
     [CmdletBinding()]
     [OutputType([object[]])]
@@ -500,7 +639,9 @@ function Invoke-BulkReplaceLiteral {
 
         [switch] $FirstOnly,
 
-        [switch] $IgnoreCase
+        [switch] $IgnoreCase,
+
+        [switch] $LiteralReplacement
     )
 
     $comparison = if ($IgnoreCase) {
@@ -570,7 +711,9 @@ function Invoke-BulkReplaceRegex {
 
         [switch] $FirstOnly,
 
-        [switch] $IgnoreCase
+        [switch] $IgnoreCase,
+
+        [switch] $LiteralReplacement
     )
 
     $options = [RegexOptions]::Multiline
@@ -581,10 +724,26 @@ function Invoke-BulkReplaceRegex {
     $regex = [Regex]::new($Pattern, $options)
     if ($FirstOnly) {
         $replacementCount = if ($regex.IsMatch($Content)) { 1 } else { 0 }
-        $updatedContent = $regex.Replace($Content, $Replacement, 1)
+        if ($LiteralReplacement) {
+            $updatedContent = $regex.Replace(
+                $Content,
+                [MatchEvaluator] { param($match) $Replacement },
+                1,
+                0
+            )
+        } else {
+            $updatedContent = $regex.Replace($Content, $Replacement, 1)
+        }
     } else {
         $replacementCount = $regex.Matches($Content).Count
-        $updatedContent = $regex.Replace($Content, $Replacement)
+        if ($LiteralReplacement) {
+            $updatedContent = $regex.Replace(
+                $Content,
+                [MatchEvaluator] { param($match) $Replacement }
+            )
+        } else {
+            $updatedContent = $regex.Replace($Content, $Replacement)
+        }
     }
 
     return [pscustomobject]@{
@@ -613,6 +772,10 @@ $normalizedRules = for ($index = 0; $index -lt $rawRules.Count; $index++) {
         -SearchOnly:$SearchOnly
 }
 
+if ($SearchMultiline -and -not $SearchOnly) {
+    throw '-SearchMultiline can only be used with -SearchOnly.'
+}
+
 if ($normalizedRules.Count -eq 0) {
     throw 'No valid replacement rules were supplied.'
 }
@@ -631,6 +794,7 @@ $searchHits = [List[object]]::new()
 $totalReplacementCount = 0
 $changedFileCount = 0
 $previewFileCount = 0
+$statusMessage = $null
 
 foreach ($file in $targetFiles) {
     $currentContent = [System.IO.File]::ReadAllText($file.FullName)
@@ -640,13 +804,30 @@ foreach ($file in $targetFiles) {
     $fileChanges = [List[object]]::new()
 
     if ($SearchOnly) {
+        $fileSearchHitCount = 0
+
         foreach ($ruleItem in $normalizedRules) {
             if (-not (Test-BulkReplaceFilePattern -FilePath $file.FullName -FilePattern $ruleItem.FilePattern)) {
                 continue
             }
 
-            foreach ($hit in @(Get-BulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)) {
+            $searchHitsForRule = if ($SearchMultiline) {
+                @(Get-BulkReplaceMultilineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)
+            } else {
+                @(Get-BulkReplaceLineHit -Content $currentContent -Rule $ruleItem -FilePath $file.FullName)
+            }
+
+            foreach ($hit in $searchHitsForRule) {
+                if ($MaxMatchesPerFile -gt 0 -and $fileSearchHitCount -ge $MaxMatchesPerFile) {
+                    break
+                }
+
                 $searchHits.Add($hit)
+                $fileSearchHitCount++
+            }
+
+            if ($MaxMatchesPerFile -gt 0 -and $fileSearchHitCount -ge $MaxMatchesPerFile) {
+                break
             }
         }
 
@@ -666,6 +847,7 @@ foreach ($file in $targetFiles) {
             Replacement = $ruleItem.Replacement
             FirstOnly   = $ruleItem.FirstOnly
             IgnoreCase  = $ruleItem.IgnoreCase
+            LiteralReplacement = $LiteralReplacement
         }
 
         $result = if ($ruleItem.Regex) {
@@ -712,12 +894,17 @@ foreach ($file in $targetFiles) {
     }
 
     $lineNumbers = @()
-    foreach ($change in $fileChanges) {
+    $changesForReport = @($fileChanges)
+    if ($MaxMatchesPerFile -gt 0 -and $changesForReport.Count -gt $MaxMatchesPerFile) {
+        $changesForReport = @($changesForReport | Select-Object -First $MaxMatchesPerFile)
+    }
+
+    foreach ($change in $changesForReport) {
         $lineNumbers += $change.LineNumber
     }
 
     $changeReports = @()
-    foreach ($change in $fileChanges) {
+    foreach ($change in $changesForReport) {
         $changeReports += $change
     }
 
@@ -734,60 +921,109 @@ foreach ($file in $targetFiles) {
 
 if ($SearchOnly) {
     if ($searchHits.Count -eq 0) {
-        Write-Host 'No matching lines found.'
+        $statusMessage = 'No matches found.'
     } else {
-        Write-Host ("Found {0} matching line(s)." -f $searchHits.Count)
+        $statusMessage = ("Found {0} match(es)." -f $searchHits.Count)
     }
 } elseif ($previewFileCount -eq 0) {
-    Write-Host 'No files required changes.'
+    $statusMessage = 'No files required changes.'
 } elseif ($changedFileCount -gt 0) {
-    Write-Host ("Updated {0} file(s) with {1} replacement(s)." -f $changedFileCount, $totalReplacementCount)
+    $statusMessage = ("Updated {0} file(s) with {1} replacement(s)." -f $changedFileCount, $totalReplacementCount)
 } else {
-    Write-Host ("Previewed {0} file(s); {1} replacement(s) would be applied." -f $previewFileCount, ($reports | Measure-Object -Property ReplacementCount -Sum).Sum)
+    $statusMessage = ("Previewed {0} file(s); {1} replacement(s) would be applied." -f $previewFileCount, ($reports | Measure-Object -Property ReplacementCount -Sum).Sum)
 }
 
 if ($PassThru) {
     if ($SearchOnly) {
+        if ($IncludeSummaryObject) {
+            $matchedFileCount = @($searchHits | Select-Object -ExpandProperty FilePath -Unique).Count
+            Write-Output ([pscustomobject]@{
+                    RecordType      = 'RunSummary'
+                    Mode            = 'SearchOnly'
+                    ScannedFileCount = $targetFiles.Count
+                    MatchedFileCount = $matchedFileCount
+                    MatchCount      = $searchHits.Count
+                })
+        }
+
         if ($PassThruFormat -eq 'Detailed') {
             Write-Output ($searchHits.ToArray()) -NoEnumerate
-            return
+        } else {
+            $summarySearchHits = @(
+                $searchHits |
+                    Group-Object -Property FilePath, RuleName |
+                    ForEach-Object {
+                        $first = $_.Group | Select-Object -First 1
+                        $lineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
+                        $startLineNumbers = @($_.Group | Where-Object { $_.PSObject.Properties.Name -contains 'StartLineNumber' } | ForEach-Object { $_.StartLineNumber })
+                        $endLineNumbers = @($_.Group | Where-Object { $_.PSObject.Properties.Name -contains 'EndLineNumber' } | ForEach-Object { $_.EndLineNumber })
+                        [pscustomobject]@{
+                            FilePath    = $first.FilePath
+                            RuleName    = $first.RuleName
+                            MatchCount  = $_.Count
+                            LineNumbers = $lineNumbers
+                            StartLineNumbers = if ($startLineNumbers.Count -gt 0) { $startLineNumbers } else { $lineNumbers }
+                            EndLineNumbers = if ($endLineNumbers.Count -gt 0) { $endLineNumbers } else { $lineNumbers }
+                        }
+                    }
+            )
+
+            Write-Output $summarySearchHits -NoEnumerate
+        }
+    } elseif ($PassThruFormat -eq 'Detailed') {
+        if ($IncludeSummaryObject) {
+            $wouldReplacementCount = ($reports | Measure-Object -Property ReplacementCount -Sum).Sum
+            Write-Output ([pscustomobject]@{
+                    RecordType           = 'RunSummary'
+                    Mode                 = 'Replace'
+                    ScannedFileCount     = $targetFiles.Count
+                    ReportedFileCount    = $reports.Count
+                    WouldChangeFileCount = $previewFileCount
+                    ChangedFileCount     = $changedFileCount
+                    ReplacementCount     = if ($null -eq $wouldReplacementCount) { 0 } else { [int] $wouldReplacementCount }
+                })
         }
 
-        $summarySearchHits = @(
-            $searchHits |
-                Group-Object -Property FilePath, RuleName |
-                ForEach-Object {
-                    $first = $_.Group | Select-Object -First 1
-                    [pscustomobject]@{
-                        FilePath    = $first.FilePath
-                        RuleName    = $first.RuleName
-                        MatchCount  = $_.Count
-                        LineNumbers = @($_.Group | ForEach-Object { $_.LineNumber })
-                    }
+        $detailedReports = @($reports)
+        if ($OnlyChanged) {
+            $detailedReports = @($detailedReports | Where-Object { $_.Changed -or $_.WouldChange })
+        }
+
+        Write-Output $detailedReports -NoEnumerate
+    } else {
+        if ($IncludeSummaryObject) {
+            $wouldReplacementCount = ($reports | Measure-Object -Property ReplacementCount -Sum).Sum
+            Write-Output ([pscustomobject]@{
+                    RecordType           = 'RunSummary'
+                    Mode                 = 'Replace'
+                    ScannedFileCount     = $targetFiles.Count
+                    ReportedFileCount    = $reports.Count
+                    WouldChangeFileCount = $previewFileCount
+                    ChangedFileCount     = $changedFileCount
+                    ReplacementCount     = if ($null -eq $wouldReplacementCount) { 0 } else { [int] $wouldReplacementCount }
+                })
+        }
+
+        $summaryReports = @(
+            $reports | ForEach-Object {
+                [pscustomobject]@{
+                    Path             = $_.Path
+                    Changed          = $_.Changed
+                    WouldChange      = $_.WouldChange
+                    ReplacementCount = $_.ReplacementCount
+                    AppliedRuleCount = @($_.AppliedRules).Count
                 }
+            }
         )
 
-        Write-Output $summarySearchHits -NoEnumerate
-        return
-    }
-
-    if ($PassThruFormat -eq 'Detailed') {
-        Write-Output ($reports.ToArray()) -NoEnumerate
-        return
-    }
-
-    $summaryReports = @(
-        $reports | ForEach-Object {
-            [pscustomobject]@{
-                Path             = $_.Path
-                Changed          = $_.Changed
-                WouldChange      = $_.WouldChange
-                ReplacementCount = $_.ReplacementCount
-                AppliedRuleCount = @($_.AppliedRules).Count
-            }
+        if ($OnlyChanged) {
+            $summaryReports = @($summaryReports | Where-Object { $_.Changed -or $_.WouldChange })
         }
-    )
 
-    Write-Output $summaryReports -NoEnumerate
-    return
+        Write-Output $summaryReports -NoEnumerate
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($statusMessage)) {
+    Write-Host $statusMessage
 }

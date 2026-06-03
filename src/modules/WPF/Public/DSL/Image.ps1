@@ -40,7 +40,8 @@ function Image {
 
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $Image.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Image)"
         Update-WPFObject $Parent $Image
     }
@@ -49,6 +50,9 @@ function Image {
     Write-Debug "Processing child elements for $Name (Image)"
     Update-WPFObject $Image $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $Image
+    $IsParentedAfter = [bool] $Image.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $Image
+    }
 }

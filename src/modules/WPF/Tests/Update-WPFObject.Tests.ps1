@@ -1,6 +1,9 @@
 Describe 'Update-WPFObject strict unexpected child mode' -Tag 'Update-WPFObject' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force -ErrorAction Stop
+    }
+
+    BeforeAll {
         $script:OriginalStrictValue = [Environment]::GetEnvironmentVariable('WPF_STRICT_UNEXPECTED_CHILD')
     }
 

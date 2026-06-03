@@ -30,6 +30,7 @@ Window 'Window' {
         # Add app state fields here.
         CurrentView = 'Home'
         IsDirty = $false
+        SelectedProcess = $null
         TotalCpuPercent = 0
         TotalMemoryPercent = 0
     }
@@ -70,6 +71,10 @@ Window 'Window' {
                     $this.CanUserResizeRows = $false
                     $this.ColumnHeaderHeight = 60
 
+                    BindProperty SelectedItem SelectedProcess -Source (Reference 'Window').Tag -ScriptBlock {
+                        $this.Mode = [System.Windows.Data.BindingMode]::TwoWay
+                    }
+
                     When Sorting {
                         param($sender, $event)
 
@@ -78,6 +83,10 @@ Window 'Window' {
                             $event.Column.SortDirection = 'Ascending'
                             # Allow default handler to toggle it to descending so sorting still happens.
                         }
+                    }
+
+                    When SelectionChanged {
+                        Invoke-TaskManagerRefreshStopProcessCommand
                     }
 
                     $ProcessItems = [ObservableCollection[object]]::new()
@@ -128,111 +137,113 @@ Window 'Window' {
                     $LastSampleTime = Get-Date
 
                     # Run background process sampling async to keep UI responsive
-                    TimedEvent 'ProcessRefresh' 3000 `
-                      -Work {
-                          # Background thread: expensive operation
-                          $processData = Get-Process | ForEach-Object {
-                              @{
-                                  Name = $_.ProcessName
-                                  Id = $_.Id
-                                  CpuTime = [double] $_.TotalProcessorTime.TotalSeconds
-                                  Memory = $_.WorkingSet64
-                              }
-                          }
+                    TimedEvent 'ProcessRefresh' 3000 {
+                        Work {
+                            # Background thread: expensive operation
+                            $processData = Get-Process | ForEach-Object {
+                                @{
+                                    Name = $_.ProcessName
+                                    Id = $_.Id
+                                    CpuTime = [double] $_.TotalProcessorTime.TotalSeconds
+                                    Memory = $_.WorkingSet64
+                                }
+                            }
 
-                          $osMemory = Get-CimInstance -ClassName Win32_OperatingSystem
-                          $totalVisibleMemoryMB = [double]([Math]::Max(1, [double]$osMemory.TotalVisibleMemorySize / 1KB))
-                          $usedPhysicalMemoryMB = [double]([Math]::Max(0, $totalVisibleMemoryMB - ([double]$osMemory.FreePhysicalMemory / 1KB)))
+                            $osMemory = Get-CimInstance -ClassName Win32_OperatingSystem
+                            $totalVisibleMemoryMB = [double]([Math]::Max(1, [double]$osMemory.TotalVisibleMemorySize / 1KB))
+                            $usedPhysicalMemoryMB = [double]([Math]::Max(0, $totalVisibleMemoryMB - ([double]$osMemory.FreePhysicalMemory / 1KB)))
 
-                          [pscustomobject] @{
-                              ProcessData = $processData
-                              TotalVisibleMemoryMB = $totalVisibleMemoryMB
-                              UsedPhysicalMemoryMB = $usedPhysicalMemoryMB
-                          }
-                      } `
-                      -OnComplete {
-                          param($RefreshData, $TimerSender)
-                          # UI thread: update controls with results
-                          if ($null -eq $RefreshData) { return }
-                          if ($null -eq $TimerSender) { return }
+                            [pscustomobject] @{
+                                ProcessData = $processData
+                                TotalVisibleMemoryMB = $totalVisibleMemoryMB
+                                UsedPhysicalMemoryMB = $usedPhysicalMemoryMB
+                            }
+                        }
 
-                          $ProcessData = $RefreshData.ProcessData
-                          if ($null -eq $ProcessData) { return }
+                        OnComplete {
+                            param($RefreshData, $TimerSender)
+                            # UI thread: update controls with results
+                            if ($null -eq $RefreshData) { return }
+                            if ($null -eq $TimerSender) { return }
 
-                          $TimerState = $TimerSender.Tag
-                          if ($null -eq $TimerState) { return }
+                            $ProcessData = $RefreshData.ProcessData
+                            if ($null -eq $ProcessData) { return }
 
-                          $CurrentSampleTime = Get-Date
-                          $ElapsedSeconds = [Math]::Max(0.001, ($CurrentSampleTime - $TimerState.LastSampleTime).TotalSeconds)
-                          $CoreCount = $TimerState.CpuCoreCount
-                          $CpuSamples = $TimerState.CpuSamples
-                          $ProcessItems = $TimerState.Items
+                            $TimerState = $TimerSender.Tag
+                            if ($null -eq $TimerState) { return }
 
-                          # Preserve selection
-                          $ProcessList = Reference 'ProcessList'
-                          $SelectedProcess = $ProcessList.SelectedItem
-                          $SelectedProcessId = if ($null -ne $SelectedProcess) { $SelectedProcess.Id } else { $null }
+                            $CurrentSampleTime = Get-Date
+                            $ElapsedSeconds = [Math]::Max(0.001, ($CurrentSampleTime - $TimerState.LastSampleTime).TotalSeconds)
+                            $CoreCount = $TimerState.CpuCoreCount
+                            $CpuSamples = $TimerState.CpuSamples
+                            $ProcessItems = $TimerState.Items
 
-                          $ProcessItems.Clear()
-                          foreach ($Process in $ProcessData) {
-                              $CurrentCpu = [double] $Process.CpuTime
-                              $PreviousCpu = $null
-                              if ($CpuSamples.ContainsKey($Process.Id)) {
-                                  $PreviousCpu = [double] $CpuSamples[$Process.Id]
-                              }
+                            # Preserve selection
+                            $ProcessList = Reference 'ProcessList'
+                            $SelectedProcess = $ProcessList.SelectedItem
+                            $SelectedProcessId = if ($null -ne $SelectedProcess) { $SelectedProcess.Id } else { $null }
 
-                              $CpuPercent = if ($null -ne $PreviousCpu) {
-                                  [double] ([Math]::Round([Math]::Max(0, (($CurrentCpu - $PreviousCpu) / $ElapsedSeconds) * 100 / $CoreCount), 1))
-                              } else {
-                                  [double] 0
-                              }
+                            $ProcessItems.Clear()
+                            foreach ($Process in $ProcessData) {
+                                $CurrentCpu = [double] $Process.CpuTime
+                                $PreviousCpu = $null
+                                if ($CpuSamples.ContainsKey($Process.Id)) {
+                                    $PreviousCpu = [double] $CpuSamples[$Process.Id]
+                                }
 
-                              $ProcessItems.Add([pscustomobject] @{
-                                  Name = $Process.Name
-                                  Id = $Process.Id
-                                  CpuPercent = $CpuPercent
-                                  MemoryMB = [Math]::Round([double] $Process.Memory / 1MB, 1)
-                              })
+                                $CpuPercent = if ($null -ne $PreviousCpu) {
+                                    [double] ([Math]::Round([Math]::Max(0, (($CurrentCpu - $PreviousCpu) / $ElapsedSeconds) * 100 / $CoreCount), 1))
+                                } else {
+                                    [double] 0
+                                }
 
-                              $CpuSamples[$Process.Id] = $CurrentCpu
-                          }
+                                $ProcessItems.Add([pscustomobject] @{
+                                    Name = $Process.Name
+                                    Id = $Process.Id
+                                    CpuPercent = $CpuPercent
+                                    MemoryMB = [Math]::Round([double] $Process.Memory / 1MB, 1)
+                                })
 
-                          # Clean up old samples
-                          $ActiveProcessIds = $ProcessData | ForEach-Object { $_.Id }
-                          foreach ($SampledPid in @($CpuSamples.Keys)) {
-                              if (-not ($ActiveProcessIds -contains $SampledPid)) {
-                                  $CpuSamples.Remove($SampledPid)
-                              }
-                          }
+                                $CpuSamples[$Process.Id] = $CurrentCpu
+                            }
 
-                          # Calculate totals
-                          $TotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
-                          $TotalProcessMemory = (
-                                $ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
-                                # Keep memory percent based on OS-wide used memory; process sum is debug-only due to shared-page double counting.
-                                $TotalVisibleMemoryMB = [double] $RefreshData.TotalVisibleMemoryMB
-                                $UsedPhysicalMemoryMB = [double] $RefreshData.UsedPhysicalMemoryMB
-                                $TotalMemoryPercent = [double]([Math]::Round(($UsedPhysicalMemoryMB / $TotalVisibleMemoryMB) * 100, 1)
-                            )
+                            # Clean up old samples
+                            $ActiveProcessIds = $ProcessData | ForEach-Object { $_.Id }
+                            foreach ($SampledPid in @($CpuSamples.Keys)) {
+                                if (-not ($ActiveProcessIds -contains $SampledPid)) {
+                                    $CpuSamples.Remove($SampledPid)
+                                }
+                            }
 
-                          Set-TaskManagerTotals `
-                              -TotalCpuPercent $TotalCpu `
-                              -TotalMemoryPercent $TotalMemoryPercent `
-                              -UsedPhysicalMemoryMB $UsedPhysicalMemoryMB `
-                              -TotalVisibleMemoryMB $TotalVisibleMemoryMB `
-                              -TotalProcessMemoryMB $TotalProcessMemory `
-                              -Phase refresh
+                            # Calculate totals
+                            $TotalCpu = ($ProcessItems | Measure-Object -Property CpuPercent -Sum).Sum
+                            $TotalProcessMemory = (
+                                  $ProcessItems | Measure-Object -Property MemoryMB -Sum).Sum
+                                  # Keep memory percent based on OS-wide used memory; process sum is debug-only due to shared-page double counting.
+                                  $TotalVisibleMemoryMB = [double] $RefreshData.TotalVisibleMemoryMB
+                                  $UsedPhysicalMemoryMB = [double] $RefreshData.UsedPhysicalMemoryMB
+                                  $TotalMemoryPercent = [double]([Math]::Round(($UsedPhysicalMemoryMB / $TotalVisibleMemoryMB) * 100, 1)
+                              )
 
-                          # Restore selection
-                          if ($null -ne $SelectedProcessId) {
-                              $ReselectedItem = $ProcessItems | Where-Object { $_.Id -eq $SelectedProcessId } | Select-Object -First 1
-                              if ($null -ne $ReselectedItem) {
-                                  $ProcessList.SelectedItem = $ReselectedItem
-                              }
-                          }
+                            Set-TaskManagerTotals `
+                                -TotalCpuPercent $TotalCpu `
+                                -TotalMemoryPercent $TotalMemoryPercent `
+                                -UsedPhysicalMemoryMB $UsedPhysicalMemoryMB `
+                                -TotalVisibleMemoryMB $TotalVisibleMemoryMB `
+                                -TotalProcessMemoryMB $TotalProcessMemory `
+                                -Phase refresh
 
-                          $TimerState.LastSampleTime = $CurrentSampleTime
-                      }
+                            # Restore selection
+                            if ($null -ne $SelectedProcessId) {
+                                $ReselectedItem = $ProcessItems | Where-Object { $_.Id -eq $SelectedProcessId } | Select-Object -First 1
+                                if ($null -ne $ReselectedItem) {
+                                    $ProcessList.SelectedItem = $ReselectedItem
+                                }
+                            }
+
+                            $TimerState.LastSampleTime = $CurrentSampleTime
+                        }
+                    }
 
                     $ProcessRefreshTimer = Reference 'ProcessRefresh'
                     $ProcessRefreshTimer.Tag = @{
@@ -309,14 +320,20 @@ Window 'Window' {
                         [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
                         $this.Content = 'Stop Process'
                         Command 'StopProcessCommand' {
-                            param($sender, $event)
-                            $SelectedProcess = (Reference 'ProcessList').SelectedItem
-                            if ($null -ne $SelectedProcess) {
-                                try {
-                                    Stop-Process -Id $SelectedProcess.Id -ErrorAction Stop
-                                } catch {
-                                    [System.Windows.MessageBox]::Show("Failed to stop process: $_", "Error", [MessageBoxButton]::OK, [MessageBoxImage]::Error)
+                            Execute {
+                                param($sender, $event)
+                                $SelectedProcess = (Reference 'ProcessList').SelectedItem
+                                if ($null -ne $SelectedProcess) {
+                                    try {
+                                        Stop-Process -Id $SelectedProcess.Id -ErrorAction Stop
+                                    } catch {
+                                        [System.Windows.MessageBox]::Show("Failed to stop process: $_", "Error", [MessageBoxButton]::OK, [MessageBoxImage]::Error)
+                                    }
                                 }
+                            }
+
+                            CanExecute {
+                                [bool] (Reference 'Window').Tag.SelectedProcess
                             }
                         }
                     }

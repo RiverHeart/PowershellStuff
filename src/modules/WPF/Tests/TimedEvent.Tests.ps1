@@ -1,20 +1,22 @@
-class TestWPFDisposable : System.IDisposable {
-    [bool] $Disposed = $false
-
-    [void] Dispose() {
-        $this.Disposed = $true
-    }
-}
-
-class TestWPFThrowingDisposable : System.IDisposable {
-    [void] Dispose() {
-        throw 'Dispose failed intentionally'
-    }
-}
-
 Describe 'TimedEvent' -Tag 'TimedEvent' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
+        class TestWPFDisposable : System.IDisposable {
+            [bool] $Disposed = $false
+
+            [void] Dispose() {
+                $this.Disposed = $true
+            }
+        }
+
+        class TestWPFThrowingDisposable : System.IDisposable {
+            [void] Dispose() {
+                throw 'Dispose failed intentionally'
+            }
+        }
     }
 
     BeforeEach {
@@ -66,16 +68,17 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
 
     It 'Should stop async timers when their window closes' {
         $Window = Window 'Window' {
-            TimedEvent 'AsyncRefresh' 60000 `
-              -Work {
-                  Start-Sleep -Milliseconds 50
-                  'result'
-              } `
-              -OnComplete {
-                  param($Result, $TimerSender)
-                  $null = $Result
-                  $null = $TimerSender
-              }
+            TimedEvent 'AsyncRefresh' 60000 {
+                Work {
+                    Start-Sleep -Milliseconds 50
+                    'result'
+                }
+                OnComplete {
+                    param($Result, $TimerSender)
+                    $null = $Result
+                    $null = $TimerSender
+                }
+            }
         }
 
         $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
@@ -97,20 +100,32 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
 
         $Warnings = InModuleScope WPF {
             $ClearWarnings = @()
-            Clear-WPFControlRegistry -WarningVariable ClearWarnings -WarningAction Continue
+            Clear-WPFControlRegistry -WarningVariable +ClearWarnings -WarningAction SilentlyContinue
             ,$ClearWarnings
         }
 
+        $warningMessages = @(
+            $Warnings | ForEach-Object {
+                if ($_ -is [System.Management.Automation.WarningRecord]) {
+                    $_.Message
+                } else {
+                    [string] $_
+                }
+            }
+        )
+
         $Good.Disposed | Should -BeTrue
-        $Warnings | Should -Not -BeNullOrEmpty
-        ($Warnings -join [Environment]::NewLine) | Should -Match 'Failed to dispose object'
+        @($warningMessages).Count | Should -BeGreaterThan 0
+        ($warningMessages -join [Environment]::NewLine) | Should -Match "Failed to dispose object 'BadDisposable'"
+        ($warningMessages -join [Environment]::NewLine) | Should -Match 'Failed to dispose object'
     }
 
     It 'Should initialize IsRefreshing guard for async timers' {
         $Window = Window 'Window' {
-            TimedEvent 'AsyncRefresh' 10000 `
-              -Work { 'result' } `
-              -OnComplete { param($r) $null = $r }
+            TimedEvent 'AsyncRefresh' 10000 {
+                Work { 'result' }
+                OnComplete { param($r) $null = $r }
+            }
         }
 
         $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
@@ -126,14 +141,15 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
         # We verify the timer is created with async configuration and will execute properly when the loop is running.
 
         $Window = Window 'Window' {
-            TimedEvent 'AsyncTimer' 100 `
-              -Work {
-                  'TestData'
-              } `
-              -OnComplete {
-                  param($result)
-                  $null = $result
-              }
+            TimedEvent 'AsyncTimer' 100 {
+                Work {
+                    'TestData'
+                }
+                OnComplete {
+                    param($result)
+                    $null = $result
+                }
+            }
         }
 
         $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
@@ -148,9 +164,10 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
 
     It 'Should initialize IsRefreshing guard correctly for async timers' {
         $Window = Window 'Window' {
-            TimedEvent 'AsyncTimer2' 250 `
-              -Work { 'result' } `
-              -OnComplete { param($r) $null = $r }
+            TimedEvent 'AsyncTimer2' 250 {
+                Work { 'result' }
+                OnComplete { param($r) $null = $r }
+            }
         }
 
         $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
@@ -168,16 +185,17 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
             $this.Height = 80
             $this.ShowInTaskbar = $false
 
-            TimedEvent 'Updater' 100 `
-              -Work {
-                  Start-Sleep -Milliseconds 60
-                  Get-Date
-              } `
-              -OnComplete {
-                  param($Result, $TimerSender)
-                  $null = $Result
-                  $null = $TimerSender
-              }
+            TimedEvent 'Updater' 100 {
+                Work {
+                    Start-Sleep -Milliseconds 60
+                    Get-Date
+                }
+                OnComplete {
+                    param($Result, $TimerSender)
+                    $null = $Result
+                    $null = $TimerSender
+                }
+            }
         }
 
         $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
@@ -216,19 +234,20 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
                 FirstName = $null
             }
 
-            TimedEvent 'AsyncResultShape' 100 `
-              -Work {
-                  [pscustomobject]@{ Name = 'Alpha' }
-                  [pscustomobject]@{ Name = 'Beta' }
-              } `
-              -OnComplete {
-                  param($Result, $TimerSender)
-                  $Items = @($Result)
-                  $WindowRef = Reference 'Window'
-                  $WindowRef.Tag.ItemCount = $Items.Count
-                  $WindowRef.Tag.FirstName = if ($Items.Count -gt 0) { $Items[0].Name } else { $null }
-                  $TimerSender.Stop()
-              }
+            TimedEvent 'AsyncResultShape' 100 {
+                Work {
+                    [pscustomobject]@{ Name = 'Alpha' }
+                    [pscustomobject]@{ Name = 'Beta' }
+                }
+                OnComplete {
+                    param($Result, $TimerSender)
+                    $Items = @($Result)
+                    $WindowRef = Reference 'Window'
+                    $WindowRef.Tag.ItemCount = $Items.Count
+                    $WindowRef.Tag.FirstName = if ($Items.Count -gt 0) { $Items[0].Name } else { $null }
+                    $TimerSender.Stop()
+                }
+            }
         }
 
         # Run a short dispatcher frame to allow timer tick and async completion.
@@ -253,5 +272,67 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
             $Stopper.Stop()
             $Window.Close()
         }
+    }
+
+    It 'Should support async mode with contextual Work and OnComplete child keywords' {
+        $Window = Window 'Window' {
+            $this.Width = 120
+            $this.Height = 80
+            $this.ShowInTaskbar = $false
+            $this.Tag = @{
+                ItemCount = 0
+            }
+
+            TimedEvent 'AsyncViaKeywords' 100 {
+                Work {
+                    [pscustomobject]@{ Name = 'One' }
+                    [pscustomobject]@{ Name = 'Two' }
+                }
+
+                OnComplete {
+                    param($Result, $TimerSender)
+                    $WindowRef = Reference 'Window'
+                    $WindowRef.Tag.ItemCount = @($Result).Count
+                    $TimerSender.Stop()
+                }
+            }
+        }
+
+        $Frame = [System.Windows.Threading.DispatcherFrame]::new()
+        $Stopper = [System.Windows.Threading.DispatcherTimer]::new()
+        $Stopper.Interval = [System.TimeSpan]::FromMilliseconds(900)
+        $Stopper.add_Tick({
+            param($sender, $e)
+            $null = $e
+            $sender.Stop()
+            $Frame.Continue = $false
+        })
+
+        try {
+            $Window.Show()
+            $Stopper.Start()
+            [System.Windows.Threading.Dispatcher]::PushFrame($Frame)
+
+            $Window.Tag.ItemCount | Should -Be 2
+        } finally {
+            $Stopper.Stop()
+            $Window.Close()
+        }
+    }
+
+    It 'Should error when contextual async mode is missing OnComplete keyword' {
+        $Error.Clear()
+
+        $Window = Window 'Window' {
+            TimedEvent 'MissingOnComplete' 100 {
+                Work {
+                    'value'
+                }
+            } -ErrorAction SilentlyContinue
+        }
+
+        $Window | Should -Not -BeNullOrEmpty
+        @($Error).Count | Should -BeGreaterThan 0
+        @($Error)[0].ToString() | Should -Match 'requires exactly one Work block and one OnComplete block'
     }
 }

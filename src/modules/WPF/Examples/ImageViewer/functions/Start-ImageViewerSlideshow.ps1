@@ -1,3 +1,18 @@
+<#
+.SYNOPSIS
+    Starts an image slideshow with a specified interval between slides.
+
+.DESCRIPTION
+    Initializes and starts a slideshow timer that automatically navigates
+    forward through images at the specified interval. If the slideshow is
+    already active, it updates the interval. The slideshow continues until
+    it is stopped manually or the window is closed.
+
+.EXAMPLE
+    Starts the slideshow with a 5-second interval between slides.
+
+    Start-ImageViewerSlideshow -IntervalSeconds 5
+#>
 function Start-ImageViewerSlideshow {
     [CmdletBinding()]
     param(
@@ -14,7 +29,9 @@ function Start-ImageViewerSlideshow {
         return
     }
 
-    if (-not $State.SlideshowTimer) {
+    if (-not $State.AutoForwardTimer) {
+        Write-Debug "Initializing slideshow timer."
+
         $Timer = [System.Windows.Threading.DispatcherTimer]::new()
         $TimerWindow = $Window
         $TimerState = $State
@@ -37,15 +54,28 @@ function Start-ImageViewerSlideshow {
             }
         }.GetNewClosure())
 
-        $State.SlideshowTimer = $Timer
+        $State.AutoForwardTimer = $Timer
     }
 
-    $State.SlideshowIntervalSeconds = $IntervalSeconds
-    $State.SlideshowTimer.Interval = [TimeSpan]::FromSeconds($IntervalSeconds)
+    $State.IsFigureDrawingMode = $false
+    $State.IsFigureDrawingPaused = $false
+    $State.FigureDrawingPoseDurationsSeconds = $null
+    $State.FigureDrawingPoseIndex = -1
+    $State.FigureDrawingPoseRemainingSeconds = 0
+    $State.FigureDrawingPoseEndsAtUtc = $null
+    $State.FigureDrawingCountdownText = '00:00:00'
+    $State.FigureDrawingLimiter = $null
+
+    if ($State.FigureDrawingCountdownTimer) {
+        $State.FigureDrawingCountdownTimer.Stop()
+    }
+
+    $State.AutoForwardIntervalSeconds = $IntervalSeconds
+    $State.AutoForwardTimer.Interval = [TimeSpan]::FromSeconds($IntervalSeconds)
     $State.IsSlideshowActive = $true
 
-    $State.SlideshowTimer.Stop()
-    $State.SlideshowTimer.Start()
+    $State.AutoForwardTimer.Stop()
+    $State.AutoForwardTimer.Start()
 
     if (-not $State.IsFullScreen) {
         Set-WPFWindowFullScreen -IsFullScreen $true

@@ -1,5 +1,5 @@
 Describe 'Image' -Tag 'Image' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

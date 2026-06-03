@@ -1,0 +1,31 @@
+{
+  "TestSuite": "WPF",
+  "Run": {
+    "Path": [
+      "Tests"
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  },
+  "Filter": {
+    "Tag": [],
+    "ExcludeTag": []
+  },
+  "Coverage": {
+    "Enabled": true,
+    "Path": [
+      "WPF.psm1",
+      "Public",
+      "Private",
+      "TypeConverters"
+    ],
+    "CoveragePercentTarget": 70,
+    "OutputFormat": "JaCoCo",
+    "OutputPath": "artifacts/coverage/WPF.coverage.xml",
+    "ExcludeTests": true,
+    "RecursePaths": true,
+    "UseBreakpoints": true,
+    "SingleHitBreakpoints": true
+  }
+}

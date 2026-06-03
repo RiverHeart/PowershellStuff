@@ -19,6 +19,9 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Fullscreen mode with mouse auto-hide on idle
 * Supports Dark/Light modes
 * Slideshow mode with configurable interval, fullscreen playback, and Escape-to-stop
+* Figure drawing mode with time-first scheduling (F6) that adapts pose durations to session minutes and available images
+* Figure drawing presets: Warmup, Balanced, and StudyHeavy
+* Figure drawing sidebar with large `HH:mm:ss` countdown and pause/play control
 * Arrow keys pan zoomed images while scrolling is possible; image navigation remains available via Spacebar and on-screen buttons
 
 ## CLI Automation Flags
@@ -62,7 +65,6 @@ For repeatable automation, use the wrapper script:
 
 * Create zoom slider
 * Support image cropping
-* Support figure drawing mode
 * Picture-in-picture?
 * Add click-and-drag panning for zoomed images
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)

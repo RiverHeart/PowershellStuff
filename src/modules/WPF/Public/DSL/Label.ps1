@@ -41,7 +41,8 @@ function Label {
 
     # Auto-attach self to parent if one exists
     $Parent = $PSCmdlet.GetVariableValue('this')
-    if ($Parent) {
+    $IsParentedBefore = [bool] $Label.Parent
+    if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Label)"
         Update-WPFObject $Parent $Label
     }
@@ -50,6 +51,9 @@ function Label {
     Write-Debug "Processing child elements for $Name (Label)"
     Update-WPFObject $Label $ScriptBlock
 
-    if ($this.Parent) { return }
-    return $Label
+    $IsParentedAfter = [bool] $Label.Parent
+    $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
+    if ($IsCollectingChildren -or -not $IsParentedAfter) {
+        return $Label
+    }
 }

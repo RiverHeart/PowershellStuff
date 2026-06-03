@@ -21,7 +21,7 @@ PowerShell 5.1 compatibility is a project goal. Treat Windows PowerShell 5.1 as 
 
 1. Confirm the change runs under Windows PowerShell 5.1 first.
 2. Run the same tests under PowerShell 7 after 5.1 validation.
-3. Use `./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF` as the default test invocation path.
+3. Use `./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF` as the default test invocation path.
 4. Keep test syntax and helpers compatible with 5.1 unless runtime-specific behavior is intentional.
 5. If behavior differs by runtime, use narrowly scoped skips/branches and document why.
 6. Ensure compatibility messaging in docs matches actual test coverage.
@@ -36,7 +36,7 @@ PowerShell 5.1 compatibility is a project goal. Treat Windows PowerShell 5.1 as 
 - Use the repository test runner as the default entrypoint:
 
 ```powershell
-./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF
+./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF
 ```
 
 - Use direct `Invoke-Pester` only when explicitly validating Pester version pinning behavior, for example:
@@ -61,10 +61,10 @@ Run tests in this order when validating a change:
 
 ```powershell
 # Primary gate
-powershell.exe -NoProfile -File ".github/skills/test-runner/scripts/Invoke-Test.ps1" -TestSuite WPF
+powershell.exe -NoProfile -File ".github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1" -TestSuite WPF
 
 # Secondary gate
-pwsh.exe -NoProfile -File ".github/skills/test-runner/scripts/Invoke-Test.ps1" -TestSuite WPF
+pwsh.exe -NoProfile -File ".github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1" -TestSuite WPF
 ```
 
 If PowerShell 7 passes but PowerShell 5.1 fails, treat the change as incompatible.
