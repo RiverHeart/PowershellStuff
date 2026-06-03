@@ -28,10 +28,11 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
             $name = "{0}_{1}" -f $case.NamePrefix, $id
 
             $psVars = New-WPFVariableList -AdditionalVariables @([psvariable]::new('this', $null))
-            $control = {
+            $result = {
                 & $case.Keyword $name {}
             }.InvokeWithContext($null, $psVars)
-            $control = @($control)[0]
+            @($result).Count | Should -Be 1
+            $control = @($result)[0]
 
             $control | Should -Not -Be $null
             $control | Should -BeOfType $case.Type

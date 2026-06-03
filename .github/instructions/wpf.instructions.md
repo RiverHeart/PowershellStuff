@@ -86,6 +86,8 @@ After making WPF module changes:
 
 For WPF control instances, avoid using `Should -Not -BeNullOrEmpty` to prove object existence. Some controls (for example `DatePicker`) stringify to an empty string when uninitialized, which makes `BeNullOrEmpty` treat an existing object as empty.
 
+`Should -BeNullOrEmpty` is still appropriate when the expected behavior is intentionally no output or an empty result collection (for example, disabled `-Keyword` blocks that should return nothing).
+
 Prefer explicit checks such as:
 
 * `$obj | Should -Not -Be $null`
