@@ -82,6 +82,16 @@ After making WPF module changes:
 * Confirm no obvious break in nested control creation, event binding, or grid definition handling.
 * When running examples unattended (agent/automation/smoke testing), set `$env:WPF_AUTO_CLOSE_SECONDS = 0` so `Show-WPFWindow` auto-closes after first render and scripts do not hang waiting for manual window close. Setting `$DebugPreference='Continue'` or `-Debug` (for scripts), will give you visibility into what the example is doing before it auto-closes.
 
+# Test Assertion Pitfall
+
+For WPF control instances, avoid using `Should -Not -BeNullOrEmpty` to prove object existence. Some controls (for example `DatePicker`) stringify to an empty string when uninitialized, which makes `BeNullOrEmpty` treat an existing object as empty.
+
+Prefer explicit checks such as:
+
+* `$obj | Should -Not -Be $null`
+* `@($obj).Count | Should -Be 1`
+* `$obj | Should -BeOfType ([System.Windows.Controls.ControlType])`
+
 # Change Boundaries
 
 Low-risk changes:

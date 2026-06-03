@@ -33,7 +33,7 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
             }.InvokeWithContext($null, $psVars)
             $control = @($control)[0]
 
-            $control | Should -Not -BeNullOrEmpty
+            $control | Should -Not -Be $null
             $control | Should -BeOfType $case.Type
             $control.Name | Should -Be $name
     }
