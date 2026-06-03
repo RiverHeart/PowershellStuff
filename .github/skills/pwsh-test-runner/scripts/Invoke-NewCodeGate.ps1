@@ -38,9 +38,7 @@ param (
     [double] $MinimumCoveragePercent = 80,
 
     [ValidateNotNullOrEmpty()]
-    [string[]] $IncludePattern = @('*.ps1', '*.psm1')
-
-    ,
+    [string[]] $IncludePattern = @('*.ps1', '*.psm1'),
 
     [ValidateNotNullOrEmpty()]
     [string[]] $ExcludePathRegex = @(

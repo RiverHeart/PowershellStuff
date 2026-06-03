@@ -1,6 +1,6 @@
 ---
 name: pwsh-test-runner
-description: Use when you need to discover, list, or run tests anywhere in this repository, including Pester suite discovery, tag discovery, and execution.
+description: Use when you need to discover, list, or run Powershell tests anywhere in this repository, including Pester suite discovery, tag discovery, and execution.
 ---
 
 # Repository Test Runner

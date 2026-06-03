@@ -1,10 +1,8 @@
 Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
-    }
 
-    BeforeAll {
-        $Cases = @(
+        $script:Cases = @(
             @{ Keyword = 'Button';       NamePrefix = 'Button';       Type = [System.Windows.Controls.Button] }
             @{ Keyword = 'Label';        NamePrefix = 'Label';        Type = [System.Windows.Controls.Label] }
             @{ Keyword = 'TextBlock';    NamePrefix = 'TextBlock';    Type = [System.Windows.Controls.TextBlock] }
@@ -17,8 +15,15 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
         )
     }
 
-    foreach ($case in $Cases) {
-        It "Returns created $($case.Keyword) when no parent context exists" {
+    It 'Returns created <Keyword> when no parent context exists' -ForEach $script:Cases {
+        param($Keyword, $NamePrefix, $Type)
+
+            $case = [pscustomobject] @{
+                Keyword = $Keyword
+                NamePrefix = $NamePrefix
+                Type = $Type
+            }
+
             $id = [guid]::NewGuid().ToString('N')
             $name = "{0}_{1}" -f $case.NamePrefix, $id
 
@@ -31,11 +36,17 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
             $control | Should -Not -BeNullOrEmpty
             $control | Should -BeOfType $case.Type
             $control.Name | Should -Be $name
-        }
     }
 
-    foreach ($case in $Cases) {
-        It "Auto-attaches $($case.Keyword) and returns no output when parent context exists" {
+    It 'Auto-attaches <Keyword> and returns no output when parent context exists' -ForEach $script:Cases {
+        param($Keyword, $NamePrefix, $Type)
+
+            $case = [pscustomobject] @{
+                Keyword = $Keyword
+                NamePrefix = $NamePrefix
+                Type = $Type
+            }
+
             $parent = [System.Windows.Controls.StackPanel]::new()
             $psVars = New-WPFVariableList -InputObject $parent
             $id = [guid]::NewGuid().ToString('N')
@@ -49,6 +60,5 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
             $parent.Children | Should -HaveCount 1
             $parent.Children[0] | Should -BeOfType $case.Type
             $parent.Children[0].Name | Should -Be $name
-        }
     }
 }
