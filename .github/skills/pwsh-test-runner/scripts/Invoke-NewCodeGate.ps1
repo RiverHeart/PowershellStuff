@@ -24,7 +24,7 @@
     Case-insensitive regex patterns used to ignore changed files (for example tests).
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-NewCodeGate.ps1 -BaseRef origin/main -CoveragePath src/modules/WPF/Tests/coverage.xml -MinimumCoveragePercent 80
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-NewCodeGate.ps1 -BaseRef origin/main -CoveragePath src/modules/WPF/Tests/coverage.xml -MinimumCoveragePercent 80
 #>
 [CmdletBinding()]
 param (

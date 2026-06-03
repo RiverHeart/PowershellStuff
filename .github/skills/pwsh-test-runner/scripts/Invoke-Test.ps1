@@ -54,28 +54,27 @@
     Returns the full Pester result object after printing the summary.
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -DebugOutput
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -DebugOutput
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -Tag DataGrid -PassThru
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -Tag DataGrid -PassThru
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -CoverageMode Full
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -CoverageMode Full
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -DetailedOutput
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -DetailedOutput
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -ListSuites
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -ListSuites
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF -ListTags
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -ListTags
 #>
 [CmdletBinding()]
-
 param (
     [Parameter(Mandatory, ParameterSetName = 'Run')]
     [Parameter(Mandatory, ParameterSetName = 'ListTags')]

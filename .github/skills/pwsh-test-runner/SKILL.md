@@ -1,5 +1,5 @@
 ---
-name: test-runner
+name: pwsh-test-runner
 description: Use when you need to discover, list, or run tests anywhere in this repository, including Pester suite discovery, tag discovery, and execution.
 ---
 
@@ -21,19 +21,19 @@ This is the preferred path for any project in the workspace unless the user expl
 Use the bundled test runner script asset at:
 
 ```powershell
-"$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/Invoke-Test.ps1"
+"$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1"
 ```
 
 Use the bundled coverage runner script asset at:
 
 ```powershell
-"$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/Invoke-TestCoverage.ps1"
+"$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-TestCoverage.ps1"
 ```
 
 Instead of reading the entire script, discover capabilities and usage with:
 
 ```powershell
-Get-Help "$(git rev-parse --show-toplevel)/.github/skills/test-runner/scripts/Invoke-Test.ps1" -Detailed
+Get-Help "$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1" -Detailed
 ```
 
 Use compact output by default. Only enable detailed Pester console output when needed with `-DetailedOutput`.

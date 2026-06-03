@@ -44,10 +44,13 @@
     Shows passing tests in Invoke-Test summary.
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-TestCoverage.ps1 -TestSuite WPF
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-TestCoverage.ps1 -TestSuite Example
 
 .EXAMPLE
-    ./.github/skills/test-runner/scripts/Invoke-TestCoverage.ps1 -TestSuite WPF -CoverageMode NewCodeAnalysis -BaseRef origin/main
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-TestCoverage.ps1 `
+        -TestSuite Example `
+        -CoverageMode NewCodeAnalysis `
+        -BaseRef origin/main
 #>
 [CmdletBinding()]
 param (

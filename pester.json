@@ -7,7 +7,7 @@
     },
     {
       "Name": "TestRunnerSkills",
-      "ConfigPath": ".github/skills/test-runner/tests/pester.json"
+      "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
     }
   ]
 }
