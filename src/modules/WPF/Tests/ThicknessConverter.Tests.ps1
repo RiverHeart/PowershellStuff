@@ -1,6 +1,9 @@
 Describe 'ThicknessConverter' -Tag 'ThicknessConverter' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 

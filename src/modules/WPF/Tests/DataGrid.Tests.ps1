@@ -1,5 +1,5 @@
 Describe 'DataGrid' -Tag 'DataGrid' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

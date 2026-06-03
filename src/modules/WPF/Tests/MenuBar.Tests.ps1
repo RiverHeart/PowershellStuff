@@ -1,5 +1,5 @@
 Describe 'MenuBar' -Tag 'MenuBar' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

@@ -42,26 +42,39 @@
 .PARAMETER ShowPassed
     Also prints passing tests in addition to non-passing tests.
 
+.PARAMETER DetailedOutput
+    Enables detailed Pester console output. By default, compact summary output is used.
+
+.PARAMETER CoverageMode
+    Coverage execution mode.
+    - None: run tests without coverage (default).
+    - Full: run tests with configured coverage settings.
+
 .PARAMETER PassThru
     Returns the full Pester result object after printing the summary.
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -DebugOutput
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -DebugOutput
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -Tag DataGrid -PassThru
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -Tag DataGrid -PassThru
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -ListSuites
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -CoverageMode Full
 
 .EXAMPLE
-    ./.github/skills/test-runner/assets/Invoke-Test.ps1 -TestSuite WPF -ListTags
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -DetailedOutput
+
+.EXAMPLE
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -ListSuites
+
+.EXAMPLE
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -ListTags
 #>
 [CmdletBinding()]
-
 param (
     [Parameter(Mandatory, ParameterSetName = 'Run')]
     [Parameter(Mandatory, ParameterSetName = 'ListTags')]
@@ -82,16 +95,29 @@ param (
 
     [switch] $DebugOutput,
     [switch] $ShowPassed,
+    [switch] $DetailedOutput,
+    [Parameter(ParameterSetName = 'Run')]
+    [ValidateSet('None', 'Full')]
+    [string] $CoverageMode = 'None',
     [switch] $PassThru
 )
 
-if (-not (Get-Module -Name Pester)) {
+$loadedPester = Get-Module -Name Pester | Sort-Object Version -Descending | Select-Object -First 1
+if ($null -ne $loadedPester -and $loadedPester.Version.Major -lt 5) {
+    Write-Error (
+        "Pester 5 or newer is required. Currently loaded version is $($loadedPester.Version). " +
+        'Remove the loaded module and run again.'
+    )
+    exit 2
+}
+
+if ($null -eq $loadedPester) {
     $pesterModule = Get-Module -ListAvailable -Name Pester |
         Sort-Object Version -Descending |
         Where-Object { $_.Version.Major -ge 5 } |
         Select-Object -First 1
     if ($null -eq $pesterModule) {
-        Write-Error 'Pester module was not found. Install Pester to run tests.'
+        Write-Error 'Pester module was not found. Install Pester 5 or newer to run tests.'
         exit 2
     }
 
@@ -220,13 +246,222 @@ function Test-SuiteManifest {
     }
 }
 
+function Write-TestRunSummary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object] $Result,
+
+        [Parameter(Mandatory)]
+        [string] $RunLabel,
+
+        [switch] $ShowPassedTests
+    )
+
+    Write-Host $RunLabel
+
+    $allTests = @()
+    if ($Result.PSObject.Properties.Name -contains 'Tests' -and $null -ne $Result.Tests) {
+        $allTests = @($Result.Tests)
+    }
+
+    $nonPassing = @()
+    if ($allTests.Count -gt 0) {
+        $nonPassing = @($allTests | Where-Object {
+            $_.Result -ne 'Passed' -and $_.Result -ne 'NotRun'
+        })
+    }
+
+    $passing = @()
+    if ($allTests.Count -gt 0) {
+        $passing = @($allTests | Where-Object { $_.Result -eq 'Passed' })
+    }
+
+    if ($ShowPassedTests -and $passing.Count -gt 0) {
+        foreach ($test in $passing) {
+            Write-Host ("[+] {0}" -f $test.ExpandedPath)
+        }
+    }
+
+    if ($nonPassing.Count -gt 0) {
+        foreach ($test in $nonPassing) {
+            $errorMessage = ''
+            if ($test.ErrorRecord -and $test.ErrorRecord.Exception) {
+                $errorMessage = $test.ErrorRecord.Exception.Message
+            }
+
+            if ([string]::IsNullOrWhiteSpace($errorMessage)) {
+                Write-Host ("[-] {0} ({1})" -f $test.ExpandedPath, $test.Result)
+            } else {
+                Write-Host ("[-] {0} ({1})`n    {2}" -f $test.ExpandedPath, $test.Result, $errorMessage)
+            }
+        }
+    } elseif (-not $ShowPassedTests) {
+        Write-Host 'All tests passed. No non-passing tests to report.'
+    }
+
+    $durationSeconds = 0
+    if ($Result.PSObject.Properties.Name -contains 'Duration' -and $null -ne $Result.Duration) {
+        $durationSeconds = $Result.Duration.TotalSeconds
+    }
+
+    Write-Host ("Tests completed in {0:N2}s" -f $durationSeconds)
+    Write-Host (
+        "Tests Passed: {0}, Failed: {1}, Skipped: {2}, Inconclusive: {3}, NotRun: {4}" -f
+        $Result.PassedCount,
+        $Result.FailedCount,
+        $Result.SkippedCount,
+        $Result.InconclusiveCount,
+        $Result.NotRunCount
+    )
+}
+
+function Resolve-CoveragePath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object] $SuiteConfig,
+
+        [Parameter(Mandatory)]
+        [string] $SuiteBaseDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $SuiteConfigPath
+    )
+
+    $resolvedCoveragePaths = @()
+
+    if (-not ($SuiteConfig.PSObject.Properties.Name -contains 'Coverage') -or $null -eq $SuiteConfig.Coverage) {
+        throw "Coverage was requested but suite config '$SuiteConfigPath' does not define Coverage."
+    }
+
+    if (
+        ($SuiteConfig.Coverage.PSObject.Properties.Name -contains 'Enabled') -and
+        (-not [bool] $SuiteConfig.Coverage.Enabled)
+    ) {
+        throw "Coverage was requested but Coverage.Enabled is false in '$SuiteConfigPath'."
+    }
+
+    if (
+        -not ($SuiteConfig.Coverage.PSObject.Properties.Name -contains 'Path') -or
+        @($SuiteConfig.Coverage.Path).Count -eq 0
+    ) {
+        throw "Coverage was requested but Coverage.Path is missing or empty in '$SuiteConfigPath'."
+    }
+
+    foreach ($pathEntry in @($SuiteConfig.Coverage.Path)) {
+        if ([System.IO.Path]::IsPathRooted([string] $pathEntry)) {
+            $resolved = Resolve-Path -Path $pathEntry -ErrorAction SilentlyContinue
+        } else {
+            $resolved = Resolve-Path -Path (Join-Path $SuiteBaseDirectory $pathEntry) -ErrorAction SilentlyContinue
+        }
+
+        if ($null -eq $resolved) {
+            throw "Coverage path was not found: $pathEntry (from $SuiteConfigPath)"
+        }
+
+        $resolvedCoveragePaths += $resolved.Path
+    }
+
+    return $resolvedCoveragePaths
+}
+
+function Resolve-CoverageOutputPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object] $SuiteConfig,
+
+        [Parameter(Mandatory)]
+        [string] $RepositoryRoot,
+
+        [Parameter(Mandatory)]
+        [string] $TestSuite
+    )
+
+    $resolvedOutputPath = $null
+    if (
+        ($SuiteConfig.Coverage.PSObject.Properties.Name -contains 'OutputPath') -and
+        -not [string]::IsNullOrWhiteSpace([string] $SuiteConfig.Coverage.OutputPath)
+    ) {
+        $configuredOutputPath = [string] $SuiteConfig.Coverage.OutputPath
+        if ([System.IO.Path]::IsPathRooted($configuredOutputPath)) {
+            $resolvedOutputPath = $configuredOutputPath
+        } else {
+            $resolvedOutputPath = Join-Path -Path $RepositoryRoot -ChildPath $configuredOutputPath
+        }
+    } else {
+        $defaultOutputDirectory = Join-Path -Path $RepositoryRoot -ChildPath 'artifacts/coverage'
+        $resolvedOutputPath = Join-Path -Path $defaultOutputDirectory -ChildPath ("{0}.coverage.xml" -f $TestSuite)
+    }
+
+    $outputDirectory = Split-Path -Path $resolvedOutputPath -Parent
+    if (-not [string]::IsNullOrWhiteSpace($outputDirectory) -and -not (Test-Path -Path $outputDirectory)) {
+        [void] (New-Item -Path $outputDirectory -ItemType Directory -Force)
+    }
+
+    return $resolvedOutputPath
+}
+
+function Get-JaCoCoLineCoverageSummary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $CoverageOutputPath
+    )
+
+    if (-not (Test-Path -Path $CoverageOutputPath)) {
+        return $null
+    }
+
+    try {
+        [xml] $coverageReport = Get-Content -Path $CoverageOutputPath -Raw -ErrorAction Stop
+        $lineCounter = @($coverageReport.report.counter | Where-Object { $_.type -eq 'LINE' } | Select-Object -First 1)
+        if ($lineCounter.Count -eq 0) {
+            return $null
+        }
+
+        $coveredLines = [int] $lineCounter[0].covered
+        $missedLines = [int] $lineCounter[0].missed
+        $totalLines = $coveredLines + $missedLines
+        $coveragePercent = if ($totalLines -eq 0) { 0 } else { [math]::Round(($coveredLines / $totalLines) * 100, 2) }
+
+        return [pscustomobject] @{
+            CoveredLines = $coveredLines
+            MissedLines = $missedLines
+            TotalLines = $totalLines
+            CoveragePercent = $coveragePercent
+        }
+    } catch {
+        return $null
+    }
+}
+
 $repoRoot = Get-RepositoryRoot -StartDirectories @((Get-Location).Path, $PSScriptRoot)
 if ($null -eq $repoRoot) {
     Write-Error 'Could not locate repository root. Add a pester.json file with isRoot=true or ensure .git exists.'
     exit 2
 }
 
-Set-Location -Path $repoRoot
+$locationPushed = $false
+Push-Location -Path $repoRoot
+$locationPushed = $true
+
+function Exit-Script {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [int] $Code
+    )
+
+    if ($script:locationPushed) {
+        Pop-Location
+        $script:locationPushed = $false
+    }
+
+    exit $Code
+}
 
 $rootConfigPath = Join-Path $repoRoot 'pester.json'
 try {
@@ -234,7 +469,7 @@ try {
     Test-RootManifest -RootConfig $rootConfig -Path $rootConfigPath
 } catch {
     Write-Error $_
-    exit 2
+    Exit-Script -Code 2
 }
 
 if ($ListSuites) {
@@ -243,14 +478,14 @@ if ($ListSuites) {
     foreach ($configuredSuite in @($rootConfig.TestSuites)) {
         Write-Host ("  {0} -> {1}" -f $configuredSuite.Name, $configuredSuite.ConfigPath)
     }
-    exit 0
+    Exit-Script -Code 0
 }
 
 $suite = @($rootConfig.TestSuites | Where-Object { $_.Name -eq $TestSuite } | Select-Object -First 1)
 if ($suite.Count -eq 0) {
     $availableSuites = @($rootConfig.TestSuites | ForEach-Object { $_.Name }) -join ', '
     Write-Error "Unknown test suite '$TestSuite'. Available suites: $availableSuites"
-    exit 2
+    Exit-Script -Code 2
 }
 
 $suiteConfigPath = if ([System.IO.Path]::IsPathRooted($suite[0].ConfigPath)) {
@@ -261,7 +496,7 @@ $suiteConfigPath = if ([System.IO.Path]::IsPathRooted($suite[0].ConfigPath)) {
 
 if (-not (Test-Path -Path $suiteConfigPath)) {
     Write-Error "Suite config was not found: $suiteConfigPath"
-    exit 2
+    Exit-Script -Code 2
 }
 
 try {
@@ -269,7 +504,7 @@ try {
     Test-SuiteManifest -SuiteConfig $suiteConfig -Path $suiteConfigPath
 } catch {
     Write-Error $_
-    exit 2
+    Exit-Script -Code 2
 }
 
 $suiteBaseDirectory = Split-Path -Path $suiteConfigPath -Parent
@@ -283,7 +518,7 @@ foreach ($pathEntry in @($suiteConfig.Run.Path)) {
 
     if ($null -eq $resolved) {
         Write-Error "Suite path was not found: $pathEntry (from $suiteConfigPath)"
-        exit 2
+        Exit-Script -Code 2
     }
 
     $resolvedPath += $resolved.Path
@@ -348,7 +583,7 @@ if ($ListTags) {
         }
     }
 
-    exit 0
+    Exit-Script -Code 0
 }
 
 $previousDebugPreference = $DebugPreference
@@ -369,7 +604,12 @@ try {
     $configuration = [PesterConfiguration]::Default
     $configuration.Run.Path = $resolvedPath
     $configuration.Run.PassThru = $true
-    $configuration.Output.Verbosity = if ($suiteConfig.Output.Verbosity) { [string] $suiteConfig.Output.Verbosity } else { 'None' }
+    # Keep agent output compact unless detailed output is explicitly requested.
+    if ($DetailedOutput) {
+        $configuration.Output.Verbosity = if ($suiteConfig.Output.Verbosity) { [string] $suiteConfig.Output.Verbosity } else { 'Normal' }
+    } else {
+        $configuration.Output.Verbosity = 'None'
+    }
 
     $effectiveIncludeTags = if ($null -ne $Tag -and $Tag.Count -gt 0) { $Tag } else { @($suiteConfig.Filter.Tag) }
     if ($effectiveIncludeTags.Count -gt 0) {
@@ -383,7 +623,70 @@ try {
         Write-Host ("Exclude Tags: {0}" -f (@($effectiveExcludeTags) -join ', '))
     }
 
-    $result = Invoke-Pester -Configuration $configuration
+    if ($CoverageMode -eq 'Full') {
+        $resolvedCoveragePaths = Resolve-CoveragePath -SuiteConfig $suiteConfig -SuiteBaseDirectory $suiteBaseDirectory -SuiteConfigPath $suiteConfigPath
+        $resolvedCoverageOutputPath = Resolve-CoverageOutputPath -SuiteConfig $suiteConfig -RepositoryRoot $repoRoot -TestSuite $TestSuite
+
+        $configuration.CodeCoverage.Enabled = $true
+        $configuration.CodeCoverage.Path = @($resolvedCoveragePaths)
+
+        # Default to non-breakpoint coverage unless suite config opts in.
+        $configuration.CodeCoverage.UseBreakpoints = $false
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'CoveragePercentTarget') {
+            $configuration.CodeCoverage.CoveragePercentTarget = [double] $suiteConfig.Coverage.CoveragePercentTarget
+        }
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'OutputFormat') {
+            $configuration.CodeCoverage.OutputFormat = [string] $suiteConfig.Coverage.OutputFormat
+        }
+
+        $configuration.CodeCoverage.OutputPath = $resolvedCoverageOutputPath
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'ExcludeTests') {
+            $configuration.CodeCoverage.ExcludeTests = [bool] $suiteConfig.Coverage.ExcludeTests
+        }
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'RecursePaths') {
+            $configuration.CodeCoverage.RecursePaths = [bool] $suiteConfig.Coverage.RecursePaths
+        }
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'UseBreakpoints') {
+            $configuration.CodeCoverage.UseBreakpoints = [bool] $suiteConfig.Coverage.UseBreakpoints
+        }
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'SingleHitBreakpoints') {
+            $configuration.CodeCoverage.SingleHitBreakpoints = [bool] $suiteConfig.Coverage.SingleHitBreakpoints
+        }
+
+        Write-Host 'Coverage Path(s):'
+        $resolvedCoveragePaths | ForEach-Object { Write-Host "  $_" }
+
+        Write-Host ("Coverage OutputPath: {0}" -f [string] $configuration.CodeCoverage.OutputPath.Value)
+
+        Write-Host ("Coverage UseBreakpoints: {0}" -f [bool] $configuration.CodeCoverage.UseBreakpoints)
+
+        if ($suiteConfig.Coverage.PSObject.Properties.Name -contains 'CoveragePercentTarget') {
+            Write-Host ("Coverage Target: {0}%" -f [double] $suiteConfig.Coverage.CoveragePercentTarget)
+        }
+
+        $result = Invoke-Pester -Configuration $configuration
+        Write-TestRunSummary -Result $result -RunLabel 'Coverage Validation Run:' -ShowPassedTests:$ShowPassed
+
+        $coverageSummary = Get-JaCoCoLineCoverageSummary -CoverageOutputPath ([string] $configuration.CodeCoverage.OutputPath.Value)
+        if ($null -ne $coverageSummary) {
+            Write-Host (
+                "Coverage Actual: {0}% ({1}/{2} lines covered, {3} missed)" -f
+                $coverageSummary.CoveragePercent,
+                $coverageSummary.CoveredLines,
+                $coverageSummary.TotalLines,
+                $coverageSummary.MissedLines
+            )
+        }
+    } else {
+        $result = Invoke-Pester -Configuration $configuration
+        Write-TestRunSummary -Result $result -RunLabel 'Test Run:' -ShowPassedTests:$ShowPassed
+    }
 } finally {
     $DebugPreference = $previousDebugPreference
     $global:DebugPreference = $previousGlobalDebugPreference
@@ -391,70 +694,15 @@ try {
 
 if ($null -eq $result) {
     Write-Error 'Pester did not return a result object.'
-    exit 2
+    Exit-Script -Code 2
 }
-
-$allTests = @()
-if ($result.PSObject.Properties.Name -contains 'Tests' -and $null -ne $result.Tests) {
-    $allTests = @($result.Tests)
-}
-
-$nonPassing = @()
-if ($allTests.Count -gt 0) {
-    $nonPassing = @($allTests | Where-Object {
-        $_.Result -ne 'Passed' -and $_.Result -ne 'NotRun'
-    })
-}
-
-$passing = @()
-if ($allTests.Count -gt 0) {
-    $passing = @($allTests | Where-Object { $_.Result -eq 'Passed' })
-}
-
-if ($ShowPassed -and $passing.Count -gt 0) {
-    foreach ($test in $passing) {
-        Write-Host ("[+] {0}" -f $test.ExpandedPath)
-    }
-}
-
-if ($nonPassing.Count -gt 0) {
-    foreach ($test in $nonPassing) {
-        $errorMessage = ''
-        if ($test.ErrorRecord -and $test.ErrorRecord.Exception) {
-            $errorMessage = $test.ErrorRecord.Exception.Message
-        }
-
-        if ([string]::IsNullOrWhiteSpace($errorMessage)) {
-            Write-Host ("[-] {0} ({1})" -f $test.ExpandedPath, $test.Result)
-        } else {
-            Write-Host ("[-] {0} ({1})`n    {2}" -f $test.ExpandedPath, $test.Result, $errorMessage)
-        }
-    }
-} elseif (-not $ShowPassed) {
-    Write-Host 'All tests passed. No non-passing tests to report.'
-}
-
-$durationSeconds = 0
-if ($result.PSObject.Properties.Name -contains 'Duration' -and $null -ne $result.Duration) {
-    $durationSeconds = $result.Duration.TotalSeconds
-}
-
-Write-Host ("Tests completed in {0:N2}s" -f $durationSeconds)
-Write-Host (
-    "Tests Passed: {0}, Failed: {1}, Skipped: {2}, Inconclusive: {3}, NotRun: {4}" -f
-    $result.PassedCount,
-    $result.FailedCount,
-    $result.SkippedCount,
-    $result.InconclusiveCount,
-    $result.NotRunCount
-)
 
 if ($PassThru) {
     $result
 }
 
 if ($result.FailedCount -gt 0) {
-    exit 1
+    Exit-Script -Code 1
 }
 
-exit 0
+Exit-Script -Code 0

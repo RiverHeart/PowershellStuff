@@ -1,5 +1,5 @@
 Describe 'Get-WPFFileInfo' -Tag 'Get-WPFFileInfo' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

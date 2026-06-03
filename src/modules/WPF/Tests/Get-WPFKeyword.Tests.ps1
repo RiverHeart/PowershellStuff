@@ -1,5 +1,5 @@
 Describe 'Get-WPFKeyword' -Tag 'Get-WPFKeyword' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

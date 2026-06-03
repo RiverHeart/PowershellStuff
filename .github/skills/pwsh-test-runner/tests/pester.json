@@ -1,5 +1,5 @@
 {
-  "TestSuite": "WPF",
+  "TestSuite": "TestRunnerSkills",
   "Run": {
     "Path": [
       "."

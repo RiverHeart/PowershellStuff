@@ -202,4 +202,44 @@ Describe 'Invoke-BulkReplace' -Tag 'Invoke-BulkReplace' {
         $Result[0].MatchedFileCount | Should -Be 1
         $Result[1].MatchCount | Should -Be 1
     }
+
+    It 'Supports multiline search with span metadata when SearchMultiline is enabled' {
+        $RootPath = Join-Path $TestDrive 'MultilineSearchRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $FilePath = Join-Path $RootPath 'MultilineSearch.Tests.ps1'
+        [System.IO.File]::WriteAllText(
+            $FilePath,
+            "Describe 'MultiLineCase' {`r`n    It 'A' {`r`n        `$true | Should -BeTrue`r`n    }`r`n}`r`n",
+            [System.Text.UTF8Encoding]::new($false)
+        )
+
+        $Result = @(
+            & $ScriptPath -Path $FilePath -SearchOnly -SearchMultiline -Find "(?ms)^Describe 'MultiLineCase' \{.*?^\}" -UseRegex -PassThru -IncludeSummaryObject
+        )
+
+        $Result.Count | Should -Be 2
+        $Result[0].RecordType | Should -Be 'RunSummary'
+        $Result[0].Mode | Should -Be 'SearchOnly'
+        $Result[0].MatchCount | Should -Be 1
+        $Result[1].MatchCount | Should -Be 1
+        $Result[1].LineNumbers | Should -Be @(1)
+        $Result[1].StartLineNumbers | Should -Be @(1)
+        $Result[1].EndLineNumbers | Should -Be @(5)
+    }
+
+    It 'Treats regex replacement text literally when LiteralReplacement is enabled' {
+        $RootPath = Join-Path $TestDrive 'LiteralReplacementRoot'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+
+        $FilePath = Join-Path $RootPath 'LiteralReplacement.Tests.ps1'
+        [System.IO.File]::WriteAllText($FilePath, "Describe 'LiteralReplacement' {`r`n}`r`n", [System.Text.UTF8Encoding]::new($false))
+
+        $Result = & $ScriptPath -Path $FilePath -Find "Describe 'LiteralReplacement'" -Replace '$1-LITERAL' -UseRegex -LiteralReplacement -PassThru
+
+        (Get-Content -Path $FilePath -Raw) | Should -BeExactly ('$1-LITERAL {' + "`r`n" + '}' + "`r`n")
+        $Result.Count | Should -Be 1
+        $Result[0].Changed | Should -BeTrue
+        $Result[0].ReplacementCount | Should -Be 1
+    }
 }

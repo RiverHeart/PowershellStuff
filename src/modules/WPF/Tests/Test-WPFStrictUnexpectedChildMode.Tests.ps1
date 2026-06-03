@@ -1,6 +1,9 @@
 Describe 'Test-WPFStrictUnexpectedChildMode' -Tag 'Test-WPFStrictUnexpectedChildMode' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $script:OriginalValue = [Environment]::GetEnvironmentVariable('WPF_STRICT_UNEXPECTED_CHILD')
     }
 

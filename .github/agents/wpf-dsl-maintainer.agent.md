@@ -23,5 +23,5 @@ Default checklist:
 1. Implement change in DSL/helper code.
 2. Add or update tests in src/modules/WPF/Tests.
 3. Update src/modules/WPF/Docs/KeywordReference.md.
-4. Run ./.github/skills/test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF.
+4. Run ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite WPF.
 5. Report behavior changes and any compatibility impacts.

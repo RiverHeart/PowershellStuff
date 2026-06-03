@@ -1,6 +1,9 @@
 Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $script:OriginalAutoCloseValue = $env:WPF_AUTO_CLOSE_SECONDS
     }
 

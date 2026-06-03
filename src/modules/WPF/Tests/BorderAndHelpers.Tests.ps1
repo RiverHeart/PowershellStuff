@@ -1,6 +1,9 @@
 Describe 'Border DSL' -Tag 'Border' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 
@@ -74,8 +77,11 @@ Describe 'Border DSL' -Tag 'Border' {
 }
 
 Describe 'Find-WPFChildNode' -Tag 'Find-WPFChildNode' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 
@@ -128,8 +134,11 @@ Describe 'Find-WPFChildNode' -Tag 'Find-WPFChildNode' {
 }
 
 Describe 'When' -Tag 'When' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 
@@ -152,8 +161,11 @@ Describe 'When' -Tag 'When' {
 }
 
 Describe 'Set-WPFWindowFullScreen' -Tag 'Set-WPFWindowFullScreen' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
         $WarningPreference = 'SilentlyContinue'
     }
 

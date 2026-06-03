@@ -1,20 +1,22 @@
-class TestWPFDisposable : System.IDisposable {
-    [bool] $Disposed = $false
-
-    [void] Dispose() {
-        $this.Disposed = $true
-    }
-}
-
-class TestWPFThrowingDisposable : System.IDisposable {
-    [void] Dispose() {
-        throw 'Dispose failed intentionally'
-    }
-}
-
 Describe 'TimedEvent' -Tag 'TimedEvent' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    BeforeAll {
+        class TestWPFDisposable : System.IDisposable {
+            [bool] $Disposed = $false
+
+            [void] Dispose() {
+                $this.Disposed = $true
+            }
+        }
+
+        class TestWPFThrowingDisposable : System.IDisposable {
+            [void] Dispose() {
+                throw 'Dispose failed intentionally'
+            }
+        }
     }
 
     BeforeEach {
@@ -98,13 +100,24 @@ Describe 'TimedEvent' -Tag 'TimedEvent' {
 
         $Warnings = InModuleScope WPF {
             $ClearWarnings = @()
-            Clear-WPFControlRegistry -WarningVariable ClearWarnings -WarningAction SilentlyContinue
+            Clear-WPFControlRegistry -WarningVariable +ClearWarnings -WarningAction SilentlyContinue
             ,$ClearWarnings
         }
 
+        $warningMessages = @(
+            $Warnings | ForEach-Object {
+                if ($_ -is [System.Management.Automation.WarningRecord]) {
+                    $_.Message
+                } else {
+                    [string] $_
+                }
+            }
+        )
+
         $Good.Disposed | Should -BeTrue
-        $Warnings | Should -Not -BeNullOrEmpty
-        ($Warnings -join [Environment]::NewLine) | Should -Match 'Failed to dispose object'
+        @($warningMessages).Count | Should -BeGreaterThan 0
+        ($warningMessages -join [Environment]::NewLine) | Should -Match "Failed to dispose object 'BadDisposable'"
+        ($warningMessages -join [Environment]::NewLine) | Should -Match 'Failed to dispose object'
     }
 
     It 'Should initialize IsRefreshing guard for async timers' {

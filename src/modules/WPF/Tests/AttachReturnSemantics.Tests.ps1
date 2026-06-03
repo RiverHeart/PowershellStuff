@@ -1,39 +1,53 @@
 Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
-    $Cases = @(
-        @{ Keyword = 'Button';       NamePrefix = 'Button';       Type = [System.Windows.Controls.Button] }
-        @{ Keyword = 'Label';        NamePrefix = 'Label';        Type = [System.Windows.Controls.Label] }
-        @{ Keyword = 'TextBlock';    NamePrefix = 'TextBlock';    Type = [System.Windows.Controls.TextBlock] }
-        @{ Keyword = 'Image';        NamePrefix = 'Image';        Type = [System.Windows.Controls.Image] }
-        @{ Keyword = 'ScrollViewer'; NamePrefix = 'ScrollViewer'; Type = [System.Windows.Controls.ScrollViewer] }
-        @{ Keyword = 'StackPanel';   NamePrefix = 'StackPanel';   Type = [System.Windows.Controls.StackPanel] }
-        @{ Keyword = 'DockPanel';    NamePrefix = 'DockPanel';    Type = [System.Windows.Controls.DockPanel] }
-        @{ Keyword = 'DatePicker';   NamePrefix = 'DatePicker';   Type = [System.Windows.Controls.DatePicker] }
-        @{ Keyword = 'DataGrid';     NamePrefix = 'DataGrid';     Type = [System.Windows.Controls.DataGrid] }
-    )
-
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+
+        $script:Cases = @(
+            @{ Keyword = 'Button';       NamePrefix = 'Button';       Type = [System.Windows.Controls.Button] }
+            @{ Keyword = 'Label';        NamePrefix = 'Label';        Type = [System.Windows.Controls.Label] }
+            @{ Keyword = 'TextBlock';    NamePrefix = 'TextBlock';    Type = [System.Windows.Controls.TextBlock] }
+            @{ Keyword = 'Image';        NamePrefix = 'Image';        Type = [System.Windows.Controls.Image] }
+            @{ Keyword = 'ScrollViewer'; NamePrefix = 'ScrollViewer'; Type = [System.Windows.Controls.ScrollViewer] }
+            @{ Keyword = 'StackPanel';   NamePrefix = 'StackPanel';   Type = [System.Windows.Controls.StackPanel] }
+            @{ Keyword = 'DockPanel';    NamePrefix = 'DockPanel';    Type = [System.Windows.Controls.DockPanel] }
+            @{ Keyword = 'DatePicker';   NamePrefix = 'DatePicker';   Type = [System.Windows.Controls.DatePicker] }
+            @{ Keyword = 'DataGrid';     NamePrefix = 'DataGrid';     Type = [System.Windows.Controls.DataGrid] }
+        )
     }
 
-    foreach ($case in $Cases) {
-        It "Returns created $($case.Keyword) when no parent context exists" {
+    It 'Returns created <Keyword> when no parent context exists' -ForEach $script:Cases {
+        param($Keyword, $NamePrefix, $Type)
+
+            $case = [pscustomobject] @{
+                Keyword = $Keyword
+                NamePrefix = $NamePrefix
+                Type = $Type
+            }
+
             $id = [guid]::NewGuid().ToString('N')
             $name = "{0}_{1}" -f $case.NamePrefix, $id
 
             $psVars = New-WPFVariableList -AdditionalVariables @([psvariable]::new('this', $null))
-            $control = {
+            $result = {
                 & $case.Keyword $name {}
             }.InvokeWithContext($null, $psVars)
-            $control = @($control)[0]
+            @($result).Count | Should -Be 1
+            $control = @($result)[0]
 
-            $control | Should -Not -BeNullOrEmpty
+            $control | Should -Not -Be $null
             $control | Should -BeOfType $case.Type
             $control.Name | Should -Be $name
-        }
     }
 
-    foreach ($case in $Cases) {
-        It "Auto-attaches $($case.Keyword) and returns no output when parent context exists" {
+    It 'Auto-attaches <Keyword> and returns no output when parent context exists' -ForEach $script:Cases {
+        param($Keyword, $NamePrefix, $Type)
+
+            $case = [pscustomobject] @{
+                Keyword = $Keyword
+                NamePrefix = $NamePrefix
+                Type = $Type
+            }
+
             $parent = [System.Windows.Controls.StackPanel]::new()
             $psVars = New-WPFVariableList -InputObject $parent
             $id = [guid]::NewGuid().ToString('N')
@@ -47,6 +61,5 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
             $parent.Children | Should -HaveCount 1
             $parent.Children[0] | Should -BeOfType $case.Type
             $parent.Children[0].Name | Should -Be $name
-        }
     }
 }

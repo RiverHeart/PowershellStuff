@@ -1,5 +1,5 @@
 Describe 'DataGridTextColumn' -Tag 'DataGridTextColumn' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

@@ -1,5 +1,5 @@
 Describe 'Style implicit setter syntax' -Tag 'Style' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 

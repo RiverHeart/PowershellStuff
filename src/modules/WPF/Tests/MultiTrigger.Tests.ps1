@@ -1,5 +1,5 @@
 Describe 'MultiTrigger' -Tag 'MultiTrigger' {
-    BeforeAll {
+    BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
 
