@@ -4,6 +4,20 @@
     # Note: These rules are geared towards the WPF module and should probably be removed
     # if/when that module is migrated to a separate repository.
     Rules = @{
+        # WARNING: This only applies to advanced cmdlets but it's better than nothing.
+        PSProvideCommentHelp = @{
+            Enable = $true
+            ExportedOnly = $false
+            BlockComment = $true
+            VSCodeSnippetCorrection = $false
+            Placement = 'before'
+        }
+        PSUseCorrectCasing = @{
+            Enable        = $true
+            CheckCommands = $true
+            CheckKeyword  = $true
+            CheckOperator = $true
+        }
         PSUseCompatibleSyntax = @{
             Enable = $true
             TargetVersions = @('PowerShellCore', 'PowerShellDesktop')
