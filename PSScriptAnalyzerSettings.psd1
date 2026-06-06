@@ -72,6 +72,9 @@
         'TypeNotFound',
 
         # Produces false positive for the 'Command' DSL keyword.
-        'PSAvoidUsingCmdletAliases'
+        'PSAvoidUsingCmdletAliases',
+
+        # For complicated commands sure but not for common/simple ones.
+        'PSAvoidUsingPositionalParameters'
     )
 }

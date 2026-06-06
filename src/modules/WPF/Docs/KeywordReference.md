@@ -907,6 +907,7 @@ The keyword contract is intentionally simple:
 - Use trailing scriptblocks for control bodies.
 - Build UI top-down through nesting.
 - Prefer $this for current-object configuration.
+- Typed assignments and helper conversions follow PowerShell `LanguagePrimitives` rules, including registered WPF PSTypeConverters.
 
 If behavior changes are needed, update examples and tests in the same change.
 
