@@ -85,8 +85,21 @@ param (
     [switch] $PassThru
 )
 
+$script:LocationPushed = $false
+
+function Restore-OriginalLocation {
+    [CmdletBinding()]
+    param()
+
+    if ($script:LocationPushed) {
+        Pop-Location -ErrorAction SilentlyContinue
+        $script:LocationPushed = $false
+    }
+}
+
 function Test-IsInteractive {
     [CmdletBinding()]
+    [OutputType([bool])]
     param()
 
     $isCiRun = ($env:CI -eq 'true') -or ($env:GITHUB_ACTIONS -eq 'true')
@@ -105,56 +118,58 @@ function Test-IsInteractive {
     }
 }
 
-$isInteractive = Test-IsInteractive
+try {
+    $isInteractive = Test-IsInteractive
 
-$IsLatestPesterAvailable = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -ge 5 } | Select-Object -First 1
-if (-not $IsLatestPesterAvailable) {
-    if (-not $isInteractive) {
-        Write-Error 'Pester module was not found and this is a non-interactive session (CI or redirected console). Install Pester before running tests.'
-        exit 2
+    $IsLatestPesterAvailable = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -ge 5 } | Select-Object -First 1
+    if (-not $IsLatestPesterAvailable) {
+        if (-not $isInteractive) {
+            Write-Error 'Pester module was not found and this is a non-interactive session (CI or redirected console). Install Pester before running tests.'
+            return
+        }
+
+        $Title = 'Pester v5 Required'
+        $Message = 'Pester v5 or later is required to run tests. Would you like to install it?'
+        $Options = [System.Management.Automation.Host.ChoiceDescription[]]@(
+            [System.Management.Automation.Host.ChoiceDescription]::new('&Yes', 'Install Pester v5 from the PowerShell Gallery.'),
+            [System.Management.Automation.Host.ChoiceDescription]::new('&No', 'Do not install Pester v5 and exit.')
+        )
+
+        $UserChoice = $Host.UI.PromptForChoice($Title, $Message, $Options, 0)
+        if ($UserChoice -eq 0) {
+            $InstallParams = @{
+                Name = 'Pester'
+                MinimumVersion = '5.0.0'
+                Scope = 'CurrentUser'
+                Force = $True
+                ErrorAction = 'Stop'
+            }
+            if ($PSEdition -eq 'Desktop') {
+                # Require because newer community-maintained versions have a different
+                # digital certificate than the Microsoft one that signs the bundled Pester v3 module.
+                $InstallParams.SkipPublisherCheck = $true
+            }
+            try {
+                Install-Module @InstallParams
+                Write-Host 'Pester v5 has been installed. Proceeding with test execution.'
+            } catch {
+                Write-Error "Failed to install Pester v5: $_"
+                return
+            }
+        } else {
+            Write-Error 'Pester v5 installation declined by user. Exiting.'
+            return
+        }
     }
 
-    $Title = 'Pester v5 Required'
-    $Message = 'Pester v5 or later is required to run tests. Would you like to install it?'
-    $Options = [System.Management.Automation.Host.ChoiceDescription[]]@(
-        [System.Management.Automation.Host.ChoiceDescription]::new('&Yes', 'Install Pester v5 from the PowerShell Gallery.'),
-        [System.Management.Automation.Host.ChoiceDescription]::new('&No', 'Do not install Pester v5 and exit.')
-    )
-
-    $UserChoice = $Host.UI.PromptForChoice($Title, $Message, $Options, 0)
-    if ($UserChoice -eq 0) {
-        $InstallParams = @{
-            Name = 'Pester'
-            MinimumVersion = '5.0.0'
-            Scope = 'CurrentUser'
-            Force = $True
-            ErrorAction = 'Stop;
-        }
-        if ($PSEdition -eq 'Desktop') {
-            # Require because newer community-maintained versions have a different
-            # digital certificate than the Microsoft one that signs the bundled Pester v3 module.
-            $InstallParams.SkipPublisherCheck = $true
-        }
-        try {
-            Install-Module @InstallParams
-            Write-Host 'Pester v5 has been installed. Proceeding with test execution.'
-        } catch {
-            Write-Error "Failed to install Pester v5: $_"
-            exit 2
-        }
-    } else {
-        Write-Error 'Pester v5 installation declined by user. Exiting.'
-        exit 2
+    $IsUsingLatestPester = Get-Module Pester | Where-Object { $_.Version.Major -ge 5 } | Select-Object -First 1
+    if (-not $IsUsingLatestPester -and $IsLatestPesterAvailable) {
+        Import-Module -Name Pester -MinimumVersion '5.0.0' -Force
     }
-}
-
-$IsUsingLatestPester = Get-Module Pester | Where-Object { $_.Version.Major -ge 5 } | Select-Object -First 1
-if (-not $IsUsingLatestPester -and $IsLatestPesterAvailable) {
-    Import-Module -Name Pester -MinimumVersion '5.0.0' -Force
-}
 
 function Get-RepositoryRoot {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [string[]] $StartDirectories
@@ -169,15 +184,15 @@ function Get-RepositoryRoot {
 
             $current = $candidate.Path
             while ($current -ne [System.IO.Path]::GetPathRoot($current)) {
-                $rootConfigPath = Join-Path $current 'pester.json'
-                if (Test-Path -Path $rootConfigPath) {
+                $RootConfigPath = Join-Path $current 'pester.json'
+                if (Test-Path -Path $RootConfigPath) {
                     try {
-                        $rootConfig = Get-Content -Path $rootConfigPath -Raw | ConvertFrom-Json -ErrorAction Stop
-                        if ($rootConfig.PSObject.Properties.Name -contains 'isRoot' -and [bool] $rootConfig.isRoot) {
+                        $RootConfig = Get-Content -Path $RootConfigPath -Raw | ConvertFrom-Json -ErrorAction Stop
+                        if ($RootConfig.PSObject.Properties.Name -contains 'isRoot' -and [bool] $RootConfig.isRoot) {
                             return $current
                         }
                     } catch {
-                        Write-Debug "Ignoring invalid root config at '$rootConfigPath': $_"
+                        Write-Debug "Ignoring invalid root config at '$RootConfigPath': $_"
                     }
                 }
 
@@ -236,36 +251,36 @@ function Test-RootManifest {
         throw "Root config '$Path' is missing TestSuites."
     }
 
-    $suites = @($RootConfig.TestSuites)
-    if ($suites.Count -eq 0) {
+    $Suites = @($RootConfig.TestSuites)
+    if ($Suites.Count -eq 0) {
         throw "Root config '$Path' must define at least one suite in TestSuites."
     }
 
-    foreach ($suite in $suites) {
-        if (-not ($suite.PSObject.Properties.Name -contains 'Name') -or [string]::IsNullOrWhiteSpace([string] $suite.Name)) {
+    foreach ($Suite in $Suites) {
+        if (-not ($Suite.PSObject.Properties.Name -contains 'Name') -or [string]::IsNullOrWhiteSpace([string] $Suite.Name)) {
             throw "Each suite in '$Path' must define a non-empty Name."
         }
 
         $hasConfigPath = (
-            ($suite.PSObject.Properties.Name -contains 'ConfigPath') -and
-            -not [string]::IsNullOrWhiteSpace([string] $suite.ConfigPath)
+            ($Suite.PSObject.Properties.Name -contains 'ConfigPath') -and
+            -not [string]::IsNullOrWhiteSpace([string] $Suite.ConfigPath)
         )
 
         $hasInlineSuiteConfig = (
-            ($suite.PSObject.Properties.Name -contains 'Run') -and
-            $null -ne $suite.Run
+            ($Suite.PSObject.Properties.Name -contains 'Run') -and
+            $null -ne $Suite.Run
         )
 
         if ($hasConfigPath -and $hasInlineSuiteConfig) {
-            throw "Suite '$($suite.Name)' in '$Path' cannot define both ConfigPath and inline Run configuration. Choose one style per suite."
+            throw "Suite '$($Suite.Name)' in '$Path' cannot define both ConfigPath and inline Run configuration. Choose one style per suite."
         }
 
         if (-not $hasConfigPath -and -not $hasInlineSuiteConfig) {
-            throw "Suite '$($suite.Name)' in '$Path' must define either ConfigPath or an inline suite Run configuration."
+            throw "Suite '$($Suite.Name)' in '$Path' must define either ConfigPath or an inline suite Run configuration."
         }
 
         if ($hasInlineSuiteConfig) {
-            Test-SuiteManifest -SuiteConfig $suite -Path "$Path (suite '$($suite.Name)')"
+            Test-SuiteManifest -SuiteConfig $Suite -Path "$Path (suite '$($Suite.Name)')"
         }
     }
 }
@@ -295,6 +310,7 @@ function Test-SuiteManifest {
 
 function Convert-SingleSuiteManifestToSuiteList {
     [CmdletBinding()]
+    [OutputType([object[]])]
     param(
         [Parameter(Mandatory)]
         [object] $Config,
@@ -305,7 +321,7 @@ function Convert-SingleSuiteManifestToSuiteList {
 
     Test-SuiteManifest -SuiteConfig $Config -Path $ConfigPath
 
-    $suiteName = if (
+    $SuiteName = if (
         ($Config.PSObject.Properties.Name -contains 'TestSuite') -and
         -not [string]::IsNullOrWhiteSpace([string] $Config.TestSuite)
     ) {
@@ -316,290 +332,295 @@ function Convert-SingleSuiteManifestToSuiteList {
 
     return @(
         [pscustomobject]@{
-            Name       = $suiteName
+            Name       = $SuiteName
             ConfigPath = $ConfigPath
         }
     )
 }
 
-$repoRoot = Get-RepositoryRoot -StartDirectories @((Get-Location).Path, $PSScriptRoot)
-if ($null -eq $repoRoot) {
-    Write-Error 'Could not locate repository root. Add a pester.json file with isRoot=true or ensure .git exists.'
-    exit 2
-}
+    $RepoRoot = Get-RepositoryRoot -StartDirectories @((Get-Location).Path, $PSScriptRoot)
+    if ($null -eq $RepoRoot) {
+        Write-Error 'Could not locate repository root. Add a pester.json file with isRoot=true or ensure .git exists.'
+        return
+    }
 
-Set-Location -Path $repoRoot
+    Push-Location -Path $RepoRoot
+    $script:LocationPushed = $true
 
-$rootConfigPath = Join-Path $repoRoot 'pester.json'
+    $RootConfigPath = Join-Path $RepoRoot 'pester.json'
 
-try {
-    $rootConfig = Read-JsonFile -Path $rootConfigPath -Description 'Root test config'
+    try {
+        $RootConfig = Read-JsonFile -Path $RootConfigPath -Description 'Root test config'
 
-    $hasRootLayout = (
-        ($rootConfig.PSObject.Properties.Name -contains 'isRoot') -and
-        [bool] $rootConfig.isRoot
+        $HasRootLayout = (
+            ($RootConfig.PSObject.Properties.Name -contains 'isRoot') -and
+            [bool] $RootConfig.isRoot
+        )
+
+        if ($HasRootLayout) {
+            Test-RootManifest -RootConfig $RootConfig -Path $RootConfigPath
+            $ConfiguredSuites = @($RootConfig.TestSuites)
+        } else {
+            # Alternative manifest style: allow a direct single-suite config at repo root.
+            $ConfiguredSuites = Convert-SingleSuiteManifestToSuiteList -Config $RootConfig -ConfigPath $RootConfigPath
+        }
+    } catch {
+        Write-Error $_
+        return
+    }
+
+    if ($ListSuites) {
+        Write-Host "Repository Root: $RepoRoot"
+        Write-Host 'Configured test suites:'
+        foreach ($ConfiguredSuite in $ConfiguredSuites) {
+            $SuiteSource = if (
+                ($ConfiguredSuite.PSObject.Properties.Name -contains 'ConfigPath') -and
+                -not [string]::IsNullOrWhiteSpace([string] $ConfiguredSuite.ConfigPath)
+            ) {
+                [string] $ConfiguredSuite.ConfigPath
+            } else {
+                '(inline in root manifest)'
+            }
+
+            Write-Host ("  {0} -> {1}" -f $ConfiguredSuite.Name, $SuiteSource)
+        }
+        return
+    }
+
+    $Suite = @($ConfiguredSuites | Where-Object { $_.Name -eq $TestSuite } | Select-Object -First 1)
+    if ($Suite.Count -eq 0) {
+        $AvailableSuites = @($ConfiguredSuites | ForEach-Object { $_.Name }) -join ', '
+        Write-Error "Unknown test suite '$TestSuite'. Available suites: $AvailableSuites"
+        return
+    }
+
+    $SuiteConfigPath = $null
+    $SuiteConfig = $null
+    $SuiteBaseDirectory = $RepoRoot
+
+    $HasSuiteConfigPath = (
+        ($Suite[0].PSObject.Properties.Name -contains 'ConfigPath') -and
+        -not [string]::IsNullOrWhiteSpace([string] $Suite[0].ConfigPath)
     )
 
-    if ($hasRootLayout) {
-        Test-RootManifest -RootConfig $rootConfig -Path $rootConfigPath
-        $configuredSuites = @($rootConfig.TestSuites)
-    } else {
-        # Alternative manifest style: allow a direct single-suite config at repo root.
-        $configuredSuites = Convert-SingleSuiteManifestToSuiteList -Config $rootConfig -ConfigPath $rootConfigPath
-    }
-} catch {
-    Write-Error $_
-    exit 2
-}
-
-if ($ListSuites) {
-    Write-Host "Repository Root: $repoRoot"
-    Write-Host 'Configured test suites:'
-    foreach ($configuredSuite in $configuredSuites) {
-        $suiteSource = if (
-            ($configuredSuite.PSObject.Properties.Name -contains 'ConfigPath') -and
-            -not [string]::IsNullOrWhiteSpace([string] $configuredSuite.ConfigPath)
-        ) {
-            [string] $configuredSuite.ConfigPath
+    if ($HasSuiteConfigPath) {
+        $SuiteConfigPath = if ([System.IO.Path]::IsPathRooted($Suite[0].ConfigPath)) {
+            $Suite[0].ConfigPath
         } else {
-            '(inline in root manifest)'
+            Join-Path $RepoRoot $Suite[0].ConfigPath
         }
 
-        Write-Host ("  {0} -> {1}" -f $configuredSuite.Name, $suiteSource)
-    }
-    exit 0
-}
+        if (-not (Test-Path -Path $SuiteConfigPath)) {
+            Write-Error "Suite config was not found: $SuiteConfigPath"
+            return
+        }
 
-$suite = @($configuredSuites | Where-Object { $_.Name -eq $TestSuite } | Select-Object -First 1)
-if ($suite.Count -eq 0) {
-    $availableSuites = @($configuredSuites | ForEach-Object { $_.Name }) -join ', '
-    Write-Error "Unknown test suite '$TestSuite'. Available suites: $availableSuites"
-    exit 2
-}
+        try {
+            $SuiteConfig = Read-JsonFile -Path $SuiteConfigPath -Description 'Suite config'
+            Test-SuiteManifest -SuiteConfig $SuiteConfig -Path $SuiteConfigPath
+        } catch {
+            Write-Error $_
+            return
+        }
 
-$suiteConfigPath = $null
-$suiteConfig = $null
-$suiteBaseDirectory = $repoRoot
-
-$hasSuiteConfigPath = (
-    ($suite[0].PSObject.Properties.Name -contains 'ConfigPath') -and
-    -not [string]::IsNullOrWhiteSpace([string] $suite[0].ConfigPath)
-)
-
-if ($hasSuiteConfigPath) {
-    $suiteConfigPath = if ([System.IO.Path]::IsPathRooted($suite[0].ConfigPath)) {
-        $suite[0].ConfigPath
+        $SuiteBaseDirectory = Split-Path -Path $SuiteConfigPath -Parent
     } else {
-        Join-Path $repoRoot $suite[0].ConfigPath
-    }
+        $SuiteConfigPath = $RootConfigPath
+        $SuiteConfig = $Suite[0]
 
-    if (-not (Test-Path -Path $suiteConfigPath)) {
-        Write-Error "Suite config was not found: $suiteConfigPath"
-        exit 2
-    }
-
-    try {
-        $suiteConfig = Read-JsonFile -Path $suiteConfigPath -Description 'Suite config'
-        Test-SuiteManifest -SuiteConfig $suiteConfig -Path $suiteConfigPath
-    } catch {
-        Write-Error $_
-        exit 2
-    }
-
-    $suiteBaseDirectory = Split-Path -Path $suiteConfigPath -Parent
-} else {
-    $suiteConfigPath = $rootConfigPath
-    $suiteConfig = $suite[0]
-
-    try {
-        Test-SuiteManifest -SuiteConfig $suiteConfig -Path "$rootConfigPath (suite '$($suite[0].Name)')"
-    } catch {
-        Write-Error $_
-        exit 2
-    }
-}
-$resolvedPath = @()
-foreach ($pathEntry in @($suiteConfig.Run.Path)) {
-    if ([System.IO.Path]::IsPathRooted($pathEntry)) {
-        $resolved = Resolve-Path -Path $pathEntry -ErrorAction SilentlyContinue
-    } else {
-        $resolved = Resolve-Path -Path (Join-Path $suiteBaseDirectory $pathEntry) -ErrorAction SilentlyContinue
-    }
-
-    if ($null -eq $resolved) {
-        Write-Error "Suite path was not found: $pathEntry (from $suiteConfigPath)"
-        exit 2
-    }
-
-    $resolvedPath += $resolved.Path
-}
-
-Write-Host "Repository Root: $repoRoot"
-Write-Host "Test Suite: $TestSuite"
-Write-Host "Suite Config: $suiteConfigPath"
-Write-Host 'Running tests in the following path(s):'
-$resolvedPath | ForEach-Object { Write-Host "  $_" }
-
-if ($ListTags) {
-    $discoveryConfiguration = [PesterConfiguration]::Default
-    $discoveryConfiguration.Run.Path = $resolvedPath
-    $discoveryConfiguration.Run.PassThru = $true
-    $discoveryConfiguration.Output.Verbosity = 'None'
-    $discoveryConfiguration.Run.SkipRun = $true
-
-    $discoveryResult = Invoke-Pester -Configuration $discoveryConfiguration
-
-    $allTags = [System.Collections.Generic.List[string]]::new()
-    $allBlocks = [System.Collections.Generic.List[object]]::new()
-
-    function Add-DiscoveredBlock {
-        param([object[]] $Blocks)
-
-        foreach ($block in @($Blocks)) {
-            if ($null -eq $block) { continue }
-
-            $allBlocks.Add($block)
-            if ($block.PSObject.Properties.Name -contains 'Blocks' -and $null -ne $block.Blocks) {
-                Add-DiscoveredBlock -Blocks @($block.Blocks)
-            }
+        try {
+            Test-SuiteManifest -SuiteConfig $SuiteConfig -Path "$RootConfigPath (suite '$($Suite[0].Name)')"
+        } catch {
+            Write-Error $_
+            return
         }
     }
-
-    if ($null -ne $discoveryResult -and ($discoveryResult.PSObject.Properties.Name -contains 'Containers') -and $null -ne $discoveryResult.Containers) {
-        foreach ($container in @($discoveryResult.Containers)) {
-            if ($container.PSObject.Properties.Name -contains 'Blocks' -and $null -ne $container.Blocks) {
-                Add-DiscoveredBlock -Blocks @($container.Blocks)
-            }
+    $ResolvedPath = @()
+    foreach ($PathEntry in @($SuiteConfig.Run.Path)) {
+        if ([System.IO.Path]::IsPathRooted($PathEntry)) {
+            $Resolved = Resolve-Path -Path $PathEntry -ErrorAction SilentlyContinue
+        } else {
+            $Resolved = Resolve-Path -Path (Join-Path $SuiteBaseDirectory $PathEntry) -ErrorAction SilentlyContinue
         }
+
+        if ($null -eq $Resolved) {
+            Write-Error "Suite path was not found: $PathEntry (from $SuiteConfigPath)"
+            return
+        }
+
+        $ResolvedPath += $Resolved.Path
     }
 
-    foreach ($discoveredBlock in $allBlocks) {
-        if ($discoveredBlock.PSObject.Properties.Name -contains 'Tag' -and $null -ne $discoveredBlock.Tag) {
-            foreach ($tagName in @($discoveredBlock.Tag)) {
-                if (-not [string]::IsNullOrWhiteSpace([string] $tagName)) {
-                    $allTags.Add([string] $tagName)
+    Write-Host "Repository Root: $RepoRoot"
+    Write-Host "Test Suite: $TestSuite"
+    Write-Host "Suite Config: $SuiteConfigPath"
+    Write-Host 'Running tests in the following path(s):'
+    $ResolvedPath | ForEach-Object { Write-Host "  $_" }
+
+    if ($ListTags) {
+        $DiscoveryConfiguration = [PesterConfiguration]::Default
+        $DiscoveryConfiguration.Run.Path = $ResolvedPath
+        $DiscoveryConfiguration.Run.PassThru = $true
+        $DiscoveryConfiguration.Output.Verbosity = 'None'
+        $DiscoveryConfiguration.Run.SkipRun = $true
+
+        $DiscoveryResult = Invoke-Pester -Configuration $DiscoveryConfiguration
+
+        $AllTags = [System.Collections.Generic.List[string]]::new()
+        $AllBlocks = [System.Collections.Generic.List[object]]::new()
+
+        function Add-DiscoveredBlock {
+            param([object[]] $Blocks)
+
+            foreach ($block in @($Blocks)) {
+                if ($null -eq $block) { continue }
+
+                $AllBlocks.Add($block)
+                if ($block.PSObject.Properties.Name -contains 'Blocks' -and $null -ne $block.Blocks) {
+                    Add-DiscoveredBlock -Blocks @($block.Blocks)
                 }
             }
         }
-    }
 
-    $distinctTags = @($allTags | Sort-Object -Unique)
-    if ($distinctTags.Count -eq 0) {
-        Write-Host 'No tags were discovered for this suite.'
-    } else {
-        Write-Host 'Discovered tags:'
-        foreach ($discoveredTag in $distinctTags) {
-            Write-Host "  $discoveredTag"
-        }
-    }
-
-    exit 0
-}
-
-$previousDebugPreference = $DebugPreference
-$previousGlobalDebugPreference = $global:DebugPreference
-
-try {
-    $effectiveDebugPreference = if ($DebugOutput) { 'Continue' } else { 'SilentlyContinue' }
-
-    $DebugPreference = $effectiveDebugPreference
-    $global:DebugPreference = $effectiveDebugPreference
-
-    if ($DebugOutput) {
-        Write-Debug 'Debug output enabled for this invocation.'
-    } else {
-        Write-Debug 'Debug output disabled for this invocation.'
-    }
-
-    $configuration = [PesterConfiguration]::Default
-    $configuration.Run.Path = $resolvedPath
-    $configuration.Run.PassThru = $true
-    $configuration.Output.Verbosity = if ($suiteConfig.Output.Verbosity) { [string] $suiteConfig.Output.Verbosity } else { 'None' }
-
-    $effectiveIncludeTags = if ($null -ne $Tag -and $Tag.Count -gt 0) { $Tag } else { @($suiteConfig.Filter.Tag) }
-    if ($effectiveIncludeTags.Count -gt 0) {
-        $configuration.Filter.Tag = @($effectiveIncludeTags)
-        Write-Host ("Include Tags: {0}" -f (@($effectiveIncludeTags) -join ', '))
-    }
-
-    $effectiveExcludeTags = if ($null -ne $ExcludeTag -and $ExcludeTag.Count -gt 0) { $ExcludeTag } else { @($suiteConfig.Filter.ExcludeTag) }
-    if ($effectiveExcludeTags.Count -gt 0) {
-        $configuration.Filter.ExcludeTag = @($effectiveExcludeTags)
-        Write-Host ("Exclude Tags: {0}" -f (@($effectiveExcludeTags) -join ', '))
-    }
-
-    $result = Invoke-Pester -Configuration $configuration
-} finally {
-    $DebugPreference = $previousDebugPreference
-    $global:DebugPreference = $previousGlobalDebugPreference
-}
-
-if ($null -eq $result) {
-    Write-Error 'Pester did not return a result object.'
-    exit 2
-}
-
-$allTests = @()
-if ($result.PSObject.Properties.Name -contains 'Tests' -and $null -ne $result.Tests) {
-    $allTests = @($result.Tests)
-}
-
-$nonPassing = @()
-if ($allTests.Count -gt 0) {
-    $nonPassing = @($allTests | Where-Object {
-        $_.Result -ne 'Passed' -and $_.Result -ne 'NotRun'
-    })
-}
-
-$passing = @()
-if ($allTests.Count -gt 0) {
-    $passing = @($allTests | Where-Object { $_.Result -eq 'Passed' })
-}
-
-if ($ShowPassed -and $passing.Count -gt 0) {
-    foreach ($test in $passing) {
-        Write-Host ("[+] {0}" -f $test.ExpandedPath)
-    }
-}
-
-if ($nonPassing.Count -gt 0) {
-    foreach ($test in $nonPassing) {
-        $errorMessage = ''
-        if ($test.ErrorRecord -and $test.ErrorRecord.Exception) {
-            $errorMessage = $test.ErrorRecord.Exception.Message
+        if ($null -ne $DiscoveryResult -and ($DiscoveryResult.PSObject.Properties.Name -contains 'Containers') -and $null -ne $DiscoveryResult.Containers) {
+            foreach ($Container in @($DiscoveryResult.Containers)) {
+                if ($Container.PSObject.Properties.Name -contains 'Blocks' -and $null -ne $Container.Blocks) {
+                    Add-DiscoveredBlock -Blocks @($Container.Blocks)
+                }
+            }
         }
 
-        if ([string]::IsNullOrWhiteSpace($errorMessage)) {
-            Write-Host ("[-] {0} ({1})" -f $test.ExpandedPath, $test.Result)
+        foreach ($DiscoveredBlock in $AllBlocks) {
+            if ($DiscoveredBlock.PSObject.Properties.Name -contains 'Tag' -and $null -ne $DiscoveredBlock.Tag) {
+                foreach ($TagName in @($DiscoveredBlock.Tag)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string] $TagName)) {
+                        $AllTags.Add([string] $TagName)
+                    }
+                }
+            }
+        }
+
+        $DistinctTags = @($AllTags | Sort-Object -Unique)
+        if ($DistinctTags.Count -eq 0) {
+            Write-Host 'No tags were discovered for this suite.'
         } else {
-            Write-Host ("[-] {0} ({1})`n    {2}" -f $test.ExpandedPath, $test.Result, $errorMessage)
+            Write-Host 'Discovered tags:'
+            foreach ($DiscoveredTag in $DistinctTags) {
+                Write-Host "  $DiscoveredTag"
+            }
+        }
+
+        return
+    }
+
+    $PreviousDebugPreference = $DebugPreference
+    $PreviousGlobalDebugPreference = $global:DebugPreference
+
+    try {
+        $effectiveDebugPreference = if ($DebugOutput) { 'Continue' } else { 'SilentlyContinue' }
+
+        $DebugPreference = $effectiveDebugPreference
+        $global:DebugPreference = $effectiveDebugPreference
+
+        if ($DebugOutput) {
+            Write-Debug 'Debug output enabled for this invocation.'
+        } else {
+            Write-Debug 'Debug output disabled for this invocation.'
+        }
+
+        $Configuration = [PesterConfiguration]::Default
+        $Configuration.Run.Path = $ResolvedPath
+        $Configuration.Run.PassThru = $true
+        $Configuration.Output.Verbosity = if ($SuiteConfig.Output.Verbosity) { [string] $SuiteConfig.Output.Verbosity } else { 'None' }
+
+        $EffectiveIncludeTags = if ($null -ne $Tag -and $Tag.Count -gt 0) { $Tag } else { @($SuiteConfig.Filter.Tag) }
+        if ($EffectiveIncludeTags.Count -gt 0) {
+            $Configuration.Filter.Tag = @($EffectiveIncludeTags)
+            Write-Host ("Include Tags: {0}" -f (@($EffectiveIncludeTags) -join ', '))
+        }
+
+        $EffectiveExcludeTags = if ($null -ne $ExcludeTag -and $ExcludeTag.Count -gt 0) { $ExcludeTag } else { @($SuiteConfig.Filter.ExcludeTag) }
+        if ($EffectiveExcludeTags.Count -gt 0) {
+            $Configuration.Filter.ExcludeTag = @($EffectiveExcludeTags)
+            Write-Host ("Exclude Tags: {0}" -f (@($EffectiveExcludeTags) -join ', '))
+        }
+
+        $Result = Invoke-Pester -Configuration $Configuration
+    } finally {
+        $DebugPreference = $PreviousDebugPreference
+        $global:DebugPreference = $PreviousGlobalDebugPreference
+    }
+
+    if ($null -eq $Result) {
+        Write-Error 'Pester did not return a result object.'
+        return
+    }
+
+    $AllTests = @()
+    if ($Result.PSObject.Properties.Name -contains 'Tests' -and $null -ne $Result.Tests) {
+        $AllTests = @($Result.Tests)
+    }
+
+    $NonPassing = @()
+    if ($AllTests.Count -gt 0) {
+        $NonPassing = @($AllTests | Where-Object {
+            $_.Result -ne 'Passed' -and $_.Result -ne 'NotRun'
+        })
+    }
+
+    $Passing = @()
+    if ($AllTests.Count -gt 0) {
+        $Passing = @($AllTests | Where-Object { $_.Result -eq 'Passed' })
+    }
+
+    if ($ShowPassed -and $Passing.Count -gt 0) {
+        foreach ($Test in $Passing) {
+            Write-Host ("[+] {0}" -f $Test.ExpandedPath)
         }
     }
-} elseif (-not $ShowPassed) {
-    Write-Host 'All tests passed. No non-passing tests to report.'
+
+    if ($NonPassing.Count -gt 0) {
+        foreach ($Test in $NonPassing) {
+            $ErrorMessage = ''
+            if ($Test.ErrorRecord -and $Test.ErrorRecord.Exception) {
+                $ErrorMessage = $Test.ErrorRecord.Exception.Message
+            }
+
+            if ([string]::IsNullOrWhiteSpace($ErrorMessage)) {
+                Write-Host ("[-] {0} ({1})" -f $Test.ExpandedPath, $Test.Result)
+            } else {
+                Write-Host ("[-] {0} ({1})`n    {2}" -f $Test.ExpandedPath, $Test.Result, $ErrorMessage)
+            }
+        }
+    } elseif (-not $ShowPassed) {
+        Write-Host 'All tests passed. No non-passing tests to report.'
+    }
+
+    $DurationSeconds = 0
+    if ($Result.PSObject.Properties.Name -contains 'Duration' -and $null -ne $Result.Duration) {
+        $DurationSeconds = $Result.Duration.TotalSeconds
+    }
+
+    Write-Host ("Tests completed in {0:N2}s" -f $DurationSeconds)
+    Write-Host (
+        "Tests Passed: {0}, Failed: {1}, Skipped: {2}, Inconclusive: {3}, NotRun: {4}" -f
+        $Result.PassedCount,
+        $Result.FailedCount,
+        $Result.SkippedCount,
+        $Result.InconclusiveCount,
+        $Result.NotRunCount
+    )
+
+    if ($PassThru) {
+        $Result
+    }
+
+    if ($Result.FailedCount -gt 0) {
+        Write-Error 'One or more tests failed.'
+        return
+    }
+
+    return
+} finally {
+    Restore-OriginalLocation
 }
-
-$durationSeconds = 0
-if ($result.PSObject.Properties.Name -contains 'Duration' -and $null -ne $result.Duration) {
-    $durationSeconds = $result.Duration.TotalSeconds
-}
-
-Write-Host ("Tests completed in {0:N2}s" -f $durationSeconds)
-Write-Host (
-    "Tests Passed: {0}, Failed: {1}, Skipped: {2}, Inconclusive: {3}, NotRun: {4}" -f
-    $result.PassedCount,
-    $result.FailedCount,
-    $result.SkippedCount,
-    $result.InconclusiveCount,
-    $result.NotRunCount
-)
-
-if ($PassThru) {
-    $result
-}
-
-if ($result.FailedCount -gt 0) {
-    exit 1
-}
-
-exit 0
