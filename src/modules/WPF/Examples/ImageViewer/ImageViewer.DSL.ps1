@@ -117,34 +117,40 @@ Window 'Window' {
         }
     }
 
-    # Use PreviewKeyDown so navigation keys still work when focused controls
+    # Demonstrate keyboard event handling with the `Key` helper.
+    Key 'Escape' {
+        Write-Debug "Escape key pressed. Attempting to exit full screen mode if active."
+        $State = $this.Tag
+        $StoppedSlideshow = $false
+        if ($State.IsSlideshowActive) {
+            Stop-ImageViewerSlideshow
+            $StoppedSlideshow = $true
+        }
+
+        if (-not $State.IsFullScreen) {
+            if ($StoppedSlideshow) {
+                $event.Handled = $true
+            }
+            return
+        }
+
+        Set-WPFWindowFullScreen -IsFullScreen $False
+        if ($State.IsFitMode) {
+            Invoke-ImageViewerFitToWindow
+        }
+        $Event.Handled = $true
+    }
+
+    # Demonstrate more general keyboard event handling with `When`. This is needed for
+    # navigation keys since they require conditional handling based on the focused
+    # control's scrollability.
+    #
+    # NOTE: Use PreviewKeyDown so navigation keys still work when focused controls
     # like ScrollViewer handle KeyDown internally.
     When PreviewKeyDown {
         param($sender, $event)
 
         switch ($event.Key) {
-            'Escape' {
-                $State = $this.Tag
-                $StoppedSlideshow = $false
-                if ($State.IsSlideshowActive) {
-                    Stop-ImageViewerSlideshow
-                    $StoppedSlideshow = $true
-                }
-
-                if (-not $State.IsFullScreen) {
-                    if ($StoppedSlideshow) {
-                        $event.Handled = $True
-                    }
-                    break
-                }
-
-                Set-WPFWindowFullScreen -IsFullScreen $False
-                if ($State.IsFitMode) {
-                    Invoke-ImageViewerFitToWindow
-                }
-                $event.Handled = $True
-                break
-            }
             'Left' {
                 if (Test-ImageViewerShouldNavigate) {
                     Invoke-ImageViewerNavigate -Direction Back

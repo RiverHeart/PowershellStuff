@@ -21,7 +21,7 @@
 #>
 function When {
     [CmdletBinding()]
-    [Alias('Add-WPFHandler')]
+    [Alias('Add-WPFHandler', '-When')]
     [OutputType([void])]
     param(
         [Parameter(Mandatory)]
@@ -34,6 +34,11 @@ function When {
 
         [object] $InputObject
     )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "When $Event"
+        return
+    }
 
     # Auto-attach self to parent if one exists
     if (-not $InputObject) {

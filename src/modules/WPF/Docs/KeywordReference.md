@@ -35,6 +35,7 @@ Scope of this page:
     * [Path](#path)
 * [Commands and Events](#commands-and-events)
     * [Command](#command)
+    * [Key](#key)
     * [When](#when)
     * [TimedEvent](#timedevent)
 * [Binding and Resources](#binding-and-resources)
@@ -58,6 +59,7 @@ Scope of this page:
 * [Lookup and Composition Helpers](#lookup-and-composition-helpers)
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
+    * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -373,6 +375,22 @@ Command 'SaveAs' 'Ctrl+Shift+S' {
     # RelayCommand does not rely on CommandManager in this module,
     # so we refresh availability explicitly when file state changes.
     (Reference 'Window').Tag.SaveAsCommand = $this.Command
+}
+```
+
+### Key
+
+`Key` registers a handler for `PreviewKeyDown` on the current object. It is syntax sugar that wraps your action in gesture-matching logic and only invokes the action when the key and modifier combination matches. Internally, `Key` registers this wrapper through `When PreviewKeyDown`.
+
+Use `Key` for concise gesture matching when you do not need full event-switch logic.
+
+```powershell
+Key 'Escape' {
+    Write-Host 'Exit fullscreen'
+}
+
+Key 'Ctrl+Shift+S' {
+    Write-Host 'Save As'
 }
 ```
 
@@ -797,6 +815,21 @@ $adapterParams = @{
 }
 
 Register-WPFChromeAdapter @adapterParams
+```
+
+### ConvertTo-KeyGesture
+
+Converts one or more gesture strings to WPF `KeyGesture` objects.
+
+Useful when you need consistent parsing for keyboard shortcuts across custom
+DSL helpers.
+
+```powershell
+$Gesture = ConvertTo-KeyGesture -InputObject 'Ctrl+Shift+S'
+```
+
+```powershell
+$Gestures = ConvertTo-KeyGesture -InputObject @('Ctrl+S', 'F11')
 ```
 
 ### Reference

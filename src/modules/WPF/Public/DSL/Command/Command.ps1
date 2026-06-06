@@ -178,10 +178,9 @@ function Command {
             }
 
             $GestureStrings = @($GesturesOrScriptBlock)
-            $Converter = [KeyGestureConverter]::new()
+            $Gestures = @(ConvertTo-KeyGesture -InputObject $GestureStrings)
             $Window = Get-WPFRegisteredObject 'Window'
-            foreach ($GestureStr in $GestureStrings) {
-                $Gesture = [KeyGesture] $Converter.ConvertFromString($GestureStr)
+            foreach ($Gesture in $Gestures) {
                 $Window.InputBindings.Add(
                     [KeyBinding]::new($Command, $Gesture)
                 ) | Out-Null
@@ -197,10 +196,10 @@ function Command {
             $GestureStrings = @($GesturesOrScriptBlock)
             $InputGestures = [InputGestureCollection]::new()
             if ($GesturesOrScriptBlock) {
-                $Converter = [KeyGestureConverter]::new()
-                foreach ($Item in $GestureStrings) {
+                $Gestures = @(ConvertTo-KeyGesture -InputObject $GestureStrings)
+                foreach ($Item in $Gestures) {
                     [void] $InputGestures.Add(
-                        [InputGesture] $Converter.ConvertFromString($Item)
+                        [InputGesture] $Item
                     )
                 }
             }
