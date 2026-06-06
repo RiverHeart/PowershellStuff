@@ -126,6 +126,7 @@ FunctionsToExport = @(
     'Execute'
     'CanExecute'
     'Import'
+    'Key'
     'MultiTrigger'
     'Reference'
     'Resource'
@@ -151,6 +152,7 @@ FunctionsToExport = @(
     # Helpers
     'Add-WPFObject'
     'Convert-SvgToXaml'
+    'ConvertTo-KeyGesture'
     'Convert-WPFObjectToXaml'
     'Find-WPFChildNode'
     'Get-WPFChromeAdapter'
