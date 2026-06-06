@@ -73,11 +73,15 @@ foreach ($Path in $Paths) {
 # being exported. As a seasoned Powershell user this is confusing and I'm sure that AI agents
 # will also struggle with this. So for the sake of clarity and to avoid confusion, I'm going
 # to do it this way until it becomes an issue, even if it is redundant.
-#
-# Fortunately, aliases defined by attribute decorators are still exported by default so those
-# don't need to be explicitly listed in the manifest.
 $ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'WPF.psd1'
-$Manifest = Import-PowerShellDataFile -Path $ManifestPath
+if (-not (Test-Path -Path $ManifestPath)) {
+    throw "Module manifest not found at '$ManifestPath'."
+}
+try {
+    $Manifest = Import-PowerShellDataFile -Path $ManifestPath -ErrorAction Stop
+} catch {
+    throw "Failed to load module manifest '$ManifestPath'. Error: $_"
+}
 
 $FunctionsToExport = if ($Manifest.ContainsKey('FunctionsToExport')) { $Manifest.FunctionsToExport } else { @() }
 $CmdletsToExport = if ($Manifest.ContainsKey('CmdletsToExport')) { $Manifest.CmdletsToExport } else { @() }
