@@ -57,9 +57,9 @@ foreach ($Path in $Paths) {
 # Export Resources
 #-----------------
 
-# `psm1` exports everything by default instead of respecting the `psd1` manifest,
-# as you'd expect, unless `Export-ModuleMember` is used to explicitly specify exports.
-# As a workaround, load the manifest and use that to determine what to export.
+# Importing `WPF.psd1` (including `Import-Module ./WPF/`) still applies manifest exports,
+# but importing `WPF.psm1` directly exports everything unless `Export-ModuleMember` is used.
+# Load the manifest export lists here so direct `.psm1` imports keep the same public surface.
 # Fortunately, aliases defined by attribute decorators are still exported by default.
 $ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'WPF.psd1'
 $Manifest = Import-PowerShellDataFile -Path $ManifestPath
