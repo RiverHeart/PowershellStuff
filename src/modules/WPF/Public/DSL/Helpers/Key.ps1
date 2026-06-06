@@ -24,18 +24,18 @@ function Key {
     param(
         [Parameter(Mandatory)]
         [validateNotNullOrEmpty()]
-        [string] $KeyGesture,
+        [string[]] $KeyGesture,
 
         [Parameter(Mandatory)]
         [scriptblock] $Action
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "Key $($KeyGesture -join ',')"
         return
     }
 
-    $ParsedGesture = ConvertTo-KeyGesture -InputObject $KeyGesture
+    $ParsedGestures = @(ConvertTo-KeyGesture -InputObject $KeyGesture)
 
     $this = $PSCmdlet.GetVariableValue('this')
     $PSVars = New-WPFVariableList -InputObject $this
@@ -43,14 +43,14 @@ function Key {
         param($sender, $event)
         Write-Debug "Key event detected: $($event.Key) with modifiers $($event.KeyboardDevice.Modifiers)"
 
-        $KeyDoesMatch = $event.Key -eq $ParsedGesture.Key
-        $ModifiersMatch =
-            $ParsedGesture.Modifiers -eq [System.Windows.Input.ModifierKeys]::None -or
-            ($event.KeyboardDevice.Modifiers -band $ParsedGesture.Modifiers) -ne 0
+        $GestureMatches = @($ParsedGestures | Where-Object {
+            $event.Key -eq $_.Key -and $event.KeyboardDevice.Modifiers -eq $_.Modifiers
+        })
+        $IsMatch = $GestureMatches.Count -gt 0
 
-        Write-Debug "Key match: $KeyDoesMatch, Modifiers match: $ModifiersMatch"
+        Write-Debug "Key match: $IsMatch"
 
-        if ($KeyDoesMatch -and $ModifiersMatch) {
+        if ($IsMatch) {
             $RuntimeVars = [System.Collections.Generic.List[psvariable]]::new()
             if ($null -ne $PSVars) {
                 foreach ($VarItem in @($PSVars)) {

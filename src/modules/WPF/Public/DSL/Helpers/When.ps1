@@ -36,7 +36,7 @@ function When {
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "When $Event"
         return
     }
 

@@ -37,7 +37,7 @@ function ConvertTo-KeyGesture {
             try {
                 $ParsedGesture = $Converter.ConvertFromString($GestureText)
             } catch {
-                throw "Invalid key gesture '$GestureText'. $_"
+                throw "Invalid key gesture '$GestureText'. $($_.Exception.Message)"
             }
 
             if ($ParsedGesture -isnot [KeyGesture]) {

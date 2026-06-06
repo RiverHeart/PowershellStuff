@@ -130,4 +130,102 @@ Describe 'Key' -Tag 'Key' {
 
         $WasExecuted | Should -BeTrue
     }
+
+    It 'Should require exact modifier matches for modified gestures' {
+        $ExecutionCount = InModuleScope WPF {
+            $script:CapturedHandler = $null
+            $script:ExecutionCount = 0
+
+            Mock -CommandName New-WPFVariableList -MockWith {
+                [System.Collections.Generic.List[psvariable]]::new()
+            }
+
+            Mock -CommandName When -MockWith {
+                param($Event, $ScriptBlock, $InputObject)
+                $script:CapturedHandler = $ScriptBlock
+            }
+
+            Key 'Ctrl+Shift+S' {
+                $script:ExecutionCount++
+            }
+
+            $NoneModifiers = [pscustomobject]@{
+                Key = [System.Windows.Input.Key]::S
+                KeyboardDevice = [pscustomobject]@{
+                    Modifiers = [System.Windows.Input.ModifierKeys]::None
+                }
+            }
+
+            $PartialModifiers = [pscustomobject]@{
+                Key = [System.Windows.Input.Key]::S
+                KeyboardDevice = [pscustomobject]@{
+                    Modifiers = [System.Windows.Input.ModifierKeys]::Control
+                }
+            }
+
+            $ExactModifiers = [pscustomobject]@{
+                Key = [System.Windows.Input.Key]::S
+                KeyboardDevice = [pscustomobject]@{
+                    Modifiers = [System.Windows.Input.ModifierKeys]::Control -bor [System.Windows.Input.ModifierKeys]::Shift
+                }
+            }
+
+            $ExtraModifiers = [pscustomobject]@{
+                Key = [System.Windows.Input.Key]::S
+                KeyboardDevice = [pscustomobject]@{
+                    Modifiers = [System.Windows.Input.ModifierKeys]::Control -bor [System.Windows.Input.ModifierKeys]::Shift -bor [System.Windows.Input.ModifierKeys]::Alt
+                }
+            }
+
+            & $script:CapturedHandler $null $NoneModifiers
+            & $script:CapturedHandler $null $PartialModifiers
+            & $script:CapturedHandler $null $ExactModifiers
+            & $script:CapturedHandler $null $ExtraModifiers
+
+            return $script:ExecutionCount
+        }
+
+        $ExecutionCount | Should -Be 1
+    }
+
+    It 'Should invoke action when any configured gesture matches' {
+        $ExecutionCount = InModuleScope WPF {
+            $script:CapturedHandler = $null
+            $script:ExecutionCount = 0
+
+            Mock -CommandName New-WPFVariableList -MockWith {
+                [System.Collections.Generic.List[psvariable]]::new()
+            }
+
+            Mock -CommandName When -MockWith {
+                param($Event, $ScriptBlock, $InputObject)
+                $script:CapturedHandler = $ScriptBlock
+            }
+
+            Key @('Ctrl+S', 'F11') {
+                $script:ExecutionCount++
+            }
+
+            $CtrlS = [pscustomobject]@{
+                Key = [System.Windows.Input.Key]::S
+                KeyboardDevice = [pscustomobject]@{
+                    Modifiers = [System.Windows.Input.ModifierKeys]::Control
+                }
+            }
+
+            $F11 = [pscustomobject]@{
+                Key = [System.Windows.Input.Key]::F11
+                KeyboardDevice = [pscustomobject]@{
+                    Modifiers = [System.Windows.Input.ModifierKeys]::None
+                }
+            }
+
+            & $script:CapturedHandler $null $CtrlS
+            & $script:CapturedHandler $null $F11
+
+            return $script:ExecutionCount
+        }
+
+        $ExecutionCount | Should -Be 2
+    }
 }
