@@ -12,7 +12,7 @@
 #>
 function StackPanel {
     [CmdletBinding()]
-    [Alias('-StackPanel')]
+    [Alias('-StackPanel', 'VStackPanel', 'HStackPanel')]
     [OutputType([void], [System.Windows.Controls.StackPanel])]
     param(
         [Parameter(Mandatory)]
@@ -24,14 +24,21 @@ function StackPanel {
         [ScriptBlock] $ScriptBlock
     )
 
-    if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
-        return
+    # Change behavior based on invocation name.
+    switch ($MyInvocation.InvocationName) {
+        '-StackPanel' {
+            Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+            return
+        }
+        'VStackPanel' { $Orientation = [System.Windows.Controls.Orientation]::Vertical }
+        'HStackPanel' { $Orientation = [System.Windows.Controls.Orientation]::Horizontal }
+        default { $Orientation = [System.Windows.Controls.Orientation]::Vertical }
     }
 
     try {
         $StackPanel = [System.Windows.Controls.StackPanel] @{
             Name = $Name
+            Orientation = $Orientation
         }
         Register-WPFObject $Name $StackPanel
         Add-WPFType $StackPanel 'Control'
