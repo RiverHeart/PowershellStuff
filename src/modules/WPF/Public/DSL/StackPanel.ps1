@@ -26,7 +26,7 @@ function StackPanel {
 
     # Change behavior based on invocation name.
     switch ($MyInvocation.InvocationName) {
-        '-StackPanel' {
+        { $_.StartsWith('-') } {
             Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
             return
         }
