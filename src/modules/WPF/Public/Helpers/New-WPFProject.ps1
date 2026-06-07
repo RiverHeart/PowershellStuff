@@ -269,34 +269,34 @@ Style Button {
     FontSize: 14
     MinWidth: 110
     Cursor: ([System.Windows.Input.Cursors]::Hand)
-    FocusVisualStyle: $null
-    SnapsToDevicePixels: $true
-    OverridesDefaultStyle: $true
+    FocusVisualStyle: `$null
+    SnapsToDevicePixels: `$true
+    OverridesDefaultStyle: `$true
 
     Chrome {
         CornerRadius: 6
 
-        Trigger IsMouseOver $true {
+        Trigger IsMouseOver `$true {
             Background: '#E9EEF7'
             BorderBrush: '#7D8BA3'
         }
 
-        Trigger IsPressed $true {
+        Trigger IsPressed `$true {
             Background: '#DDE6F3'
             BorderBrush: '#6D7D98'
         }
 
-        Trigger IsKeyboardFocused $true {
+        Trigger IsKeyboardFocused `$true {
             BorderBrush: '#2563EB'
         }
 
-        Trigger IsEnabled $false {
+        Trigger IsEnabled `$false {
             Background: '#F3F4F6'
             BorderBrush: '#D6DCE5'
         }
     }
 
-    Trigger IsEnabled $false {
+    Trigger IsEnabled `$false {
         Foreground: '#9CA3AF'
     }
 }
@@ -310,27 +310,27 @@ Style 'PrimaryButton' Button {
     Chrome {
         CornerRadius: 6
 
-        Trigger IsMouseOver $true {
+        Trigger IsMouseOver `$true {
             Background: '#0978E6'
             BorderBrush: '#075FBA'
         }
 
-        Trigger IsPressed $true {
+        Trigger IsPressed `$true {
             Background: '#0869C9'
             BorderBrush: '#064F97'
         }
 
-        Trigger IsKeyboardFocused $true {
+        Trigger IsKeyboardFocused `$true {
             BorderBrush: '#1D4ED8'
         }
 
-        Trigger IsEnabled $false {
+        Trigger IsEnabled `$false {
             Background: '#B6D7FF'
             BorderBrush: '#9FC5EF'
         }
     }
 
-    Trigger IsEnabled $false {
+    Trigger IsEnabled `$false {
         Foreground: '#E8F2FF'
     }
 }
@@ -344,27 +344,27 @@ Style 'DangerButton' Button {
     Chrome {
         CornerRadius: 6
 
-        Trigger IsMouseOver $true {
+        Trigger IsMouseOver `$true {
             Background: '#C91F1F'
             BorderBrush: '#A31515'
         }
 
-        Trigger IsPressed $true {
+        Trigger IsPressed `$true {
             Background: '#B31B1B'
             BorderBrush: '#8F1212'
         }
 
-        Trigger IsKeyboardFocused $true {
+        Trigger IsKeyboardFocused `$true {
             BorderBrush: '#991B1B'
         }
 
-        Trigger IsEnabled $false {
+        Trigger IsEnabled `$false {
             Background: '#F3B0B0'
             BorderBrush: '#E39A9A'
         }
     }
 
-    Trigger IsEnabled $false {
+    Trigger IsEnabled `$false {
         Foreground: '#FFF4F4'
     }
 }
@@ -378,27 +378,27 @@ Style 'GhostButton' Button {
     Chrome {
         CornerRadius: 6
 
-        Trigger IsMouseOver $true {
+        Trigger IsMouseOver `$true {
             Background: '#F8FAFC'
             BorderBrush: '#9EA8B8'
         }
 
-        Trigger IsPressed $true {
+        Trigger IsPressed `$true {
             Background: '#F1F5F9'
             BorderBrush: '#8B97AA'
         }
 
-        Trigger IsKeyboardFocused $true {
+        Trigger IsKeyboardFocused `$true {
             BorderBrush: '#2563EB'
         }
 
-        Trigger IsEnabled $false {
+        Trigger IsEnabled `$false {
             Background: '#F8FAFC'
             BorderBrush: '#D2D9E3'
         }
     }
 
-    Trigger IsEnabled $false {
+    Trigger IsEnabled `$false {
         Foreground: '#A1AAB7'
     }
 }
@@ -412,7 +412,7 @@ Style TextBox {
     FontSize: 16
     Foreground: '#111827'
     Background: '#FFFFFF'
-    FocusVisualStyle: $null
+    FocusVisualStyle: `$null
 
     Template {
         Border 'InputChrome' {
@@ -420,25 +420,25 @@ Style TextBox {
             Background: '#FFFFFF'
             BorderBrush: '#B8C0CC'
             BorderThickness: 1
-            SnapsToDevicePixels: $true
+            SnapsToDevicePixels: `$true
 
             ScrollViewer 'PART_ContentHost' {
                 Margin: 10, 8, 10, 8
-                Focusable: $false
+                Focusable: `$false
                 HorizontalAlignment: ([HorizontalAlignment]::Stretch)
                 VerticalAlignment: ([VerticalAlignment]::Stretch)
             }
         }
 
-        Trigger IsMouseOver $true {
+        Trigger IsMouseOver `$true {
             BorderBrush: '#9EA8B8' -Target 'InputChrome'
         }
 
-        Trigger IsKeyboardFocused $true {
+        Trigger IsKeyboardFocused `$true {
             BorderBrush: '#2563EB' -Target 'InputChrome'
         }
 
-        Trigger IsEnabled $false {
+        Trigger IsEnabled `$false {
             Background: '#F3F4F6' -Target 'InputChrome'
             BorderBrush: '#D2D9E3' -Target 'InputChrome'
             Foreground: '#A1AAB7'
