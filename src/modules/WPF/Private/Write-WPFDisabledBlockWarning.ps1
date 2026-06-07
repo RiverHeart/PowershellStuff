@@ -1,3 +1,12 @@
+<#
+.SYNOPSIS
+    Writes a warning message indicating that a WPF block has been disabled.
+
+.EXAMPLE
+    -StackPanel 'MyPanel' { ...code... }
+
+    This will skip the StackPanel block and write a warning indicating that it was disabled.
+#>
 function Write-WPFDisabledBlockWarning {
     [CmdletBinding()]
     param(
