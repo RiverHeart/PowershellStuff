@@ -64,7 +64,7 @@ Window 'Window' {
                     Watch Visibility Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
-                        Shortcut 'Open' {
+                        Command 'Open' {
                             $fileName = Get-WPFFileSelection -Category Image -Window (Reference 'Window')
                             if ($fileName) {
                                 Invoke-ImageViewerLoadFile -FileName $fileName
