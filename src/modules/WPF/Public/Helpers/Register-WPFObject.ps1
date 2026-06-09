@@ -3,9 +3,13 @@
     Returns a registered object if one exists.
 
 .DESCRIPTION
-    Returns a registered object if one exists.
+    This function registers an object in the current context. If an object
+    with the same name already exists, it will not be overwritten unless the
+    `-Overwrite` switch is used.
 
-    Objects are automatically registered at time of creation.
+    The function also resolves the context ID based on the input object and
+    the current context. If the input object is a Window, it will set the
+    active context to the new window.
 
 .EXAMPLE
     Register a new object.
@@ -24,6 +28,7 @@ function Register-WPFObject {
         [Parameter(Mandatory)]
         [object] $InputObject,
 
+        [ValidateNotNullOrEmpty()]
         [string] $ContextId,
 
         [switch] $Overwrite
