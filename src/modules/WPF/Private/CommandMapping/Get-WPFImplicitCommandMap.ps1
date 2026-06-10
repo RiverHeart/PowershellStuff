@@ -1,3 +1,28 @@
+<#
+.SYNOPSIS
+    Analyzes a script block to identify potential implicit command names and
+    maps them to their resolved forms.
+
+.DESCRIPTION
+    This function processes a provided script block to find command invocations that
+    could be interpreted as implicit property setters or resource references. It generates
+    a mapping of these command names to their resolved property or resource names, taking
+    into account reserved command names and allowing for customization of the criteria used to
+    identify implicit names.
+
+.EXAMPLE
+    Analyze a style definition to identify implicit property setter commands.
+
+    $styleScript = {
+        FontSize: 16
+        Margin: '2,4,6,8'
+        FocusVisualStyle: $null
+    }
+
+    $implicitCommandMap = Get-WPFImplicitCommandMap `
+        -ScriptBlock $styleScript `
+        -ReservedCommands @('Setter')
+#>
 function Get-WPFImplicitCommandMap {
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.Dictionary[string, string]])]

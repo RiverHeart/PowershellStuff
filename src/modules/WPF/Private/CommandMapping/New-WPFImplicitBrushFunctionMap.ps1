@@ -1,3 +1,25 @@
+<#
+.SYNOPSIS
+    Generates a map of property setting functions that prevent the need to call `Brush`.
+
+.DESCRIPTION
+    This function analyzes a provided scriptblock to identify potential implicit brush commands.
+    It generates a mapping of these command names to scriptblocks that can be invoked to apply
+    the corresponding brush setters to WPF styles. The function takes into account reserved
+    command names and allows for customization of the context name used in error messages.
+
+.EXAMPLE
+    Define implicit brush setters for a style.
+
+    $styleScript = {
+        Background: 'MyBackgroundResource'
+        BorderBrush: 'MyBorderBrushResource'
+    }
+
+    $brushFunctionMap = New-WPFImplicitBrushFunctionMap `
+        -ScriptBlock $styleScript `
+        -ContextName 'Style'
+#>
 function New-WPFImplicitBrushFunctionMap {
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.Dictionary[string, scriptblock]])]

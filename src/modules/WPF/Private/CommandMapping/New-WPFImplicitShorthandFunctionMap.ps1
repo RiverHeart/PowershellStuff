@@ -1,3 +1,29 @@
+<#
+.SYNOPSIS
+    Generates a mapping of implicit setter function names to scriptblocks
+    that implement the setter logic for WPF styles.
+
+.DESCRIPTION
+    This function analyzes a provided scriptblock (which defines a style) to identify
+    potential implicit property setter commands. It generates a mapping of these command
+    names to scriptblocks that can be invoked to apply the corresponding property setters
+    to WPF styles. The function takes into account reserved command names, allows for
+    customization of the context name used in error messages, and can prioritize certain
+    implicit names based on a provided scriptblock.
+
+.EXAMPLE
+    Use colon syntax to define implicit setters for properties.
+
+    $styleScript = {
+        FontSize: 16
+        Margin: '2,4,6,8'
+        FocusVisualStyle: $null
+    }
+
+    $setterMap = New-WPFImplicitSetterFunctionMap `
+        -ScriptBlock $styleScript `
+        -TargetType [System.Windows.Controls.Button]
+#>
 function New-WPFImplicitSetterFunctionMap {
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.Dictionary[string, scriptblock]])]
