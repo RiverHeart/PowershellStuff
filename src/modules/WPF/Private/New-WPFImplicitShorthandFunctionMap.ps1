@@ -23,10 +23,7 @@ function Get-WPFImplicitCommandMap {
     }
 
     $implicitCommandMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $commandAsts = $ScriptBlock.Ast.FindAll({
-            param($Ast)
-            $Ast -is [System.Management.Automation.Language.CommandAst]
-        }, $true)
+    $commandAsts = Find-AstNode -ScriptBlock $ScriptBlock -Type CommandAst -All -Recurse
 
     foreach ($commandAst in $commandAsts) {
         $commandName = $commandAst.GetCommandName()
