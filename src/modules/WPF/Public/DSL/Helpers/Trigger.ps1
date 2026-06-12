@@ -152,10 +152,8 @@ function Trigger {
             $trigger | Add-Member -NotePropertyName '_WPFDefaultSetterScope' -NotePropertyValue 'Chrome' -Force
         }
 
-        $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+        $implicitSetterFunctions = New-WPFStylePropertyHandler `
             -ScriptBlock $ScriptBlock `
-            -TargetType $targetType `
-            -ReservedCommands @('Setter') `
             -ContextName 'Trigger'
 
         $PSVars = New-WPFVariableList -InputObject $trigger

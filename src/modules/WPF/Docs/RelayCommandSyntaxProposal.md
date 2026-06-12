@@ -29,11 +29,11 @@ Attach the command by name where needed:
 
 ```powershell
 MenuItem '(F)ile/(S)ave As' {
-    Shortcut 'SaveAs' 'Ctrl+Shift+S'
+  Command 'SaveAs' 'Ctrl+Shift+S'
 }
 
 Button 'SaveButton' {
-    Shortcut 'SaveAs'
+  Command 'SaveAs'
 }
 ```
 
@@ -47,7 +47,7 @@ Button 'SaveButton' {
 - CanExecute:
   - Optional.
   - Defaults to always true when omitted.
-- Shortcut binding:
+- Command binding:
   - Uses the named command if present.
   - Keeps existing input gesture behavior.
 - Enabled state:
@@ -67,7 +67,7 @@ Button 'SaveButton' {
    - registers command name
    - captures Execute and optional CanExecute scriptblocks
    - materializes the underlying RelayCommand object
-3. Update Shortcut and command-aware controls to resolve and attach a named command.
+3. Update Command and command-aware controls to resolve and attach a named command.
 4. Ensure command invalidation hooks exist for state changes that affect CanExecute.
 
 ## Open Design Questions
@@ -81,7 +81,7 @@ Button 'SaveButton' {
 
 ## Non-Goals For First Iteration
 
-- Inline command sugar inside Shortcut.
+- Inline command sugar inside Command.
 - Advanced routing features beyond current DSL needs.
 - Multiple CanExecute blocks or composition syntax.
 
@@ -108,7 +108,7 @@ RelayCommand 'SaveAs' {
 }
 
 MenuItem '(F)ile/(S)ave As' {
-    Shortcut 'SaveAs' 'Ctrl+Shift+S'
+  Command 'SaveAs' 'Ctrl+Shift+S'
 }
 ```
 

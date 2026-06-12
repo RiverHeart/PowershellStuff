@@ -53,12 +53,12 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         Style $StyleName Button {
             Template {
                 Border 'TemplateBorder' {
-                    Padding '3,4,5,6'
+                    Padding: '3,4,5,6'
 
                     ContentPresenter {
-                        HorizontalAlignment ([System.Windows.HorizontalAlignment]::Stretch)
-                        VerticalAlignment ([System.Windows.VerticalAlignment]::Stretch)
-                        SnapsToDevicePixels $true
+                        HorizontalAlignment: ([System.Windows.HorizontalAlignment]::Stretch)
+                        VerticalAlignment: ([System.Windows.VerticalAlignment]::Stretch)
+                        SnapsToDevicePixels: $true
                     }
                 }
             }
@@ -85,13 +85,13 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $Button = [System.Windows.Controls.Button]::new()
 
         Theme $ThemeName {
-            ButtonBackground '#223344'
+            ButtonBackground: '#223344'
         }
 
         Style $StyleName Button {
             Template {
                 Border 'TemplateBorder' {
-                    Background ButtonBackground -Resource
+                    Background: ButtonBackground -Resource
                 }
             }
         }
@@ -117,7 +117,7 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $Button = [System.Windows.Controls.Button]::new()
 
         Theme $ThemeName {
-            ButtonBackground '#334455'
+            ButtonBackground: '#334455'
         }
 
         Style $StyleName Button {

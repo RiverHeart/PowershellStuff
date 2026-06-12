@@ -96,10 +96,8 @@ function Style {
     $style = [System.Windows.Style]::new($resolvedType)
     $PSVars = New-WPFVariableList -InputObject $style
 
-    $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+    $implicitSetterFunctions = New-WPFStylePropertyHandler `
         -ScriptBlock $ScriptBlock `
-        -TargetType $resolvedType `
-        -ReservedCommands @('Setter', 'Trigger', 'DataTrigger', 'MultiTrigger', 'Chrome', 'ExtendStyle', 'Template') `
         -ContextName 'Style'
 
     # Execute once with injected helpers and WPF DSL variables. This keeps

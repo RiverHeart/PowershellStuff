@@ -9,9 +9,9 @@ Describe 'Style implicit setter syntax' -Tag 'Style' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style $styleName Button {
-            FontSize 16
-            Margin '2,4,6,8'
-            FocusVisualStyle $null
+            FontSize: 16
+            Margin: '2,4,6,8'
+            FocusVisualStyle: $null
         }
 
         $psVars = New-WPFVariableList -InputObject $button
@@ -29,7 +29,7 @@ Describe 'Style implicit setter syntax' -Tag 'Style' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style $styleName Button {
-            Opacity 1.0
+            Opacity: 1.0
 
             Trigger IsEnabled $false {
                 Setter Opacity 0.35
@@ -50,7 +50,7 @@ Describe 'Style implicit setter syntax' -Tag 'Style' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style $styleName Button {
-            Background ButtonBackground -Resource
+            Background: ButtonBackground -Resource
         }
 
         $psVars = New-WPFVariableList -InputObject $button

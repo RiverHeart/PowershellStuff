@@ -65,7 +65,7 @@ function Find-AstNode {
             if ($Completions.Count -gt 0) {
                 return $Completions
             }
-            return $null  # Prevent fallback autocomplete
+            return @()  # Prevent fallback autocomplete
         })]
         [string[]] $Type,
         [scriptblock] $Query,
