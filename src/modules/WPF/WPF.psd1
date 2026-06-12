@@ -92,6 +92,8 @@ FunctionsToExport = @(
     # DSL
 
     # DSL/Controls
+    'App'
+    'Content'
     'Command'
     'Border'
     'ContentPresenter'
@@ -108,6 +110,7 @@ FunctionsToExport = @(
     'Row'
     'Menu'
     'MenuItem'
+    'StatusBar'
     'ScrollViewer'
     'StackPanel'
     'TextBlock'

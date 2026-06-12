@@ -90,7 +90,23 @@ function Update-WPFObject {
                 # recursing through their scriptblock but for objects being created
                 # on the fly or re-parented I think it still makes sense to use Update-WPFObject.
 
-                Add-WPFObject $InputObject $Child
+                $AppRootProperty = $InputObject.PSObject.Properties['_WPFAppRoot']
+                $AppContentProperty = $InputObject.PSObject.Properties['_WPFAppContent']
+                if ($InputObject -is [System.Windows.Window] -and $AppRootProperty -and $AppRootProperty.Value -and $AppContentProperty -and $AppContentProperty.Value) {
+
+                    if ($Child -is [System.Windows.Controls.MenuItem]) {
+                        $AppMenu = Get-WPFAppMenu -Window $InputObject
+                        if ($AppMenu) {
+                            Add-WPFObject $AppMenu $Child
+                        }
+                    } elseif ($Child -is [System.Windows.Controls.Primitives.StatusBar]) {
+                        Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'StatusBar'
+                    } else {
+                        Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'Content'
+                    }
+                } else {
+                    Add-WPFObject $InputObject $Child
+                }
             }
             # Shape
             elseif (Test-WPFType $Child 'Shape') {
