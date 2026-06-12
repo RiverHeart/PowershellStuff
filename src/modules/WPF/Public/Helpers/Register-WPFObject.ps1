@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Returns a registered object if one exists.
+    Registers a WPF object in the current context.
 
 .DESCRIPTION
     This function registers an object in the current context. If an object
