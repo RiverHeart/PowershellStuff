@@ -98,14 +98,14 @@ Describe 'Chrome' -Tag 'Chrome' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style $styleName Button {
-            BorderBrush '#B8C0CC'
-            BorderThickness 1
+            BorderBrush: '#B8C0CC'
+            BorderThickness: 1
 
             Chrome {
                 CornerRadius: 6
 
                 Trigger IsEnabled $false {
-                    BorderBrush '#2563EB'
+                    BorderBrush: '#2563EB'
                 }
             }
         }

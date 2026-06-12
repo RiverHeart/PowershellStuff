@@ -31,7 +31,7 @@ Describe 'Trigger' -Tag 'Trigger' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style $styleName Button {
-            Opacity 1.0
+            Opacity: 1.0
 
             Trigger IsEnabled $false {
                 Opacity: 0.4

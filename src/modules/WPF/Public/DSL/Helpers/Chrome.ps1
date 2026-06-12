@@ -165,10 +165,9 @@ function Chrome {
     $chromeFactory | Add-Member -NotePropertyName '_WPFChromeTargetName' -NotePropertyValue $adapter.PartName -Force
     $chromeFactory | Add-Member -NotePropertyName '_WPFChromeTargetType' -NotePropertyValue $adapter.ShellType -Force
 
-    $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+    $implicitSetterFunctions = New-WPFStylePropertyHandler `
         -ScriptBlock $ScriptBlock `
         -TargetType $adapter.ShellType `
-        -ReservedCommands @('Setter') `
         -ContextName 'Chrome'
 
     $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $chromeVars, @()) | Out-Null

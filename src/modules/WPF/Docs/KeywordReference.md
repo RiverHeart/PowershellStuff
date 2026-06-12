@@ -659,6 +659,23 @@ Setter BorderBrush '#2563EB' -Scope Chrome
 
 `-Scope Chrome` remains available for explicit setter routing in template-backed trigger contexts.
 
+### Property Syntax Contract
+
+For Theme and Style script bodies, property assignment uses the colon-delimited command form.
+
+- Theme shorthand: `Key: Value` forwards to `Brush Key Value`.
+- Style shorthand: `Property: Value` forwards to `Setter Property Value`.
+- Explicit `Brush` and `Setter` calls remain fully supported.
+- Bare command form without a colon (for example, `Background Value`) is not
+    shorthand syntax and should be treated as normal command invocation behavior.
+
+The shorthand dispatcher is implemented by function factories:
+
+- `New-WPFThemePropertyHandler`
+- `New-WPFStylePropertyHandler`
+
+These factories populate shorthand function declarations for the current script scope so the forwarded calls run in the caller context without requiring recreation of user-authored script blocks.
+
 ### Chrome
 
 Defines a simplified template shell for supported controls.

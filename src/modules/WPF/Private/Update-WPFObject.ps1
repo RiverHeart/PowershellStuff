@@ -47,10 +47,9 @@ function Update-WPFObject {
             if ($InputObject -is [System.Windows.FrameworkElementFactory]) {
                 $factoryType = $InputObject.Type
 
-                $implicitSetterFunctions = New-WPFImplicitSetterFunctionMap `
+                $implicitSetterFunctions = New-WPFStylePropertyHandler `
                     -ScriptBlock $ScriptBlock `
                     -TargetType $factoryType `
-                    -ReservedCommands @('Setter') `
                     -ContextName 'Factory'
 
                 $ChildObjects = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())

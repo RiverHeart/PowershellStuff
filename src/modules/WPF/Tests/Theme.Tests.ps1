@@ -87,7 +87,7 @@ Describe 'Theme' -Tag 'Theme' {
         $window = [System.Windows.Window]::new()
 
         Theme $themeName {
-            WindowBackground '#ABCDEF'
+            WindowBackground: '#ABCDEF'
         }
 
         $psVars = New-WPFVariableList -InputObject $window
@@ -104,7 +104,7 @@ Describe 'Theme' -Tag 'Theme' {
         $button = [System.Windows.Controls.Button]::new()
 
         Theme $themeName {
-            WindowBackground '#EEEEEE'
+            WindowBackground: '#EEEEEE'
             Brush 'ButtonBackground' '#123456'
         }
 

@@ -38,9 +38,8 @@ function Theme {
     $dictionary = [System.Windows.ResourceDictionary]::new()
     $PSVars = New-WPFVariableList -InputObject $dictionary
 
-    $implicitBrushFunctions = New-WPFImplicitBrushFunctionMap `
+    $implicitBrushFunctions = New-WPFThemePropertyHandler `
         -ScriptBlock $ScriptBlock `
-        -ReservedCommands @('Brush') `
         -ContextName 'Theme'
 
     # Execute once with injected helpers and WPF DSL variables. This keeps normal
