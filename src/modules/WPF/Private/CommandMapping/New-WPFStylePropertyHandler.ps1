@@ -25,8 +25,7 @@
     }
 
     $setterMap = New-WPFStylePropertyHandler `
-        -ScriptBlock $styleScript `
-        -TargetType [System.Windows.Controls.Button]
+        -ScriptBlock $styleScript
 #>
 function New-WPFStylePropertyHandler {
     [CmdletBinding()]
@@ -34,9 +33,6 @@ function New-WPFStylePropertyHandler {
     param(
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock,
-
-        [Parameter(Mandatory)]
-        [type] $TargetType,
 
         [Parameter()]
         [ValidateNotNullOrEmpty()]

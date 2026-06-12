@@ -98,7 +98,6 @@ function Style {
 
     $implicitSetterFunctions = New-WPFStylePropertyHandler `
         -ScriptBlock $ScriptBlock `
-        -TargetType $resolvedType `
         -ContextName 'Style'
 
     # Execute once with injected helpers and WPF DSL variables. This keeps

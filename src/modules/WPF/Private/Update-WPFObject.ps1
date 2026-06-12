@@ -49,7 +49,6 @@ function Update-WPFObject {
 
                 $implicitSetterFunctions = New-WPFStylePropertyHandler `
                     -ScriptBlock $ScriptBlock `
-                    -TargetType $factoryType `
                     -ContextName 'Factory'
 
                 $ChildObjects = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())

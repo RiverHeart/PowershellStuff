@@ -154,7 +154,6 @@ function Trigger {
 
         $implicitSetterFunctions = New-WPFStylePropertyHandler `
             -ScriptBlock $ScriptBlock `
-            -TargetType $targetType `
             -ContextName 'Trigger'
 
         $PSVars = New-WPFVariableList -InputObject $trigger

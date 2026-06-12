@@ -167,7 +167,6 @@ function Chrome {
 
     $implicitSetterFunctions = New-WPFStylePropertyHandler `
         -ScriptBlock $ScriptBlock `
-        -TargetType $adapter.ShellType `
         -ContextName 'Chrome'
 
     $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $chromeVars, @()) | Out-Null
