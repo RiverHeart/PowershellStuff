@@ -94,6 +94,7 @@ FunctionsToExport = @(
     # DSL/Controls
     'App'
     'Content'
+    'Footer'
     'Command'
     'Border'
     'ContentPresenter'

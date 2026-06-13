@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     App is a thin wrapper around Window that pre-wires a DockPanel root, a
-    content host, and an implicit top-level Menu.
+    constrained content host, an optional footer host, and an implicit
+    top-level Menu.
 
 .EXAMPLE
     App 'Example' {
@@ -59,9 +60,12 @@ function App {
         $Window.Content = $Root
         $Window | Add-Member -NotePropertyName '_WPFAppRoot' -NotePropertyValue $Root -Force
 
-        $Content = [System.Windows.Controls.StackPanel] @{
+        # Use a Grid content host so body controls are measured with finite space.
+        # This avoids unbounded StackPanel measurement issues for viewport controls
+        # like ScrollViewer, DataGrid, and image surfaces.
+        $Content = [System.Windows.Controls.Grid] @{
             Name = "${Name}Content"
-            Margin = 16
+            Margin = 5
         }
         Register-WPFObject -Name $Content.Name -InputObject $Content -ContextId $ContextId
         Add-WPFType $Content 'Control'

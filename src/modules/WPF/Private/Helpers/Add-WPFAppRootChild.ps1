@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Routes controls into the App root shell using placement semantics:
-    Menu (top), StatusBar (bottom), or Content (main content host).
+    Menu (top), Footer (bottom above the status bar), StatusBar (bottom), or
+    Content (main content host).
 #>
 function Add-WPFAppRootChild {
     [CmdletBinding()]
@@ -16,7 +17,7 @@ function Add-WPFAppRootChild {
         [object] $Child,
 
         [Parameter(Mandatory)]
-        [ValidateSet('Menu', 'StatusBar', 'Content')]
+        [ValidateSet('Menu', 'Footer', 'StatusBar', 'Content')]
         [string] $Placement
     )
 
@@ -30,7 +31,7 @@ function Add-WPFAppRootChild {
     }
 
     $Root = [System.Windows.Controls.DockPanel] $RootProperty.Value
-    $ContentHost = [System.Windows.Controls.StackPanel] $ContentProperty.Value
+    $ContentHost = [System.Windows.Controls.Grid] $ContentProperty.Value
 
     if ($Placement -eq 'Content') {
         if ($Child -eq $ContentHost) {
@@ -52,10 +53,18 @@ function Add-WPFAppRootChild {
             [System.Windows.Controls.DockPanel]::SetDock($Child, [System.Windows.Controls.Dock]::Top)
             $InsertIndex = 0
         }
+        'Footer' {
+            [System.Windows.Controls.DockPanel]::SetDock($Child, [System.Windows.Controls.Dock]::Bottom)
+            $InsertIndex = @($Root.Children | Where-Object {
+                $_ -is [System.Windows.Controls.Menu] -or
+                $_ -is [System.Windows.Controls.Primitives.StatusBar]
+            }).Count
+        }
         'StatusBar' {
             [System.Windows.Controls.DockPanel]::SetDock($Child, [System.Windows.Controls.Dock]::Bottom)
-            $HasMenu = @($Root.Children | Where-Object { $_ -is [System.Windows.Controls.Menu] }).Count -gt 0
-            $InsertIndex = if ($HasMenu) { 1 } else { 0 }
+            $InsertIndex = @($Root.Children | Where-Object {
+                $_ -is [System.Windows.Controls.Menu]
+            }).Count
         }
     }
 

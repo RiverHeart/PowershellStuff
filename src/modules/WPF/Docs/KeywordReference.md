@@ -115,7 +115,12 @@ Window 'MainWindow' {
 ### App
 
 Creates an application-oriented Window shell with a DockPanel root, a content
-host, and an implicit top-level Menu.
+host, an optional footer region, and an implicit top-level Menu.
+
+The App content host is a constrained fill region so viewport-based controls
+(`ScrollViewer`, `DataGrid`, image surfaces) measure against finite available
+space. If you want sequential stacking semantics, add a `StackPanel` inside
+`Content` explicitly.
 
 Root-level `MenuItem` entries are routed into an implicit `Menu` when no explicit
 `Menu` has been created yet, which makes simple app layouts easier to write.
@@ -131,11 +136,32 @@ App 'Example' {
 
 Routes a block into the App shell's main content host.
 
+`Content` does not add an extra visual container. It forwards directly into
+the App content host.
+
 ```powershell
 App 'Example' {
     Content {
         Button 'SaveButton' {
             $this.Content = 'Save'
+        }
+    }
+}
+```
+
+### Footer
+
+Routes a block into the App shell's footer region, docked above the status bar.
+
+```powershell
+App 'Example' {
+    Footer {
+        StackPanel 'ActionRow' {
+            $this.Orientation = 'Horizontal'
+
+            Button 'SaveButton' {
+                $this.Content = 'Save'
+            }
         }
     }
 }
@@ -373,7 +399,8 @@ MenuItem '_File/_Open' {
 
 ### StatusBar
 
-Creates a StatusBar and docks it to the bottom of an App shell.
+Creates a StatusBar and docks it to the bottom of an App shell, below any
+Footer region.
 
 Supports named and nameless forms.
 
