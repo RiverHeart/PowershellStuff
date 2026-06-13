@@ -40,7 +40,7 @@ function Invoke-ImageViewerCopyFeedback {
 
             $TimerState.IsCopyFeedbackActive = $false
 
-            Invoke-ImageViewerUpdateStatus
+            Invoke-ImageViewerUpdateStatus -Window $TimerWindow
         }.GetNewClosure())
 
         $State.CopyFeedbackTimer = $Timer
@@ -48,7 +48,8 @@ function Invoke-ImageViewerCopyFeedback {
 
     $State.CopyFeedbackTimer.Stop()
 
-    $DetailsLabel = Reference 'StatusDetailsLabel'
+    $ContextId = Get-WPFContextId -InputObject $Window
+    $DetailsLabel = Reference 'StatusDetailsLabel' -ContextId $ContextId
     if (-not $DetailsLabel) {
         return
     }

@@ -50,7 +50,7 @@ Import "$PSScriptRoot/ImageViewer.Styles.ps1"
 Import "$PSScriptRoot/functions"
 
 # MARK: WINDOW
-Window 'Window' {
+App 'Window' {
     $this.Title = 'Image Viewer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.AllowDrop = $true
@@ -225,438 +225,389 @@ Window 'Window' {
 
     }
 
-    Grid "Body" {
-        $this.Margin = 5
+    MenuBar 'Menu' {
+        $this.Height = 25
+        Watch Visibility Window.Tag.IsFullScreen -Invert
 
-        # MARK: MENU
-        Row {
-            Column 'Expand' {
-                MenuBar 'Menu' {
-                    $this.Height = 25
-                    Watch Visibility Window.Tag.IsFullScreen -Invert
+        MenuItem '(F)ile/(O)pen' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
 
-                    MenuItem '(F)ile/(O)pen' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
+            Command 'Open' {
+                $Window = Get-WPFWindow
+                $FileName = Get-WPFFileSelection -Category Image -Window $Window
 
-                        Command 'Open' {
-                            $Window = Get-WPFWindow
-                            $FileName = Get-WPFFileSelection -Category Image -Window $Window
+                # Return early if we failed to get a file
+                if (-not $FileName) {
+                    return
+                }
 
-                            # Return early if we failed to get a file
-                            if (-not $FileName) {
-                                return
-                            }
+                Invoke-ImageViewerLoadFile -FileName $FileName
+            }
+        }
+        MenuItem '(F)ile/(S)ave As' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
 
-                            Invoke-ImageViewerLoadFile -FileName $FileName
+            Command 'SaveAs' 'Ctrl+Shift+S' {
+                Execute {
+                    $BitmapSource = Reference 'Viewer' -Property Source
+                    $CurrentFile = (Get-WPFWindow).Tag.FileNavigator.CurrentFile
+                    $SourcePath = $null
+                    $InitialDirectory = $null
+
+                    if ($null -ne $CurrentFile) {
+                        $SourcePath = $CurrentFile.FullName
+                        $InitialDirectory = $CurrentFile.DirectoryName
+                    }
+
+                    Invoke-ImageViewerSaveFileAs `
+                        -Image $BitmapSource `
+                        -SourcePath $SourcePath `
+                        -InitialDirectory $InitialDirectory
+                }
+                CanExecute {
+                    [bool] (Get-WPFWindow).Tag.IsFileLoaded
+                }
+            }
+
+            # RelayCommand does not rely on CommandManager in this module,
+            # so we refresh availability explicitly when file state changes.
+            (Get-WPFWindow).Tag.SaveAsCommand = $this.Command
+        }
+        MenuItem '(F)ile/(E)xit' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'CloseCommand' 'Ctrl+q' {
+                Write-Debug "Close command triggered. Closing window."
+                (Get-WPFWindow).Close()
+            }
+        }
+
+        MenuItem '(I)mage/(R)otate 90°' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'Rotate' 'Ctrl+R' {
+                Invoke-ImageViewerRotate -Direction Clockwise
+            }
+        }
+
+        MenuItem '(I)mage/R(o)tate -90°' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'RotateCounter' 'Ctrl+Shift+R' {
+                Invoke-ImageViewerRotate -Direction CounterClockwise
+            }
+        }
+
+        MenuItem '(V)iew/Zoom (I)n' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'ZoomIn' 'Ctrl+Add' {
+                Invoke-ImageViewerSetZoom -Delta 0.10
+            }
+        }
+
+        MenuItem '(V)iew/Zoom (O)ut' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'ZoomOut' 'Ctrl+Subtract' {
+                Invoke-ImageViewerSetZoom -Delta -0.10
+            }
+        }
+
+        MenuItem '(V)iew/(F)ullScreen' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'FullScreen' 'F11' {
+                Write-Debug "Toggling full screen mode."
+                $Window = Get-WPFWindow
+                $State = $Window.Tag
+                $IsEnteringFullScreen = -not $State.IsFullScreen
+
+                Set-WPFWindowFullScreen -IsFullScreen $IsEnteringFullScreen
+
+                if ($IsEnteringFullScreen) {
+                    Start-ImageViewerMouseIdleHide
+                } else {
+                    Stop-ImageViewerMouseIdleHide
+                }
+
+                if ($State.IsFitMode) {
+                    Invoke-ImageViewerFitToWindow
+                }
+            }
+        }
+
+        MenuItem '(V)iew/(S)lideshow' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'Slideshow' 'F5' {
+                Execute {
+                    Invoke-ImageViewerToggleSlideshow
+                }
+                CanExecute {
+                    [bool] (Get-WPFWindow).Tag.IsFileLoaded
+                }
+            }
+
+            # RelayCommand does not auto-requery in this module.
+            (Get-WPFWindow).Tag.SlideshowCommand = $this.Command
+        }
+
+        MenuItem '(V)iew/Figure (D)rawing Mode' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'FigureDrawingMode' 'F6' {
+                Execute {
+                    Invoke-ImageViewerToggleFigureDrawingMode
+                }
+                CanExecute {
+                    [bool] (Get-WPFWindow).Tag.IsFileLoaded
+                }
+            }
+
+            # RelayCommand does not auto-requery in this module.
+            (Get-WPFWindow).Tag.FigureDrawingCommand = $this.Command
+        }
+
+        MenuItem '(V)iew/Image Fit to (W)indow' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            When Click {
+                Invoke-ImageViewerFitToWindow
+            }
+        }
+
+        MenuItem '(V)iew/Image (A)ctual Size' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            When Click {
+                Invoke-ImageViewerSetZoom -Reset
+            }
+        }
+
+        MenuItem '(V)iew/(T)oggle Theme' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            Command 'ToggleTheme' 'Ctrl+T' {
+                Invoke-ImageViewerToggleTheme
+            }
+        }
+
+        MenuItem '(H)elp/(A)bout' {
+            UseStyle 'ImageViewer.UnthemedMenuItem'
+
+            When Click {
+                Invoke-ImageViewerShowAbout
+            }
+        }
+    }
+
+    Content {
+        DockPanel 'MainPanel' {
+            $this.LastChildFill = $true
+
+            # MARK: IMG VIEWER
+            # In case the image is larger than the window, use the ScrollViewer
+            # to adjust the view window.
+            Border 'FigureDrawingSidebar' {
+                $this.Width = 260
+                $this.Padding = 16
+                $this.Margin = 6, 0, 0, 0
+                $this.Background = '#E61C1C1C'
+                $this.BorderThickness = 1
+                $this.BorderBrush = '#FF4A4A4A'
+                [DockPanel]::SetDock($this, [Dock]::Right)
+                Watch Visibility Window.Tag.IsFigureDrawingMode -Converter {
+                    if ($_) { 'Visible' } else { 'Collapsed' }
+                }
+
+                StackPanel 'FigureDrawingSidebarStack' {
+                    $this.VerticalAlignment = [VerticalAlignment]::Center
+                    $this.HorizontalAlignment = [HorizontalAlignment]::Stretch
+
+                    Label 'FigureDrawingCountdownLabel' {
+                        $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                        $this.FontFamily = 'Consolas'
+                        $this.FontSize = 46
+                        $this.FontWeight = [FontWeights]::Bold
+                        $this.Foreground = '#FFF8F8F8'
+                        Watch Content Window.Tag.FigureDrawingCountdownText
+                    }
+
+                    Label 'FigureDrawingMetaLabel' {
+                        $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                        $this.Foreground = '#FFD3D3D3'
+                        Watch Content Window.Tag.IsFigureDrawingPaused -Converter {
+                            if ($_) { 'Paused' } else { 'Running' }
                         }
                     }
-                    MenuItem '(F)ile/(S)ave As' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
 
-                        Command 'SaveAs' 'Ctrl+Shift+S' {
-                            Execute {
-                                $BitmapSource = Reference 'Viewer' -Property Source
-                                $CurrentFile = (Get-WPFWindow).Tag.FileNavigator.CurrentFile
-                                $SourcePath = $null
-                                $InitialDirectory = $null
-
-                                if ($null -ne $CurrentFile) {
-                                    $SourcePath = $CurrentFile.FullName
-                                    $InitialDirectory = $CurrentFile.DirectoryName
+                    Button 'FigureDrawingPauseButton' {
+                        UseStyle 'ImageViewer.IconButton'
+                        $this.HorizontalAlignment = [HorizontalAlignment]::Center
+                        $this.Margin = 0, 20, 0, 0
+                        Watch ToolTip Window.Tag.IsFigureDrawingPaused -Converter {
+                            if ($_) { 'Resume figure drawing' } else { 'Pause figure drawing' }
+                        }
+                        Watch Content Window.Tag.IsFigureDrawingPaused -Converter {
+                            if ($_) {
+                                Path 'images/play-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
                                 }
-
-                                Invoke-ImageViewerSaveFileAs `
-                                    -Image $BitmapSource `
-                                    -SourcePath $SourcePath `
-                                    -InitialDirectory $InitialDirectory
-                            }
-                            CanExecute {
-                                [bool] (Get-WPFWindow).Tag.IsFileLoaded
-                            }
-                        }
-
-                        # RelayCommand does not rely on CommandManager in this module,
-                        # so we refresh availability explicitly when file state changes.
-                        (Get-WPFWindow).Tag.SaveAsCommand = $this.Command
-                    }
-                    MenuItem '(F)ile/(E)xit' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'CloseCommand' 'Ctrl+q' {
-                            Write-Debug "Close command triggered. Closing window."
-                            (Get-WPFWindow).Close()
-                        }
-                    }
-
-                    MenuItem '(I)mage/(R)otate 90°' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'Rotate' 'Ctrl+R' {
-                            Invoke-ImageViewerRotate -Direction Clockwise
-                        }
-                    }
-
-                    MenuItem '(I)mage/R(o)tate -90°' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'RotateCounter' 'Ctrl+Shift+R' {
-                            Invoke-ImageViewerRotate -Direction CounterClockwise
-                        }
-                    }
-
-                    MenuItem '(V)iew/Zoom (I)n' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'ZoomIn' 'Ctrl+Add' {
-                            Invoke-ImageViewerSetZoom -Delta 0.10
-                        }
-                    }
-
-                    MenuItem '(V)iew/Zoom (O)ut' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'ZoomOut' 'Ctrl+Subtract' {
-                            Invoke-ImageViewerSetZoom -Delta -0.10
-                        }
-                    }
-
-                    MenuItem '(V)iew/(F)ullScreen' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'FullScreen' 'F11' {
-                            Write-Debug "Toggling full screen mode."
-                            $Window = Get-WPFWindow
-                            $State = $Window.Tag
-                            $IsEnteringFullScreen = -not $State.IsFullScreen
-
-                            Set-WPFWindowFullScreen -IsFullScreen $IsEnteringFullScreen
-
-                            if ($IsEnteringFullScreen) {
-                                Start-ImageViewerMouseIdleHide
                             } else {
-                                Stop-ImageViewerMouseIdleHide
-                            }
-
-                            if ($State.IsFitMode) {
-                                Invoke-ImageViewerFitToWindow
-                            }
-                        }
-                    }
-
-                    MenuItem '(V)iew/(S)lideshow' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'Slideshow' 'F5' {
-                            Execute {
-                                Invoke-ImageViewerToggleSlideshow
-                            }
-                            CanExecute {
-                                [bool] (Get-WPFWindow).Tag.IsFileLoaded
-                            }
-                        }
-
-                        # RelayCommand does not auto-requery in this module.
-                        (Get-WPFWindow).Tag.SlideshowCommand = $this.Command
-                    }
-
-                    MenuItem '(V)iew/Figure (D)rawing Mode' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'FigureDrawingMode' 'F6' {
-                            Execute {
-                                Invoke-ImageViewerToggleFigureDrawingMode
-                            }
-                            CanExecute {
-                                [bool] (Get-WPFWindow).Tag.IsFileLoaded
-                            }
-                        }
-
-                        # RelayCommand does not auto-requery in this module.
-                        (Get-WPFWindow).Tag.FigureDrawingCommand = $this.Command
-                    }
-
-                    MenuItem '(V)iew/Image Fit to (W)indow' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        When Click {
-                            Invoke-ImageViewerFitToWindow
-                        }
-                    }
-
-                    MenuItem '(V)iew/Image (A)ctual Size' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        When Click {
-                            Invoke-ImageViewerSetZoom -Reset
-                        }
-                    }
-
-                    MenuItem '(V)iew/(T)oggle Theme' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        Command 'ToggleTheme' 'Ctrl+T' {
-                            Invoke-ImageViewerToggleTheme
-                        }
-                    }
-
-                    MenuItem '(H)elp/(A)bout' {
-                        UseStyle 'ImageViewer.UnthemedMenuItem'
-
-                        When Click {
-                            Invoke-ImageViewerShowAbout
-                        }
-                    }
-                }
-            }
-        }
-
-        # MARK: IMG VIEWER
-        Row 'Expand' {
-            Column 'Expand' {
-                # In case the image is larger than the window, use the ScrollViewer
-                # to adjust the view window.
-                ScrollViewer 'ScrollViewer' {
-                    $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
-                    $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
-                    $this.Background = 'Transparent'
-
-                    When PreviewMouseWheel {
-                        param($sender, $event)
-
-                        if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
-                            return
-                        }
-
-                        $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
-                        Invoke-ImageViewerSetZoom -Delta $Delta
-                        $event.Handled = $true
-                    }
-
-                    Image 'Viewer' {
-                        $this.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
-                        $this.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
-                    }
-                }
-            }
-
-            Column 'Fit' {
-                Border 'FigureDrawingSidebar' {
-                    $this.Width = 260
-                    $this.Padding = 16
-                    $this.Margin = 6, 0, 0, 0
-                    $this.Background = '#E61C1C1C'
-                    $this.BorderThickness = 1
-                    $this.BorderBrush = '#FF4A4A4A'
-                    Watch Visibility Window.Tag.IsFigureDrawingMode -Converter {
-                        if ($_) { 'Visible' } else { 'Collapsed' }
-                    }
-
-                    StackPanel 'FigureDrawingSidebarStack' {
-                        $this.VerticalAlignment = [VerticalAlignment]::Center
-                        $this.HorizontalAlignment = [HorizontalAlignment]::Stretch
-
-                        Label 'FigureDrawingCountdownLabel' {
-                            $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                            $this.FontFamily = 'Consolas'
-                            $this.FontSize = 46
-                            $this.FontWeight = [FontWeights]::Bold
-                            $this.Foreground = '#FFF8F8F8'
-                            Watch Content Window.Tag.FigureDrawingCountdownText
-                        }
-
-                        Label 'FigureDrawingMetaLabel' {
-                            $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                            $this.Foreground = '#FFD3D3D3'
-                            Watch Content Window.Tag.IsFigureDrawingPaused -Converter {
-                                if ($_) { 'Paused' } else { 'Running' }
-                            }
-                        }
-
-                        Button 'FigureDrawingPauseButton' {
-                            UseStyle 'ImageViewer.IconButton'
-                            $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                            $this.Margin = 0, 20, 0, 0
-                            Watch ToolTip Window.Tag.IsFigureDrawingPaused -Converter {
-                                if ($_) { 'Resume figure drawing' } else { 'Pause figure drawing' }
-                            }
-                            Watch Content Window.Tag.IsFigureDrawingPaused -Converter {
-                                if ($_) {
-                                    Path 'images/play-solid-full.svg' {
-                                        UseStyle 'ImageViewer.IconPath'
-                                    }
-                                } else {
-                                    Path 'images/pause-solid-full.svg' {
-                                        UseStyle 'ImageViewer.IconPath'
-                                    }
+                                Path 'images/pause-solid-full.svg' {
+                                    UseStyle 'ImageViewer.IconPath'
                                 }
                             }
+                        }
 
-                            When Click {
-                                Invoke-ImageViewerToggleFigureDrawingPause
-                            }
+                        When Click {
+                            Invoke-ImageViewerToggleFigureDrawingPause
                         }
                     }
                 }
             }
+
+            ScrollViewer 'ScrollViewer' {
+                $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
+                $this.Background = 'Transparent'
+
+                When PreviewMouseWheel {
+                    param($sender, $event)
+
+                    if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
+                        return
+                    }
+
+                    $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
+                    Invoke-ImageViewerSetZoom -Delta $Delta
+                    $event.Handled = $true
+                }
+
+                Image 'Viewer' {
+                    $this.VerticalAlignment = [VerticalAlignment]::Center  # Center image to mirror how most image viewers work.
+                    $this.StretchDirection = [StretchDirection]::DownOnly  # Prevent image from stretching across the entire window.
+                }
+            }
         }
 
+    }
+
+    Footer {
         # MARK: TOOLBAR
-        Row {
-            Column {
-                # StackPanel 'FigureDrawingToolbar' {
-                #     $this.Orientation = [Orientation]::Horizontal
-                #     $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                #     Watch Visibility Window.Tag.IsFigureDrawingMode -Converter {
-                #         if ($_) { 'Visible' } else { 'Collapsed' }
-                #     }
+        StackPanel 'ButtonPanel' {
+            $this.Orientation = [Orientation]::Horizontal
+            $this.HorizontalAlignment = [HorizontalAlignment]::Center
+            Watch Visibility Window.Tag.IsFullScreen -Invert
 
-                #     Label 'CountdownLabel' {
-                #         TimedEvent 'ProcessRefresh' 3000 `
-                #             -When { (Get-WPFWindow).Tag.FigureDrawingCountdownActive } `
-                #             -Execute {
-                #                 $this.Content =
-                #             }
-                #     }
-
-                #     Button 'PauseButton' {
-                #         UseStyle 'ImageViewer.IconButton'
-                #         Watch IsEnabled Window.Tag.IsFileLoaded
-                #         Watch ToolTip Window.Tag.IsAutoForwardActive -Converter {
-                #             if ($_) { 'Pause' } else { 'Start' }
-                #         }
-                #         Watch Content Window.Tag.IsAutoForwardActive -Converter {
-                #             if ($_) {
-                #                 Path 'images/pause-solid-full.svg' {
-                #                     UseStyle 'ImageViewer.IconPath'
-                #                 }
-                #             } else {
-                #                 Path 'images/play-solid-full.svg' {
-                #                     UseStyle 'ImageViewer.IconPath'
-                #                 }
-                #             }
-                #         }
-
-                #         When 'Click' {
-                #             Invoke-ImageViewerToggleAutoForward
-                #         }
-                #     }
-                # }
-
-                StackPanel 'ButtonPanel' {
-                    $this.Orientation = [Orientation]::Horizontal
-                    $this.HorizontalAlignment = [HorizontalAlignment]::Center
-                    Watch Visibility Window.Tag.IsFullScreen -Invert
-
-                    Button 'CopyButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        Watch IsEnabled Window.Tag.IsFileLoaded
-                        Watch ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
-                            if ($_) { 'Copied to clipboard' } else { 'Copy image to clipboard' }
+            Button 'CopyButton' {
+                UseStyle 'ImageViewer.IconButton'
+                Watch IsEnabled Window.Tag.IsFileLoaded
+                Watch ToolTip Window.Tag.IsCopyFeedbackActive -Converter {
+                    if ($_) { 'Copied to clipboard' } else { 'Copy image to clipboard' }
+                }
+                Watch Content Window.Tag.IsCopyFeedbackActive -Converter {
+                    if ($_) {
+                        Path 'images/clipboard-check-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
                         }
-                        Watch Content Window.Tag.IsCopyFeedbackActive -Converter {
-                            if ($_) {
-                                Path 'images/clipboard-check-solid-full.svg' {
-                                    UseStyle 'ImageViewer.IconPath'
-                                }
-                            } else {
-                                Path 'images/clipboard-solid-full.svg' {
-                                    UseStyle 'ImageViewer.IconPath'
-                                }
-                            }
-                        }
-
-                        When 'Click' {
-                            try {
-                                Set-WPFClipboard -InputObject (Reference 'Viewer') -ErrorAction Stop
-                                Invoke-ImageViewerCopyFeedback -Success
-                            } catch {
-                                Invoke-ImageViewerCopyFeedback
-                            }
-                        }
-                    }
-                    Button 'ZoomModeButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        Watch IsEnabled Window.Tag.IsFileLoaded
-                        Watch ToolTip Window.Tag.IsFitMode -Converter {
-                            if ($_) { 'Actual size (100%)' } else { 'Fit image to window' }
-                        }
-                        Watch Content Window.Tag.IsFitMode -Converter {
-                            if ($_) {
-                                Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
-                                    UseStyle 'ImageViewer.IconPath'
-                                }
-                            } else {
-                                Path 'images/arrows-to-circle-solid-full.svg' {
-                                    UseStyle 'ImageViewer.IconPath'
-                                }
-                            }
-                        }
-
-                        When 'Click' {
-                            if ((Get-WPFWindow).Tag.IsFitMode) {
-                                Invoke-ImageViewerSetZoom -Reset
-                            } else {
-                                Invoke-ImageViewerFitToWindow
-                            }
-                        }
-                    }
-                    Button 'RotateButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        $this.ToolTip = 'Rotate 90° clockwise'
-                        Watch IsEnabled Window.Tag.IsFileLoaded
-
-                        When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
-                        Path 'images/arrows-rotate-solid-full.svg' {
+                    } else {
+                        Path 'images/clipboard-solid-full.svg' {
                             UseStyle 'ImageViewer.IconPath'
                         }
                     }
-                    Button 'BackButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        Watch IsEnabled Window.Tag.IsFileLoaded
+                }
 
-                        When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
-                        Path 'images/arrow-left-solid-full.svg' {
+                When 'Click' {
+                    try {
+                        Set-WPFClipboard -InputObject (Reference 'Viewer') -ErrorAction Stop
+                        Invoke-ImageViewerCopyFeedback -Success
+                    } catch {
+                        Invoke-ImageViewerCopyFeedback
+                    }
+                }
+            }
+
+            Button 'ZoomModeButton' {
+                UseStyle 'ImageViewer.IconButton'
+                Watch IsEnabled Window.Tag.IsFileLoaded
+                Watch ToolTip Window.Tag.IsFitMode -Converter {
+                    if ($_) { 'Actual size (100%)' } else { 'Fit image to window' }
+                }
+                Watch Content Window.Tag.IsFitMode -Converter {
+                    if ($_) {
+                        Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
+                            UseStyle 'ImageViewer.IconPath'
+                        }
+                    } else {
+                        Path 'images/arrows-to-circle-solid-full.svg' {
                             UseStyle 'ImageViewer.IconPath'
                         }
                     }
-                    Button 'ForwardButton' {
-                        UseStyle 'ImageViewer.IconButton'
-                        Watch IsEnabled Window.Tag.IsFileLoaded
+                }
 
-                        When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
-                        Path 'images/arrow-right-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
-                        }
+                When 'Click' {
+                    if ((Get-WPFWindow).Tag.IsFitMode) {
+                        Invoke-ImageViewerSetZoom -Reset
+                    } else {
+                        Invoke-ImageViewerFitToWindow
                     }
+                }
+            }
+
+            Button 'RotateButton' {
+                UseStyle 'ImageViewer.IconButton'
+                $this.ToolTip = 'Rotate 90° clockwise'
+                Watch IsEnabled Window.Tag.IsFileLoaded
+
+                When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
+                Path 'images/arrows-rotate-solid-full.svg' {
+                    UseStyle 'ImageViewer.IconPath'
+                }
+            }
+
+            Button 'BackButton' {
+                UseStyle 'ImageViewer.IconButton'
+                Watch IsEnabled Window.Tag.IsFileLoaded
+
+                When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
+                Path 'images/arrow-left-solid-full.svg' {
+                    UseStyle 'ImageViewer.IconPath'
+                }
+            }
+            Button 'ForwardButton' {
+                UseStyle 'ImageViewer.IconButton'
+                Watch IsEnabled Window.Tag.IsFileLoaded
+
+                When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
+                Path 'images/arrow-right-solid-full.svg' {
+                    UseStyle 'ImageViewer.IconPath'
                 }
             }
         }
+    }
 
-        # MARK: STATUS BAR
-        Row {
-            Column 'Expand' {
-                DockPanel 'StatusPanel' {
-                    $this.Margin = 5, 0, 5, 0
-                    Watch Visibility Window.Tag.IsFullScreen -Invert
+    # MARK: STATUS BAR
+    StatusBar {
+        $this.Margin = 5, 0, 5, 0
+        Watch Visibility Window.Tag.IsFullScreen -Invert
 
-                    Label 'StatusFileLabel' {
-                        $this.Content = 'No image loaded'
-                        [DockPanel]::SetDock($this, [Dock]::Left)
-                    }
-                    Label 'StatusIndexLabel' {
-                        $this.Content = '0/0'
-                        [DockPanel]::SetDock($this, [Dock]::Right)
-                    }
-                    Label 'StatusDetailsLabel' {
-                        $this.Content = '-'
-                        [DockPanel]::SetDock($this, [Dock]::Right)
-                    }
-                    Label 'StatusZoomLabel' {
-                        $this.Content = '100%'
-                        [DockPanel]::SetDock($this, [Dock]::Right)
-                    }
-                }
-            }
+        Label 'StatusFileLabel' {
+            $this.Content = 'No image loaded'
+            [DockPanel]::SetDock($this, [Dock]::Left)
+        }
+        Label 'StatusIndexLabel' {
+            $this.Content = '0/0'
+            [DockPanel]::SetDock($this, [Dock]::Right)
+        }
+        Label 'StatusDetailsLabel' {
+            $this.Content = '-'
+            [DockPanel]::SetDock($this, [Dock]::Right)
+        }
+        Label 'StatusZoomLabel' {
+            $this.Content = '100%'
+            [DockPanel]::SetDock($this, [Dock]::Right)
         }
     }
 } | Show-WPFWindow
