@@ -6,7 +6,7 @@ function Invoke-ImageViewerNavigate {
         [string] $Direction
     )
 
-    $State = (Reference 'Window').Tag
+    $State = (Get-WPFWindow).Tag
     if (-not $State.IsFileLoaded) { return }
     $Navigator = $State.FileNavigator
     if (-not $Navigator.CurrentFile) { return }

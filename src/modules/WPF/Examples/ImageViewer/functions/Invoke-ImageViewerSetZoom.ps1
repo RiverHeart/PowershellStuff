@@ -6,7 +6,7 @@ function Invoke-ImageViewerSetZoom {
         [switch] $Reset
     )
 
-    $State = (Reference 'Window').Tag
+    $State = (Get-WPFWindow).Tag
     $Viewer = Reference 'Viewer'
 
     $State.IsFitMode = $false

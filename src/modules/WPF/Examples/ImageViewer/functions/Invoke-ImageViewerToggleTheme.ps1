@@ -2,6 +2,6 @@ function Invoke-ImageViewerToggleTheme {
     [CmdletBinding()]
     param()
 
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     Switch-WPFTheme -Root $Window
 }

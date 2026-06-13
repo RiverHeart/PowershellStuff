@@ -4,7 +4,7 @@ function Start-ImageViewerMouseIdleHide {
 
     Write-Debug "Starting mouse idle hide."
 
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $State = $Window.Tag
 
     # Create the timer if it doesn't exist

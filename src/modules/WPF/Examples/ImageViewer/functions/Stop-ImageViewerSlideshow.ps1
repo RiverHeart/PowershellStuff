@@ -7,7 +7,7 @@ function Stop-ImageViewerSlideshow {
     Write-Debug "Stopping slideshow."
 
     if ($null -eq $Window) {
-        $Window = Reference 'Window' -ErrorAction SilentlyContinue
+        $Window = Get-WPFWindow -ErrorAction SilentlyContinue
     }
     if ($null -eq $Window) {
         return

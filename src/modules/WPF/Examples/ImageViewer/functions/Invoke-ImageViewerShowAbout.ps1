@@ -9,7 +9,7 @@ function Invoke-ImageViewerShowAbout {
     [CmdletBinding()]
     param()
 
-    $ParentWindow = Reference 'Window'
+    $ParentWindow = Get-WPFWindow
 
     Window 'About_Window' {
         $this.Title = 'About Image Viewer'

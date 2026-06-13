@@ -22,7 +22,7 @@ function Start-ImageViewerSlideshow {
     )
 
     Write-Debug "Starting slideshow with interval '$IntervalSeconds' seconds."
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $State = $Window.Tag
 
     if (-not $State.IsFileLoaded) {

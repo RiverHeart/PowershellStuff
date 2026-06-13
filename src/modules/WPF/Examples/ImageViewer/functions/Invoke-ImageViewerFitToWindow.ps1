@@ -2,7 +2,7 @@ function Invoke-ImageViewerFitToWindow {
     [CmdletBinding()]
     param()
 
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $State = $Window.Tag
     if (-not $State.IsFileLoaded) {
         return
@@ -23,11 +23,13 @@ function Invoke-ImageViewerFitToWindow {
     $ViewportHeight = [double] $ScrollViewer.ViewportHeight
 
     if ($ViewportWidth -le 0 -or $ViewportHeight -le 0) {
+        Write-Debug "Viewport width or height ($ViewportWidth x $ViewportHeight) is zero or negative, falling back to ScrollViewer actual size."
         $ViewportWidth = [double] $ScrollViewer.ActualWidth
         $ViewportHeight = [double] $ScrollViewer.ActualHeight
     }
 
     if ($ViewportWidth -le 0 -or $ViewportHeight -le 0) {
+        Write-Debug "Viewport width or height ($ViewportWidth x $ViewportHeight) is zero or negative, cannot fit to window."
         return
     }
 
@@ -43,6 +45,7 @@ function Invoke-ImageViewerFitToWindow {
     }
 
     if ($ImageWidth -le 0 -or $ImageHeight -le 0) {
+        Write-Debug "Image width or height ($ImageWidth x $ImageHeight) is zero or negative, cannot fit to window."
         return
     }
 

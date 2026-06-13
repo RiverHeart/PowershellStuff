@@ -20,7 +20,7 @@ function Invoke-ImageViewerCopyFeedback {
         [switch] $Success
     )
 
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $State = $Window.Tag
 
     if (-not $State.CopyFeedbackTimer) {

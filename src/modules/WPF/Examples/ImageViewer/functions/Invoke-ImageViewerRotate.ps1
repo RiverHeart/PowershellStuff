@@ -44,7 +44,7 @@ function Invoke-ImageViewerRotate {
         [switch] $ResetRotation
     )
 
-    [pscustomobject] $State = Reference 'Window' -Property Tag
+    [pscustomobject] $State = (Get-WPFWindow).Tag
     [System.Windows.Controls.Image] $Viewer = Reference 'Viewer'
 
     if (-not $State.IsFileLoaded) {

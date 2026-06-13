@@ -11,7 +11,7 @@ function Invoke-ImageViewerLoadFile {
         return
     }
 
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $Viewer = Reference 'Viewer'
 
     try {

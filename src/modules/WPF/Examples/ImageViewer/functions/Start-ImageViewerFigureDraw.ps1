@@ -11,7 +11,7 @@ function Start-ImageViewerFigureDrawingMode {
     )
 
     Write-Debug "Starting figure drawing mode with preset '$Preset' and session length '$TotalMinutes' minutes."
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $State = $Window.Tag
 
     if (-not $State.IsFileLoaded) {
