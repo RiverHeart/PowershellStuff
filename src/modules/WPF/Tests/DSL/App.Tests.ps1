@@ -64,6 +64,23 @@ Describe 'App' -Tag 'App' {
         $RootStatusBar[0].Items[0] | Should -BeOfType [System.Windows.Controls.TextBlock]
     }
 
+    It 'Should reserve implicit app shell names with __ prefix' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $AppName = "App_$Id"
+
+        $App = App $AppName {
+            MenuItem "File_$Id/Open_$Id" { }
+        }
+
+        $RootMenu = @($App.Content.Children | Where-Object { $_ -is [System.Windows.Controls.Menu] })
+        $RootMenu | Should -HaveCount 1
+        $RootMenu[0].Name | Should -Be "__${AppName}Menu"
+
+        $AppContentProperty = $App.PSObject.Properties['_WPFAppContent']
+        $AppContentProperty | Should -Not -Be $null
+        $AppContentProperty.Value.Name | Should -Be "__${AppName}Content"
+    }
+
     It 'Should dock explicit MenuBar to the top app menu region' {
         $Id = [guid]::NewGuid().ToString('N')
 

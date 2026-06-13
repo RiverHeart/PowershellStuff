@@ -64,7 +64,7 @@ function App {
         # This avoids unbounded StackPanel measurement issues for viewport controls
         # like ScrollViewer, DataGrid, and image surfaces.
         $Content = [System.Windows.Controls.Grid] @{
-            Name = "${Name}Content"
+            Name = "__${Name}Content"
             Margin = 5
         }
         Register-WPFObject -Name $Content.Name -InputObject $Content -ContextId $ContextId

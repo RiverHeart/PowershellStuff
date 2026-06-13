@@ -125,6 +125,10 @@ space. If you want sequential stacking semantics, add a `StackPanel` inside
 Root-level `MenuItem` entries are routed into an implicit `Menu` when no explicit
 `Menu` has been created yet, which makes simple app layouts easier to write.
 
+Implicit app shell controls use reserved internal names with a `__` prefix
+(for example, `__ExampleMenu` and `__ExampleContent`) to avoid collisions with
+user-defined control names.
+
 ```powershell
 App 'Example' {
     $this.Title = 'Example'

@@ -38,7 +38,7 @@ function Get-WPFAppMenu {
     }
 
     $ContextId = Get-WPFControlContextId -InputObject $Window
-    $MenuName = if ($Window.Name) { "{0}Menu" -f $Window.Name } else { 'AppMenu' }
+    $MenuName = if ($Window.Name) { "__{0}Menu" -f $Window.Name } else { '__AppMenu' }
     $Menu = [System.Windows.Controls.Menu] @{
         Name = $MenuName
     }
