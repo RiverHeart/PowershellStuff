@@ -44,8 +44,6 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
-Start-Sleep -Seconds 2
-
 # Define the Image Viewer GUI
 
 Import "$PSScriptRoot/ImageViewer.Styles.ps1"
@@ -112,7 +110,7 @@ Window 'Window' {
     # WARNING: A little debouncing might be needed to prevent multiple rapid
     # SizeChanged events from causing issues.
     When SizeChanged {
-        if ((Reference 'Window').Tag.IsFitMode) {
+        if ($this.Tag.IsFitMode) {
             Invoke-ImageViewerFitToWindow
         }
     }
@@ -135,7 +133,7 @@ Window 'Window' {
         }
 
         Set-WPFWindowFullScreen -IsFullScreen $False
-        if ($State.IsFitMode) {
+        if ($this.Tag.IsFitMode) {
             Invoke-ImageViewerFitToWindow
         }
         $Event.Handled = $true
@@ -241,7 +239,7 @@ Window 'Window' {
                         UseStyle 'ImageViewer.UnthemedMenuItem'
 
                         Command 'Open' {
-                            $Window = Reference 'Window'
+                            $Window = Get-WPFWindow
                             $FileName = Get-WPFFileSelection -Category Image -Window $Window
 
                             # Return early if we failed to get a file
@@ -258,7 +256,7 @@ Window 'Window' {
                         Command 'SaveAs' 'Ctrl+Shift+S' {
                             Execute {
                                 $BitmapSource = Reference 'Viewer' -Property Source
-                                $CurrentFile = (Reference 'Window').Tag.FileNavigator.CurrentFile
+                                $CurrentFile = (Get-WPFWindow).Tag.FileNavigator.CurrentFile
                                 $SourcePath = $null
                                 $InitialDirectory = $null
 
@@ -273,20 +271,20 @@ Window 'Window' {
                                     -InitialDirectory $InitialDirectory
                             }
                             CanExecute {
-                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                                [bool] (Get-WPFWindow).Tag.IsFileLoaded
                             }
                         }
 
                         # RelayCommand does not rely on CommandManager in this module,
                         # so we refresh availability explicitly when file state changes.
-                        (Reference 'Window').Tag.SaveAsCommand = $this.Command
+                        (Get-WPFWindow).Tag.SaveAsCommand = $this.Command
                     }
                     MenuItem '(F)ile/(E)xit' {
                         UseStyle 'ImageViewer.UnthemedMenuItem'
 
                         Command 'CloseCommand' 'Ctrl+q' {
                             Write-Debug "Close command triggered. Closing window."
-                            (Reference 'Window').Close()
+                            (Get-WPFWindow).Close()
                         }
                     }
 
@@ -327,7 +325,7 @@ Window 'Window' {
 
                         Command 'FullScreen' 'F11' {
                             Write-Debug "Toggling full screen mode."
-                            $Window = Reference 'Window'
+                            $Window = Get-WPFWindow
                             $State = $Window.Tag
                             $IsEnteringFullScreen = -not $State.IsFullScreen
 
@@ -353,12 +351,12 @@ Window 'Window' {
                                 Invoke-ImageViewerToggleSlideshow
                             }
                             CanExecute {
-                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                                [bool] (Get-WPFWindow).Tag.IsFileLoaded
                             }
                         }
 
                         # RelayCommand does not auto-requery in this module.
-                        (Reference 'Window').Tag.SlideshowCommand = $this.Command
+                        (Get-WPFWindow).Tag.SlideshowCommand = $this.Command
                     }
 
                     MenuItem '(V)iew/Figure (D)rawing Mode' {
@@ -369,12 +367,12 @@ Window 'Window' {
                                 Invoke-ImageViewerToggleFigureDrawingMode
                             }
                             CanExecute {
-                                [bool] (Reference 'Window').Tag.IsFileLoaded
+                                [bool] (Get-WPFWindow).Tag.IsFileLoaded
                             }
                         }
 
                         # RelayCommand does not auto-requery in this module.
-                        (Reference 'Window').Tag.FigureDrawingCommand = $this.Command
+                        (Get-WPFWindow).Tag.FigureDrawingCommand = $this.Command
                     }
 
                     MenuItem '(V)iew/Image Fit to (W)indow' {
@@ -514,7 +512,7 @@ Window 'Window' {
 
                 #     Label 'CountdownLabel' {
                 #         TimedEvent 'ProcessRefresh' 3000 `
-                #             -When { Reference 'Window'.Tag.FigureDrawingCountdownActive } `
+                #             -When { (Get-WPFWindow).Tag.FigureDrawingCountdownActive } `
                 #             -Execute {
                 #                 $this.Content =
                 #             }
@@ -595,7 +593,7 @@ Window 'Window' {
                         }
 
                         When 'Click' {
-                            if ((Reference 'Window').Tag.IsFitMode) {
+                            if ((Get-WPFWindow).Tag.IsFitMode) {
                                 Invoke-ImageViewerSetZoom -Reset
                             } else {
                                 Invoke-ImageViewerFitToWindow

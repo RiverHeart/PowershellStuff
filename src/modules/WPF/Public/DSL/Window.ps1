@@ -42,6 +42,7 @@ function Window {
         }
         Set-WPFControlContext -InputObject $Window -ContextId $ContextId
         Register-WPFObject -Name $Name -InputObject $Window -ContextId $ContextId -Overwrite
+        Register-WPFObject -Name '__WPFCurrentWindow' -InputObject $Window -ContextId $ContextId -Overwrite
         $Window.Resources['WPFDialogCloseReason'] = 'User'
 
         $Window.Add_Closed({

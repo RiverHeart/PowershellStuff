@@ -168,6 +168,7 @@ FunctionsToExport = @(
     'New-WPFProject'
     'New-WPFSize'
     'New-WPFVariableList'
+    'Get-WPFWindow'
     'Register-WPFChromeAdapter'
     'Register-WPFObject'
     'Set-WPFClipboard'
