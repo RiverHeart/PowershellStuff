@@ -15,10 +15,10 @@ Describe 'App' -Tag 'App' {
         $App.Title | Should -Be 'App Test'
         $ContentHost = @($App.Content.Children | Where-Object { $_ -is [System.Windows.Controls.Grid] })
         $ContentHost | Should -HaveCount 1
-        $ContentHost[0].Margin.Left | Should -Be 12
-        $ContentHost[0].Margin.Top | Should -Be 12
-        $ContentHost[0].Margin.Right | Should -Be 12
-        $ContentHost[0].Margin.Bottom | Should -Be 12
+        $ContentHost[0].Margin.Left | Should -Be 5
+        $ContentHost[0].Margin.Top | Should -Be 5
+        $ContentHost[0].Margin.Right | Should -Be 5
+        $ContentHost[0].Margin.Bottom | Should -Be 5
     }
 
     It 'Should route root-level controls into the content host, dock the menu, and dock the status bar' {
