@@ -159,6 +159,7 @@ FunctionsToExport = @(
     'Convert-WPFObjectToXaml'
     'Find-WPFChildNode'
     'Get-WPFChromeAdapter'
+    'Get-WPFContextId'
     'Get-WPFDarkModePreference'
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'

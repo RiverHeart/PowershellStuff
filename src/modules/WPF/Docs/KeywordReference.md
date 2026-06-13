@@ -909,7 +909,23 @@ $Window = Get-WPFWindow
 ```
 
 ```powershell
-$Window = Get-WPFWindow -ContextId $Window._WPFContextId
+$ContextId = Get-WPFContextId
+$Window = Get-WPFWindow -ContextId $ContextId
+```
+
+### Get-WPFContextId
+
+Gets the current control context id for the resolved DSL context.
+
+Use this when you need to pin later `Reference` or `Get-WPFWindow` calls to a
+specific window context.
+
+```powershell
+$ContextId = Get-WPFContextId
+```
+
+```powershell
+$ContextId = Get-WPFContextId -InputObject $SomeControl
 ```
 
 ### Reference
@@ -921,7 +937,9 @@ If multiple windows register the same name, `Reference` resolves by the current 
 ```powershell
 $Window = Get-WPFWindow
 $Buttons = Reference 'BackButton', 'ForwardButton'
-$Window = Get-WPFWindow -ContextId $Window._WPFContextId
+$ContextId = Get-WPFContextId
+$Window = Get-WPFWindow -ContextId $ContextId
+$Buttons = Reference 'BackButton', 'ForwardButton' -ContextId $ContextId
 ```
 
 ### Import
