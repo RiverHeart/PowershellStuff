@@ -7,11 +7,19 @@ function Start-ImageViewerFigureDrawingMode {
 
         [Parameter()]
         [ValidateSet('Warmup', 'Balanced', 'StudyHeavy')]
-        [string] $Preset = 'Balanced'
+        [string] $Preset = 'Balanced',
+
+        [ValidateNotNullOrEmpty()]
+        [string] $ContextId
     )
 
     Write-Debug "Starting figure drawing mode with preset '$Preset' and session length '$TotalMinutes' minutes."
-    $Window = Get-WPFWindow
+    $Window = Get-WPFWindow -ContextId $ContextId -ErrorAction Stop
+    if (-not $ContextId) {
+        $ContextId = Get-WPFContextId -InputObject $Window -ErrorAction Stop
+    }
+
+    $TimerContextId = $ContextId
     $State = $Window.Tag
 
     if (-not $State.IsFileLoaded) {
@@ -55,18 +63,18 @@ function Start-ImageViewerFigureDrawingMode {
                         return
                     }
 
-                    Invoke-ImageViewerNavigate -Direction Forward
+                    Invoke-ImageViewerNavigate -Direction Forward -ContextId $TimerContextId
                     $TimerState.FigureDrawingPoseIndex = $NextPoseIndex
                     $NextDuration = [double] $TimerState.FigureDrawingPoseDurationsSeconds[$NextPoseIndex]
                     $TimerState.FigureDrawingPoseRemainingSeconds = $NextDuration
                     $TimerState.FigureDrawingPoseEndsAtUtc = [DateTime]::UtcNow.AddSeconds($NextDuration)
                     $TimerState.AutoForwardIntervalSeconds = $NextDuration
                     $TimerState.AutoForwardTimer.Interval = [TimeSpan]::FromSeconds($NextDuration)
-                    Invoke-ImageViewerUpdateFigureDrawingCountdown
+                    Invoke-ImageViewerUpdateFigureDrawingCountdown -ContextId $TimerContextId
                     return
                 }
 
-                Invoke-ImageViewerNavigate -Direction Forward
+                Invoke-ImageViewerNavigate -Direction Forward -ContextId $TimerContextId
             } catch {
                 # If shutdown/context teardown races this tick, stop gracefully.
                 $this.Stop()
@@ -81,7 +89,7 @@ function Start-ImageViewerFigureDrawingMode {
         $CountdownTimer.Interval = [TimeSpan]::FromMilliseconds(250)
 
         $null = $CountdownTimer.add_Tick({
-            Invoke-ImageViewerUpdateFigureDrawingCountdown
+            Invoke-ImageViewerUpdateFigureDrawingCountdown -ContextId $TimerContextId
         }.GetNewClosure())
 
         $State.FigureDrawingCountdownTimer = $CountdownTimer
@@ -110,13 +118,13 @@ function Start-ImageViewerFigureDrawingMode {
     $State.AutoForwardTimer.Start()
     $State.FigureDrawingCountdownTimer.Stop()
     $State.FigureDrawingCountdownTimer.Start()
-    Invoke-ImageViewerUpdateFigureDrawingCountdown
+    Invoke-ImageViewerUpdateFigureDrawingCountdown -ContextId $TimerContextId
 
     if (-not $State.IsFullScreen) {
         Set-WPFWindowFullScreen -IsFullScreen $true
     }
 
     if ($State.IsFitMode) {
-        Invoke-ImageViewerFitToWindow
+        Invoke-ImageViewerFitToWindow -ContextId $TimerContextId
     }
 }

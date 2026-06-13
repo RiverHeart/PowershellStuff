@@ -18,11 +18,19 @@ function Start-ImageViewerSlideshow {
     param(
         [Parameter(Mandatory)]
         [ValidateRange(0.5, 600)]
-        [double] $IntervalSeconds
+        [double] $IntervalSeconds,
+
+        [ValidateNotNullOrEmpty()]
+        [string] $ContextId
     )
 
     Write-Debug "Starting slideshow with interval '$IntervalSeconds' seconds."
-    $Window = Get-WPFWindow
+    $Window = Get-WPFWindow -ContextId $ContextId -ErrorAction Stop
+    if (-not $ContextId) {
+        $ContextId = Get-WPFContextId -InputObject $Window -ErrorAction Stop
+    }
+
+    $TimerContextId = $ContextId
     $State = $Window.Tag
 
     if (-not $State.IsFileLoaded) {
@@ -47,7 +55,7 @@ function Start-ImageViewerSlideshow {
             }
 
             try {
-                Invoke-ImageViewerNavigate -Direction Forward
+                Invoke-ImageViewerNavigate -Direction Forward -ContextId $TimerContextId
             } catch {
                 # If shutdown/context teardown races this tick, stop gracefully.
                 $this.Stop()
@@ -82,6 +90,6 @@ function Start-ImageViewerSlideshow {
     }
 
     if ($State.IsFitMode) {
-        Invoke-ImageViewerFitToWindow
+        Invoke-ImageViewerFitToWindow -ContextId $TimerContextId
     }
 }

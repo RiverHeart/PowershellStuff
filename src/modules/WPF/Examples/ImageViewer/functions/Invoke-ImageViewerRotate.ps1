@@ -41,11 +41,18 @@ function Invoke-ImageViewerRotate {
         [int] $RotationAngle = 90,
 
         [Parameter(Mandatory,ParameterSetName = 'Reset')]
-        [switch] $ResetRotation
+        [switch] $ResetRotation,
+
+        [ValidateNotNullOrEmpty()]
+        [string] $ContextId
     )
 
-    [pscustomobject] $State = (Get-WPFWindow).Tag
-    [System.Windows.Controls.Image] $Viewer = Reference 'Viewer'
+    [System.Windows.Window] $Window = Get-WPFWindow -ContextId $ContextId -ErrorAction Stop
+    if (-not $ContextId) {
+        $ContextId = Get-WPFContextId -InputObject $Window -ErrorAction Stop
+    }
+    [pscustomobject] $State = $Window.Tag
+    [System.Windows.Controls.Image] $Viewer = Reference 'Viewer' -ContextId $ContextId
 
     if (-not $State.IsFileLoaded) {
         return
@@ -72,8 +79,8 @@ function Invoke-ImageViewerRotate {
 
     # If we're in fit mode, recalculate to account for the new aspect ratio.
     if ($State.IsFitMode) {
-        Invoke-ImageViewerFitToWindow
+        Invoke-ImageViewerFitToWindow -ContextId $ContextId
     }
 
-    Invoke-ImageViewerUpdateStatus
+    Invoke-ImageViewerUpdateStatus -Window $Window
 }

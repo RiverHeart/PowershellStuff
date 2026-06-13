@@ -514,6 +514,8 @@ TimedEvent 'RefreshData' 3000 {
 }
 ```
 
+**Async context note**: In DispatcherTimer callbacks, capture and pass the window's ContextId explicitly to ensure helpers resolve to the correct window. See [AsyncContextPinning.md](AsyncContextPinning.md) for detailed guidance.
+
 ## Binding and Resources
 
 ### State
@@ -930,6 +932,10 @@ Gets the current root window for the resolved DSL context.
 
 Prefer this for root-window access instead of relying on a specific registered
 window name.
+
+In async callbacks (for example `DispatcherTimer` ticks), capture a context id
+once and call `Get-WPFWindow -ContextId` so delayed handlers remain pinned to
+the originating window.
 
 ```powershell
 $Window = Get-WPFWindow

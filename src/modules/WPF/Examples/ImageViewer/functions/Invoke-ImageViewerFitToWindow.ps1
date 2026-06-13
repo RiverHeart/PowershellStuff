@@ -1,15 +1,21 @@
 function Invoke-ImageViewerFitToWindow {
     [CmdletBinding()]
-    param()
+    param(
+        [ValidateNotNullOrEmpty()]
+        [string] $ContextId
+    )
 
-    $Window = Get-WPFWindow
+    $Window = Get-WPFWindow -ContextId $ContextId -ErrorAction Stop
+    if (-not $ContextId) {
+        $ContextId = Get-WPFContextId -InputObject $Window -ErrorAction Stop
+    }
     $State = $Window.Tag
     if (-not $State.IsFileLoaded) {
         return
     }
 
-    $Viewer = Reference 'Viewer'
-    $ScrollViewer = Reference 'ScrollViewer'
+    $Viewer = Reference 'Viewer' -ContextId $ContextId
+    $ScrollViewer = Reference 'ScrollViewer' -ContextId $ContextId
     $Source = $Viewer.Source
     if (-not ($Source -is [System.Windows.Media.Imaging.BitmapSource])) {
         return
@@ -64,5 +70,5 @@ function Invoke-ImageViewerFitToWindow {
 
     $State.IsFitMode = $true
 
-    Invoke-ImageViewerUpdateStatus
+    Invoke-ImageViewerUpdateStatus -Window $Window
 }
