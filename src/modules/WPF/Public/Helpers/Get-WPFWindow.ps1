@@ -37,8 +37,8 @@ function Get-WPFWindow {
         return
     }
 
-    if ($ControlTable.ContainsKey('__WPFCurrentWindow')) {
-        $RegisteredWindow = $ControlTable['__WPFCurrentWindow']
+    if ($ControlTable.ContainsKey('__WPFWindow')) {
+        $RegisteredWindow = $ControlTable['__WPFWindow']
         if ($RegisteredWindow -is [System.Windows.Window]) {
             return $RegisteredWindow
         }
