@@ -6,8 +6,11 @@
     Builds a System.Windows.Data.Binding with common source selectors used by
     DataTrigger and template-driven styles.
 
-    Use this keyword when Bind is not suitable and a raw Binding object is
-    needed, for example DataTrigger with RelativeSource settings.
+    This keyword is optional for BindProperty usage. BindProperty creates and
+    applies its own Binding object internally.
+
+    Use this keyword when BindProperty or other DSL APIs need a raw Binding
+    object, for example DataTrigger with RelativeSource settings.
 
 .EXAMPLE
     DataTrigger (Binding 'IsEnabled' -Self) $false {
