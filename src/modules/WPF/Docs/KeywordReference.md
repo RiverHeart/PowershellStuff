@@ -897,6 +897,21 @@ $Gesture = ConvertTo-KeyGesture -InputObject 'Ctrl+Shift+S'
 $Gestures = ConvertTo-KeyGesture -InputObject @('Ctrl+S', 'F11')
 ```
 
+### Get-WPFWindow
+
+Gets the current root window for the resolved DSL context.
+
+Prefer this for root-window access instead of relying on a specific registered
+window name.
+
+```powershell
+$Window = Get-WPFWindow
+```
+
+```powershell
+$Window = Get-WPFWindow -ContextId $Window._WPFContextId
+```
+
 ### Reference
 
 Gets a registered object by name from the current window context.
@@ -904,9 +919,9 @@ Gets a registered object by name from the current window context.
 If multiple windows register the same name, `Reference` resolves by the current DSL object context. Use `-ContextId` for explicit lookup.
 
 ```powershell
-$Window = Reference 'Window'
+$Window = Get-WPFWindow
 $Buttons = Reference 'BackButton', 'ForwardButton'
-$Window = Reference 'Window' -ContextId $Window._WPFContextId
+$Window = Get-WPFWindow -ContextId $Window._WPFContextId
 ```
 
 ### Import
