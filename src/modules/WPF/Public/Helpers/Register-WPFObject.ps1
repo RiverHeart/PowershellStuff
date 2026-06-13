@@ -35,7 +35,29 @@ function Register-WPFObject {
     )
 
     $Parent = $PSCmdlet.GetVariableValue('this')
-    $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $InputObject -CreateIfMissing -Name $Name
+    $ResolveContextParams = @{
+        CreateIfMissing = $true
+        Name            = $Name
+    }
+
+    $ResolvedContextId = $null
+    if ($PSBoundParameters.ContainsKey('ContextId')) {
+        if (Test-WPFControlContextId -ContextId $ContextId) {
+            $ResolvedContextId = $ContextId
+        } else {
+            $ResolvedContextId = New-WPFControlContext -Name $Name -ContextId $ContextId
+        }
+    }
+
+    if (-not $ResolvedContextId) {
+        $InputObjectContextId = Get-WPFControlContextId -InputObject $InputObject
+        if ($InputObjectContextId) {
+            $ResolveContextParams.InputObject = $InputObject
+        }
+
+        $ResolvedContextId = Resolve-WPFControlContextId @ResolveContextParams
+    }
+
     if (-not $ResolvedContextId -and $Parent) {
         $ResolvedContextId = Resolve-WPFControlContextId -InputObject $Parent -CreateIfMissing -Name $Name
     }

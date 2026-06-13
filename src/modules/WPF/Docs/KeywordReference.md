@@ -902,7 +902,10 @@ $Gestures = ConvertTo-KeyGesture -InputObject @('Ctrl+S', 'F11')
 Gets the current root window for the resolved DSL context.
 
 Prefer this for root-window access instead of relying on a specific registered
-window name.
+window name. It resolves against the current DSL object when available, then
+falls back to the active context or the single registered context.
+When you pass `-ContextId`, the context must resolve; otherwise the command
+emits an error. Omit `-ContextId` to use fallback resolution.
 
 ```powershell
 $Window = Get-WPFWindow
@@ -917,6 +920,9 @@ $Window = Get-WPFWindow -ContextId $Window._WPFContextId
 Gets a registered object by name from the current window context.
 
 If multiple windows register the same name, `Reference` resolves by the current DSL object context. Use `-ContextId` for explicit lookup.
+Explicit `-ContextId` values must resolve to an existing context; if they do
+not, the command emits an error. Omit `-ContextId` to use the normal fallback
+rules.
 
 ```powershell
 $Window = Get-WPFWindow
