@@ -43,7 +43,7 @@ Scope of this page:
     * [TimedEvent](#timedevent)
 * [Binding and Resources](#binding-and-resources)
     * [State](#state)
-    * [Watch](#watch)
+    * [Bind](#bind)
     * [BindProperty](#bindproperty)
     * [Binding](#binding)
     * [ValueConverter](#valueconverter)
@@ -520,7 +520,7 @@ TimedEvent 'RefreshData' 3000 {
 
 Creates observable state for the current DSL parent, enabling reactive UI updates via bindings and callbacks.
 
-The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or watched via the `Watch` keyword.
+The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or bound via the `Bind` keyword.
 
 PowerShell-side callback hooks are also supported through `AddBinding()`, which fires when the underlying property changes.
 
@@ -558,7 +558,7 @@ Window 'MyApp' {
 }
 ```
 
-Watch state changes with the `Watch` keyword:
+Bind state changes with the `Bind` keyword:
 
 ```powershell
 Window 'MyApp' {
@@ -567,18 +567,18 @@ Window 'MyApp' {
     }
 
     TextBlock 'Status' {
-        Watch Visibility Window.Tag.IsLoading -Invert
+        Bind Visibility -To Window.Tag.IsLoading -Invert
     }
 }
 ```
 
-### Watch
+### Bind
 
 Binds a target property to an observable state path.
 
 ```powershell
-Watch Visibility Window.Tag.IsFullScreen -Invert
-Watch IsEnabled Window.Tag.IsFileLoaded
+Bind Visibility -To Window.Tag.IsFullScreen -Invert
+Bind IsEnabled -To Window.Tag.IsFileLoaded
 ```
 
 ### BindProperty

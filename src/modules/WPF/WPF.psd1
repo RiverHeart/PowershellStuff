@@ -119,7 +119,7 @@ FunctionsToExport = @(
     'Window'
 
     # DSL/Helpers
-    'Watch'
+    'Bind'
     'Binding'
     'BindProperty'
     'BoundTo'
@@ -144,7 +144,6 @@ FunctionsToExport = @(
     'OnComplete'
     'Trigger'
     'UseStyle'
-    'Watch'
     'When'
 
     # DSL/Custom Controls

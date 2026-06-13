@@ -6,7 +6,7 @@
     Builds a System.Windows.Data.Binding with common source selectors used by
     DataTrigger and template-driven styles.
 
-    Use this keyword when Watch is not suitable and a raw Binding object is
+    Use this keyword when Bind is not suitable and a raw Binding object is
     needed, for example DataTrigger with RelativeSource settings.
 
 .EXAMPLE

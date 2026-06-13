@@ -1,6 +1,12 @@
-Describe 'Watch' -Tag 'Watch' {
+Describe 'Bind' -Tag 'Bind' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+    }
+
+    It 'Should export Bind and not export Watch' {
+        Get-Command -Name Bind -Module WPF -ErrorAction Stop | Should -Not -Be $null
+
+        { Get-Command -Name Watch -Module WPF -ErrorAction Stop } | Should -Throw
     }
 
     It 'Should pass the source value to converter param blocks' {
@@ -14,7 +20,7 @@ Describe 'Watch' -Tag 'Watch' {
             }
 
             Label $labelName {
-                Watch Content "$windowName.Tag.IsReady" -Converter {
+                Bind Content -To "$windowName.Tag.IsReady" -Converter {
                     param($SourceValue)
 
                     if ($SourceValue) { 'Ready' } else { 'Not Ready' }
@@ -42,7 +48,7 @@ Describe 'Watch' -Tag 'Watch' {
             }
 
             Label $labelName {
-                Watch Content "$windowName.Tag.IsReady" -Converter {
+                Bind Content -To "$windowName.Tag.IsReady" -Converter {
                     if ($_) { 'Ready' } else { 'Not Ready' }
                 }
             }
@@ -68,7 +74,7 @@ Describe 'Watch' -Tag 'Watch' {
             }
 
             Label $labelName {
-                Watch Visibility "$windowName.Tag.IsFullScreen" -Invert
+                Bind Visibility -To "$windowName.Tag.IsFullScreen" -Invert
             }
         }
 
