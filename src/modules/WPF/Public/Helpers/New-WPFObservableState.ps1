@@ -16,7 +16,7 @@ using namespace System.Windows.Controls
     When a property value changes, all WPF bindings update automatically, and any
     callbacks registered via AddBinding() are invoked.
 
-    Use with the Watch DSL keyword to declaratively wire control properties to state,
+    Use with the Bind DSL keyword to declaratively wire control properties to state,
     or bind directly in DataTemplates and XAML-like DSL code.
 
 .PARAMETER Properties

@@ -6,6 +6,9 @@
     Establishes a WPF data binding between a control property and a binding source
     (another control, element name, relative source, or arbitrary object).
 
+    BindProperty creates a System.Windows.Data.Binding internally. You do not
+    need to call the Binding keyword first for standard BindProperty usage.
+
     Use this keyword to bind regular properties (like TextBlock.Text) to dependency
     properties or observable sources.
 
@@ -35,6 +38,7 @@
 
 .PARAMETER ScriptBlock
     Optional scriptblock to configure the binding object (e.g., set Converter, Mode, etc.).
+    The scriptblock receives the internally created Binding instance as $this.
 
 .EXAMPLE
     # Bind TextBlock.Text to DataGrid.ItemsSource.Count

@@ -74,7 +74,7 @@ Window 'Window' {
         Row {
             Column 'Expand' {
                 MenuBar 'Menu' {
-                    Watch Visibility Window.Tag.IsFullScreen -Invert
+                    Bind Visibility -To Window.Tag.IsFullScreen -Invert
 
                     MenuItem '(F)ile/(O)pen' {
                         Command 'Open' {

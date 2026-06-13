@@ -31,6 +31,6 @@ function Set-WPFWindowFullScreen {
         $Window.ResizeMode  = $State.OldResizeMode
     }
 
-    # Updating IsFullScreen triggers Watch callbacks on Menu and ButtonPanel visibility
+    # Updating IsFullScreen triggers Bind callbacks on Menu and ButtonPanel visibility
     $State.IsFullScreen = $IsFullScreen
 }
