@@ -9,7 +9,7 @@
     StatusBar { ... }
 
 .LINK
-    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.statusbar
+    https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.primitives.statusbar
 #>
 function StatusBar {
     [CmdletBinding()]
