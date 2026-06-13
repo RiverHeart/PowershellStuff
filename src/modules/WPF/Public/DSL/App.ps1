@@ -1,23 +1,23 @@
 <#
 .SYNOPSIS
-    Creates a WPF Window object.
+    Creates an application-oriented WPF Window shell.
 
 .DESCRIPTION
-    Creates a WPF Window object. Window is always treated as a root element
-    and will never auto-attach to a parent. Use the Owner property to establish
-    an owner relationship for modal dialogs.
+    App is a thin wrapper around Window that pre-wires a DockPanel root, a
+    content host, and an implicit top-level Menu.
 
 .EXAMPLE
-    Disable a block of code without commenting it out by using a negative prefix.
-
-    -Window 'MainWindow' { ...code... }
+    App 'Example' {
+        $this.Title = 'Example'
+        MenuItem 'File/Open' { }
+    }
 
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.window
 #>
-function Window {
+function App {
     [CmdletBinding()]
-    [Alias('-Window')]
+    [Alias('-App')]
     [OutputType([void], [System.Windows.Window])]
     param(
         [Parameter(Mandatory)]
@@ -50,24 +50,33 @@ function Window {
             Remove-WPFControlContext -InputObject $Sender
         })
 
-        if (-not $Window.Height -and -not $Window.Width){
+        if (-not $Window.Height -and -not $Window.Width) {
             $Window.SizeToContent = 'WidthAndHeight'
         }
         Add-WPFType $Window 'Control'
+
+        $Root = [System.Windows.Controls.DockPanel]::new()
+        $Window.Content = $Root
+        $Window | Add-Member -NotePropertyName '_WPFAppRoot' -NotePropertyValue $Root -Force
+
+        $Content = [System.Windows.Controls.StackPanel] @{
+            Name = "${Name}Content"
+            Margin = 16
+        }
+        Register-WPFObject -Name $Content.Name -InputObject $Content -ContextId $ContextId
+        Add-WPFType $Content 'Control'
+        $Window | Add-Member -NotePropertyName '_WPFAppContent' -NotePropertyValue $Content -Force
+        Add-WPFAppRootChild -Window $Window -Child $Content -Placement 'Content'
     } catch {
         Remove-WPFControlContext -ContextId $ContextId
-        Write-Error "Failed to create '$Name' (Window) with error: $_"
+        Write-Error "Failed to create '$Name' (App) with error: $_"
     }
-
-    # Window is always root; do not auto-attach to parent
-    # Use the Owner property to establish ownership relationships
 
     $ShouldAutoClose = $false
     $EffectiveAutoCloseSeconds = 0.0
     $CallerBoundParameters = $PSCmdlet.GetVariableValue('PSBoundParameters', $null)
     $CallerAutoCloseSeconds = $PSCmdlet.GetVariableValue('AutoCloseSeconds', $null)
 
-    # Prefer explicit caller AutoCloseSeconds. Fallback to WPF_AUTO_CLOSE_SECONDS.
     if ($CallerBoundParameters -and
         ($CallerBoundParameters -is [System.Collections.IDictionary]) -and
         $CallerBoundParameters.ContainsKey('AutoCloseSeconds')
@@ -86,8 +95,7 @@ function Window {
         Enable-WPFAutoClose -Window $Window -AutoCloseSeconds ([double] $EffectiveAutoCloseSeconds)
     }
 
-    # NOTE: Allow exceptions from child objects to bubble up
-    Write-Debug "Processing child elements for $Name (Window)"
+    Write-Debug "Processing child elements for $Name (App)"
     Update-WPFObject $Window $ScriptBlock
 
     return $Window

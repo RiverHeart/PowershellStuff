@@ -13,6 +13,8 @@ Scope of this page:
 * [Core Pattern](#core-pattern)
 * [Controls](#controls)
     * [Window](#window)
+    * [App](#app)
+    * [Content](#content)
     * [Grid](#grid)
     * [Row](#row)
     * [Column](#column)
@@ -31,6 +33,7 @@ Scope of this page:
     * [Menu](#menu)
     * [MenuBar](#menubar)
     * [MenuItem](#menuitem)
+    * [StatusBar](#statusbar)
 * [Shapes](#shapes)
     * [Path](#path)
 * [Commands and Events](#commands-and-events)
@@ -106,6 +109,35 @@ between a normal/user close (`User`) and DSL auto-close (`AutoClose`).
 ```powershell
 Window 'MainWindow' {
     $this.Title = 'My App'
+}
+```
+
+### App
+
+Creates an application-oriented Window shell with a DockPanel root, a content
+host, and an implicit top-level Menu.
+
+Root-level `MenuItem` entries are routed into an implicit `Menu` when no explicit
+`Menu` has been created yet, which makes simple app layouts easier to write.
+
+```powershell
+App 'Example' {
+    $this.Title = 'Example'
+    MenuItem 'File/Open' { }
+}
+```
+
+### Content
+
+Routes a block into the App shell's main content host.
+
+```powershell
+App 'Example' {
+    Content {
+        Button 'SaveButton' {
+            $this.Content = 'Save'
+        }
+    }
 }
 ```
 
@@ -336,6 +368,22 @@ Creates a MenuItem. Supports path shorthand using slash-separated names.
 ```powershell
 MenuItem '_File/_Open' {
     When Click { }
+}
+```
+
+### StatusBar
+
+Creates a StatusBar and docks it to the bottom of an App shell.
+
+Supports named and nameless forms.
+
+```powershell
+App 'Example' {
+    StatusBar {
+        TextBlock 'ReadyText' {
+            $this.Text = 'Ready'
+        }
+    }
 }
 ```
 
@@ -849,6 +897,21 @@ $Gesture = ConvertTo-KeyGesture -InputObject 'Ctrl+Shift+S'
 $Gestures = ConvertTo-KeyGesture -InputObject @('Ctrl+S', 'F11')
 ```
 
+### Get-WPFWindow
+
+Gets the current root window for the resolved DSL context.
+
+Prefer this for root-window access instead of relying on a specific registered
+window name.
+
+```powershell
+$Window = Get-WPFWindow
+```
+
+```powershell
+$Window = Get-WPFWindow -ContextId $Window._WPFContextId
+```
+
 ### Reference
 
 Gets a registered object by name from the current window context.
@@ -856,9 +919,9 @@ Gets a registered object by name from the current window context.
 If multiple windows register the same name, `Reference` resolves by the current DSL object context. Use `-ContextId` for explicit lookup.
 
 ```powershell
-$Window = Reference 'Window'
+$Window = Get-WPFWindow
 $Buttons = Reference 'BackButton', 'ForwardButton'
-$Window = Reference 'Window' -ContextId $Window._WPFContextId
+$Window = Get-WPFWindow -ContextId $Window._WPFContextId
 ```
 
 ### Import
