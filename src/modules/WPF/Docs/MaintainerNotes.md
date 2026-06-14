@@ -10,6 +10,10 @@ Use the development log for dated progress entries and in-flight investigation n
 
 ## Design Notes
 
+### State Input Model
+
+For a summary of attempts to move `State` from explicit hashtable input to scriptblock syntax, including context-binding failures and tradeoffs, see [StateScriptBlockSyntaxInvestigation.md](StateScriptBlockSyntaxInvestigation.md).
+
 ### Object References
 
 Because children are defined by functions and added automatically there is an issue regarding node access. If each element were created the regular way you'd have a variable reference but not here. The original options were either automatic variables or a lookup table keyed by control name.
