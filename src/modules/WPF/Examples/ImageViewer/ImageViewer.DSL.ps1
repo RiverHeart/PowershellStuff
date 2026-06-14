@@ -590,24 +590,39 @@ App 'Window' {
 
     # MARK: STATUS BAR
     StatusBar {
-        $this.Margin = 5, 0, 5, 0
+        $this.Margin = 0, 5, 0, 0
         Bind Visibility -To Window.Tag.IsFullScreen -Invert
 
-        Label 'StatusFileLabel' {
-            $this.Content = 'No image loaded'
+        StatusBarItem 'StatusFileItem' {
             [DockPanel]::SetDock($this, [Dock]::Left)
+
+            Label 'StatusFileLabel' {
+                $this.Content = 'No image loaded'
+            }
         }
-        Label 'StatusIndexLabel' {
-            $this.Content = '0/0'
+
+        StatusBarItem 'StatusIndexItem' {
             [DockPanel]::SetDock($this, [Dock]::Right)
+
+            Label 'StatusIndexLabel' {
+                $this.Content = '0/0'
+            }
         }
-        Label 'StatusDetailsLabel' {
-            $this.Content = '-'
+
+        StatusBarItem 'StatusDetailsItem' {
             [DockPanel]::SetDock($this, [Dock]::Right)
+
+            Label 'StatusDetailsLabel' {
+                $this.Content = '-'
+            }
         }
-        Label 'StatusZoomLabel' {
-            $this.Content = '100%'
+
+        StatusBarItem 'StatusZoomItem' {
             [DockPanel]::SetDock($this, [Dock]::Right)
+
+            Label 'StatusZoomLabel' {
+                $this.Content = '100%'
+            }
         }
     }
 } | Show-WPFWindow

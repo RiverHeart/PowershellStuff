@@ -112,6 +112,7 @@ FunctionsToExport = @(
     'Menu'
     'MenuItem'
     'StatusBar'
+    'StatusBarItem'
     'ScrollViewer'
     'StackPanel'
     'TextBlock'

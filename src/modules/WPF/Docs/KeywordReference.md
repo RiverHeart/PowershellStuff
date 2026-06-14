@@ -175,6 +175,52 @@ App 'Example' {
 }
 ```
 
+### StatusBar
+
+Creates a WPF `StatusBar`.
+
+Plain child controls are added as items, but WPF may wrap them in generated
+item containers. When you need layout behavior that applies to the arranged
+container itself, such as right-docking content, use explicit `StatusBarItem`
+ entries.
+
+```powershell
+StatusBar {
+    StatusBarItem {
+        [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Left)
+
+        TextBlock 'StatusFileText' {
+            $this.Text = 'Ready'
+        }
+    }
+
+    StatusBarItem {
+        [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Right)
+
+        TextBlock 'StatusZoomText' {
+            $this.Text = '100%'
+        }
+    }
+}
+```
+
+### StatusBarItem
+
+Creates a WPF `StatusBarItem`.
+
+Supports named and nameless forms and is primarily useful when you want to
+control status bar item container layout directly.
+
+```powershell
+StatusBarItem 'ZoomItem' {
+    [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Right)
+
+    TextBlock 'ZoomText' {
+        $this.Text = '100%'
+    }
+}
+```
+
 ### Grid
 
 Creates a Grid and processes Row and Column specs.

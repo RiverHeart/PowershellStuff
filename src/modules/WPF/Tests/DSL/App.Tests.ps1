@@ -185,4 +185,39 @@ Describe 'App' -Tag 'App' {
         $RootStatusBar[0].Items | Should -HaveCount 1
         $RootStatusBar[0].Items[0] | Should -BeOfType [System.Windows.Controls.TextBlock]
     }
+
+    It 'Should allow docking explicit StatusBarItem containers inside StatusBar' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $App = App "App_$Id" {
+            StatusBar {
+                StatusBarItem "LeftItem_$Id" {
+                    [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Left)
+
+                    TextBlock "StatusFile_$Id" {
+                        $this.Text = 'No image loaded'
+                    }
+                }
+
+                StatusBarItem "RightItem_$Id" {
+                    [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Right)
+
+                    TextBlock "StatusZoom_$Id" {
+                        $this.Text = '100%'
+                    }
+                }
+            }
+        }
+
+        $RootStatusBar = @($App.Content.Children | Where-Object { $_ -is [System.Windows.Controls.Primitives.StatusBar] })
+        $RootStatusBar | Should -HaveCount 1
+        $RootStatusBar[0].Items | Should -HaveCount 2
+        $RootStatusBar[0].Items[0] | Should -BeOfType [System.Windows.Controls.Primitives.StatusBarItem]
+        $RootStatusBar[0].Items[1] | Should -BeOfType [System.Windows.Controls.Primitives.StatusBarItem]
+        [System.Windows.Controls.DockPanel]::GetDock($RootStatusBar[0].Items[0]) | Should -Be 'Left'
+        [System.Windows.Controls.DockPanel]::GetDock($RootStatusBar[0].Items[1]) | Should -Be 'Right'
+        $RootStatusBar[0].Items[0].Content | Should -BeOfType [System.Windows.Controls.TextBlock]
+        $RootStatusBar[0].Items[1].Content | Should -BeOfType [System.Windows.Controls.TextBlock]
+        $RootStatusBar[0].Items[1].Content.Text | Should -Be '100%'
+    }
 }
