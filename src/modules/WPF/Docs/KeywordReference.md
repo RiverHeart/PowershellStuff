@@ -122,6 +122,10 @@ The App content host is a constrained fill region so viewport-based controls
 space. If you want sequential stacking semantics, add a `StackPanel` inside
 `Content` explicitly.
 
+When an App window enters fullscreen through `Set-WPFWindowFullScreen`, the
+shell temporarily removes the content host margin so viewport content can reach
+the window edges, then restores the original margin when fullscreen exits.
+
 Root-level `MenuItem` entries are routed into an implicit `Menu` when no explicit
 `Menu` has been created yet, which makes simple app layouts easier to write.
 

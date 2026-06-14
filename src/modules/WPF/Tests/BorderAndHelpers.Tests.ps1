@@ -243,6 +243,37 @@ Describe 'Set-WPFWindowFullScreen' -Tag 'Set-WPFWindowFullScreen' {
         }
     }
 
+    It 'Should collapse and restore App content host margin when toggling fullscreen' {
+        InModuleScope WPF {
+            $State = [pscustomobject]@{
+                IsFullScreen   = $false
+                OldWindowStyle = $null
+                OldWindowState = $null
+                OldResizeMode  = $null
+            }
+
+            $ContentHost = [System.Windows.Controls.Grid]::new()
+            $ContentHost.Margin = [System.Windows.Thickness]::new(5)
+
+            $MockWindow = [pscustomobject]@{
+                WindowStyle = [WindowStyle]::SingleBorderWindow
+                WindowState = [WindowState]::Normal
+                ResizeMode  = [ResizeMode]::CanResize
+                Tag         = $State
+            }
+            $MockWindow | Add-Member -NotePropertyName _WPFAppContent -NotePropertyValue $ContentHost -Force
+
+            Set-WPFWindowFullScreen -IsFullScreen $true -Window $MockWindow
+
+            $ContentHost.Margin | Should -Be -ExpectedValue ([System.Windows.Thickness]::new(0))
+            $State.OldAppContentMargin | Should -Be -ExpectedValue ([System.Windows.Thickness]::new(5))
+
+            Set-WPFWindowFullScreen -IsFullScreen $false -Window $MockWindow
+
+            $ContentHost.Margin | Should -Be -ExpectedValue ([System.Windows.Thickness]::new(5))
+        }
+    }
+
     It 'Should resolve the default window by explicit ContextId for async-safe callbacks' {
         InModuleScope WPF {
             $State = [pscustomobject]@{
