@@ -79,6 +79,7 @@ function Invoke-ImageViewerRotate {
 
     # If we're in fit mode, recalculate to account for the new aspect ratio.
     if ($State.IsFitMode) {
+        Write-Debug "Recalculating fit to window after rotation. New rotation angle: $($State.RotationAngle) degrees."
         Invoke-ImageViewerFitToWindow -ContextId $ContextId
     }
 
