@@ -55,7 +55,34 @@ function Invoke-ImageViewerFitToWindow {
         return
     }
 
-    $ZoomLevel = [Math]::Min($ViewportWidth / $ImageWidth, $ViewportHeight / $ImageHeight)
+    $RotationAngle = [double] $State.RotationAngle
+    $RotationAngle = $RotationAngle % 360
+    if ($RotationAngle -lt 0) {
+        $RotationAngle += 360
+    }
+
+    $Radians = $RotationAngle * ([Math]::PI / 180.0)
+    $CosTheta = [Math]::Abs([Math]::Cos($Radians))
+    $SinTheta = [Math]::Abs([Math]::Sin($Radians))
+
+    # Guard against floating-point residue near right angles (e.g., cos(90deg)).
+    if ($CosTheta -lt 1e-10) {
+        $CosTheta = 0.0
+    }
+    if ($SinTheta -lt 1e-10) {
+        $SinTheta = 0.0
+    }
+
+    # Fit against the axis-aligned bounds after rotation, then apply scale.
+    $RotatedImageWidth = ($ImageWidth * $CosTheta) + ($ImageHeight * $SinTheta)
+    $RotatedImageHeight = ($ImageWidth * $SinTheta) + ($ImageHeight * $CosTheta)
+
+    if ($RotatedImageWidth -le 0 -or $RotatedImageHeight -le 0) {
+        Write-Debug "Rotated image width or height ($RotatedImageWidth x $RotatedImageHeight) is zero or negative, cannot fit to window."
+        return
+    }
+
+    $ZoomLevel = [Math]::Min($ViewportWidth / $RotatedImageWidth, $ViewportHeight / $RotatedImageHeight)
     $ZoomLevel = [Math]::Max(0.10, [Math]::Min(8.00, $ZoomLevel))
     $ZoomLevel = [Math]::Floor($ZoomLevel * 100.0) / 100.0
     $State.ZoomLevel = $ZoomLevel

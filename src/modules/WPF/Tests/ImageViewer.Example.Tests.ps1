@@ -130,4 +130,16 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $NavigateContent | Should -Match 'Get-WPFWindow\s+-ContextId\s+\$ContextId'
         $NavigateContent | Should -Match 'Reference\s+''Viewer''\s+-ContextId\s+\$ContextId'
     }
+
+    It 'Computes fit zoom from rotation-aware image bounds' {
+        $FitPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerFitToWindow.ps1'
+        $FitContent = Get-Content -Path $FitPath -Raw
+
+        $FitContent | Should -Match 'RotationAngle\s*=\s*\[double\]\s+\$State\.RotationAngle'
+        $FitContent | Should -Match '\$CosTheta\s*=\s*\[Math\]::Abs\(\[Math\]::Cos\(\$Radians\)\)'
+        $FitContent | Should -Match '\$SinTheta\s*=\s*\[Math\]::Abs\(\[Math\]::Sin\(\$Radians\)\)'
+        $FitContent | Should -Match '\$RotatedImageWidth\s*=\s*\(\$ImageWidth\s*\*\s*\$CosTheta\)\s*\+\s*\(\$ImageHeight\s*\*\s*\$SinTheta\)'
+        $FitContent | Should -Match '\$RotatedImageHeight\s*=\s*\(\$ImageWidth\s*\*\s*\$SinTheta\)\s*\+\s*\(\$ImageHeight\s*\*\s*\$CosTheta\)'
+        $FitContent | Should -Match '\$ZoomLevel\s*=\s*\[Math\]::Min\(\$ViewportWidth\s*/\s*\$RotatedImageWidth,\s*\$ViewportHeight\s*/\s*\$RotatedImageHeight\)'
+    }
 }
