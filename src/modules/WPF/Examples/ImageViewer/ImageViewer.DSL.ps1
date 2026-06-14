@@ -416,7 +416,7 @@ App 'Window' {
                 $this.Background = '#E61C1C1C'
                 $this.BorderThickness = 1
                 $this.BorderBrush = '#FF4A4A4A'
-                [DockPanel]::SetDock($this, [Dock]::Right)
+                Dock Right
                 Bind Visibility -To Window.Tag.IsFigureDrawingMode -Converter {
                     if ($_) { 'Visible' } else { 'Collapsed' }
                 }
@@ -594,7 +594,7 @@ App 'Window' {
         Bind Visibility -To Window.Tag.IsFullScreen -Invert
 
         StatusBarItem 'StatusFileItem' {
-            [DockPanel]::SetDock($this, [Dock]::Left)
+            Dock Left
 
             Label 'StatusFileLabel' {
                 $this.Content = 'No image loaded'
@@ -602,7 +602,7 @@ App 'Window' {
         }
 
         StatusBarItem 'StatusIndexItem' {
-            [DockPanel]::SetDock($this, [Dock]::Right)
+            Dock Right
 
             Label 'StatusIndexLabel' {
                 $this.Content = '0/0'
@@ -610,7 +610,7 @@ App 'Window' {
         }
 
         StatusBarItem 'StatusDetailsItem' {
-            [DockPanel]::SetDock($this, [Dock]::Right)
+            Dock Right
 
             Label 'StatusDetailsLabel' {
                 $this.Content = '-'
@@ -618,7 +618,7 @@ App 'Window' {
         }
 
         StatusBarItem 'StatusZoomItem' {
-            [DockPanel]::SetDock($this, [Dock]::Right)
+            Dock Right
 
             Label 'StatusZoomLabel' {
                 $this.Content = '100%'

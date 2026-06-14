@@ -317,7 +317,7 @@ Window 'Window' {
                     }
                     Button 'StopProcessButton' {
                         UseStyle 'TaskManager.StopButton'
-                        [System.Windows.Controls.DockPanel]::SetDock($this, 'Right')
+                        Dock Right
                         $this.Content = 'Stop Process'
                         Command 'StopProcessCommand' {
                             Execute {

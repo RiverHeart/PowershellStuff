@@ -154,12 +154,16 @@ App 'Window' {
         Bind Visibility -To Window.Tag.IsFullScreen -Invert
 
         StatusBarItem 'StatusFileItem' {
+            Dock Left
+
             Label 'StatusFileLabel' {
                 $this.Content = 'No image loaded'
             }
         }
 
         StatusBarItem 'StatusZoomItem' {
+            Dock Right
+
             Label 'StatusZoomLabel' {
                 $this.Content = '100%'
             }

@@ -127,6 +127,7 @@ FunctionsToExport = @(
     'Brush'
     'Chrome'
     'DataTrigger'
+    'Dock'
     'ExtendStyle'
     'Execute'
     'CanExecute'

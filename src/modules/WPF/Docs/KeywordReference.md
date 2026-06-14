@@ -63,6 +63,7 @@ Scope of this page:
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
+    * [Dock](#dock)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -187,7 +188,7 @@ container itself, such as right-docking content, use explicit `StatusBarItem`
 ```powershell
 StatusBar {
     StatusBarItem {
-        [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Left)
+        Dock Left
 
         TextBlock 'StatusFileText' {
             $this.Text = 'Ready'
@@ -195,7 +196,7 @@ StatusBar {
     }
 
     StatusBarItem {
-        [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Right)
+        Dock Right
 
         TextBlock 'StatusZoomText' {
             $this.Text = '100%'
@@ -213,7 +214,7 @@ control status bar item container layout directly.
 
 ```powershell
 StatusBarItem 'ZoomItem' {
-    [System.Windows.Controls.DockPanel]::SetDock($this, [System.Windows.Controls.Dock]::Right)
+    Dock Right
 
     TextBlock 'ZoomText' {
         $this.Text = '100%'
@@ -978,6 +979,22 @@ $Gesture = ConvertTo-KeyGesture -InputObject 'Ctrl+Shift+S'
 
 ```powershell
 $Gestures = ConvertTo-KeyGesture -InputObject @('Ctrl+S', 'F11')
+```
+
+### Dock
+
+Sets the `DockPanel.Dock` attached property on the current object.
+
+Use inside a DSL block to target `$this`, or pass `-InputObject` explicitly.
+
+```powershell
+StatusBarItem 'StatusZoomItem' {
+    Dock Right
+}
+```
+
+```powershell
+Dock Top -InputObject $SomeControl
 ```
 
 ### Get-WPFWindow
