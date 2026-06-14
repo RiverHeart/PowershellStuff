@@ -1,5 +1,8 @@
 {
     "files.trimTrailingWhitespace": true,
+    "[markdown]": {
+        "files.trimTrailingWhitespace": false
+    },
     "files.insertFinalNewline": true,
     "powershell.codeFormatting.addWhitespaceAroundPipe": true,
     "powershell.codeFormatting.useCorrectCasing": true,
