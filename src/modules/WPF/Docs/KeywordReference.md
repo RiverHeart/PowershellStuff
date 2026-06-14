@@ -957,12 +957,20 @@ Gets the current control context id for the resolved DSL context.
 Use this when you need to pin later `Reference` or `Get-WPFWindow` calls to a
 specific window context.
 
+Helpers that accept `-ContextId`, such as `Set-WPFWindowFullScreen`, can be
+kept on the originating window the same way in async callbacks.
+
 ```powershell
 $ContextId = Get-WPFContextId
 ```
 
 ```powershell
 $ContextId = Get-WPFContextId -InputObject $SomeControl
+```
+
+```powershell
+$ContextId = Get-WPFContextId
+Set-WPFWindowFullScreen -IsFullScreen $true -ContextId $ContextId
 ```
 
 ### Reference
