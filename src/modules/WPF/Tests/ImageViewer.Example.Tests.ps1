@@ -88,9 +88,9 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $DslContent = Get-Content -Path $DslPath -Raw
 
         $DslContent | Should -Match "Border 'FigureDrawingSidebar'"
-        $DslContent | Should -Match 'Watch Visibility Window.Tag.IsFigureDrawingMode'
+        $DslContent | Should -Match 'Bind Visibility -To Window.Tag.IsFigureDrawingMode'
         $DslContent | Should -Match "Label 'FigureDrawingCountdownLabel'"
-        $DslContent | Should -Match 'Watch Content Window.Tag.FigureDrawingCountdownText'
+        $DslContent | Should -Match 'Bind Content -To Window.Tag.FigureDrawingCountdownText'
         $DslContent | Should -Match 'Invoke-ImageViewerToggleFigureDrawingPause'
     }
 
@@ -103,5 +103,43 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $CountdownContent | Should -Match 'FigureDrawingCountdownText\s*='
 
         ([TimeSpan]::FromSeconds(65)).ToString('hh\:mm\:ss') | Should -Be '00:01:05'
+    }
+
+    It 'Pins slideshow timer navigation to the window context id captured at start' {
+        $StartPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Start-ImageViewerSlideshow.ps1'
+        $StartContent = Get-Content -Path $StartPath -Raw
+
+        $StartContent | Should -Match 'Get-WPFContextId\s+-InputObject\s+\$Window'
+        $StartContent | Should -Match 'Invoke-ImageViewerNavigate\s+-Direction\s+Forward\s+-ContextId\s+\$TimerContextId'
+    }
+
+    It 'Pins figure drawing timer callbacks to the captured window context id' {
+        $FigurePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Start-ImageViewerFigureDraw.ps1'
+        $FigureContent = Get-Content -Path $FigurePath -Raw
+
+        $FigureContent | Should -Match 'Get-WPFContextId\s+-InputObject\s+\$Window'
+        $FigureContent | Should -Match 'Invoke-ImageViewerNavigate\s+-Direction\s+Forward\s+-ContextId\s+\$TimerContextId'
+        $FigureContent | Should -Match 'Invoke-ImageViewerUpdateFigureDrawingCountdown\s+-ContextId\s+\$TimerContextId'
+    }
+
+    It 'Allows navigation helper to resolve window by explicit ContextId' {
+        $NavigatePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerNavigate.ps1'
+        $NavigateContent = Get-Content -Path $NavigatePath -Raw
+
+        $NavigateContent | Should -Match '\[string\]\s+\$ContextId'
+        $NavigateContent | Should -Match 'Get-WPFWindow\s+-ContextId\s+\$ContextId'
+        $NavigateContent | Should -Match 'Reference\s+''Viewer''\s+-ContextId\s+\$ContextId'
+    }
+
+    It 'Computes fit zoom from rotation-aware image bounds' {
+        $FitPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerFitToWindow.ps1'
+        $FitContent = Get-Content -Path $FitPath -Raw
+
+        $FitContent | Should -Match 'RotationAngle\s*=\s*\[double\]\s+\$State\.RotationAngle'
+        $FitContent | Should -Match '\$CosTheta\s*=\s*\[Math\]::Abs\(\[Math\]::Cos\(\$Radians\)\)'
+        $FitContent | Should -Match '\$SinTheta\s*=\s*\[Math\]::Abs\(\[Math\]::Sin\(\$Radians\)\)'
+        $FitContent | Should -Match '\$RotatedImageWidth\s*=\s*\(\$ImageWidth\s*\*\s*\$CosTheta\)\s*\+\s*\(\$ImageHeight\s*\*\s*\$SinTheta\)'
+        $FitContent | Should -Match '\$RotatedImageHeight\s*=\s*\(\$ImageWidth\s*\*\s*\$SinTheta\)\s*\+\s*\(\$ImageHeight\s*\*\s*\$CosTheta\)'
+        $FitContent | Should -Match '\$ZoomLevel\s*=\s*\[Math\]::Min\(\$ViewportWidth\s*/\s*\$RotatedImageWidth,\s*\$ViewportHeight\s*/\s*\$RotatedImageHeight\)'
     }
 }

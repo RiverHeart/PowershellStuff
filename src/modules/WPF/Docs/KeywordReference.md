@@ -43,7 +43,7 @@ Scope of this page:
     * [TimedEvent](#timedevent)
 * [Binding and Resources](#binding-and-resources)
     * [State](#state)
-    * [Watch](#watch)
+    * [Bind](#bind)
     * [BindProperty](#bindproperty)
     * [Binding](#binding)
     * [ValueConverter](#valueconverter)
@@ -63,6 +63,7 @@ Scope of this page:
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
+    * [Dock](#dock)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -115,10 +116,23 @@ Window 'MainWindow' {
 ### App
 
 Creates an application-oriented Window shell with a DockPanel root, a content
-host, and an implicit top-level Menu.
+host, an optional footer region, and an implicit top-level Menu.
+
+The App content host is a constrained fill region so viewport-based controls
+(`ScrollViewer`, `DataGrid`, image surfaces) measure against finite available
+space. If you want sequential stacking semantics, add a `StackPanel` inside
+`Content` explicitly.
+
+When an App window enters fullscreen through `Set-WPFWindowFullScreen`, the
+shell temporarily removes the content host margin so viewport content can reach
+the window edges, then restores the original margin when fullscreen exits.
 
 Root-level `MenuItem` entries are routed into an implicit `Menu` when no explicit
 `Menu` has been created yet, which makes simple app layouts easier to write.
+
+Implicit app shell controls use reserved internal names with a `__` prefix
+(for example, `__ExampleMenu` and `__ExampleContent`) to avoid collisions with
+user-defined control names.
 
 ```powershell
 App 'Example' {
@@ -131,12 +145,79 @@ App 'Example' {
 
 Routes a block into the App shell's main content host.
 
+`Content` does not add an extra visual container. It forwards directly into
+the App content host.
+
 ```powershell
 App 'Example' {
     Content {
         Button 'SaveButton' {
             $this.Content = 'Save'
         }
+    }
+}
+```
+
+### Footer
+
+Routes a block into the App shell's footer region, docked above the status bar.
+
+```powershell
+App 'Example' {
+    Footer {
+        StackPanel 'ActionRow' {
+            $this.Orientation = 'Horizontal'
+
+            Button 'SaveButton' {
+                $this.Content = 'Save'
+            }
+        }
+    }
+}
+```
+
+### StatusBar
+
+Creates a WPF `StatusBar`.
+
+Plain child controls are added as items, but WPF may wrap them in generated
+item containers. When you need layout behavior that applies to the arranged
+container itself, such as right-docking content, use explicit `StatusBarItem`
+ entries.
+
+```powershell
+StatusBar {
+    StatusBarItem {
+        Dock Left
+
+        TextBlock 'StatusFileText' {
+            $this.Text = 'Ready'
+        }
+    }
+
+    StatusBarItem {
+        Dock Right
+
+        TextBlock 'StatusZoomText' {
+            $this.Text = '100%'
+        }
+    }
+}
+```
+
+### StatusBarItem
+
+Creates a WPF `StatusBarItem`.
+
+Supports named and nameless forms and is primarily useful when you want to
+control status bar item container layout directly.
+
+```powershell
+StatusBarItem 'ZoomItem' {
+    Dock Right
+
+    TextBlock 'ZoomText' {
+        $this.Text = '100%'
     }
 }
 ```
@@ -373,7 +454,8 @@ MenuItem '_File/_Open' {
 
 ### StatusBar
 
-Creates a StatusBar and docks it to the bottom of an App shell.
+Creates a StatusBar and docks it to the bottom of an App shell, below any
+Footer region.
 
 Supports named and nameless forms.
 
@@ -487,13 +569,15 @@ TimedEvent 'RefreshData' 3000 {
 }
 ```
 
+**Async context note**: In DispatcherTimer callbacks, capture and pass the window's ContextId explicitly to ensure helpers resolve to the correct window. See [AsyncContextPinning.md](AsyncContextPinning.md) for detailed guidance.
+
 ## Binding and Resources
 
 ### State
 
 Creates observable state for the current DSL parent, enabling reactive UI updates via bindings and callbacks.
 
-The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or watched via the `Watch` keyword.
+The common convention is to call `State` inside the root `Window` block. It initializes the parent object's `Tag` property with an observable object that implements WPF's `INotifyPropertyChanged`. Properties defined in State can be bound directly in templates or bound via the `Bind` keyword.
 
 PowerShell-side callback hooks are also supported through `AddBinding()`, which fires when the underlying property changes.
 
@@ -531,7 +615,7 @@ Window 'MyApp' {
 }
 ```
 
-Watch state changes with the `Watch` keyword:
+Bind state changes with the `Bind` keyword:
 
 ```powershell
 Window 'MyApp' {
@@ -540,18 +624,18 @@ Window 'MyApp' {
     }
 
     TextBlock 'Status' {
-        Watch Visibility Window.Tag.IsLoading -Invert
+        Bind Visibility -To Window.Tag.IsLoading -Invert
     }
 }
 ```
 
-### Watch
+### Bind
 
 Binds a target property to an observable state path.
 
 ```powershell
-Watch Visibility Window.Tag.IsFullScreen -Invert
-Watch IsEnabled Window.Tag.IsFileLoaded
+Bind Visibility -To Window.Tag.IsFullScreen -Invert
+Bind IsEnabled -To Window.Tag.IsFileLoaded
 ```
 
 ### BindProperty
@@ -897,6 +981,22 @@ $Gesture = ConvertTo-KeyGesture -InputObject 'Ctrl+Shift+S'
 $Gestures = ConvertTo-KeyGesture -InputObject @('Ctrl+S', 'F11')
 ```
 
+### Dock
+
+Sets the `DockPanel.Dock` attached property on the current object.
+
+Use inside a DSL block to target `$this`, or pass `-InputObject` explicitly.
+
+```powershell
+StatusBarItem 'StatusZoomItem' {
+    Dock Right
+}
+```
+
+```powershell
+Dock Top -InputObject $SomeControl
+```
+
 ### Get-WPFWindow
 
 Gets the current root window for the resolved DSL context.
@@ -904,12 +1004,40 @@ Gets the current root window for the resolved DSL context.
 Prefer this for root-window access instead of relying on a specific registered
 window name.
 
+In async callbacks (for example `DispatcherTimer` ticks), capture a context id
+once and call `Get-WPFWindow -ContextId` so delayed handlers remain pinned to
+the originating window.
+
 ```powershell
 $Window = Get-WPFWindow
 ```
 
 ```powershell
-$Window = Get-WPFWindow -ContextId $Window._WPFContextId
+$ContextId = Get-WPFContextId
+$Window = Get-WPFWindow -ContextId $ContextId
+```
+
+### Get-WPFContextId
+
+Gets the current control context id for the resolved DSL context.
+
+Use this when you need to pin later `Reference` or `Get-WPFWindow` calls to a
+specific window context.
+
+Helpers that accept `-ContextId`, such as `Set-WPFWindowFullScreen`, can be
+kept on the originating window the same way in async callbacks.
+
+```powershell
+$ContextId = Get-WPFContextId
+```
+
+```powershell
+$ContextId = Get-WPFContextId -InputObject $SomeControl
+```
+
+```powershell
+$ContextId = Get-WPFContextId
+Set-WPFWindowFullScreen -IsFullScreen $true -ContextId $ContextId
 ```
 
 ### Reference
@@ -921,7 +1049,9 @@ If multiple windows register the same name, `Reference` resolves by the current 
 ```powershell
 $Window = Get-WPFWindow
 $Buttons = Reference 'BackButton', 'ForwardButton'
-$Window = Get-WPFWindow -ContextId $Window._WPFContextId
+$ContextId = Get-WPFContextId
+$Window = Get-WPFWindow -ContextId $ContextId
+$Buttons = Reference 'BackButton', 'ForwardButton' -ContextId $ContextId
 ```
 
 ### Import

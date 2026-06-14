@@ -94,6 +94,7 @@ FunctionsToExport = @(
     # DSL/Controls
     'App'
     'Content'
+    'Footer'
     'Command'
     'Border'
     'ContentPresenter'
@@ -111,6 +112,7 @@ FunctionsToExport = @(
     'Menu'
     'MenuItem'
     'StatusBar'
+    'StatusBarItem'
     'ScrollViewer'
     'StackPanel'
     'TextBlock'
@@ -118,13 +120,14 @@ FunctionsToExport = @(
     'Window'
 
     # DSL/Helpers
-    'Watch'
+    'Bind'
     'Binding'
     'BindProperty'
     'BoundTo'
     'Brush'
     'Chrome'
     'DataTrigger'
+    'Dock'
     'ExtendStyle'
     'Execute'
     'CanExecute'
@@ -143,7 +146,6 @@ FunctionsToExport = @(
     'OnComplete'
     'Trigger'
     'UseStyle'
-    'Watch'
     'When'
 
     # DSL/Custom Controls
@@ -159,6 +161,7 @@ FunctionsToExport = @(
     'Convert-WPFObjectToXaml'
     'Find-WPFChildNode'
     'Get-WPFChromeAdapter'
+    'Get-WPFContextId'
     'Get-WPFDarkModePreference'
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'

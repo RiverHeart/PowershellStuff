@@ -1,8 +1,11 @@
 function Invoke-ImageViewerUpdateFigureDrawingCountdown {
     [CmdletBinding()]
-    param()
+    param(
+        [ValidateNotNullOrEmpty()]
+        [string] $ContextId
+    )
 
-    $Window = Reference 'Window' -ErrorAction SilentlyContinue
+    $Window = Get-WPFWindow -ContextId $ContextId -ErrorAction SilentlyContinue
     if ($null -eq $Window) {
         return
     }

@@ -95,6 +95,11 @@ Style Menu {
     Foreground: Foreground -Resource
 }
 
+Style StatusBar {
+    Background: SurfaceBackground -Resource
+    Foreground: Foreground -Resource
+}
+
 Style 'ImageViewer.UnthemedMenuItem' MenuItem {
     # Use OS system brushes so MenuItem stays unthemed and does not inherit Menu foreground.
     Background: ([System.Windows.SystemColors]::MenuBrush)

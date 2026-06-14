@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Initializes a New-WPFObservableState on the current parent's Tag property,
-    making state bindable in templates and watchable via the Watch keyword.
+    making state bindable in templates and bindable via the Bind keyword.
 
     The usual convention is to call State inside the root Window block, but any
     DSL parent with a writable Tag property can host the state object.

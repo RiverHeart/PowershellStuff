@@ -5,7 +5,7 @@
 .DESCRIPTION
     Content is a lightweight logical block for App shells. It does not create
     a separate visual container; it forwards its scriptblock to the app's main
-    content host so users can group content explicitly when they want to.
+    content host so users can group body content explicitly when they want to.
 #>
 function Content {
     [CmdletBinding()]

@@ -7,10 +7,10 @@
     New-WPFObservableState. Whenever the source property changes, the target
     property is updated automatically.
 
-    Call inside a DSL control body to Watch from $this implicitly, or pass a control
+    Call inside a DSL control body to Bind from $this implicitly, or pass a control
     via -InputObject for use outside a body.
 
-    SourcePath format: "RegisteredName[.NavigationPath].PropertyName"
+    -To format: "RegisteredName[.NavigationPath].PropertyName"
     The first segment is resolved via Reference, intermediate segments navigate
     sub-objects, and the last segment is the observable property to watch.
 
@@ -29,7 +29,7 @@
 .PARAMETER Property
     The property name to update on the target control (e.g. 'Visibility', 'IsEnabled').
 
-.PARAMETER SourcePath
+.PARAMETER To
     Dot-notation path to the observable state property.
     Example: 'Window.Tag.IsFullScreen'
 
@@ -47,14 +47,14 @@
 .EXAMPLE
     # Inside a control body - hides menu when fullscreen
     MenuBar 'Menu' {
-        Watch Visibility Window.Tag.IsFullScreen -Invert
+        Bind Visibility -To Window.Tag.IsFullScreen -Invert
         ...
     }
 
 .EXAMPLE
     # Enable buttons only when a file is loaded
     Button 'BackButton' {
-        Watch IsEnabled Window.Tag.IsFileLoaded
+        Bind IsEnabled -To Window.Tag.IsFileLoaded
         ...
     }
 
@@ -62,7 +62,7 @@
     # Using a converter with implicit $_
 
     Label 'Status' {
-        Watch Content Window.Tag.CurrentFile -Converter {
+        Bind Content -To Window.Tag.CurrentFile -Converter {
             if ($_) { "File: $($_.Name)" } else { 'No file loaded' }
         }
         ...
@@ -72,23 +72,23 @@
     # Using a converter with named parameter
 
     Label 'Status' {
-        Watch Content Window.Tag.CurrentFile -Converter {
+        Bind Content -To Window.Tag.CurrentFile -Converter {
             param($File)
             if ($File) { "File: $($File.Name)" } else { 'No file loaded' }
         }
         ...
     }
 #>
-function Watch {
+function Bind {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
         [ValidateNotNullOrEmpty()]
         [string] $Property,
 
-        [Parameter(Mandatory, Position = 1)]
+        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $SourcePath,
+        [string] $To,
 
         [Parameter(Position = 2)]
         [scriptblock] $Converter,
@@ -101,32 +101,32 @@ function Watch {
     )
 
     process {
-        Write-Verbose "Watch: Resolving target object for property '$Property' from source path '$SourcePath'."
+        Write-Verbose "Bind: Resolving target object for property '$Property' from source path '$To'."
         $Target = if ($null -ne $InputObject) { $InputObject } else { $PSCmdlet.GetVariableValue('this') }
 
         if (-not $Target) {
-            Write-Error "Watch: Unable to resolve target object. Use Watch inside a DSL control block or pass -InputObject."
+            Write-Error "Bind: Unable to resolve target object. Use Bind inside a DSL control block or pass -InputObject."
             return
         }
 
         # Resolve "RegisteredName[.Segment...].PropertyName":
         # first segment -> Reference lookup, intermediates -> navigation, last -> property name
-        $Parts  = $SourcePath.Split('.')
+        $Parts = $To.Split('.')
         if ($Parts.Length -lt 2) {
-            Write-Error "Watch: SourcePath '$SourcePath' must include at least one navigation/property segment (example: Window.Tag.IsFullScreen)."
+            Write-Error "Bind: -To '$To' must include at least one navigation/property segment (example: Window.Tag.IsFullScreen)."
             return
         }
 
-        Write-Verbose "Watch: Resolving source root '$($Parts[0])'."
+        Write-Verbose "Bind: Resolving source root '$($Parts[0])'."
         $Source = Reference $Parts[0]
         for ($i = 1; $i -lt ($Parts.Length - 1); $i++) {
-            Write-Verbose "Watch: Navigating source segment '$($Parts[$i])'."
+            Write-Verbose "Bind: Navigating source segment '$($Parts[$i])'."
             $Source = $Source.($Parts[$i])
         }
         $SourceProp = $Parts[-1]
 
         if ($null -eq $Source) {
-            Write-Error "Watch: Failed to resolve source object for path '$SourcePath'."
+            Write-Error "Bind: Failed to resolve source object for path '$To'."
             return
         }
 
@@ -161,8 +161,8 @@ function Watch {
         }.GetNewClosure()
 
         $TargetName = if ($Target.PSObject.Properties['Name']) { $Target.Name } else { '<unnamed>' }
-        Write-Debug "Watch registered: Source='$SourcePath' (property '$SourceProp') -> Target='$TargetName.$Property'; Invert=$Invert; ConverterPresent=$($null -ne $Converter)"
-        Write-Verbose "Watch: Registering callback and applying initial value for '$Property'."
+        Write-Debug "Bind registered: Source='$To' (property '$SourceProp') -> Target='$TargetName.$Property'; Invert=$Invert; ConverterPresent=$($null -ne $Converter)"
+        Write-Verbose "Bind: Registering callback and applying initial value for '$Property'."
         $Source.AddBinding($SourceProp, $callback)
     }
 }

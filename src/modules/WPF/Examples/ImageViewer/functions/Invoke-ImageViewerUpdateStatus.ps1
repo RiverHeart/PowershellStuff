@@ -1,13 +1,23 @@
 
 function Invoke-ImageViewerUpdateStatus {
     [CmdletBinding()]
-    param()
+    param(
+        [System.Windows.Window] $Window
+    )
 
-    $State = (Reference 'Window').Tag
-    $FileLabel = Reference 'StatusFileLabel'
-    $IndexLabel = Reference 'StatusIndexLabel'
-    $DetailsLabel = Reference 'StatusDetailsLabel'
-    $ZoomLabel = Reference 'StatusZoomLabel'
+    if ($null -eq $Window) {
+        $Window = Get-WPFWindow -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $Window -or $null -eq $Window.Tag) {
+        return
+    }
+
+    $ContextId = Get-WPFContextId -InputObject $Window
+    $State = $Window.Tag
+    $FileLabel = Reference 'StatusFileLabel' -ContextId $ContextId
+    $IndexLabel = Reference 'StatusIndexLabel' -ContextId $ContextId
+    $DetailsLabel = Reference 'StatusDetailsLabel' -ContextId $ContextId
+    $ZoomLabel = Reference 'StatusZoomLabel' -ContextId $ContextId
 
     if (-not $State.IsFileLoaded -or -not $State.FileNavigator -or -not $State.FileNavigator.CurrentFile) {
         $FileLabel.Content = 'No image loaded'
@@ -20,7 +30,7 @@ function Invoke-ImageViewerUpdateStatus {
     $CurrentFile = $State.FileNavigator.CurrentFile
     $CurrentIndex = $State.FileNavigator.Index + 1
     $TotalFiles = $State.FileNavigator.Files.Count
-    $Source = (Reference 'Viewer').Source
+    $Source = (Reference 'Viewer' -ContextId $ContextId).Source
 
     $Dimensions = '-'
     if ($Source -is [System.Windows.Media.Imaging.BitmapSource]) {

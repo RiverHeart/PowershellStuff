@@ -99,6 +99,8 @@ function Update-WPFObject {
                         if ($AppMenu) {
                             Add-WPFObject $AppMenu $Child
                         }
+                    } elseif ($Child -is [System.Windows.Controls.Menu]) {
+                        Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'Menu'
                     } elseif ($Child -is [System.Windows.Controls.Primitives.StatusBar]) {
                         Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'StatusBar'
                     } else {

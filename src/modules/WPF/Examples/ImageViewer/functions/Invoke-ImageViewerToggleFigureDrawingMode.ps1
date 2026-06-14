@@ -2,7 +2,7 @@ function Invoke-ImageViewerToggleFigureDrawingMode {
     [CmdletBinding()]
     param()
 
-    $Window = Reference 'Window'
+    $Window = Get-WPFWindow
     $State = $Window.Tag
 
     if (-not $State.IsFileLoaded) {
