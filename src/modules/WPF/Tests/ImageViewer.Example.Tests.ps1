@@ -20,6 +20,8 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $HelperPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Test-ImageViewerShouldNavigate.ps1'
         $HelperContent = Get-Content -Path $HelperPath -Raw
 
+        $HelperContent | Should -Match 'Get-WPFWindow\s+-ErrorAction\s+SilentlyContinue'
+        $HelperContent | Should -Match 'Find-WPFChildNode\s+-Node\s+\$Window\s+-Type\s+\(\[System\.Windows\.Controls\.Menu\]\)'
         $HelperContent | Should -Match 'IsKeyboardFocusWithin'
         $HelperContent | Should -Match 'ScrollableWidth'
         $HelperContent | Should -Not -Match 'HorizontalOffset'
