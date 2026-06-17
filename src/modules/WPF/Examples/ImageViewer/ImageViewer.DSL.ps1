@@ -236,7 +236,6 @@ App 'Window' {
         if ($PSBoundParameters.ContainsKey('SlideshowIntervalSeconds')) {
             Start-ImageViewerSlideshow -IntervalSeconds $SlideshowIntervalSeconds
         }
-
     }
 
     Menu 'Menu' {

@@ -25,7 +25,6 @@ function Get-WPFFunctionParam {
         [string[]] $Exclude
     )
 
-
     # Get TabExpansion2 raw arguments
     $Callstack = Get-PSCallStack | Where-Object { $_.Command -eq $Command } | Select-Object -First 1
     $BoundParams = $Callstack.InvocationInfo.BoundParameters
