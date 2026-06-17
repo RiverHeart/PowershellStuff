@@ -12,6 +12,12 @@ function Test-ImageViewerShouldNavigate {
     [OutputType([bool])]
     param()
 
+
+    $Menu = Get-WPFMenu
+    if ($Menu -and $Menu.IsKeyboardFocusWithin) {
+        return $false
+    }
+
     $ScrollViewer = Reference 'ScrollViewer'
     if (-not $ScrollViewer) {
         return $true

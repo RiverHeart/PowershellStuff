@@ -46,7 +46,7 @@
 
 .EXAMPLE
     # Inside a control body - hides menu when fullscreen
-    MenuBar 'Menu' {
+    Menu 'Menu' {
         Bind Visibility -To Window.Tag.IsFullScreen -Invert
         ...
     }

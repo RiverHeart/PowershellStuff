@@ -148,8 +148,6 @@ FunctionsToExport = @(
     'UseStyle'
     'When'
 
-    # DSL/Custom Controls
-    'MenuBar'
 
     # DSL/Shapes
     'Path'
@@ -171,6 +169,7 @@ FunctionsToExport = @(
     'New-WPFProject'
     'New-WPFSize'
     'New-WPFVariableList'
+    'Get-WPFMenu'
     'Get-WPFWindow'
     'Register-WPFChromeAdapter'
     'Register-WPFObject'

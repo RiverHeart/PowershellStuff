@@ -81,11 +81,11 @@ Describe 'App' -Tag 'App' {
         $AppContentProperty.Value.Name | Should -Be "__${AppName}Content"
     }
 
-    It 'Should dock explicit MenuBar to the top app menu region' {
+    It 'Should dock explicit Menu to the top app menu region' {
         $Id = [guid]::NewGuid().ToString('N')
 
         $App = App "App_$Id" {
-            MenuBar "Menu_$Id" {
+            Menu "Menu_$Id" {
                 MenuItem "File_$Id/Open_$Id" { }
             }
 

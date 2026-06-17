@@ -2,28 +2,11 @@
 .SYNOPSIS
     Creates a WPF Menu object.
 
-.NOTES
-    I would like to find a way to support this simplified syntax
-    which omits the DockPanel and uses path separators to reduce the
-    nesting. This assumes that the scriptblock for a menuitem is always
-    going to be a scriptblock for Execute or an OnClick handler.
-    Unfortunately there doesn't seem to be a great way of supporting
-    Target/CanExecute with this...
-
-    MenuBar 'Menu' {
-        $this.Height = 25
-
-        MenuItem '_File/_Open' {
-            Command
-        }
-        MenuItem '_File/_Exit' {
-            Write-Host "Barfu"
-        }
-
-        MenuItem '_Help/_Abount' {
-            Write-Host "Zanzibar"
-        }
-    }
+.DESCRIPTION
+    Creates a Menu control, registers it in the current context, and attempts to
+    auto-attach to a parent Window or Menu if one exists. If the parent is a Window,
+    also registers the Menu as a stable __WPFMenu alias for retrieval. Processes child
+    elements defined in the script block.
 
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menu
@@ -53,6 +36,15 @@ function Menu {
         }
         Register-WPFObject $Name $Menu
         Add-WPFType $Menu 'Control'
+
+        # Register as stable __WPFMenu alias if parent is a Window
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent -is [System.Windows.Window]) {
+            $ContextId = Get-WPFControlContextId -InputObject $Parent -ErrorAction SilentlyContinue
+            if ($ContextId) {
+                Register-WPFObject -Name '__WPFMenu' -InputObject $Menu -ContextId $ContextId -Overwrite
+            }
+        }
     } catch {
         Write-Error "Failed to create '$Name' (Menu) with error: $_"
     }

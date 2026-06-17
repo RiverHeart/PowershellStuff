@@ -1,4 +1,4 @@
-Describe 'MenuBar' -Tag 'MenuBar' {
+Describe 'Menu' -Tag 'Menu' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
     }
@@ -12,7 +12,7 @@ Describe 'MenuBar' -Tag 'MenuBar' {
         Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         {
-            -MenuBar "MenuBar_$Id" {
+            -Menu "MenuBar_$Id" {
                 MenuItem "File_$Id" {}
             }
         }.Invoke()
@@ -23,7 +23,7 @@ Describe 'MenuBar' -Tag 'MenuBar' {
     It 'Should return menu object when no parent context exists' {
         $Id = [guid]::NewGuid().ToString('N')
 
-        $Menu = MenuBar "MenuBar_$Id" {
+        $Menu = Menu "MenuBar_$Id" {
             MenuItem "File_$Id" {}
         }
 
@@ -38,7 +38,7 @@ Describe 'MenuBar' -Tag 'MenuBar' {
         $PSVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {
-            MenuBar "MenuBar_$Id" {
+            Menu "MenuBar_$Id" {
                 MenuItem "File_$Id" {}
             }
         }.InvokeWithContext($null, $PSVars)
@@ -55,7 +55,7 @@ Describe 'MenuBar' -Tag 'MenuBar' {
         $PSVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {
-            MenuBar "MenuBar_$Id" {
+            Menu "MenuBar_$Id" {
                 MenuItem "File_$Id" {}
             }
         }.InvokeWithContext($null, $PSVars)

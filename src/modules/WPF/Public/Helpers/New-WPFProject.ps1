@@ -81,7 +81,7 @@ function New-WPFProject {
 @"
         Row {
             Column 'Expand' {
-                MenuBar 'Menu' {
+                Menu 'Menu' {
                     MenuItem '(F)ile/(E)xit' {
                         Command 'CloseCommand' 'Ctrl+q' {
                             Write-Debug "Close command triggered. Closing window."

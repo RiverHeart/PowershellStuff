@@ -163,9 +163,23 @@ App 'Window' {
                 }
                 break
             }
-            { $_ -in @('D0', 'NumPad0') -and ([Keyboard]::Modifiers -band [ModifierKeys]::Control) } {
+            { $_ -in @('D0', 'NumPad0') } {
                 Invoke-ImageViewerSetZoom -Reset
                 $event.Handled = $True
+                break
+            }
+            { $_ -in @('Add', 'OemPlus') } {
+                if ($this.Tag.IsFileLoaded) {
+                    Invoke-ImageViewerSetZoom -Delta 0.10
+                    $event.Handled = $True
+                }
+                break
+            }
+            { $_ -in @('Subtract', 'OemMinus') } {
+                if ($this.Tag.IsFileLoaded) {
+                    Invoke-ImageViewerSetZoom -Delta -0.10
+                    $event.Handled = $True
+                }
                 break
             }
         }
@@ -225,7 +239,7 @@ App 'Window' {
 
     }
 
-    MenuBar 'Menu' {
+    Menu 'Menu' {
         $this.Height = 25
         Bind Visibility -To Window.Tag.IsFullScreen -Invert
 
@@ -491,7 +505,6 @@ App 'Window' {
                 }
             }
         }
-
     }
 
     Footer {

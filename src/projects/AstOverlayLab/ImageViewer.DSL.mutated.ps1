@@ -212,7 +212,7 @@ Window 'Window' {
         # MARK: MENU
         Row {
             Column 'Expand' {
-                MenuBar 'Menu' {
+                Menu 'Menu' {
                     $this.Height = 25
                     Watch Visibility Window.Tag.IsFullScreen -Invert
 
