@@ -163,7 +163,7 @@ App 'Window' {
                 }
                 break
             }
-            { $_ -in @('D0', 'NumPad0') -and ([Keyboard]::Modifiers -band [ModifierKeys]::Control) } {
+            { $_ -in @('D0', 'NumPad0') } {
                 Invoke-ImageViewerSetZoom -Reset
                 $event.Handled = $True
                 break

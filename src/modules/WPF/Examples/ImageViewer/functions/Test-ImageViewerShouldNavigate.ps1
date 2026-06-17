@@ -12,12 +12,10 @@ function Test-ImageViewerShouldNavigate {
     [OutputType([bool])]
     param()
 
-    $Window = Get-WPFWindow -ErrorAction SilentlyContinue
-    if ($Window) {
-        $Menu = Find-WPFChildNode -Node $Window -Type ([System.Windows.Controls.Menu])
-        if ($Menu -and $Menu.IsKeyboardFocusWithin) {
-            return $false
-        }
+
+    $Menu = Get-WPFMenu
+    if ($Menu -and $Menu.IsKeyboardFocusWithin) {
+        return $false
     }
 
     $ScrollViewer = Reference 'ScrollViewer'

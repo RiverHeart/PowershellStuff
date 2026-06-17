@@ -93,10 +93,12 @@ function MenuItem {
     $Parent = $PSCmdlet.GetVariableValue('this')
     $WasAutoAttached = $False
     if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
-        $AppRootProperty = $Parent.PSObject.Properties['_WPFAppRoot']
-        if ($Parent -is [System.Windows.Window] -and $AppRootProperty -and $AppRootProperty.Value) {
+        if ($Parent -is [System.Windows.Window]) {
             Write-Debug "Beginning app-menu auto-attach for $Name (MenuItem)"
-            $Menu = Get-WPFAppMenu -Window $Parent
+            $Menu = Get-WPFMenu -Window $Parent
+            if (-not $Menu) {
+                $Menu = New-WPFMenu -Window $Parent
+            }
             if ($Menu) {
                 Add-WPFObject $Menu $WPFObject
                 $WasAutoAttached = $True
