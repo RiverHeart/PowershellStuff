@@ -505,7 +505,6 @@ App 'Window' {
                 }
             }
         }
-
     }
 
     Footer {

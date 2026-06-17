@@ -96,7 +96,8 @@ function Update-WPFObject {
 
                     if ($Child -is [System.Windows.Controls.MenuItem]) {
                         $Menu = Get-WPFMenu -Window $InputObject
-                        if (-not $Menu) {
+                        $AppRootProperty = $InputObject.PSObject.Properties['_WPFAppRoot']
+                        if (-not $Menu -and $AppRootProperty.Value) {
                             $Menu = New-WPFMenu -Window $InputObject
                         }
                         if ($Menu) {
