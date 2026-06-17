@@ -168,6 +168,20 @@ App 'Window' {
                 $event.Handled = $True
                 break
             }
+            { $_ -in @('Add', 'OemPlus') } {
+                if ($this.Tag.IsFileLoaded) {
+                    Invoke-ImageViewerSetZoom -Delta 0.10
+                    $event.Handled = $True
+                }
+                break
+            }
+            { $_ -in @('Subtract', 'OemMinus') } {
+                if ($this.Tag.IsFileLoaded) {
+                    Invoke-ImageViewerSetZoom -Delta -0.10
+                    $event.Handled = $True
+                }
+                break
+            }
         }
     }
 
