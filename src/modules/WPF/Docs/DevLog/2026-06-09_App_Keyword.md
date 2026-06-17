@@ -13,7 +13,7 @@ Window 'Window' {
     Grid 'Body' {
         Row {
             Column 'Expand' {
-                MenuBar 'Menu' {
+                Menu 'Menu' {
                     MenuItem '(F)ile/(E)xit' {
                         Command 'CloseCommand' 'Ctrl+q' {
                             # Open

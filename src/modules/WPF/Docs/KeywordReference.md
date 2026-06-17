@@ -31,7 +31,6 @@ Scope of this page:
     * [DataGridTextColumn](#datagridtextcolumn)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
-    * [MenuBar](#menubar)
     * [MenuItem](#menuitem)
     * [StatusBar](#statusbar)
 * [Shapes](#shapes)
@@ -426,18 +425,6 @@ Menu 'TopMenu' {
         MenuItem '_Exit' {
             When Click { (Reference 'MainWindow').Close() }
         }
-    }
-}
-```
-
-### MenuBar
-
-Creates a Menu intended for menu bar scenarios.
-
-```powershell
-MenuBar 'Menu' {
-    MenuItem '_File/_Open' {
-        When Click { }
     }
 }
 ```

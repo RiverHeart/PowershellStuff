@@ -225,7 +225,7 @@ App 'Window' {
 
     }
 
-    MenuBar 'Menu' {
+    Menu 'Menu' {
         $this.Height = 25
         Bind Visibility -To Window.Tag.IsFullScreen -Invert
 

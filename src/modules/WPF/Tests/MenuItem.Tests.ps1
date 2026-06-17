@@ -5,7 +5,7 @@ Describe 'MenuItem' -Tag 'MenuItem' {
 
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
-        $MenuBar = [System.Windows.Controls.Menu]::new()
+        $Menu = [System.Windows.Controls.Menu]::new()
 
         $WarningPreference = 'SilentlyContinue'
         . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
@@ -17,6 +17,6 @@ Describe 'MenuItem' -Tag 'MenuItem' {
             }
         }.Invoke()
 
-        $MenuBar.Items.Count | Should -Be -ExpectedValue 0
+        $Menu.Items.Count | Should -Be -ExpectedValue 0
     }
 }

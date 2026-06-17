@@ -148,8 +148,6 @@ FunctionsToExport = @(
     'UseStyle'
     'When'
 
-    # DSL/Custom Controls
-    'MenuBar'
 
     # DSL/Shapes
     'Path'
