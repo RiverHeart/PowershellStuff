@@ -45,17 +45,23 @@ function Complete-WPFEvent {
         return
     }
 
-    # Confusing. When typing `Handler X` the `Handler` function hasn't become
-    # a CommandAst object yet. Once the Handler has a scriptblock defined
-    # such as `Handler X {}` it becomes one. Therefore we need to get the last
-    # CommandAst that isn't the handler itself to account for the two scenarios.
+    # While typing `When <Event>`, the parser behavior changes as input grows:
+    # `When` may not yet be represented as a CommandAst, but `When A` is.
+    # Once that happens, the command under the cursor can resolve to `When`
+    # instead of the owning control (for example `Window` or `Button`). Ignore
+    # event-keyword command names so selection stays on the enclosing control.
+    $IgnoredCommandNames = @('when', '-when', 'add-wpfhandler', 'handler')
+
     $ParentNode = $Params.Ast.FindAll({
         param($AstNode)
         $AstNode -is [CommandAst] -and
         $AstNode.Extent.StartOffset -le $Params.PositionOfCursor.Offset -and
         $Params.PositionOfCursor.Offset -le $AstNode.Extent.EndOffset
     }, <# recurse #> $True) |
-        Where-Object { $_.GetCommandName() -ne 'Handler' } |
+        Where-Object {
+            $CandidateName = $_.GetCommandName()
+            $CandidateName -and ($IgnoredCommandNames -notcontains $CandidateName.ToLowerInvariant())
+        } |
         Select-Object -Last 1
 
     # Validate parent node exists
@@ -68,6 +74,10 @@ function Complete-WPFEvent {
     # supported events. Store in cache for future lookups.
     # TODO: Could use more validation here
     $Control = $ParentNode.GetCommandName()
+    if ($Control -ieq 'App') {
+        $Control = 'Window'
+    }
+
     if (-not $script:WPFHandlerCache.Completions.ContainsKey($Control)) {
         $Type = Get-WPFTypeInfo $Control
 
@@ -89,9 +99,23 @@ function Complete-WPFEvent {
     # The results are already alphabetical so no need to sort these.
     $Completions = $script:WPFHandlerCache.Completions[$Control] |
         Where-Object {
-            $_.StartsWith($WordToComplete, [StringComparison]::InvariantCultureIgnoreCase)
+            # Filter by substring
+            $_ -ilike "*$WordToComplete*"
         } |
-        Sort-Object |
+        Sort-Object -Property @(
+            {
+                # When searching, place StartsWith matches first.
+                if ([string]::IsNullOrWhiteSpace($WordToComplete)) {
+                    0  # All results tie when no search term is provided to maintain alphabetical order.
+                } else {
+                    [int]($_ -inotlike "$WordToComplete*")
+                }
+            },
+            {
+                # Always keep deterministic alphabetical ordering.
+                $_
+            }
+        ) |
         ForEach-Object {
             $CompletionText = if ($Quote) { $Quote + $_ + $Quote  } else { $_ }
             [CompletionResult]::new(
