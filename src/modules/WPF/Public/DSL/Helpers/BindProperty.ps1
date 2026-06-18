@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Establishes a WPF data binding between a control property and a binding source
-    (another control, element name, relative source, or arbitrary object).
+    (another control, element name, relative source, arbitrary object, or
+    inherited DataContext when no explicit source selector is provided).
 
     BindProperty creates a System.Windows.Data.Binding internally. You do not
     need to call the Binding keyword first for standard BindProperty usage.
@@ -20,6 +21,8 @@
 
 .PARAMETER Path
     The binding path on the source object (e.g., 'ItemsSource.Count', 'IsChecked').
+    When no source selector is provided, this path is resolved against inherited
+    DataContext.
 
 .PARAMETER Self
     Bind relative to the target control itself using RelativeSource Self.
@@ -44,6 +47,16 @@
     # Bind TextBlock.Text to DataGrid.ItemsSource.Count
     TextBlock 'ProcessCount' {
         BindProperty Text ItemsSource.Count -Source (Reference 'ProcessList')
+    }
+
+.EXAMPLE
+    # Bind TextBlock.Text using inherited DataContext
+    Window 'MyApp' {
+        State @{ Count = 0 }
+
+        TextBlock 'Counter' {
+            BindProperty Text Count
+        }
     }
 
 .EXAMPLE
@@ -120,11 +133,6 @@ function BindProperty {
             return
         }
 
-        if ($selectorCount -eq 0) {
-            Write-Error 'BindProperty: You must specify a source selector: -Self, -TemplatedParent, -ElementName, or -Source.'
-            return
-        }
-
         # Resolve the target dependency property descriptor
         $TargetType = $Target.GetType()
         $DepPropDescriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $TargetType, $TargetType)
@@ -145,6 +153,13 @@ function BindProperty {
             $binding.ElementName = $ElementName
         } elseif ($PSBoundParameters.ContainsKey('Source')) {
             $binding.Source = $Source
+        } else {
+            $dataContextProperty = $Target.PSObject.Properties['DataContext']
+            if ($null -ne $dataContextProperty -and $null -eq $Target.DataContext) {
+                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. The binding will remain unresolved until DataContext is assigned or inherited."
+            } else {
+                Write-Verbose "BindProperty: No source selector specified; using inherited DataContext for path '$Path'."
+            }
         }
 
         # Allow custom configuration via scriptblock

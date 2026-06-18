@@ -45,25 +45,47 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         } | Should -Throw
     }
 
-    It 'Should require a source selector' {
+    It 'Should bind using inherited DataContext when no source selector is provided' {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        $State = New-WPFObservableState @{
+            Count = 1
+        }
 
-        {
-            BindProperty -InputObject $TextBlock -Property Text -Path 'SomePath' -ErrorAction Stop
-        } | Should -Throw
+        $TextBlock.DataContext = $State
+
+        BindProperty -InputObject $TextBlock -Property Text -Path Count
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBlock, [System.Windows.Controls.TextBlock]::TextProperty)
+        $binding | Should -Not -BeNullOrEmpty
+        $binding.Path.Path | Should -Be 'Count'
+        $binding.Source | Should -Be $null
+        $binding.RelativeSource | Should -Be $null
+        $binding.ElementName | Should -BeNullOrEmpty
+
+        $TextBlock.Text | Should -Be '1'
+
+        $State.Count = 2
+        $TextBlock.Text | Should -Be '2'
+    }
+
+    It 'Should warn when no source selector is provided and DataContext is null' {
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        $Warnings = @()
+
+        BindProperty -InputObject $TextBlock -Property Text -Path Count -WarningVariable Warnings -WarningAction Continue
+
+        $Warnings.Count | Should -Be 1
+        $Warnings[0].ToString() | Should -Match 'DataContext is null'
     }
 
     It 'Should allow configuring the binding via ScriptBlock' {
         $Grid = [System.Windows.Controls.DataGrid]::new()
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
 
-        $converterApplied = $false
-
         # Bind with a converter
         BindProperty -InputObject $TextBlock -Property Text -Path ItemsSource.Count -Source $Grid -ScriptBlock {
             $this.Converter = New-WPFValueConverter {
                 param($Value)
-                $converterApplied = $true
                 if ($null -eq $Value) { return '0' }
                 return $Value.ToString()
             }
