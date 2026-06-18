@@ -145,7 +145,7 @@ function Update-WPFObject {
         }
 
         # Get base exception and surface here?
-        Write-Error "Failed to update '$thisName' ($thisType) with error: $_"
+        Write-Error "Failed to update '$thisName' ($thisType) with error: $($_.Exception.Message)"
         return
     }
 }

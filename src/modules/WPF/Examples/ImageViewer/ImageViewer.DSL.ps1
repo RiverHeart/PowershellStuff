@@ -240,7 +240,7 @@ App 'Window' {
 
     Menu 'Menu' {
         $this.Height = 25
-        Bind Visibility -To Window.Tag.IsFullScreen -Invert
+        Link Visibility -ToState IsFullScreen -Invert
 
         MenuItem '(F)ile/(O)pen' {
             UseStyle 'ImageViewer.UnthemedMenuItem'
@@ -430,8 +430,9 @@ App 'Window' {
                 $this.BorderThickness = 1
                 $this.BorderBrush = '#FF4A4A4A'
                 Dock Right
-                Bind Visibility -To Window.Tag.IsFigureDrawingMode -Converter {
-                    if ($_) { 'Visible' } else { 'Collapsed' }
+                Link Visibility -ToState IsFigureDrawingMode -Map @{
+                    $true  = 'Visible'
+                    $false = 'Collapsed'
                 }
 
                 StackPanel 'FigureDrawingSidebarStack' {
@@ -444,14 +445,15 @@ App 'Window' {
                         $this.FontSize = 46
                         $this.FontWeight = [FontWeights]::Bold
                         $this.Foreground = '#FFF8F8F8'
-                        Bind Content -To Window.Tag.FigureDrawingCountdownText
+                        Link Content -ToState FigureDrawingCountdownText
                     }
 
                     Label 'FigureDrawingMetaLabel' {
                         $this.HorizontalAlignment = [HorizontalAlignment]::Center
                         $this.Foreground = '#FFD3D3D3'
-                        Bind Content -To Window.Tag.IsFigureDrawingPaused -Converter {
-                            if ($_) { 'Paused' } else { 'Running' }
+                        Link Content -ToState IsFigureDrawingPaused -Map @{
+                            $true  = 'Paused'
+                            $false = 'Running'
                         }
                     }
 
@@ -459,19 +461,17 @@ App 'Window' {
                         UseStyle 'ImageViewer.IconButton'
                         $this.HorizontalAlignment = [HorizontalAlignment]::Center
                         $this.Margin = 0, 20, 0, 0
-                        Bind ToolTip -To Window.Tag.IsFigureDrawingPaused -Converter {
-                            if ($_) { 'Resume figure drawing' } else { 'Pause figure drawing' }
+                        Link ToolTip -ToState IsFigureDrawingPaused -Map @{
+                            $true  = 'Resume figure drawing'
+                            $false = 'Pause figure drawing'
                         }
-                        Bind Content -To Window.Tag.IsFigureDrawingPaused -Converter {
-                            if ($_) {
-                                Path 'images/play-solid-full.svg' {
-                                    UseStyle 'ImageViewer.IconPath'
-                                }
-                            } else {
-                                Path 'images/pause-solid-full.svg' {
-                                    UseStyle 'ImageViewer.IconPath'
-                                }
-                            }
+                        Link Content -ToState IsFigureDrawingPaused -Map @{
+                            $true  = (Path 'images/play-solid-full.svg' {
+                                UseStyle 'ImageViewer.IconPath'
+                            })
+                            $false = (Path 'images/pause-solid-full.svg' {
+                                UseStyle 'ImageViewer.IconPath'
+                            })
                         }
 
                         When Click {
@@ -511,24 +511,22 @@ App 'Window' {
         StackPanel 'ButtonPanel' {
             $this.Orientation = [Orientation]::Horizontal
             $this.HorizontalAlignment = [HorizontalAlignment]::Center
-            Bind Visibility -To Window.Tag.IsFullScreen -Invert
+            Link Visibility -ToState IsFullScreen -Invert
 
             Button 'CopyButton' {
                 UseStyle 'ImageViewer.IconButton'
-                Bind IsEnabled -To Window.Tag.IsFileLoaded
-                Bind ToolTip -To Window.Tag.IsCopyFeedbackActive -Converter {
-                    if ($_) { 'Copied to clipboard' } else { 'Copy image to clipboard' }
+                Link IsEnabled -ToState IsFileLoaded
+                Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+                    $true  = 'Copied to clipboard'
+                    $false = 'Copy image to clipboard'
                 }
-                Bind Content -To Window.Tag.IsCopyFeedbackActive -Converter {
-                    if ($_) {
-                        Path 'images/clipboard-check-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
-                        }
-                    } else {
-                        Path 'images/clipboard-solid-full.svg' {
-                            UseStyle 'ImageViewer.IconPath'
-                        }
-                    }
+                Link Content -ToState IsCopyFeedbackActive -Map @{
+                    $true  = (Path 'images/clipboard-check-solid-full.svg' {
+                        UseStyle 'ImageViewer.IconPath'
+                    })
+                    $false = (Path 'images/clipboard-solid-full.svg' {
+                        UseStyle 'ImageViewer.IconPath'
+                    })
                 }
 
                 When 'Click' {
@@ -543,20 +541,20 @@ App 'Window' {
 
             Button 'ZoomModeButton' {
                 UseStyle 'ImageViewer.IconButton'
-                Bind IsEnabled -To Window.Tag.IsFileLoaded
-                Bind ToolTip -To Window.Tag.IsFitMode -Converter {
-                    if ($_) { 'Actual size (100%)' } else { 'Fit image to window' }
+                Link IsEnabled -ToState IsFileLoaded
+                Link ToolTip -ToState IsFitMode -Map @{
+                    $true  = 'Actual size (100%)'
+                    $false = 'Fit image to window'
                 }
-                Bind Content -To Window.Tag.IsFitMode -Converter {
-                    if ($_) {
+                Link Content -ToState IsFitMode -Map @{
+                    $true = (
                         Path 'images/up-right-and-down-left-from-center-solid-full.svg' {
                             UseStyle 'ImageViewer.IconPath'
-                        }
-                    } else {
+                        })
+                    $false = (
                         Path 'images/arrows-to-circle-solid-full.svg' {
                             UseStyle 'ImageViewer.IconPath'
-                        }
-                    }
+                        })
                 }
 
                 When 'Click' {
@@ -571,7 +569,7 @@ App 'Window' {
             Button 'RotateButton' {
                 UseStyle 'ImageViewer.IconButton'
                 $this.ToolTip = 'Rotate 90° clockwise'
-                Bind IsEnabled -To Window.Tag.IsFileLoaded
+                Link IsEnabled -ToState IsFileLoaded
 
                 When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
                 Path 'images/arrows-rotate-solid-full.svg' {
@@ -581,7 +579,7 @@ App 'Window' {
 
             Button 'BackButton' {
                 UseStyle 'ImageViewer.IconButton'
-                Bind IsEnabled -To Window.Tag.IsFileLoaded
+                Link IsEnabled -ToState IsFileLoaded
 
                 When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
                 Path 'images/arrow-left-solid-full.svg' {
@@ -590,7 +588,7 @@ App 'Window' {
             }
             Button 'ForwardButton' {
                 UseStyle 'ImageViewer.IconButton'
-                Bind IsEnabled -To Window.Tag.IsFileLoaded
+                Link IsEnabled -ToState IsFileLoaded
 
                 When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
                 Path 'images/arrow-right-solid-full.svg' {
@@ -603,7 +601,7 @@ App 'Window' {
     # MARK: STATUS BAR
     StatusBar {
         $this.Margin = 0, 5, 0, 0
-        Bind Visibility -To Window.Tag.IsFullScreen -Invert
+        Link Visibility -ToState IsFullScreen -Invert
 
         StatusBarItem 'StatusFileItem' {
             Dock Left

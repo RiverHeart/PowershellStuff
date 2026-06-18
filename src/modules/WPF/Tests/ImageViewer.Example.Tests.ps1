@@ -89,9 +89,9 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $DslContent = Get-Content -Path $DslPath -Raw
 
         $DslContent | Should -Match "Border 'FigureDrawingSidebar'"
-        $DslContent | Should -Match 'Bind Visibility -To Window.Tag.IsFigureDrawingMode'
+        $DslContent | Should -Match 'Link Visibility -ToState IsFigureDrawingMode'
         $DslContent | Should -Match "Label 'FigureDrawingCountdownLabel'"
-        $DslContent | Should -Match 'Bind Content -To Window.Tag.FigureDrawingCountdownText'
+        $DslContent | Should -Match 'Link Content -ToState FigureDrawingCountdownText'
         $DslContent | Should -Match 'Invoke-ImageViewerToggleFigureDrawingPause'
     }
 
