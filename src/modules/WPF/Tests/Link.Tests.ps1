@@ -88,6 +88,62 @@ Describe 'Link' -Tag 'Link' {
         $label.Content | Should -Be 'Ready'
     }
 
+    It 'Should map state values to prebuilt WPF objects' {
+        $id = [guid]::NewGuid().ToString('N')
+        $windowName = "Window_$id"
+        $labelName = "Label_$id"
+
+        $activeContent = [System.Windows.Controls.TextBlock]::new()
+        $activeContent.Text = 'Ready'
+
+        $inactiveContent = [System.Windows.Controls.TextBlock]::new()
+        $inactiveContent.Text = 'Not Ready'
+
+        $null = Window $windowName {
+            $this.Tag = New-WPFObservableState @{
+                IsReady = $false
+            }
+
+            Label $labelName {
+                Link Content -ToState IsReady -Map @{
+                    $true  = $activeContent
+                    $false = $inactiveContent
+                }
+            }
+        }
+
+        $window = Reference $windowName
+        $label = Reference $labelName
+
+        [object]::ReferenceEquals($label.Content, $inactiveContent) | Should -Be $true
+
+        $window.Tag.IsReady = $true
+        [object]::ReferenceEquals($label.Content, $activeContent) | Should -Be $true
+    }
+
+    It 'Should warn when -Map contains scriptblock values' {
+        Mock Write-Warning {} -ModuleName WPF
+
+        $id = [guid]::NewGuid().ToString('N')
+        $windowName = "Window_$id"
+        $labelName = "Label_$id"
+
+        $null = Window $windowName {
+            $this.Tag = New-WPFObservableState @{
+                IsReady = $false
+            }
+
+            Label $labelName {
+                Link Content -ToState IsReady -Map @{
+                    $true  = { 'Ready' }
+                    $false = 'Not Ready'
+                }
+            }
+        }
+
+        Should -Invoke Write-Warning -ModuleName WPF -Times 1 -Exactly
+    }
+
     It 'Should use -Default when map key is missing' {
         $id = [guid]::NewGuid().ToString('N')
         $windowName = "Window_$id"

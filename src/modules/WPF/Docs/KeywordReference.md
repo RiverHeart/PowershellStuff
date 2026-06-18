@@ -644,6 +644,16 @@ Link ToolTip -ToState IsCopyFeedbackActive -Map @{
 }
 ```
 
+Map entries should be final values/objects, not deferred scriptblocks. For
+control content values, evaluate the object at map creation time:
+
+```powershell
+Link Content -ToState IsCopyFeedbackActive -Map @{
+    $true  = (Path 'images/clipboard-check-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
+    $false = (Path 'images/clipboard-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
+}
+```
+
 `-Map` also accepts `True`/`False` keys for boolean state values, and supports
 `-Default` for unmatched values:
 

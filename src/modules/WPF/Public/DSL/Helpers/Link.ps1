@@ -139,6 +139,18 @@ function Link {
                     $UseDefaultMapValue = $HasDefault
                     $DefaultMapValue = $Default
 
+                    $ScriptBlockMapKeys = @()
+                    foreach ($MapKey in $MapValues.Keys) {
+                        if ($MapValues[$MapKey] -is [scriptblock]) {
+                            $ScriptBlockMapKeys += [string] $MapKey
+                        }
+                    }
+
+                    if ($ScriptBlockMapKeys.Count -gt 0) {
+                        $ScriptBlockMapKeyList = $ScriptBlockMapKeys -join ', '
+                        Write-Warning "Link: -Map contains scriptblock value(s) for key(s): $ScriptBlockMapKeyList. Use evaluated values/objects in -Map (for example, wrap Path calls in parentheses)."
+                    }
+
                     $BindParams.Converter = {
                         param($SourceValue)
 
