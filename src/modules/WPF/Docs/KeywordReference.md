@@ -635,6 +635,26 @@ Use `-ToState` for state-style binding (delegates to `Bind`):
 Link Visibility -ToState IsFullScreen -Invert
 ```
 
+Map state values without writing a converter block:
+
+```powershell
+Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+    $true  = 'Copied to clipboard'
+    $false = 'Copy image to clipboard'
+}
+```
+
+`-Map` also accepts `True`/`False` keys for boolean state values, and supports
+`-Default` for unmatched values:
+
+```powershell
+Link Content -ToState FigureDrawingPreset -Map @{
+    Quick    = '2 min'
+    Balanced = '5 min'
+    Long     = '10 min'
+} -Default 'Custom'
+```
+
 Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
 
 ```powershell

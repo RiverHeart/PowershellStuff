@@ -16,6 +16,12 @@
     Link Visibility -ToState IsFullScreen -Invert
 
 .EXAMPLE
+    Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+        $true  = 'Copied to clipboard'
+        $false = 'Copy image to clipboard'
+    }
+
+.EXAMPLE
     Link Text -Property Count
 
 .EXAMPLE
@@ -45,6 +51,16 @@ function Link {
 
         [Parameter(ParameterSetName = 'State')]
         [scriptblock] $Converter,
+
+        [Parameter(ParameterSetName = 'State')]
+        [hashtable] $Map,
+
+        [Parameter(ParameterSetName = 'State')]
+        [AllowNull()]
+        [object] $Default,
+
+        [Parameter(ParameterSetName = 'State')]
+        [switch] $StrictMap,
 
         [Parameter(ParameterSetName = 'State')]
         [switch] $Invert,
@@ -88,6 +104,24 @@ function Link {
 
         switch ($PSCmdlet.ParameterSetName) {
             'State' {
+                $HasMap = $PSBoundParameters.ContainsKey('Map')
+                $HasDefault = $PSBoundParameters.ContainsKey('Default')
+
+                if ($HasMap -and $PSBoundParameters.ContainsKey('Converter')) {
+                    Write-Error 'Link: Specify either -Map or -Converter in state mode, not both.'
+                    return
+                }
+
+                if (-not $HasMap -and ($HasDefault -or $StrictMap)) {
+                    Write-Error 'Link: -Default and -StrictMap require -Map in state mode.'
+                    return
+                }
+
+                if ($HasDefault -and $StrictMap) {
+                    Write-Error 'Link: -Default and -StrictMap cannot be combined in state mode.'
+                    return
+                }
+
                 $Window = Get-WPFWindow
                 if ($null -eq $Window -or [string]::IsNullOrWhiteSpace($Window.Name)) {
                     Write-Error 'Link: Unable to resolve the current window context for -ToState mode.'
@@ -99,7 +133,38 @@ function Link {
                     To       = "$($Window.Name).Tag.$ToState"
                 }
 
-                if ($PSBoundParameters.ContainsKey('Converter')) {
+                if ($HasMap) {
+                    $MapValues = $Map
+                    $UseStrictMap = [bool] $StrictMap
+                    $UseDefaultMapValue = $HasDefault
+                    $DefaultMapValue = $Default
+
+                    $BindParams.Converter = {
+                        param($SourceValue)
+
+                        if ($MapValues.Contains($SourceValue)) {
+                            return $MapValues[$SourceValue]
+                        }
+
+                        # Helpful fallback for common boolean map literals like True/False.
+                        if ($SourceValue -is [bool]) {
+                            $BoolKeyText = if ($SourceValue) { 'True' } else { 'False' }
+                            if ($MapValues.Contains($BoolKeyText)) {
+                                return $MapValues[$BoolKeyText]
+                            }
+                        }
+
+                        if ($UseDefaultMapValue) {
+                            return $DefaultMapValue
+                        }
+
+                        if ($UseStrictMap) {
+                            throw "Link: -Map has no entry for source value '$SourceValue'."
+                        }
+
+                        return $SourceValue
+                    }.GetNewClosure()
+                } elseif ($PSBoundParameters.ContainsKey('Converter')) {
                     $BindParams.Converter = $Converter
                 }
 
