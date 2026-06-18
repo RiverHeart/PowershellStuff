@@ -625,6 +625,35 @@ Bind Visibility -To Window.Tag.IsFullScreen -Invert
 Bind IsEnabled -To Window.Tag.IsFileLoaded
 ```
 
+### Link
+
+Unified binding sugar that delegates to existing binding keywords.
+
+Use `-ToState` for state-style binding (delegates to `Bind`):
+
+```powershell
+Link Visibility -ToState IsFullScreen -Invert
+```
+
+Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
+
+```powershell
+Link Text -Property Count
+Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
+```
+
+`-Path` is supported as an alias for `-Property`:
+
+```powershell
+Link Text -Path CurrentFile.Name
+```
+
+Use `-AsBinding` for advanced trigger/template scenarios (delegates to `Binding`):
+
+```powershell
+$binding = Link -AsBinding -Property IsEnabled -Self
+```
+
 ### BindProperty
 
 Binds a dependency property to a binding path, source, or relative source.
