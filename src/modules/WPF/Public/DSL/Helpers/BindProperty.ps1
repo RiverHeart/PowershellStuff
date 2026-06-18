@@ -155,7 +155,9 @@ function BindProperty {
             $binding.Source = $Source
         } else {
             $dataContextProperty = $Target.PSObject.Properties['DataContext']
-            if ($null -ne $dataContextProperty -and $null -eq $Target.DataContext) {
+            if ($null -eq $dataContextProperty) {
+                Write-Warning "BindProperty: Target type '$($TargetType.FullName)' does not expose DataContext. Specify -Self, -TemplatedParent, -ElementName, or -Source for path '$Path'."
+            } elseif ($null -eq $Target.DataContext) {
                 Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. The binding will remain unresolved until DataContext is assigned or inherited."
             } else {
                 Write-Verbose "BindProperty: No source selector specified; using inherited DataContext for path '$Path'."
