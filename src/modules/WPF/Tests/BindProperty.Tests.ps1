@@ -69,10 +69,14 @@ Describe 'BindProperty' -Tag 'BindProperty' {
     }
 
     It 'Should warn when no source selector is provided and DataContext is null' {
+        $WarningPreference = 'SilentlyContinue'
+        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
+        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
+
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
         $Warnings = @()
 
-        BindProperty -InputObject $TextBlock -Property Text -Path Count -WarningVariable Warnings -WarningAction Continue
+        BindProperty -InputObject $TextBlock -Property Text -Path Count -WarningVariable Warnings
 
         $Warnings.Count | Should -Be 1
         $Warnings[0].ToString() | Should -Match 'DataContext is null'
