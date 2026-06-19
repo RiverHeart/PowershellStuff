@@ -49,7 +49,7 @@ Window 'Window' {
                 $this.Width = 75
                 $this.Margin = 5
 
-                When 'Click' {
+                On 'Click' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $True
                 }
@@ -59,7 +59,7 @@ Window 'Window' {
                 $this.Width = 75
                 $this.Margin = 5
 
-                When 'Click' {
+                On 'Click' {
                     $Window = Reference 'Window'
                     $Window.DialogResult = $False
                 }

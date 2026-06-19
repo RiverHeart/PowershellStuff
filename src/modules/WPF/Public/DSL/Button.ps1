@@ -6,7 +6,7 @@
     Creates a Button with a Click event handler.
 
     Button 'MyButton' {
-        When Click { Write-Host 'Clicked!' }
+        On Click { Write-Host 'Clicked!' }
     }
 
 .EXAMPLE

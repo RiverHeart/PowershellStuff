@@ -38,6 +38,7 @@ Scope of this page:
 * [Commands and Events](#commands-and-events)
     * [Command](#command)
     * [Key](#key)
+    * [On](#on)
     * [When](#when)
     * [TimedEvent](#timedevent)
 * [Binding and Resources](#binding-and-resources)
@@ -423,7 +424,7 @@ Creates a Menu control.
 Menu 'TopMenu' {
     MenuItem '_File' {
         MenuItem '_Exit' {
-            When Click { (Reference 'MainWindow').Close() }
+            On Click { (Reference 'MainWindow').Close() }
         }
     }
 }
@@ -435,7 +436,7 @@ Creates a MenuItem. Supports path shorthand using slash-separated names.
 
 ```powershell
 MenuItem '_File/_Open' {
-    When Click { }
+    On Click { }
 }
 ```
 
@@ -511,13 +512,49 @@ Key 'Ctrl+Shift+S' {
 }
 ```
 
-### When
+### On
 
 Adds an event handler to the current object.
 
 ```powershell
-When Click {
+On Click {
     Write-Host 'Clicked'
+}
+```
+
+### When
+
+Declares a state-reactive handler on the parent control. Fires when observable
+state on `Tag` reaches or transitions through a specific value.
+
+Handlers run with `$this` bound to the parent control, `$StateValue` set to the
+new value, and `$PreviousStateValue` set to the prior value.
+
+Fire when a state property becomes a target value:
+
+```powershell
+Button 'FitButton' {
+    State @{ IsFitMode = $false }
+
+    When -State IsFitMode -Becomes $true {
+        Invoke-FitToWindow
+    }
+}
+```
+
+Fire on any change, or filter by transition:
+
+```powershell
+When -State RotationAngle -Changes {
+    Write-Debug "Rotation is now $StateValue"
+}
+
+When -State IsFitMode -Changes -To $true {
+    Invoke-FitToWindow
+}
+
+When -State IsFitMode -Changes -From $false -To $true {
+    Invoke-FitToWindow
 }
 ```
 
@@ -594,7 +631,7 @@ Window 'MyApp' {
     }
 
     Button 'Increment' {
-        When Click {
+        On Click {
             $window = Reference 'Window'
             $window.Tag.Count++
         }

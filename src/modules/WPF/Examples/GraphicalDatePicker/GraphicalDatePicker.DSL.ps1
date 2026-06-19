@@ -36,7 +36,7 @@ Window 'Window' {
         $this.Margin = 5
 
         DatePicker 'DatePicker' {
-            When 'SelectedDateChanged' {
+            On 'SelectedDateChanged' {
                 (Reference 'OKButton').IsEnabled = $True
             }
         }
@@ -50,7 +50,7 @@ Window 'Window' {
                 $this.Margin = 5
                 $this.IsEnabled = $False
 
-                When "Click" {
+                On "Click" {
                     (Reference 'Window').DialogResult = $True
                 }
             }
@@ -59,7 +59,7 @@ Window 'Window' {
                 $this.Width = 75
                 $this.Margin = 5
 
-                When "Click" {
+                On "Click" {
                     (Reference 'Window').DialogResult = $False
                 }
             }

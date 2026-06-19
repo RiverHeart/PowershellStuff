@@ -36,7 +36,7 @@ function $FunctionName {
         $global:ImportedWhenVisibility = $null
 
         $Button = Button "ImportWhenButton_$([guid]::NewGuid().ToString('N'))" {
-            When Click {
+            On Click {
                 $global:ImportedWhenVisibility = [ordered] @{}
 
                 try {
@@ -74,7 +74,7 @@ function $FunctionName {
         $global:ImportedWhenGlobalVisibility = $null
 
         $Button = Button "ImportGlobalWhenButton_$([guid]::NewGuid().ToString('N'))" {
-            When Click {
+            On Click {
                 $global:ImportedWhenGlobalVisibility = [ordered] @{
                     InsideHasGlobal = [bool] (Get-Command -Name 'Invoke-ImportedWhenGlobalHelper' -ErrorAction SilentlyContinue)
                 }
@@ -107,7 +107,7 @@ function $FunctionName {
         $global:DotSourcedWhenResult = $null
 
         $Button = Button "DotSourceWhenButton_$([guid]::NewGuid().ToString('N'))" {
-            When Click {
+            On Click {
                 if (Get-Command -Name 'Invoke-DotSourcedWhenHelper' -ErrorAction SilentlyContinue) {
                     $global:DotSourcedWhenResult = Invoke-DotSourcedWhenHelper
                 }

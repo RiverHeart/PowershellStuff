@@ -12,7 +12,7 @@ Describe 'Key' -Tag 'Key' {
                 [System.Collections.Generic.List[psvariable]]::new()
             }
 
-            Mock -CommandName When -MockWith {
+            Mock -CommandName On -MockWith {
                 param($Event, $ScriptBlock, $InputObject)
                 $script:CapturedHandler = $ScriptBlock
             }
@@ -44,7 +44,7 @@ Describe 'Key' -Tag 'Key' {
                 [System.Collections.Generic.List[psvariable]]::new()
             }
 
-            Mock -CommandName When -MockWith {
+            Mock -CommandName On -MockWith {
                 param($Event, $ScriptBlock, $InputObject)
                 $script:CapturedHandler = $ScriptBlock
             }
@@ -75,7 +75,7 @@ Describe 'Key' -Tag 'Key' {
                 [System.Collections.Generic.List[psvariable]]::new()
             }
 
-            Mock -CommandName When -MockWith {
+            Mock -CommandName On -MockWith {
                 param($Event, $ScriptBlock, $InputObject)
                 $script:CapturedHandler = $ScriptBlock
             }
@@ -108,7 +108,7 @@ Describe 'Key' -Tag 'Key' {
                 @([psvariable]::new('this', [pscustomobject]@{ Name = 'Window' }))
             }
 
-            Mock -CommandName When -MockWith {
+            Mock -CommandName On -MockWith {
                 param($Event, $ScriptBlock, $InputObject)
                 $script:CapturedHandler = $ScriptBlock
             }
@@ -140,7 +140,7 @@ Describe 'Key' -Tag 'Key' {
                 [System.Collections.Generic.List[psvariable]]::new()
             }
 
-            Mock -CommandName When -MockWith {
+            Mock -CommandName On -MockWith {
                 param($Event, $ScriptBlock, $InputObject)
                 $script:CapturedHandler = $ScriptBlock
             }
@@ -197,7 +197,7 @@ Describe 'Key' -Tag 'Key' {
                 [System.Collections.Generic.List[psvariable]]::new()
             }
 
-            Mock -CommandName When -MockWith {
+            Mock -CommandName On -MockWith {
                 param($Event, $ScriptBlock, $InputObject)
                 $script:CapturedHandler = $ScriptBlock
             }

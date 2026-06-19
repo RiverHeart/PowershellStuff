@@ -112,7 +112,7 @@ using namespace System.Windows.Controls
         $Window = Window "Window_$Id" {
             $this.Title = 'User Close Window'
 
-            When Loaded {
+            On Loaded {
                 $this.DialogResult = $false
             }
         }

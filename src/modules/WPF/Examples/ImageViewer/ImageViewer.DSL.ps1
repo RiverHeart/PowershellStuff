@@ -109,7 +109,7 @@ App 'Window' {
 
     # WARNING: A little debouncing might be needed to prevent multiple rapid
     # SizeChanged events from causing issues.
-    When SizeChanged {
+    On SizeChanged {
         if ($this.Tag.IsFitMode) {
             Invoke-ImageViewerFitToWindow
         }
@@ -145,7 +145,7 @@ App 'Window' {
     #
     # NOTE: Use PreviewKeyDown so navigation keys still work when focused controls
     # like ScrollViewer handle KeyDown internally.
-    When PreviewKeyDown {
+    On PreviewKeyDown {
         param($sender, $event)
 
         switch ($event.Key) {
@@ -185,12 +185,12 @@ App 'Window' {
         }
     }
 
-    When Closing {
+    On Closing {
         Stop-ImageViewerSlideshow -Window $this
         Stop-ImageViewerMouseIdleHide -Window $this
     }
 
-    When DragOver {
+    On DragOver {
         param($sender, $event)
 
         if ($event.Data.GetDataPresent([DataFormats]::FileDrop)) {
@@ -202,7 +202,7 @@ App 'Window' {
         $event.Handled = $true
     }
 
-    When Drop {
+    On Drop {
         param($sender, $event)
 
         if (-not $event.Data.GetDataPresent([DataFormats]::FileDrop)) {
@@ -217,7 +217,7 @@ App 'Window' {
         $event.Handled = $true
     }
 
-    When 'Loaded' {
+    On 'Loaded' {
         Invoke-ImageViewerUpdateStatus
 
         if ($FilePath) {
@@ -385,7 +385,7 @@ App 'Window' {
         MenuItem '(V)iew/Image Fit to (W)indow' {
             UseStyle 'ImageViewer.UnthemedMenuItem'
 
-            When Click {
+            On Click {
                 Invoke-ImageViewerFitToWindow
             }
         }
@@ -393,7 +393,7 @@ App 'Window' {
         MenuItem '(V)iew/Image (A)ctual Size' {
             UseStyle 'ImageViewer.UnthemedMenuItem'
 
-            When Click {
+            On Click {
                 Invoke-ImageViewerSetZoom -Reset
             }
         }
@@ -409,7 +409,7 @@ App 'Window' {
         MenuItem '(H)elp/(A)bout' {
             UseStyle 'ImageViewer.UnthemedMenuItem'
 
-            When Click {
+            On Click {
                 Invoke-ImageViewerShowAbout
             }
         }
@@ -474,7 +474,7 @@ App 'Window' {
                             })
                         }
 
-                        When Click {
+                        On Click {
                             Invoke-ImageViewerToggleFigureDrawingPause
                         }
                     }
@@ -486,7 +486,7 @@ App 'Window' {
                 $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
                 $this.Background = 'Transparent'
 
-                When PreviewMouseWheel {
+                On PreviewMouseWheel {
                     param($sender, $event)
 
                     if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
@@ -529,7 +529,7 @@ App 'Window' {
                     })
                 }
 
-                When 'Click' {
+                On 'Click' {
                     try {
                         Set-WPFClipboard -InputObject (Reference 'Viewer') -ErrorAction Stop
                         Invoke-ImageViewerCopyFeedback -Success
@@ -557,7 +557,7 @@ App 'Window' {
                         })
                 }
 
-                When 'Click' {
+                On 'Click' {
                     if ((Get-WPFWindow).Tag.IsFitMode) {
                         Invoke-ImageViewerSetZoom -Reset
                     } else {
@@ -571,7 +571,7 @@ App 'Window' {
                 $this.ToolTip = 'Rotate 90° clockwise'
                 Link IsEnabled -ToState IsFileLoaded
 
-                When 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
+                On 'Click' { Invoke-ImageViewerRotate -Direction Clockwise }
                 Path 'images/arrows-rotate-solid-full.svg' {
                     UseStyle 'ImageViewer.IconPath'
                 }
@@ -581,7 +581,7 @@ App 'Window' {
                 UseStyle 'ImageViewer.IconButton'
                 Link IsEnabled -ToState IsFileLoaded
 
-                When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
+                On 'Click' { Invoke-ImageViewerNavigate -Direction Back }
                 Path 'images/arrow-left-solid-full.svg' {
                     UseStyle 'ImageViewer.IconPath'
                 }
@@ -590,7 +590,7 @@ App 'Window' {
                 UseStyle 'ImageViewer.IconButton'
                 Link IsEnabled -ToState IsFileLoaded
 
-                When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
+                On 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
                 Path 'images/arrow-right-solid-full.svg' {
                     UseStyle 'ImageViewer.IconPath'
                 }

@@ -46,11 +46,11 @@ function Complete-WPFEvent {
     }
 
     # While typing `When <Event>`, the parser behavior changes as input grows:
-    # `When` may not yet be represented as a CommandAst, but `When A` is.
+    # `When` may not yet be represented as a CommandAst, but `On A` is.
     # Once that happens, the command under the cursor can resolve to `When`
     # instead of the owning control (for example `Window` or `Button`). Ignore
     # event-keyword command names so selection stays on the enclosing control.
-    $IgnoredCommandNames = @('when', '-when', 'add-wpfhandler', 'handler')
+    $IgnoredCommandNames = @('on', '-on', 'when', '-when', 'add-wpfhandler', 'handler')
 
     $ParentNode = $Params.Ast.FindAll({
         param($AstNode)

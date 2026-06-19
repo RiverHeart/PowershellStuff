@@ -7,7 +7,7 @@
     It is syntax sugar that wraps your action in gesture-matching logic and only
     invokes the action when the key and modifier combination matches.
 
-    Internally, `Key` registers this wrapper through `When PreviewKeyDown`.
+    Internally, `Key` registers this wrapper through `On PreviewKeyDown`.
 
 .EXAMPLE
     Define a keyboard shortcut for Ctrl+Shift+S:
@@ -67,5 +67,5 @@ function Key {
         }
     }.GetNewClosure()
 
-    When PreviewKeyDown $Handler
+    On PreviewKeyDown $Handler
 }

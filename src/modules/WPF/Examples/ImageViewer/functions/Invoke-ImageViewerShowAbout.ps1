@@ -70,7 +70,7 @@ function Invoke-ImageViewerShowAbout {
                     $this.Width = 75
                     $this.Margin = 5
 
-                    When Click {
+                    On Click {
                         $Window = Reference 'About_Window'
                         $Window.DialogResult = $true
                     }

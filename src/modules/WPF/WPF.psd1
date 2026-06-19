@@ -134,6 +134,7 @@ FunctionsToExport = @(
     'Import'
     'Key'
     'Link'
+    'On'
     'MultiTrigger'
     'Reference'
     'Resource'
