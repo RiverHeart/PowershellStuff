@@ -139,7 +139,7 @@ App 'Window' {
         $Event.Handled = $true
     }
 
-    # Demonstrate more general keyboard event handling with `When`. This is needed for
+    # Demonstrate more general keyboard event handling with `On`. This is needed for
     # navigation keys since they require conditional handling based on the focused
     # control's scrollability.
     #

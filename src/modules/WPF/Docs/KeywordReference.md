@@ -498,7 +498,7 @@ Command 'SaveAs' 'Ctrl+Shift+S' {
 
 ### Key
 
-`Key` registers a handler for `PreviewKeyDown` on the current object. It is syntax sugar that wraps your action in gesture-matching logic and only invokes the action when the key and modifier combination matches. Internally, `Key` registers this wrapper through `When PreviewKeyDown`.
+`Key` registers a handler for `PreviewKeyDown` on the current object. It is syntax sugar that wraps your action in gesture-matching logic and only invokes the action when the key and modifier combination matches. Internally, `Key` registers this wrapper through `On PreviewKeyDown`.
 
 Use `Key` for concise gesture matching when you do not need full event-switch logic.
 
