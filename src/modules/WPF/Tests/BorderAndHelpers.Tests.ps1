@@ -1,6 +1,7 @@
 Describe 'Border DSL' -Tag 'Border' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../WPF.psd1" -Force
+        $env:SuppressWPFDisabledBlockWarning = $true
     }
 
     BeforeAll {
@@ -44,10 +45,6 @@ Describe 'Border DSL' -Tag 'Border' {
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
-
-        $WarningPreference = 'SilentlyContinue'
-        . "$PSScriptRoot/Helpers/Sync-ModulePreference.ps1"
-        Sync-ModulePreference -Name 'WPF' -Include 'WarningPreference'
 
         $Result = {
             -Border "Border_$Id" {
