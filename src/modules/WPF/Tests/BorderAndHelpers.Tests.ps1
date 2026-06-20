@@ -140,20 +140,20 @@ Describe 'When' -Tag 'When' {
     }
 
     It 'Should inject this as the current object when event fires' {
-        $global:WhenThisName = $null
+        $global:OnThisName = $null
 
-        $Name = "WhenButton_$([guid]::NewGuid().ToString('N'))"
+        $Name = "OnButton_$([guid]::NewGuid().ToString('N'))"
         $Button = Button $Name {
             On Click {
-                $global:WhenThisName = $this.Name
+                $global:OnThisName = $this.Name
             }
         }
 
         $Button.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent))
 
-        $global:WhenThisName | Should -Be -ExpectedValue $Name
+        $global:OnThisName | Should -Be -ExpectedValue $Name
 
-        Remove-Variable -Name WhenThisName -Scope Global -ErrorAction SilentlyContinue
+        Remove-Variable -Name OnThisName -Scope Global -ErrorAction SilentlyContinue
     }
 
     It 'Should run -State handler when value becomes target value' {
