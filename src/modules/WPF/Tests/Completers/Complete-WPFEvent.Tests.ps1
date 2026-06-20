@@ -7,7 +7,7 @@ Describe 'Complete-WPFEvent' -Tag 'Complete-WPFEvent' {
 
     BeforeEach {
         InModuleScope WPF {
-            $script:WPFHandlerCache = $null
+            $script:WPFControlEventsCache = $null
         }
 
         $script:EventNames = @('AclEvent', 'Click', 'Closed', 'XclTail')
@@ -18,11 +18,18 @@ Describe 'Complete-WPFEvent' -Tag 'Complete-WPFEvent' {
         $script:Ast = [Parser]::ParseInput($script:Source, [ref] $script:Tokens, [ref] $script:ParseErrors)
         $script:CursorOffset = $script:Source.IndexOf('Button') + 1
 
-        Mock -ModuleName WPF -CommandName Get-WPFFunctionParam -MockWith {
-            [pscustomobject]@{
-                Ast = $script:Ast
-                PositionOfCursor = [pscustomobject]@{ Offset = $script:CursorOffset }
-            }
+        Mock -ModuleName WPF -CommandName Get-PSCallStack -MockWith {
+            @(
+                [pscustomobject]@{
+                    Command = 'TabExpansion2'
+                    InvocationInfo = [pscustomobject]@{
+                        BoundParameters = [pscustomobject]@{
+                            Ast = $script:Ast
+                            PositionOfCursor = [pscustomobject]@{ Offset = $script:CursorOffset }
+                        }
+                    }
+                }
+            )
         }
 
         Mock -ModuleName WPF -CommandName Get-WPFTypeInfo -MockWith {
