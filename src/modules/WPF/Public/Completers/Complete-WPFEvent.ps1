@@ -50,7 +50,7 @@ function Complete-WPFEvent {
     # Once that happens, the command under the cursor can resolve to `When`
     # instead of the owning control (for example `Window` or `Button`). Ignore
     # event-keyword command names so selection stays on the enclosing control.
-    $IgnoredCommandNames = @('on', '-on', 'when', '-when', 'add-wpfhandler', 'handler')
+    $IgnoredCommandNames = @('on', '-on', 'add-wpfhandler')
 
     $ParentNode = $Params.Ast.FindAll({
         param($AstNode)
