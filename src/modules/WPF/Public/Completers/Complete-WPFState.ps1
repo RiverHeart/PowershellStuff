@@ -23,23 +23,15 @@ using namespace System.Management.Automation.Language
     what values should be returned.
 
 .NOTES
-    There are some limitations to be aware of with this implementation:
+    * This implementation is potentially expensive for large ASTs. Powershell only
+      calls the completers once then filters an in-memory copy of results as the user types.
+      Only if the user presses backspace or re-triggers completion will the completer be
+      called again. Therefore, it's unlikely to become an issue. If, somehow, it did
+      become an issue we could cache the unfiltered property names for a short time.
 
-    TODO:
-    * This implementation is potentially expensive, especially for deeper command
-      paths and larger ASTs. Caching results based on AST node extents may be a worthwhile
-      optimization if performance becomes an issue. The cache would need to have a short
-      expiration time (1 minute) or be cleared on AST-changing events to avoid stale results.
-      Expiration time is probably the easier approach and would likely be sufficient given
-      typical editing speeds. Honestly, I need some helper functions for cache management.
-
-    * Currently, if multiple State commands are present in the command path, keys from
-      all of them will be returned. Depending on the use case, it may be desirable to
-      only return keys from the closest enclosing State command. This could be achieved by
-      tracking the closest State node while traversing the AST path and only returning keys
-      from that node.
-
-    This is committed anyway so we have a baseline for functional behavior.
+    * Right now we're only returning properties within the AST path leading to the cursor
+      but if we expect users to call state from across the entire application we should be
+      including all State declarations.
 
 .EXAMPLE
     Given the following command structure:
