@@ -238,6 +238,19 @@ App 'Window' {
         }
     }
 
+    # TOOD: Find a way to zoom towards the mouse pointer.
+    On MouseWheel {
+        param($sender, $event)
+
+        if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
+            return
+        }
+
+        $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
+        Invoke-ImageViewerSetZoom -Delta $Delta
+        $event.Handled = $true
+    }
+
     Menu 'Menu' {
         $this.Height = 25
         Link Visibility -ToState IsFullScreen -Invert
