@@ -49,7 +49,7 @@ App 'Window' {
     }
 
     # Use PreviewKeyDown so navigation still works when focused controls handle KeyDown internally.
-    When PreviewKeyDown {
+    On PreviewKeyDown {
         param($sender, $event)
 
         switch ($event.Key) {
@@ -127,12 +127,12 @@ App 'Window' {
 
             Button 'BackButton' {
                 Bind IsEnabled -To Window.Tag.IsFileLoaded
-                When 'Click' { Invoke-ImageViewerNavigate -Direction Back }
+                On 'Click' { Invoke-ImageViewerNavigate -Direction Back }
             }
 
             Button 'ForwardButton' {
                 Bind IsEnabled -To Window.Tag.IsFileLoaded
-                When 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
+                On 'Click' { Invoke-ImageViewerNavigate -Direction Forward }
             }
         }
     }

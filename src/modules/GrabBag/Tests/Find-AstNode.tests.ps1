@@ -70,4 +70,127 @@ Describe 'Find-AstNode' {
         $WithoutRecurse[0].Extent.Text | Should -Match '^&\s*\{'
         ($WithRecurse | Where-Object { $_.GetCommandName() -eq 'Write-Host' }).Count | Should -Be 1
     }
+
+    It 'filters nodes whose extents contain the specified cursor offset' {
+        $Source = {
+            & {
+                Write-Host 'nested'
+            }
+        }
+
+        $Ast = $Source.Ast
+        $InnerNode = Find-AstNode -Ast $Ast -Type CommandAst -Recurse -Query {
+            $_.GetCommandName() -eq 'Write-Host'
+        }
+        $CursorOffset = $InnerNode.Extent.StartOffset + 1
+
+        $Nodes = Find-AstNode -Ast $Ast -Type CommandAst -All -Recurse -ContainsCursor -CursorOffset $CursorOffset
+
+        $Nodes.Count | Should -Be 2
+        ($Nodes | Where-Object { $_.GetCommandName() -eq 'Write-Host' }).Count | Should -Be 1
+        ($Nodes | Where-Object {
+            $_.Extent.StartOffset -le $CursorOffset -and
+            $CursorOffset -le $_.Extent.EndOffset
+        }).Count | Should -Be 2
+    }
+
+    It 'composes ContainsCursor with Query filtering' {
+        $Source = {
+            & {
+                Write-Host 'nested'
+            }
+        }
+
+        $Ast = $Source.Ast
+        $InnerNode = Find-AstNode -Ast $Ast -Type CommandAst -Recurse -Query {
+            $_.GetCommandName() -eq 'Write-Host'
+        }
+        $CursorOffset = $InnerNode.Extent.StartOffset + 1
+
+        $Node = Find-AstNode -Ast $Ast -Type CommandAst -Recurse -ContainsCursor -CursorOffset $CursorOffset -Query {
+            $_.GetCommandName() -eq 'Write-Host'
+        }
+
+        $Node | Should -Not -BeNullOrEmpty
+        $Node.GetCommandName() | Should -Be 'Write-Host'
+    }
+
+    It 'requires CursorOffset when ContainsCursor is specified and cannot be auto-resolved' {
+        {
+            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -ContainsCursor
+        } | Should -Throw '*CursorOffset is required when ContainsCursor is specified and could not be resolved from TabExpansion2 context.*'
+    }
+
+    It 'requires ContainsCursor when CursorOffset is specified' {
+        {
+            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -CursorOffset 0
+        } | Should -Throw '*ContainsCursor is required when CursorOffset is specified.*'
+    }
+
+    It 'auto-resolves CursorOffset from TabExpansion2 callstack when ContainsCursor is specified' {
+        $Source = {
+            & {
+                Write-Host 'nested'
+            }
+        }
+
+        $Ast = $Source.Ast
+        $InnerNode = Find-AstNode -Ast $Ast -Type CommandAst -Recurse -Query {
+            $_.GetCommandName() -eq 'Write-Host'
+        }
+        $CursorOffset = $InnerNode.Extent.StartOffset + 1
+
+        Mock -ModuleName GrabBag -CommandName Get-PSCallStack -MockWith {
+            @(
+                [pscustomobject] @{
+                    Command = 'TabExpansion2'
+                    InvocationInfo = [pscustomobject] @{
+                        BoundParameters = [pscustomobject] @{
+                            PositionOfCursor = [pscustomobject] @{ Offset = $CursorOffset }
+                        }
+                    }
+                }
+            )
+        }
+
+        {
+            $Nodes = Find-AstNode -Ast $Ast -Type CommandAst -All -Recurse -ContainsCursor
+
+            $Nodes.Count | Should -Be 2
+            ($Nodes | Where-Object { $_.GetCommandName() -eq 'Write-Host' }).Count | Should -Be 1
+        } | Should -Not -Throw
+    }
+
+    It 'auto-resolves Ast and CursorOffset from TabExpansion2 callstack when ContainsCursor is specified' {
+        $Source = {
+            & {
+                Write-Host 'nested'
+            }
+        }
+
+        $Ast = $Source.Ast
+        $InnerNode = Find-AstNode -Ast $Ast -Type CommandAst -Recurse -Query {
+            $_.GetCommandName() -eq 'Write-Host'
+        }
+        $CursorOffset = $InnerNode.Extent.StartOffset + 1
+
+        Mock -ModuleName GrabBag -CommandName Get-PSCallStack -MockWith {
+            @(
+                [pscustomobject] @{
+                    Command = 'TabExpansion2'
+                    InvocationInfo = [pscustomobject] @{
+                        BoundParameters = [pscustomobject] @{
+                            Ast = $Ast
+                            PositionOfCursor = [pscustomobject] @{ Offset = $CursorOffset }
+                        }
+                    }
+                }
+            )
+        }
+
+        $Nodes = Find-AstNode -Type CommandAst -All -Recurse -ContainsCursor
+
+        $Nodes.Count | Should -Be 2
+        ($Nodes | Where-Object { $_.GetCommandName() -eq 'Write-Host' }).Count | Should -Be 1
+    }
 }

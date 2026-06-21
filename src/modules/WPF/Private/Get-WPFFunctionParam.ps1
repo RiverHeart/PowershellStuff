@@ -31,7 +31,6 @@ function Get-WPFFunctionParam {
 
     # Return if we got nothing
     if (-not $BoundParams) {
-        Write-Host "Foo"
         return $null
     }
 

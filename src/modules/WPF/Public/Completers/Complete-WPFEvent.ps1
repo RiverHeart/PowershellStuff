@@ -31,38 +31,31 @@ function Complete-WPFEvent {
     )
 
     # Micro-optimization, maybe?
-    if (-not $script:WPFHandlerCache) {
-        $script:WPFHandlerCache = @{
+    if (-not $script:WPFControlEventsCache) {
+        $script:WPFControlEventsCache = @{
             Completions = @{}
         }
     }
 
-    # Obtain the raw arguments passed to TabExpansion2 so we can traverse
-    # the AST ourselves.
-    $Params = Get-WPFFunctionParam TabExpansion2
-    if (-not $Params) {
-        Write-Debug 'Failed to find params for TabExpansion2'
-        return
-    }
-
-    # While typing `When <Event>`, the parser behavior changes as input grows:
-    # `When` may not yet be represented as a CommandAst, but `When A` is.
-    # Once that happens, the command under the cursor can resolve to `When`
+    # While typing `Command <Parameter>`, the parser behavior changes as input grows:
+    # `Command` may not yet be represented as a CommandAst, but `Command <Parameter>` is.
+    #
+    # Once that happens, the command under the cursor can resolve to `Command`
     # instead of the owning control (for example `Window` or `Button`). Ignore
-    # event-keyword command names so selection stays on the enclosing control.
-    $IgnoredCommandNames = @('when', '-when', 'add-wpfhandler', 'handler')
+    # the command names and aliases of consumers so selection stays on the enclosing
+    # control.
+    $IgnoredCommandNames = @('on', '-on', 'add-wpfhandler')
 
-    $ParentNode = $Params.Ast.FindAll({
-        param($AstNode)
-        $AstNode -is [CommandAst] -and
-        $AstNode.Extent.StartOffset -le $Params.PositionOfCursor.Offset -and
-        $Params.PositionOfCursor.Offset -le $AstNode.Extent.EndOffset
-    }, <# recurse #> $True) |
-        Where-Object {
+    try {
+        $ParentNode = Find-AstNode -Type CommandAst -All -Recurse -ContainsCursor -Query {
             $CandidateName = $_.GetCommandName()
             $CandidateName -and ($IgnoredCommandNames -notcontains $CandidateName.ToLowerInvariant())
         } |
         Select-Object -Last 1
+    } catch {
+        Write-Debug "Failed to resolve AST context for event completion: $($_.Exception.Message)"
+        return
+    }
 
     # Validate parent node exists
     if (-not $ParentNode) {
@@ -74,11 +67,9 @@ function Complete-WPFEvent {
     # supported events. Store in cache for future lookups.
     # TODO: Could use more validation here
     $Control = $ParentNode.GetCommandName()
-    if ($Control -ieq 'App') {
-        $Control = 'Window'
-    }
+    if ($Control -ieq 'App') { $Control = 'Window' }
 
-    if (-not $script:WPFHandlerCache.Completions.ContainsKey($Control)) {
+    if (-not $script:WPFControlEventsCache.Completions.ContainsKey($Control)) {
         $Type = Get-WPFTypeInfo $Control
 
         if (-not $Type) {
@@ -86,35 +77,25 @@ function Complete-WPFEvent {
             return
         }
 
-        $script:WPFHandlerCache.Completions[$Control] = $Type.GetEvents().Name
+        $script:WPFControlEventsCache.Completions[$Control] = $Type.GetEvents().Name
     }
 
     # Detect if word is quoted. Strip quotes for filtering
     # and add to results returned.
     $Quote = [Regex]::Match($WordToComplete, "^('|`")").Value
-    if ($Quote) {
-        $WordToComplete = $WordToComplete.Trim($Quote)
-    }
+    if ($Quote) { $WordToComplete = $WordToComplete.Trim($Quote) }
 
     # The results are already alphabetical so no need to sort these.
-    $Completions = $script:WPFHandlerCache.Completions[$Control] |
-        Where-Object {
-            # Filter by substring
-            $_ -ilike "*$WordToComplete*"
-        } |
+    $Completions = $script:WPFControlEventsCache.Completions[$Control] |
+        Where-Object { $_ -ilike "*$WordToComplete*" } |
         Sort-Object -Property @(
             {
-                # When searching, place StartsWith matches first.
-                if ([string]::IsNullOrWhiteSpace($WordToComplete)) {
-                    0  # All results tie when no search term is provided to maintain alphabetical order.
-                } else {
-                    [int]($_ -inotlike "$WordToComplete*")
-                }
+                # Tie results when no search term is provided to maintain alphabetical order.
+                if ([string]::IsNullOrWhiteSpace($WordToComplete)) { 0 }
+                # Otherwise, prioritize results that start with the search term.
+                else { [int]($_ -inotlike "$WordToComplete*") }
             },
-            {
-                # Always keep deterministic alphabetical ordering.
-                $_
-            }
+            { $_  <# Always keep deterministic alphabetical ordering. #> }
         ) |
         ForEach-Object {
             $CompletionText = if ($Quote) { $Quote + $_ + $Quote  } else { $_ }
@@ -126,8 +107,6 @@ function Complete-WPFEvent {
             )
         }
 
-    if ($Completions.Count -gt 0) {
-        return $Completions
-    }
+    if ($Completions.Count -gt 0) { return $Completions }
     return $null  # Prevent fallback autocomplete
 }

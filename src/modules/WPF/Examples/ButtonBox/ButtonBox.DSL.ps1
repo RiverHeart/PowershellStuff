@@ -22,7 +22,7 @@ Window 'Window' {
             $this.Content = 'English'
             $this.Width = 100
 
-            When "Click" {
+            On "Click" {
                 Write-Host "Hello World! I speak $($this.Content)"
             }
         }
@@ -30,7 +30,7 @@ Window 'Window' {
             $this.Content = 'Japanese'
             $this.Width = 100
 
-            When "Click" {
+            On "Click" {
                 Write-Host "Konichiwa Sekai! I speak $($this.Content)"
             }
         }

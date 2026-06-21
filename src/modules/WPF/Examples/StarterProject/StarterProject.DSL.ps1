@@ -27,12 +27,12 @@ App 'Window' {
         LastSavedTask = ''
     }
 
-    When Loaded {
+    On Loaded {
         Write-Debug 'StarterProject loaded.'
     }
 
     # Uncomment this block to add window-wide keyboard shortcuts.
-    # When KeyDown {
+    # On KeyDown {
     #     param($sender, $event)
     #
     #     switch ($event.Key) {
@@ -65,7 +65,7 @@ App 'Window' {
             $this.Width = 420
             $this.Margin = 0, 0, 0, 8
             $this.Text = 'Prepare onboarding draft'
-            When TextChanged {
+            On TextChanged {
                 $State = (Reference 'Window').Tag
                 if ($null -ne $State) {
                     $State.IsDirty = $true

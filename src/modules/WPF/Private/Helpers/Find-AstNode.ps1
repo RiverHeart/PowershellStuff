@@ -25,7 +25,7 @@
     }
 #>
 function Find-AstNode {
-    [CmdletBinding(DefaultParameterSetName='ByScriptBlock')]
+    [CmdletBinding(DefaultParameterSetName='ByTabExpansion2Context')]
     param(
         [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=0)]
         [scriptblock] $ScriptBlock,
@@ -35,6 +35,7 @@ function Find-AstNode {
 
         [Parameter(ParameterSetName='ByScriptBlock',Position=1)]
         [Parameter(ParameterSetName='ByAst',Position=1)]
+        [Parameter(ParameterSetName='ByTabExpansion2Context',Position=1)]
         [ArgumentCompleter({
             param(
                 [string] $CommandName,
@@ -68,13 +69,74 @@ function Find-AstNode {
             return @()  # Prevent fallback autocomplete
         })]
         [string[]] $Type,
+
+        [Parameter(ParameterSetName='ByScriptBlock')]
+        [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [scriptblock] $Query,
+
+        [Parameter(ParameterSetName='ByScriptBlock')]
+        [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [switch] $All,
-        [switch] $Recurse
+
+        [Parameter(ParameterSetName='ByScriptBlock')]
+        [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByTabExpansion2Context')]
+        [switch] $Recurse,
+
+        [Parameter(ParameterSetName='ByScriptBlock')]
+        [Parameter(ParameterSetName='ByAst')]
+        [Parameter(Mandatory,ParameterSetName='ByTabExpansion2Context')]
+        [switch] $ContainsCursor,
+
+        [Parameter(ParameterSetName='ByScriptBlock')]
+        [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByTabExpansion2Context')]
+        [int] $CursorOffset
     )
 
     if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
         $Ast = $ScriptBlock.Ast
+    }
+
+    $HasContainsCursor = $PSBoundParameters.ContainsKey('ContainsCursor')
+    $HasCursorOffset = $PSBoundParameters.ContainsKey('CursorOffset')
+
+    if ($HasContainsCursor -and ((-not $HasCursorOffset) -or (-not $PSBoundParameters.ContainsKey('Ast')))) {
+        $TabExpansion2Params = $null
+        $Callstack = Get-PSCallStack | Where-Object { $_.Command -eq 'TabExpansion2' } | Select-Object -First 1
+        if ($Callstack) {
+            $TabExpansion2Params = $Callstack.InvocationInfo.BoundParameters
+        }
+
+        if ((-not $PSBoundParameters.ContainsKey('Ast')) -and $TabExpansion2Params -and $TabExpansion2Params.Ast) {
+            $Ast = $TabExpansion2Params.Ast
+        }
+
+        if (
+            $TabExpansion2Params -and
+            $TabExpansion2Params.PositionOfCursor -and
+            $null -ne $TabExpansion2Params.PositionOfCursor.Offset
+        ) {
+            $CursorOffset = [int] $TabExpansion2Params.PositionOfCursor.Offset
+            $HasCursorOffset = $true
+        }
+
+        if (-not $HasCursorOffset) {
+            Write-Error 'CursorOffset is required when ContainsCursor is specified and could not be resolved from TabExpansion2 context.'
+            return
+        }
+
+        if (-not $Ast) {
+            Write-Error 'Ast is required and could not be resolved from TabExpansion2 context.'
+            return
+        }
+    }
+
+    if ($HasCursorOffset -and -not $HasContainsCursor) {
+        Write-Error 'ContainsCursor is required when CursorOffset is specified.'
+        return
     }
 
     $HasCallerQuery = $PSBoundParameters.ContainsKey('Query')
@@ -114,6 +176,14 @@ function Find-AstNode {
             }
 
             if (-not $IsExpectedType) {
+                return $false
+            }
+        }
+
+        if ($HasContainsCursor) {
+            if ($CursorOffset -lt $AstNode.Extent.StartOffset -or
+                $CursorOffset -gt $AstNode.Extent.EndOffset
+            ) {
                 return $false
             }
         }

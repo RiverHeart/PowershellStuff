@@ -38,6 +38,7 @@ Scope of this page:
 * [Commands and Events](#commands-and-events)
     * [Command](#command)
     * [Key](#key)
+    * [On](#on)
     * [When](#when)
     * [TimedEvent](#timedevent)
 * [Binding and Resources](#binding-and-resources)
@@ -423,7 +424,7 @@ Creates a Menu control.
 Menu 'TopMenu' {
     MenuItem '_File' {
         MenuItem '_Exit' {
-            When Click { (Reference 'MainWindow').Close() }
+            On Click { (Reference 'MainWindow').Close() }
         }
     }
 }
@@ -435,7 +436,7 @@ Creates a MenuItem. Supports path shorthand using slash-separated names.
 
 ```powershell
 MenuItem '_File/_Open' {
-    When Click { }
+    On Click { }
 }
 ```
 
@@ -497,7 +498,7 @@ Command 'SaveAs' 'Ctrl+Shift+S' {
 
 ### Key
 
-`Key` registers a handler for `PreviewKeyDown` on the current object. It is syntax sugar that wraps your action in gesture-matching logic and only invokes the action when the key and modifier combination matches. Internally, `Key` registers this wrapper through `When PreviewKeyDown`.
+`Key` registers a handler for `PreviewKeyDown` on the current object. It is syntax sugar that wraps your action in gesture-matching logic and only invokes the action when the key and modifier combination matches. Internally, `Key` registers this wrapper through `On PreviewKeyDown`.
 
 Use `Key` for concise gesture matching when you do not need full event-switch logic.
 
@@ -511,13 +512,49 @@ Key 'Ctrl+Shift+S' {
 }
 ```
 
-### When
+### On
 
 Adds an event handler to the current object.
 
 ```powershell
-When Click {
+On Click {
     Write-Host 'Clicked'
+}
+```
+
+### When
+
+Declares a state-reactive handler on the parent control. Fires when observable
+state on `Tag` reaches or transitions through a specific value.
+
+Handlers run with `$this` bound to the parent control, `$StateValue` set to the
+new value, and `$PreviousStateValue` set to the prior value.
+
+Fire when a state property becomes a target value:
+
+```powershell
+Button 'FitButton' {
+    State @{ IsFitMode = $false }
+
+    When -State IsFitMode -Becomes $true {
+        Invoke-FitToWindow
+    }
+}
+```
+
+Fire on any change, or filter by transition:
+
+```powershell
+When -State RotationAngle -Changes {
+    Write-Debug "Rotation is now $StateValue"
+}
+
+When -State IsFitMode -Changes -To $true {
+    Invoke-FitToWindow
+}
+
+When -State IsFitMode -Changes -From $false -To $true {
+    Invoke-FitToWindow
 }
 ```
 
@@ -594,7 +631,7 @@ Window 'MyApp' {
     }
 
     Button 'Increment' {
-        When Click {
+        On Click {
             $window = Reference 'Window'
             $window.Tag.Count++
         }
@@ -623,6 +660,65 @@ Binds a target property to an observable state path.
 ```powershell
 Bind Visibility -To Window.Tag.IsFullScreen -Invert
 Bind IsEnabled -To Window.Tag.IsFileLoaded
+```
+
+### Link
+
+Unified binding sugar that delegates to existing binding keywords.
+
+Use `-ToState` for state-style binding (delegates to `Bind`):
+
+```powershell
+Link Visibility -ToState IsFullScreen -Invert
+```
+
+Map state values without writing a converter block:
+
+```powershell
+Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+    $true  = 'Copied to clipboard'
+    $false = 'Copy image to clipboard'
+}
+```
+
+Map entries should be final values/objects, not deferred scriptblocks. For
+control content values, evaluate the object at map creation time:
+
+```powershell
+Link Content -ToState IsCopyFeedbackActive -Map @{
+    $true  = (Path 'images/clipboard-check-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
+    $false = (Path 'images/clipboard-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
+}
+```
+
+`-Map` also accepts `True`/`False` keys for boolean state values, and supports
+`-Default` for unmatched values:
+
+```powershell
+Link Content -ToState FigureDrawingPreset -Map @{
+    Quick    = '2 min'
+    Balanced = '5 min'
+    Long     = '10 min'
+} -Default 'Custom'
+```
+
+Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
+
+```powershell
+Link Text -Property Count
+Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
+```
+
+`-Path` is supported as an alias for `-Property`:
+
+```powershell
+Link Text -Path CurrentFile.Name
+```
+
+Use `-AsBinding` for advanced trigger/template scenarios (delegates to `Binding`):
+
+```powershell
+$binding = Link -AsBinding -Property IsEnabled -Self
 ```
 
 ### BindProperty

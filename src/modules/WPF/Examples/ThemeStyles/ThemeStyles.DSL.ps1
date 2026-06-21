@@ -111,13 +111,13 @@ Window 'Window' {
         Button 'ToggleThemeButton' {
             UseStyle 'PrimaryButton'
             $this.Content = 'Toggle Theme'
-            When Click {
+            On Click {
                 Toggle-ExampleTheme
             }
         }
     }
 
-    When Loaded {
+    On Loaded {
         Set-ExampleTheme -Name $this.Tag.CurrentTheme
     }
 } | Show-WPFWindow
