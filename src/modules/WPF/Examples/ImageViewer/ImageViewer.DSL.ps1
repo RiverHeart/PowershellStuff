@@ -238,19 +238,6 @@ App 'Window' {
         }
     }
 
-    # TOOD: Find a way to zoom towards the mouse pointer.
-    On MouseWheel {
-        param($sender, $event)
-
-        if (-not ([Keyboard]::Modifiers -band [ModifierKeys]::Control)) {
-            return
-        }
-
-        $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
-        Invoke-ImageViewerSetZoom -Delta $Delta
-        $event.Handled = $true
-    }
-
     Menu 'Menu' {
         $this.Height = 25
         Link Visibility -ToState IsFullScreen -Invert
@@ -506,9 +493,31 @@ App 'Window' {
                         return
                     }
 
+                    $event.Handled = $true
+
+                    # Get mouse positions relative to the image viewer and the scroll viewer.
+                    $Viewer = (Reference 'Viewer')
+                    $MousePositionRelativeToViewer = $event.GetPosition($Viewer)
+                    $MousePositionRelativeToScrollViewer = $event.GetPosition($this)
+
+                    # Apply zoom
                     $Delta = if ($event.Delta -gt 0) { 0.10 } else { -0.10 }
                     Invoke-ImageViewerSetZoom -Delta $Delta
-                    $event.Handled = $true
+
+                    # Calculate the new scroll offsets to keep the zoom centered around the mouse position.
+                    $ZoomLevel = (Reference 'Window').Tag.ZoomLevel
+
+                    $NewMousePositionRelativeToViewer = [System.Windows.Point]::new(
+                        $MousePositionRelativeToViewer.X * $ZoomLevel,
+                        $MousePositionRelativeToViewer.Y * $ZoomLevel
+                    )
+
+                    $ScrollViewerOffsetX = $NewMousePositionRelativeToViewer.X - $MousePositionRelativeToScrollViewer.X
+                    $ScrollViewerOffsetY = $NewMousePositionRelativeToViewer.Y - $MousePositionRelativeToScrollViewer.Y
+
+                    Write-Debug "Mouse wheel zoom: Delta=$Delta, ZoomLevel=$ZoomLevel, MousePosViewer=($($MousePositionRelativeToViewer.X), $($MousePositionRelativeToViewer.Y)), MousePosScrollViewer=($($MousePositionRelativeToScrollViewer.X), $($MousePositionRelativeToScrollViewer.Y)), NewMousePosViewer=($($NewMousePositionRelativeToViewer.X), $($NewMousePositionRelativeToViewer.Y)), ScrollOffsets=($ScrollViewerOffsetX, $ScrollViewerOffsetY)"
+                    $this.ScrollToHorizontalOffset($ScrollViewerOffsetX)
+                    $this.ScrollToVerticalOffset($ScrollViewerOffsetY)
                 }
 
                 Image 'Viewer' {
