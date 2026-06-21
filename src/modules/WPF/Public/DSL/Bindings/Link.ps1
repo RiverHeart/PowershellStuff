@@ -41,6 +41,7 @@ function Link {
 
         [Parameter(Mandatory, ParameterSetName = 'State')]
         [ValidateNotNullOrEmpty()]
+        [ArgumentCompleter({ Complete-WPFState @args })]
         [string] $ToState,
 
         [Parameter(Mandatory, Position = 1, ParameterSetName = 'Property')]
