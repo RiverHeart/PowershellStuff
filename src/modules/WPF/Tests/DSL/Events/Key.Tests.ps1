@@ -1,4 +1,4 @@
-Describe 'Key' -Tag 'Key' {
+Describe 'Key' -Tag 'Key', 'Category:Events' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../../../WPF.psd1" -Force
     }

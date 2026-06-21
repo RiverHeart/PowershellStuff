@@ -1,4 +1,4 @@
-Describe 'TimedEvent' -Tag 'TimedEvent' {
+Describe 'TimedEvent' -Tag 'TimedEvent', 'Category:Events' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../../../WPF.psd1" -Force
     }

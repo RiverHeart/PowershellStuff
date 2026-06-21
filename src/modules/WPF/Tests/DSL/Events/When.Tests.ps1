@@ -1,4 +1,4 @@
-Describe 'When' -Tag 'When' {
+Describe 'When' -Tag 'When', 'Category:Events' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../../../WPF.psd1" -Force
     }
