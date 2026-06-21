@@ -5,14 +5,14 @@ function Get-WPFControlRegistry {
 
     if (-not $Script:WPFControlRegistry) {
         Write-Debug "Initializing WPF Control Registry"
-        $Script:WPFControlRegistry = [ordered] @{
+        $Script:WPFControlRegistry = [hashtable]::Synchronized(@{
             ActiveContextId = $null
-            Contexts        = @{}
-        }
+            Contexts        = [hashtable]::Synchronized(@{})
+        })
     }
 
     if (-not $Script:WPFControlRegistry.Contains('Contexts')) {
-        $Script:WPFControlRegistry.Contexts = @{}
+        $Script:WPFControlRegistry.Contexts = [hashtable]::Synchronized(@{})
     }
 
     if (-not $Script:WPFControlRegistry.Contains('ActiveContextId')) {

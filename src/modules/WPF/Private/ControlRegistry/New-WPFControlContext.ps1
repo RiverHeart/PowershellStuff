@@ -14,12 +14,12 @@ function New-WPFControlContext {
 
     if (-not $State.Contexts.ContainsKey($Id)) {
         Write-Debug "Creating new WPF Control Context: Id='$Id', Name='$Name'"
-        $State.Contexts[$Id] = [ordered] @{
+        $State.Contexts[$Id] = [hashtable]::Synchronized(@{
             Id        = $Id
             Name      = $Name
             CreatedAt = [datetime]::UtcNow
-            Objects   = @{}
-        }
+            Objects   = [hashtable]::Synchronized(@{})
+        })
     }
 
     if ($Activate) {
