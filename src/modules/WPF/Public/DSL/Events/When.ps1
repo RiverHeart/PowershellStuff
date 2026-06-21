@@ -93,7 +93,7 @@ function When {
 
     $StateObject = $InputObject.Tag
     if ($null -eq $StateObject) {
-        Write-Error "When: -State '$State' requires an observable state object on '$($InputObject.Name).Tag'."
+        Write-Error "When: '$State' requires an observable state object on '$($InputObject.Name).Tag'."
         return
     }
 
