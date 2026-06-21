@@ -88,6 +88,7 @@ FunctionsToExport = @(
     'Complete-WPFRegisteredObject'
     'Complete-WPFEvent'
     'Complete-WPFFileInfo'
+    'Complete-WPFState'
 
     # DSL
 
@@ -134,6 +135,7 @@ FunctionsToExport = @(
     'Import'
     'Key'
     'Link'
+    'On'
     'MultiTrigger'
     'Reference'
     'Resource'

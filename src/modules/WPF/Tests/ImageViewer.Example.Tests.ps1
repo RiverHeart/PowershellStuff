@@ -3,7 +3,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $ScriptPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/ImageViewer.DSL.ps1'
         $Content = Get-Content -Path $ScriptPath -Raw
 
-        $Content | Should -Match 'When\s+PreviewKeyDown\s*\{'
+        $Content | Should -Match 'On\s+PreviewKeyDown\s*\{'
         $Content | Should -Not -Match 'When\s+KeyDown\s*\{'
     }
 

@@ -18,6 +18,14 @@ function Write-WPFDisabledBlockWarning {
         [string] $Name
     )
 
+    $suppressWarningSetting = [string] [System.Environment]::GetEnvironmentVariable('SuppressWPFDisabledBlockWarning')
+    if (-not [string]::IsNullOrWhiteSpace($suppressWarningSetting)) {
+        $normalizedSetting = $suppressWarningSetting.Trim().ToLowerInvariant()
+        if ($normalizedSetting -in @('1', 'true', 'yes', 'on')) {
+            return
+        }
+    }
+
     $DisplayName = if (
         [string]::IsNullOrWhiteSpace($Name) -or
         $Name.TrimStart().StartsWith('{')

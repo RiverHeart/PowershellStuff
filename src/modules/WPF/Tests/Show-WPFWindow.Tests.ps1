@@ -36,7 +36,7 @@ Describe 'Show-WPFWindow' -Tag 'Show-WPFWindow' {
                 $this.Content = 'Auto-close render content'
             }
 
-            When Closing {
+            On Closing {
                 $null = Reference $WindowName -ErrorAction Stop
                 $global:ShowWindowClosingCount++
             }

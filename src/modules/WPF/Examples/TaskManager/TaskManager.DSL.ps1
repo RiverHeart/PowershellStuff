@@ -35,11 +35,11 @@ Window 'Window' {
         TotalMemoryPercent = 0
     }
 
-    When Loaded {
+    On Loaded {
         Write-Debug 'TaskManager loaded.'
     }
 
-    When Closed {
+    On Closed {
         Write-Debug 'TaskManager window closed.'
     }
 
@@ -75,7 +75,7 @@ Window 'Window' {
                         $this.Mode = [System.Windows.Data.BindingMode]::TwoWay
                     }
 
-                    When Sorting {
+                    On Sorting {
                         param($sender, $event)
 
                         # If the column hasn't been sorted yet, default to descending sort to show highest values at the top.
@@ -85,7 +85,7 @@ Window 'Window' {
                         }
                     }
 
-                    When SelectionChanged {
+                    On SelectionChanged {
                         Invoke-TaskManagerRefreshStopProcessCommand
                     }
 

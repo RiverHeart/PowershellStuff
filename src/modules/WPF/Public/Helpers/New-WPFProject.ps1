@@ -112,7 +112,7 @@ function New-WPFProject {
                         `$this.Width = 420
                         `$this.Margin = 0, 0, 0, 8
                         `$this.Text = 'Prepare onboarding draft'
-                        When TextChanged {
+                        On TextChanged {
                             `$State = (Reference 'Window').Tag
                             if (`$null -ne `$State) {
                                 `$State.IsDirty = `$true
@@ -223,12 +223,12 @@ Window 'Window' {
         LastSavedTask = ''
     }
 
-    When Loaded {
+    On Loaded {
         Write-Debug '$Name loaded.'
     }
 
     # Uncomment this block to add window-wide keyboard shortcuts.
-    # When KeyDown {
+    # On KeyDown {
     #     param(`$sender, `$event)
     #
     #     switch (`$event.Key) {

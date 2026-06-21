@@ -1,0 +1,54 @@
+<#
+.SYNOPSIS
+    Keyword for adding an event handler to the parent object.
+
+.DESCRIPTION
+    Keyword for adding an event handler to the parent object.
+
+    For handlers bound through WPF Add_<Event> methods, PowerShell
+    provides `$this` as the current sender object at invocation time,
+    so this helper binds the original scriptblock directly instead of
+    trying to inject `$this` manually.
+
+.EXAMPLE
+    Adds a handler for the 'Click' event to a button.
+
+    Button 'MyButton' {
+        On Click {
+            Write-Host "Button clicked"
+        }
+    }
+#>
+function On {
+    [CmdletBinding()]
+    [Alias('Add-WPFHandler', '-On')]
+    [OutputType([void])]
+    param(
+        [Parameter(Mandatory, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [ArgumentCompleter({ Complete-WPFEvent @args })]
+        [string] $Event,
+
+        [Parameter(Mandatory, Position = 1)]
+        [scriptblock] $ScriptBlock,
+
+        [object] $InputObject
+    )
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "On $Event"
+        return
+    }
+
+    # Auto-attach self to parent if one exists
+    if (-not $InputObject) {
+        $InputObject = $PSCmdlet.GetVariableValue('this')
+        if (-not $InputObject) {
+            Write-Warning "Parent not found for event handler '$Event'"
+            return
+        }
+    }
+
+    Write-Debug "Adding handler for event '$Event' to object '$($InputObject.Name)' ($($InputObject.GetType().Name))"
+    $InputObject."Add_$Event"($ScriptBlock)
+}
