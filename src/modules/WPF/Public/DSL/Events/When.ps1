@@ -21,7 +21,7 @@
     Window 'Main' {
         State @{ IsFitMode = $false }
 
-        When -State IsFitMode -Becomes $true {
+        When IsFitMode -Becomes $true {
             Invoke-FitToWindow
         }
     }
@@ -30,7 +30,7 @@
     Window 'Main' {
         State @{ RotationAngle = 0 }
 
-        When -State RotationAngle -Changes {
+        When RotationAngle -Changes {
             Write-Debug "Rotation is now $StateValue"
         }
     }
@@ -39,7 +39,7 @@
     Window 'Main' {
         State @{ IsFitMode = $false }
 
-        When -State IsFitMode -Changes -To $true {
+        When IsFitMode -Changes -To $true {
             Invoke-FitToWindow
         }
     }
@@ -51,12 +51,13 @@ function When {
     param(
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'StateBecomes')]
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'StateChanges')]
-        [scriptblock] $ScriptBlock,
-
-        [Parameter(Mandatory, ParameterSetName = 'StateBecomes')]
-        [Parameter(Mandatory, ParameterSetName = 'StateChanges')]
         [ValidateNotNullOrEmpty()]
+        [ArgumentCompleter({ Complete-WPFState @args })]
         [string] $State,
+
+        [Parameter(Mandatory, Position = 1, ParameterSetName = 'StateBecomes')]
+        [Parameter(Mandatory, Position = 1, ParameterSetName = 'StateChanges')]
+        [scriptblock] $ScriptBlock,
 
         [Parameter(Mandatory, ParameterSetName = 'StateBecomes')]
         [AllowNull()]
@@ -77,7 +78,7 @@ function When {
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "When -State $State"
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "When $State"
         return
     }
 
@@ -90,10 +91,9 @@ function When {
         }
     }
 
-
     $StateObject = $InputObject.Tag
     if ($null -eq $StateObject) {
-        Write-Error "When: -State '$State' requires an observable state object on '$($InputObject.Name).Tag'."
+        Write-Error "When: '$State' requires an observable state object on '$($InputObject.Name).Tag'."
         return
     }
 
