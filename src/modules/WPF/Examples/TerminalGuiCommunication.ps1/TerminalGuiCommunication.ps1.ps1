@@ -1,3 +1,28 @@
+<#
+.NOTE
+    This is going to be difficult to implement nicely so I'll likely need to come
+    back to this later.
+
+    Implementation difficulties:
+
+    AllocConsole() fails with ERROR_ACCESS_DENIED (0x5) when called from the main
+    process because it already has a console allocated (the Powershell console) and
+    Windows does not allow multiple consoles for a single process.
+
+    We could work around this by running the UI in a background runspace so the existing
+    console is shared by the REPL and the UI (for logging) but logs will be
+    interleaved with user input which is not ideal.
+
+    Since our "logging" is just bog-standard Write-Foo calls we can't just flip
+    a switch to log to a file and tail that in a separate console. Named pipes
+    are an option but I don't like the idea. Writing logs to memory is just asking for
+    trouble.
+
+    We could potentially implement a custom console control in WPF and redirect output
+    there but that is a non-trivial amount of work and we're not bringing in third party
+    components.
+#>
+
 # Change to the script directory if we're not in it.
 if (-not $PSScriptRoot -ne $PWD) {
     Set-Location $PSScriptRoot
@@ -9,11 +34,19 @@ Import-Module ../.. -Force
 
 function New-WPFConsole {
     [CmdletBinding()]
-    [OutputType([WPFConsole])]
     param(
         [Parameter(Mandatory)]
         [object] $Window
     )
+
+    # Determine the path to the WPF module for importing in the new runspace
+    $WPFModulePath = Get-Module WPF | Select-Object -First 1 -ExpandProperty ModuleBase
+    if ($WPFModulePath) {
+        Write-Verbose "WPF module path: $WPFModulePath"
+    } else {
+        Write-Error "Could not determine WPF module path."
+        return
+    }
 
     $ConsoleCode = @"
 using System;
@@ -32,18 +65,18 @@ public class WPFConsole : IDisposable {
     private bool _disposed = false;
 
     public WPFConsole() {
-        if (AllocConsole() == 0) {
+        if (AllocConsole() == false) {
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         }
     }
 
     // Write to console from the UI thread
-    public static void WriteLine(string message) {
+    public void WriteLine(string message) {
         if (_disposed) { throw new ObjectDisposedException("WPFConsole"); }
         Console.WriteLine(message);
     }
 
-    public static string ReadLine() {
+    public string ReadLine() {
         if (_disposed) { throw new ObjectDisposedException("WPFConsole"); }
         return Console.ReadLine();
     }
@@ -68,12 +101,17 @@ public class WPFConsole : IDisposable {
 "@
 
     if (-not ('WPFConsole' -as [type])) {
-        Add-Type -TypeDefinition $ConsoleCode -Language CSharp
+        try {
+            Add-Type -TypeDefinition $ConsoleCode -Language CSharp
+        } catch {
+            Write-Error "Failed to compile WPFConsole: $_"
+            return
+        }
     }
 
     try {
-        [WPFConsole]::AllocConsole()
-        [WPFConsole]::WriteLine("Hello from the console!")
+        $console = [WPFConsole]::new()
+        $console.WriteLine("Hello from the console!")
     } catch {
         Write-Error "Failed to allocate console: $_"
         return
@@ -90,12 +128,14 @@ public class WPFConsole : IDisposable {
     $PowerShell = [powershell]::Create()
     $PowerShell.Runspace = $Runspace
     $PowerShell.AddScript({
+        Import-Module $using:WPFModulePath -Force
+
         while ($true) {
-            [WPFConsole]::WriteLine("WPF> ")
-            $Input = [WPFConsole]::ReadLine()
+            $console.WriteLine("WPF> ")
+            $Input = $console.ReadLine()
             if ($Input -eq 'exit') { break }
 
-            [WPFConsole]::WriteLine("You entered: $Input")
+            $console.WriteLine("You entered: $Input")
             # Marshal the input back to the UI thread safely
             $Window.Dispatcher.Invoke([action]{
                 $ConsoleInputLabel.Content = "You entered: $Input"
@@ -103,43 +143,31 @@ public class WPFConsole : IDisposable {
                 # Execute user's typed command in the background runspace and capture output
                 # try {
                 #     $Output = Invoke-Expression $Input 2>&1 | Out-String
-                #     [WPFConsole]::WriteLine("Output: $Output")
+                #     $console.WriteLine("Output: $Output")
                 # } catch {
-                #     [WPFConsole]::WriteLine("Error: $_")
+                #     $console.WriteLine("Error: $_")
                 # }
             })
         }
     }).BeginInvoke()
-    # $Pipeline = $Runspace.CreatePipeline()
-    # $Pipeline.Commands.AddScript({
-    #     while ($true) {
-    #         $Input = Read-Host "Enter some text (or 'exit' to quit)"
-    #         if ($Input -eq 'exit') {
-    #             break
-    #         }
-    #         [WPFConsole]::WriteLine("You entered: $Input")
-    #         # Marshal the input back to the UI thread safely
-    #         $Window.Dispatcher.Invoke([action]{
-    #             $ConsoleInputLabel.Content = "You entered: $Input"
-    #         })
-    #     }
-    # })
-    # $Pipeline.InvokeAsync()
 }
 
 Window 'Window' {
     $this.Title = 'Terminal GUI Communication Example'
     $this.Height = 100
     $this.Width = 250
+    State @{
+        WPFConsole = $null
+    }
 
     On Loaded {
-        New-WPFConsole
+        $this.Tag.State.WPFConsole = New-WPFConsole -Window $this
     }
 
     On Closed {
         # Clean up the console when the window is closed
         try {
-            [WPFConsole]::Dispose()
+            $this.Tag.State.WPFConsole.Dispose()
         } catch {
             Write-Error "Failed to dispose WPFConsole: $_"
         }
