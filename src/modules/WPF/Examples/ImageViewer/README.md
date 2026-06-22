@@ -23,6 +23,7 @@ Free SVG icons sourced from [FontAwesome](https://fontawesome.com/search?ip=clas
 * Figure drawing presets: Warmup, Balanced, and StudyHeavy
 * Figure drawing sidebar with large `HH:mm:ss` countdown and pause/play control
 * Arrow keys pan zoomed images while scrolling is possible; image navigation remains available via Spacebar and on-screen buttons
+* Supports mousewheel zoom focused on the mouse location.
 
 ## CLI Automation Flags
 

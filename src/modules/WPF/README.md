@@ -3,14 +3,16 @@
 > [!WARNING]
 > Experimental project. APIs, syntax, and behavior may change.
 
-A code-first PowerShell DSL for building WPF desktop applications without requiring XAML as the primary authoring model.
+A code-first PowerShell DSL for building WPF desktop applications that doesn't require a single line of XAML.
 
-The focus is readability and fast iteration: define UI structure, behavior, and styling in one place using nested PowerShell syntax or spread across a few helper files without rigid MVC or MVVM patterns.
+The DSL optimizes for readability, expressing user intent, and reducing boilerplate. Define UI structure, behavior, and styling in one place using nested PowerShell syntax or spread those across a few helper files without rigid MVC or MVVM patterns.
 
 ## Table of Contents
 
 * [Flagship Example](#flagship-example)
 * [Design Philosophy](#design-philosophy)
+  * [Code First](#code-first)
+  * [Express User Intent](#express-user-intent)
 * [Why Use it](#why-use-it)
 * [When This Is Not a Fit](#when-this-is-not-a-fit)
 * [Requirements](#requirements)
@@ -21,7 +23,7 @@ The focus is readability and fast iteration: define UI structure, behavior, and 
 
 ## Flagship Example
 
-The following is a screenshot and trimmed excerpt from the ImageViewer application in [Examples/ImageViewer](./Examples/ImageViewer) so you can get a sense of what you can produce and what the syntax looks like. The ImageViewer is a real, non-trivial app.
+To get a sense of what you can produce and what the syntax looks like, here is a screenshot and trimmed excerpt from the ImageViewer application in [Examples/ImageViewer](./Examples/ImageViewer). The ImageViewer is a [fully featured app](./Examples/ImageViewer/README.md#features), not a trivial example of sticking an image in a box.
 
 ![Image Viewer](./Examples/ImageViewer/ImageViewer.png)
 
@@ -85,7 +87,7 @@ App 'Window' {
 
     Menu 'Menu' {
         $this.Height = 25
-        Bind Visibility -To Window.Tag.IsFullScreen -Invert
+        Link Visibility -ToState IsFullScreen -Invert
 
         MenuItem '(F)ile/(O)pen' {
             Command 'Open' {
@@ -136,7 +138,7 @@ App 'Window' {
         StackPanel 'ButtonPanel' {
             $this.Orientation = [Orientation]::Horizontal
             $this.HorizontalAlignment = [HorizontalAlignment]::Center
-            Bind Visibility -To Window.Tag.IsFullScreen -Invert
+            Link Visibility -ToState IsFullScreen -Invert
 
             Button 'BackButton' {
                 Bind IsEnabled -To Window.Tag.IsFileLoaded
@@ -151,7 +153,7 @@ App 'Window' {
     }
 
     StatusBar {
-        Bind Visibility -To Window.Tag.IsFullScreen -Invert
+        Link Visibility -ToState IsFullScreen -Invert
 
         StatusBarItem 'StatusFileItem' {
             Dock Left
@@ -172,15 +174,21 @@ App 'Window' {
 } | Show-WPFWindow
 ```
 
-Full example: [Examples/ImageViewer](./Examples/ImageViewer)
-
-The DSL reduces WPF ceremony, but larger desktop applications still carry real complexity.
-
 ## Design Philosophy
+
+### Code First
 
 This DSL is intentionally code-first.
 
 Interoperability with XAML is possible in principle, but the main workflow here is closer to HTML/CSS/JavaScript ergonomics: structure, style, and behavior can be authored in a unified code-first workflow, while still being split across files when that keeps a project maintainable.
+
+### Express User Intent
+
+Many frameworks make complex things easy at the cost of making simple things hard. Even if a complex thing is easy, the way it's exposed to the user may still be unintuitive. The DSL hopes to address these pain points by helping express the user's intent. If something is common that should become a happy path. If something is not obvious the abstraction might need tweaked.
+
+If the quintessential app includes a menu, a body, maybe a footer and/or status bar, it shouldn't be hard to create that. With that in mind, the DSL isn't going to force you to figure out how `Menu` interacts with `DockPanel` and how `Window` can only have a single child container so you need to stick your `DockPanel/Menu` combo into another container so you can place your `Button` and `StatusBar` and figure out how those work. Those are unimportant implementation details when you're just getting started. If you use `App` instead of a `Window`, you get `Menu`, `Content`, `Footer` and `StatusBar` blocks.
+
+Making a control visible depending on a boolean property is another example. In C#/WPF, you need to write a visibility converter for this common scenario. In the DSL you add `State @{ IsFullScreen = $true }` to your `Window`/`App` and `Link Visibility -ToState IsFullScreen -Invert` to each property you want to toggle visibility on and it infers what you want to happen.
 
 ## Why Use It
 
@@ -221,21 +229,29 @@ Current limitations:
 
 Many reasons, but a few big ones:
 
-- WinForms is limited and WPF requires too much ceremony.
-- Declarative UI is useful, but XAML is not always the most approachable path.
-- C# is powerful, but for quick UI prototyping it can feel heavyweight.
-- The project explores whether a readable, practical PowerShell-first WPF DSL is viable.
+- WinForms is limited compared to WPF
+- WPF requires too much ceremony.
+- Non-trivial XAML *feels* overwhelming (to me).
+- C# is powerful, but the tooling and boilerplate can make it feel heavy.
+- I wanted to see if a Powershell DSL for WPF applications was possible. Turns out it is!
+- If we're allowed to write legit apps in an interpreted language, like Python, I think it's only fair Powershell gets a shot.
 
 ## Project Goals
 
 - Make a fun, practical, leaky abstraction.
 - Favor convention over configuration.
-- Keep syntax easy to read and edit.
+- Optimize for user intent.
+- Keep syntax easy to read and write.
 - Keep barrier to entry low by staying compatible with PowerShell 5.
 - Let users compose UI from regular functions rather than opaque tooling.
 - Provide enough examples to prove real-world usefulness.
 
 ## Project Scaffolding
+
+> [!NOTE]
+> TODO: 
+> - Rename this section to "Getting Started".
+> - Move project details into the generated README
 
 Use `New-WPFProject` to generate a repeatable starter structure for new DSL apps.
 
