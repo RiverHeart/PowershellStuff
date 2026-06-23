@@ -17,17 +17,45 @@ function Get-WPFWindow {
     [CmdletBinding()]
     [OutputType([System.Windows.Window])]
     param(
+        [ValidateNotNullOrEmpty()]
         [string] $ContextId
     )
 
-    $ScopeObject = $PSCmdlet.GetVariableValue('this')
-    if ($ScopeObject -is [System.Windows.Window]) {
-        return $ScopeObject
+    $ScopeObject = $null
+
+    if (-not $PSBoundParameters.ContainsKey('ContextId')) {
+        Write-Debug 'Get-WPFWindow: Resolving window for current context.'
+        $ScopeObject = $PSCmdlet.GetVariableValue('this')
+        if ($ScopeObject -is [System.Windows.Window]) {
+            return $ScopeObject
+        } elseif ($ScopeObject -and $ScopeObject -isnot [System.Windows.Window]) {
+            Write-Debug "Get-WPFWindow: Current scope object is of type '$($ScopeObject.GetType().FullName)'."
+        } else {
+            Write-Debug 'Get-WPFWindow: No current scope object available; falling back to registry resolution.'
+        }
     }
 
-    $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $ScopeObject
+    Write-Debug "Get-WPFWindow: Resolving window for context '$ContextId'."
+
+    if ($PSBoundParameters.ContainsKey('ContextId')) {
+        if (-not (Test-WPFControlContextId -ContextId $ContextId -ErrorIfMissing)) {
+            return
+        }
+
+        $ResolvedContextId = $ContextId
+    } else {
+        $ResolveContextParams = @{}
+        if ($ScopeObject -and (Get-WPFControlContextId -InputObject $ScopeObject)) {
+            $ResolveContextParams.InputObject = $ScopeObject
+        }
+
+        $ResolvedContextId = Resolve-WPFControlContextId @ResolveContextParams
+    }
+
     if (-not $ResolvedContextId) {
-        Write-Error 'No current window is available for the resolved context.'
+        if ($PSBoundParameters.ContainsKey('ContextId')) {
+            Write-Error 'No current window is available for the resolved context.'
+        }
         return
     }
 
