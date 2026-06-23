@@ -18,6 +18,8 @@ The DSL optimizes for readability, expressing user intent, and reducing boilerpl
 * [Requirements](#requirements)
 * [Project Status](#project-status)
 * [Project Goals](#project-goals)
+* [Getting Started](#getting-started)
+* [Prior Art](#prior-art)
 * [Documentation](#documentation)
 * [Resources](#resources)
 
@@ -246,12 +248,12 @@ Many reasons, but a few big ones:
 - Let users compose UI from regular functions rather than opaque tooling.
 - Provide enough examples to prove real-world usefulness.
 
-## Project Scaffolding
+## Getting Started
 
 > [!NOTE]
 > TODO: 
-> - Rename this section to "Getting Started".
 > - Move project details into the generated README
+> - Focus more on installation... so uh `git clone`
 
 Use `New-WPFProject` to generate a repeatable starter structure for new DSL apps.
 
