@@ -1,0 +1,7 @@
+I recently discovered that there were some formidable attempts at creating PowerShell WPF modules in the past. It came up in conversation with Gemini that `ShowUI` kept the main console interactive by running the UI in a background thread. I am interested in doing that as it would help with debugging and development but it's complicated to implement. Right now, the WPF module is hosting a lot of state but threads would have to import modules with separate scopes which would prevent keywords like `Reference` from working. Additionally, running the UI in a background thread without custom logging would just dump everything to the console rendering it unusable. Creating a robust logging system to replace the PowerShell stream cmdlets has the same module scope issues that threading creates.
+
+Despite not supporting thread, what I have now works. The ImageViewer proves that much. So it's not as if the DSL is useless without threading. Plus, as Gemini helpfully points out below, there are some advantages to the way it works right now.
+
+**The Historical Compromise:** Older frameworks like ShowUI chose to run in background threads to keep the console interactive, accepting the technical debt of strict cross-thread UI dispatching and complex stream management.
+
+**Your Current Advantage:** Running synchronously on the main thread keeps your streams entirely deterministic, guarantees easy variable scoping, and prevents cross-thread memory corruption. It treats the PowerShell terminal exactly like a traditional application wrapper.
