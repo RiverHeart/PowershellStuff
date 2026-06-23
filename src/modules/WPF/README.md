@@ -300,6 +300,15 @@ Use `-Bare` for a more minimal starter without the default File menu shell:
 New-WPFProject MyApp -Bare
 ```
 
+## Prior Art
+
+I always knew that there were WPF PowerShell modules out there but I didn't think anyone had made a serious effort at a code first implementation. Most of what I've seen up till this point has just loaded XAML. While searching for more examples to DSL-ify I came across [this tutorial](https://learn.microsoft.com/en-us/archive/msdn-magazine/2011/july/msdn-magazine-windows-powershell-with-wpf-secrets-to-building-a-wpf-application-in-windows-powershell) which uses a `WPK` module. Turns out there were a few projects that attempted what I'm playing with now.
+
+
+* **PowerBoots (2008):** Early attempt to integrate WPF with PowerShell.
+* **WPK (2009):** Microsoft's attempt to standardize a UI-generation kit for administrative tool building.
+* **[ShowUI](https://github.com/ShowUI/ShowUI) (2011-2014):** A combined evolution of PowerBoots and WPK.
+
 ## Documentation
 
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
