@@ -11,17 +11,18 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.textbox
 #>
 function TextBox {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-TextBox')]
     [OutputType([void], [System.Windows.Controls.TextBox])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
-        [scriptblock] $ScriptBlock
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
+        [ScriptBlock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
@@ -30,10 +31,11 @@ function TextBox {
     }
 
     try {
-        $TextBox = [System.Windows.Controls.TextBox] @{
-            Name = $Name
+        $TextBox = [System.Windows.Controls.TextBox]::new()
+        if ($Name -ne '__Nameless__') {
+            $TextBox.Name = $Name
+            Register-WPFObject $Name $TextBox
         }
-        Register-WPFObject $Name $TextBox
         Add-WPFType $TextBox 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (TextBox) with error: $_"

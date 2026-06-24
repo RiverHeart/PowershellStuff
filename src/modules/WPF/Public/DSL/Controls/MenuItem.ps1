@@ -43,6 +43,10 @@ function MenuItem {
     [Alias('-MenuItem')]
     [OutputType([void], [System.Windows.Controls.MenuItem])]
     param(
+        # NOTE:
+        # In regular WPF, you typically wouldn't name your MenuItems but the Name parameter is mandatory
+        # here because it functions as the header text for the MenuItem and is used to generate a safe
+        # backing name for the registered object so it can be referenced later when creating nested MenuItems.
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string] $Name,

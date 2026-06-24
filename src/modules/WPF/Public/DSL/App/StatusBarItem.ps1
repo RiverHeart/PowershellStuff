@@ -12,29 +12,22 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.primitives.statusbaritem
 #>
 function StatusBarItem {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-StatusBarItem')]
     [OutputType([void], [System.Windows.Controls.Primitives.StatusBarItem])]
     param(
-        [Parameter(Position = 0)]
-        [object] $Name,
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
         Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
         return
-    }
-
-    if ($Name -is [scriptblock] -and -not $PSBoundParameters.ContainsKey('ScriptBlock')) {
-        $ScriptBlock = $Name
-        $Name = $null
-    }
-
-    if (-not $ScriptBlock) {
-        throw 'StatusBarItem requires a scriptblock.'
     }
 
     if ($null -ne $Name) {
@@ -49,34 +42,23 @@ function StatusBarItem {
     }
 
     try {
-        $StatusBarItem = if ($Name) {
-            [System.Windows.Controls.Primitives.StatusBarItem] @{
-                Name = $Name
-            }
-        } else {
-            [System.Windows.Controls.Primitives.StatusBarItem]::new()
+        $StatusBarItem = [System.Windows.Controls.Primitives.StatusBarItem] @{
+            Name = $Name
         }
-
-        if ($Name) {
-            Register-WPFObject $Name $StatusBarItem
-        }
-
+        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $StatusBarItem }
         Add-WPFType $StatusBarItem 'Control'
     } catch {
-        $StatusBarItemName = if ($Name) { $Name } else { '__Nameless__' }
-        Write-Error "Failed to create '$StatusBarItemName' (StatusBarItem) with error: $_"
+        Write-Error "Failed to create '$Name' (StatusBarItem) with error: $_"
     }
 
     $Parent = $PSCmdlet.GetVariableValue('this')
     $IsParentedBefore = [bool] $StatusBarItem.Parent
     if ($Parent -and -not $IsParentedBefore) {
-        $StatusBarItemName = if ($Name) { $Name } else { '__Nameless__' }
-        Write-Debug "Beginning auto-attach for $StatusBarItemName (StatusBarItem)"
+        Write-Debug "Beginning auto-attach for $Name (StatusBarItem)"
         Update-WPFObject $Parent $StatusBarItem
     }
 
-    $StatusBarItemName = if ($Name) { $Name } else { '__Nameless__' }
-    Write-Debug "Processing child elements for $StatusBarItemName (StatusBarItem)"
+    Write-Debug "Processing child elements for $Name (StatusBarItem)"
     Update-WPFObject $StatusBarItem $ScriptBlock
 
     $IsParentedAfter = [bool] $StatusBarItem.Parent

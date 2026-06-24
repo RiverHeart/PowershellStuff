@@ -11,16 +11,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.stackpanel
 #>
 function StackPanel {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-StackPanel', 'VStackPanel', 'HStackPanel')]
     [OutputType([void], [System.Windows.Controls.StackPanel])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -30,17 +31,19 @@ function StackPanel {
             Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
             return
         }
-        'VStackPanel' { $Orientation = [System.Windows.Controls.Orientation]::Vertical }
-        'HStackPanel' { $Orientation = [System.Windows.Controls.Orientation]::Horizontal }
+        'VStackPanel' { $Orientation = [System.Windows.Controls.Orientation]::Vertical; break }
+        'HStackPanel' { $Orientation = [System.Windows.Controls.Orientation]::Horizontal; break }
         default { $Orientation = [System.Windows.Controls.Orientation]::Vertical }
     }
 
     try {
         $StackPanel = [System.Windows.Controls.StackPanel] @{
-            Name = $Name
             Orientation = $Orientation
         }
-        Register-WPFObject $Name $StackPanel
+        if ($Name -ne '__Nameless__') {
+            $StackPanel.Name = $Name
+            Register-WPFObject $Name $StackPanel
+        }
         Add-WPFType $StackPanel 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (StackPanel) with error: $_"
