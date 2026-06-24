@@ -39,17 +39,19 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menuitem
 #>
 function MenuItem {
-    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
+    [CmdletBinding()]
     [Alias('-MenuItem')]
     [OutputType([void], [System.Windows.Controls.MenuItem])]
     param(
-        [Parameter(ParameterSetName = 'Name', Position = 0)]
-        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        # NOTE:
+        # In regular WPF, you typically wouldn't name your MenuItems but the Name parameter is mandatory
+        # here because it functions as the header text for the MenuItem and is used to generate a safe
+        # backing name for the registered object so it can be referenced later when creating nested MenuItems.
+        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $Name = '__Nameless__',
+        [string] $Name,
 
-        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
-        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
+        [Parameter(Mandatory)]
         [ScriptBlock] $ScriptBlock,
 
         [switch] $NoAutoAttach
@@ -83,7 +85,7 @@ function MenuItem {
                 Name = $ObjectName
                 Header = $HeaderName
             }
-            if ($ObjectName -ne '__Nameless__') { Register-WPFObject $ObjectName $WPFObject }
+            Register-WPFObject $ObjectName $WPFObject
         }
 
         Add-WPFType $WPFObject 'Control'
