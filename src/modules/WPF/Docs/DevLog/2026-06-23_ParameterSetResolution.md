@@ -1,6 +1,6 @@
 Learned a neat trick from Gemini today. It turns out that `[ValidateScript()]` runs during the evaluation phase when PowerShell is picking a parameter set to see if input can be bound to parameters in the set. During this phase failure to bind doesn't throw an error immediately.
 
-One thing that has plagued me during the development of the DSL keywords is the fact that `[Scriptblock]` casts to `[string]`. Scriptblocks would always qualify for position 0's `[string]` which led me to make name mandatory instead of optional. It was always possible to just accept an `[object]` and inspect the type but that prevents legitimate objects from casting to `[string] and checking types in the function body gets messy very fast.
+One thing that has plagued me during the development of the DSL keywords is the fact that `[Scriptblock]` casts to `[string]`. Scriptblocks would always qualify for position 0's `[string]` which led me to make name mandatory instead of optional. It was always possible to just accept an `[object]` and inspect the type but that prevents legitimate objects from casting to `[string]` and checking types in the function body gets messy very fast.
 
 With this new trick, it becomes possible to disqualify scriptblocks from string parameters like so,
 
