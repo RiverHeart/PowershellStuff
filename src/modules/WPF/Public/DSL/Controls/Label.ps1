@@ -31,10 +31,11 @@ function Label {
     }
 
     try {
-        $Label = [System.Windows.Controls.Label] @{
-            Name = $Name
+        $Label = [System.Windows.Controls.Label]::new()
+        if ($Name -ne '__Nameless__') {
+            $Label.Name = $Name
+            Register-WPFObject $Name $Label
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Label }
         Add-WPFType $Label 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Label) with error: $_"

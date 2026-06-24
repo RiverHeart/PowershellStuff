@@ -8,11 +8,11 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
 
-        $Result = {
+        {
             -ScrollViewer "Viewer_$Id" {
                 Label "Child_$Id" {}
             }
-        }.Invoke()
+        }.Invoke() | Out-Null
 
         $Parent.Content | Should -BeNullOrEmpty
     }
@@ -26,7 +26,7 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
             Template {
                 Border 'InputChrome' {
                     ScrollViewer 'PART_ContentHost' {
-                        Setter Margin '2,2,2,2'
+                        Setter Margin 2
                     }
                 }
             }
@@ -50,7 +50,7 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         Style $StyleName Button {
             Template {
                 Border 'TemplateBorder' {
-                    Padding: '3,4,5,6'
+                    Padding: 3, 4, 5, 6
 
                     ContentPresenter {
                         HorizontalAlignment: ([System.Windows.HorizontalAlignment]::Stretch)

@@ -32,9 +32,11 @@ function ScrollViewer {
 
     # Factory mode: inside a Template block, produce a FrameworkElementFactory
     # instead of a live ScrollViewer instance.
+    #
+    # NOTE: The Name is set on the factory because ScrollViewer is a special case
+    # where it is used as a PART_ContentHost and needs to be found by name.
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
-        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ScrollViewer])
-        $Factory.Name = $Name
+        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ScrollViewer], $Name)
 
         $Parent = $PSCmdlet.GetVariableValue('this')
         if ($Parent) {
@@ -48,10 +50,11 @@ function ScrollViewer {
     }
 
     try {
-        $ScrollViewer = [System.Windows.Controls.ScrollViewer] @{
-            Name = $Name
+        $ScrollViewer = [System.Windows.Controls.ScrollViewer]::new()
+        if ($Name -ne '__Nameless__') {
+            $ScrollViewer.Name = $Name
+            Register-WPFObject $Name $ScrollViewer
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $ScrollViewer }
         Add-WPFType $ScrollViewer 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (ScrollViewer) with error: $_"

@@ -35,10 +35,11 @@ function Button {
     }
 
     try {
-        $Button = [System.Windows.Controls.Button] @{
-            Name = $Name
+        $Button = [System.Windows.Controls.Button]::new()
+        if ($Name -ne '__Nameless__') {
+            $Button.Name = $Name
+            Register-WPFObject $Name $Button
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Button }
         Add-WPFType $Button 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Button) with error: $_"

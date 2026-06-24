@@ -47,6 +47,9 @@ function Border {
 
     # Factory mode: inside a Template block, produce a FrameworkElementFactory
     # instead of a live Border instance.
+    #
+    # NOTE: The Name is set on the factory because Border is a special case
+    # where it is used as a PART_ContentHost and needs to be found by name.
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
         $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border], $Name)
 
@@ -64,10 +67,11 @@ function Border {
     }
 
     try {
-        $Border = [System.Windows.Controls.Border] @{
-            Name = $Name
+        $Border = [System.Windows.Controls.Border]::new()
+        if ($Name -ne '__Nameless__') {
+            $Border.Name = $Name
+            Register-WPFObject $Name $Border
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Border }
         Add-WPFType $Border 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Border) with error: $_"
@@ -82,7 +86,7 @@ function Border {
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
-    Write-Debug "Processing child elements for $BorderName (Border)"
+    Write-Debug "Processing child elements for $Name (Border)"
     Update-WPFObject $Border $ScriptBlock
 
     $IsParentedAfter = [bool] $Border.Parent

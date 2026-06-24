@@ -31,10 +31,11 @@ function Image {
     }
 
     try {
-        $Image = [System.Windows.Controls.Image] @{
-            Name = $Name
+        $Image = [System.Windows.Controls.Image]::new()
+        if ($Name -ne '__Nameless__') {
+            $Image.Name = $Name
+            Register-WPFObject $Name $Image
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Image }
         Add-WPFType $Image 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Image) with error: $_"

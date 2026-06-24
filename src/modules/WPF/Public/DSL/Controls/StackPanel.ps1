@@ -38,10 +38,12 @@ function StackPanel {
 
     try {
         $StackPanel = [System.Windows.Controls.StackPanel] @{
-            Name = $Name
             Orientation = $Orientation
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $StackPanel }
+        if ($Name -ne '__Nameless__') {
+            $StackPanel.Name = $Name
+            Register-WPFObject $Name $StackPanel
+        }
         Add-WPFType $StackPanel 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (StackPanel) with error: $_"

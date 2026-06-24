@@ -31,10 +31,11 @@ function TextBlock {
     }
 
     try {
-        $TextBlock = [System.Windows.Controls.TextBlock] @{
-            Name = $Name
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        if ($Name -ne '__Nameless__') {
+            $TextBlock.Name = $Name
+            Register-WPFObject $Name $TextBlock
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $TextBlock }
         Add-WPFType $TextBlock 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (TextBlock) with error: $_"

@@ -31,10 +31,11 @@ function DataGrid {
     }
 
     try {
-        $DataGrid = [System.Windows.Controls.DataGrid] @{
-            Name = $Name
+        $DataGrid = [System.Windows.Controls.DataGrid]::new()
+        if ($Name -ne '__Nameless__') {
+            $DataGrid.Name = $Name
+            Register-WPFObject $Name $DataGrid
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $DataGrid }
         Add-WPFType $DataGrid 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DataGrid) with error: $_"

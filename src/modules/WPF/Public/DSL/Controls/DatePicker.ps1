@@ -31,10 +31,11 @@ function DatePicker {
     }
 
     try {
-        $DatePicker = [System.Windows.Controls.DatePicker] @{
-            Name = $Name
+        $DatePicker = [System.Windows.Controls.DatePicker]::new()
+        if ($Name -ne '__Nameless__') {
+            $DatePicker.Name = $Name
+            Register-WPFObject $Name $DatePicker
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $DatePicker }
         Add-WPFType $DatePicker 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DatePicker) with error: $_"

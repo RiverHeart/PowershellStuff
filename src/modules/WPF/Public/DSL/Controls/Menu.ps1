@@ -32,10 +32,11 @@ function Menu {
     }
 
     try {
-        $Menu = [System.Windows.Controls.Menu] @{
-            Name = $Name
+        $Menu = [System.Windows.Controls.Menu]::new()
+        if ($Name -ne '__Nameless__') {
+            $Menu.Name = $Name
+            Register-WPFObject $Name $Menu
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Menu }
         Add-WPFType $Menu 'Control'
 
         # Register as stable __WPFMenu alias if parent is a Window

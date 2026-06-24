@@ -31,10 +31,11 @@ function DockPanel {
     }
 
     try {
-        $DockPanel = [System.Windows.Controls.DockPanel] @{
-            Name = $Name
+        $DockPanel = [System.Windows.Controls.DockPanel]::new()
+        if ($Name -ne '__Nameless__') {
+            $DockPanel.Name = $Name
+            Register-WPFObject $Name $DockPanel
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $DockPanel }
         Add-WPFType $DockPanel 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DockPanel) with error: $_"

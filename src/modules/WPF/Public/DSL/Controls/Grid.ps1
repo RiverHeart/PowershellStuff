@@ -39,10 +39,11 @@ function Grid {
     }
 
     try {
-        $Grid = [System.Windows.Controls.Grid] @{
-            Name = $Name
+        $Grid = [System.Windows.Controls.Grid]::new()
+        if ($Name -ne '__Nameless__') {
+            $Grid.Name = $Name
+            Register-WPFObject $Name $Grid
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Grid }
         Add-WPFType $Grid 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
