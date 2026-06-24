@@ -39,15 +39,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menuitem
 #>
 function MenuItem {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-MenuItem')]
     [OutputType([void], [System.Windows.Controls.MenuItem])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
         [ValidateNotNullOrEmpty()]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock,
 
         [switch] $NoAutoAttach
@@ -81,7 +83,7 @@ function MenuItem {
                 Name = $ObjectName
                 Header = $HeaderName
             }
-            Register-WPFObject $ObjectName $WPFObject
+            if ($ObjectName -ne '__Nameless__') { Register-WPFObject $ObjectName $WPFObject }
         }
 
         Add-WPFType $WPFObject 'Control'

@@ -26,15 +26,18 @@
     -Border 'MyBorder' { ...code... }
 #>
 function Border {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-Border')]
-    [OutputType([void], [System.Windows.Controls.Border])]
+    [OutputType([void], [System.Windows.Controls.Border], [System.Windows.FrameworkElementFactory])]
     param(
-        [Parameter(Position = 0)]
-        [object] $Name,
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        [ValidatePattern('^\w+$')]
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Position = 1)]
-        [scriptblock] $ScriptBlock
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
+        [ScriptBlock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
@@ -42,41 +45,18 @@ function Border {
         return
     }
 
-    if ($Name -is [scriptblock] -and -not $PSBoundParameters.ContainsKey('ScriptBlock')) {
-        $ScriptBlock = $Name
-        $Name = $null
-    }
-
-    if (-not $ScriptBlock) {
-        throw 'Border requires a scriptblock.'
-    }
-
-    if ($null -ne $Name) {
-        $Name = [string] $Name
-        if ([string]::IsNullOrWhiteSpace($Name)) {
-            throw 'Border name cannot be empty.'
-        }
-
-        if ($Name -notmatch '^\w+$') {
-            throw "Invalid Border name '$Name'. Name must match '^\\w+$'."
-        }
-    }
-
     # Factory mode: inside a Template block, produce a FrameworkElementFactory
     # instead of a live Border instance.
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
-        $BorderName = if ($Name) { $Name } else { '__Nameless__' }
-        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border])
-
-        if ($Name) { $Factory.Name = $Name }
+        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border], $Name)
 
         $Parent = $PSCmdlet.GetVariableValue('this')
         if ($Parent) {
-            Write-Debug "Factory auto-attach: $BorderName (Border) -> $($Parent.GetType().Name)"
+            Write-Debug "Factory auto-attach: $Name (Border) -> $($Parent.GetType().Name)"
             Add-WPFObject $Parent $Factory
         }
 
-        Write-Debug "Processing factory children for $BorderName (Border)"
+        Write-Debug "Processing factory children for $Name (Border)"
         Update-WPFObject $Factory $ScriptBlock
 
         if (-not $Parent) { return $Factory }
@@ -84,35 +64,24 @@ function Border {
     }
 
     try {
-        $Border = if ($Name) {
-            [System.Windows.Controls.Border] @{
-                Name = $Name
-            }
-        } else {
-            [System.Windows.Controls.Border]::new()
+        $Border = [System.Windows.Controls.Border] @{
+            Name = $Name
         }
-
-        if ($Name) {
-            Register-WPFObject $Name $Border
-        }
-
+        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Border }
         Add-WPFType $Border 'Control'
     } catch {
-        $BorderName = if ($Name) { $Name } else { '__Nameless__' }
-        Write-Error "Failed to create '$BorderName' (Border) with error: $_"
+        Write-Error "Failed to create '$Name' (Border) with error: $_"
     }
 
     # Auto-attach if parent exists
     $Parent = $PSCmdlet.GetVariableValue('this')
     $IsParentedBefore = [bool] $Border.Parent
     if ($Parent -and -not $IsParentedBefore) {
-        $BorderName = if ($Name) { $Name } else { '__Nameless__' }
-        Write-Debug "Beginning auto-attach for $BorderName (Border)"
+        Write-Debug "Beginning auto-attach for $Name (Border)"
         Update-WPFObject $Parent $Border
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
-    $BorderName = if ($Name) { $Name } else { '__Nameless__' }
     Write-Debug "Processing child elements for $BorderName (Border)"
     Update-WPFObject $Border $ScriptBlock
 

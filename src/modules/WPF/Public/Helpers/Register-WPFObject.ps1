@@ -18,6 +18,7 @@
 #>
 function Register-WPFObject {
     [CmdletBinding()]
+    [OutputType([void])]
     [Alias('Register')]
     param(
         # Only allow letters, numbers, and underscores
@@ -33,6 +34,9 @@ function Register-WPFObject {
 
         [switch] $Overwrite
     )
+
+    # Don't register objects with the default nameless identifier.
+    if ($Name -eq '__Nameless__') { return }
 
     $Parent = $PSCmdlet.GetVariableValue('this')
     $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $InputObject -CreateIfMissing -Name $Name

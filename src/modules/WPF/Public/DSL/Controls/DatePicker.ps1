@@ -11,16 +11,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.datepicker
 #>
 function DatePicker {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-DatePicker')]
     [OutputType([void], [System.Windows.Controls.DatePicker])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -33,7 +34,7 @@ function DatePicker {
         $DatePicker = [System.Windows.Controls.DatePicker] @{
             Name = $Name
         }
-        Register-WPFObject $Name $DatePicker
+        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $DatePicker }
         Add-WPFType $DatePicker 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DatePicker) with error: $_"

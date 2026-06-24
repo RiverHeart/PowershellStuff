@@ -15,17 +15,18 @@
     -Button 'MyButton' { ...code... }
 #>
 function Button {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-Button')]
     [OutputType([void], [System.Windows.Controls.Button])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
-        [scriptblock] $ScriptBlock
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
+        [ScriptBlock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
@@ -37,7 +38,7 @@ function Button {
         $Button = [System.Windows.Controls.Button] @{
             Name = $Name
         }
-        Register-WPFObject $Name $Button
+        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Button }
         Add-WPFType $Button 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Button) with error: $_"

@@ -11,16 +11,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.label
 #>
 function Label {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-Label')]
     [OutputType([void], [System.Windows.Controls.Label])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ -not ($_ -is [scriptblock]) })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [scriptblock] $ScriptBlock
     )
 
@@ -33,7 +34,7 @@ function Label {
         $Label = [System.Windows.Controls.Label] @{
             Name = $Name
         }
-        Register-WPFObject $Name $Label
+        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $Label }
         Add-WPFType $Label 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Label) with error: $_"
