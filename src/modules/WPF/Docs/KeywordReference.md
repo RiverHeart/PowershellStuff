@@ -87,6 +87,7 @@ ControlName 'Name' {
 Behavior notes:
 
 - Inside the scriptblock, $this is the object currently being configured.
+- Tab completion for $this properties is context-aware and resolves against the nearest enclosing DSL control command.
 - Controls created inside another control are auto-attached to the parent.
 - Most controls return nothing when auto-attached, otherwise they return the created object.
 - Return behavior is based on the created control's parent state and whether the `WPFCollectChildren` is set to true in the caller scope.
