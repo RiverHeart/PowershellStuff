@@ -17,7 +17,7 @@ function StatusBarItem {
     [OutputType([void], [System.Windows.Controls.Primitives.StatusBarItem])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
-        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [string] $Name = '__Nameless__',
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
@@ -30,22 +30,12 @@ function StatusBarItem {
         return
     }
 
-    if ($null -ne $Name) {
-        $Name = [string] $Name
-        if ([string]::IsNullOrWhiteSpace($Name)) {
-            throw 'StatusBarItem name cannot be empty.'
-        }
-
-        if ($Name -notmatch '^\w+$') {
-            throw "Invalid StatusBarItem name '$Name'. Name must match '^\\w+$'."
-        }
-    }
-
     try {
-        $StatusBarItem = [System.Windows.Controls.Primitives.StatusBarItem] @{
-            Name = $Name
+        $StatusBarItem = [System.Windows.Controls.Primitives.StatusBarItem]::new()
+        if ($Name -ne '__Nameless__') {
+            $StatusBarItem.Name = $Name
+            Register-WPFObject $Name $StatusBarItem
         }
-        if ($Name -ne '__Nameless__') { Register-WPFObject $Name $StatusBarItem }
         Add-WPFType $StatusBarItem 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (StatusBarItem) with error: $_"
