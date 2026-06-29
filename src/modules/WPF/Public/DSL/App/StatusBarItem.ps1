@@ -18,6 +18,7 @@ function StatusBarItem {
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
         [ValidateScript({ $_ -isnot [scriptblock] })]
+        [ValidatePattern('^\w+$')]
         [string] $Name = '__Nameless__',
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]

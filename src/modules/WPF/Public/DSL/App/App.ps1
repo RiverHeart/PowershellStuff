@@ -17,12 +17,13 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.window
 #>
 function App {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-App')]
     [OutputType([void], [System.Windows.Window])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
         [ValidateScript({ $_ -isnot [scriptblock] })]
+        [ValidatePattern('^\w+$')]
         [string] $Name = '__Nameless__',
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
