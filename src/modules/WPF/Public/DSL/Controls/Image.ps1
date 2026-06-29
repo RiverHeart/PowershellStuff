@@ -16,13 +16,13 @@ function Image {
     [OutputType([void], [System.Windows.Controls.Image])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
-        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
         [string] $Name = '__Nameless__',
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
         [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
-        [scriptblock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {

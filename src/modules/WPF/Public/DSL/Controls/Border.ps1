@@ -31,7 +31,7 @@ function Border {
     [OutputType([void], [System.Windows.Controls.Border], [System.Windows.FrameworkElementFactory])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
-        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
         [string] $Name = '__Nameless__',
 

@@ -16,7 +16,7 @@ function ScrollViewer {
     [OutputType([void], [System.Windows.Controls.ScrollViewer], [System.Windows.FrameworkElementFactory])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
-        [ValidateScript({ -not ($_ -is [scriptblock]) })]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
         [string] $Name = '__Nameless__',
 
