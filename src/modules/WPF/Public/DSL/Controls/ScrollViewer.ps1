@@ -11,16 +11,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.scrollviewer
 #>
 function ScrollViewer {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-ScrollViewer')]
-    [OutputType([void], [System.Windows.Controls.ScrollViewer])]
+    [OutputType([void], [System.Windows.Controls.ScrollViewer], [System.Windows.FrameworkElementFactory])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -31,9 +32,11 @@ function ScrollViewer {
 
     # Factory mode: inside a Template block, produce a FrameworkElementFactory
     # instead of a live ScrollViewer instance.
+    #
+    # NOTE: The Name is set on the factory because ScrollViewer is a special case
+    # where it is used as a PART_ContentHost and needs to be found by name.
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
-        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ScrollViewer])
-        $Factory.Name = $Name
+        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ScrollViewer], $Name)
 
         $Parent = $PSCmdlet.GetVariableValue('this')
         if ($Parent) {
@@ -47,10 +50,11 @@ function ScrollViewer {
     }
 
     try {
-        $ScrollViewer = [System.Windows.Controls.ScrollViewer] @{
-            Name = $Name
+        $ScrollViewer = [System.Windows.Controls.ScrollViewer]::new()
+        if ($Name -ne '__Nameless__') {
+            $ScrollViewer.Name = $Name
+            Register-WPFObject $Name $ScrollViewer
         }
-        Register-WPFObject $Name $ScrollViewer
         Add-WPFType $ScrollViewer 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (ScrollViewer) with error: $_"

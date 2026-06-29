@@ -19,16 +19,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.grid
 #>
 function Grid {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-Grid')]
     [OutputType([void], [System.Windows.Controls.Grid])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -38,10 +39,11 @@ function Grid {
     }
 
     try {
-        $Grid = [System.Windows.Controls.Grid] @{
-            Name = $Name
+        $Grid = [System.Windows.Controls.Grid]::new()
+        if ($Name -ne '__Nameless__') {
+            $Grid.Name = $Name
+            Register-WPFObject $Name $Grid
         }
-        Register-WPFObject $Name $Grid
         Add-WPFType $Grid 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
