@@ -20,6 +20,12 @@ Theme 'Dark' {
     ButtonHoverBackground: '#3E3E3E'
 }
 
+# I keep seeing marching ants around the scrollviewer intermittently. I can't think of a reason
+# why I would want that for any controls so I'm just going to disable it globally.
+Style 'Control' {
+    FocusVisualStyle: $null
+}
+
 Style Window {
     Background: WindowBackground -Resource
     Foreground: Foreground -Resource
