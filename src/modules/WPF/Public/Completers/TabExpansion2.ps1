@@ -30,7 +30,7 @@ function TabExpansion2 {
         [Hashtable] $options = $null
     )
 
-    $completions = Complete-WPFThisProperty @PSBoundParameters
+    $completions = Complete-WPFThis @PSBoundParameters
     if ($completions) {
         return $completions
     }

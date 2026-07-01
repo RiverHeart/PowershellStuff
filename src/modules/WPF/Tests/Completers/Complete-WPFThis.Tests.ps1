@@ -1,7 +1,7 @@
 using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
-Describe 'Complete-WPFThisProperty' -Tag 'Complete-WPFThisProperty' {
+Describe 'Complete-WPFThis' -Tag 'Complete-WPFThis' {
     BeforeDiscovery {
         Import-Module -Name "$PSScriptRoot/../../WPF.psd1" -Force
     }
@@ -49,7 +49,7 @@ Window 'Main' {
 
         $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
             param($Source, $CursorColumn)
-            Complete-WPFThisProperty -inputScript $Source -cursorColumn $CursorColumn
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
         }
 
         @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Be @('$this.Content', '$this.ContextMenu')
@@ -68,7 +68,7 @@ Window 'Main' {
 
         $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
             param($Source, $CursorColumn)
-            Complete-WPFThisProperty -inputScript $Source -cursorColumn $CursorColumn
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
         }
 
         @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Be @('$this.Content', '$this.ContextMenu')
@@ -84,7 +84,7 @@ App 'MainApp' {
 
         $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
             param($Source, $CursorColumn)
-            Complete-WPFThisProperty -inputScript $Source -cursorColumn $CursorColumn
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
         }
 
         @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Be @('$this.Title')
@@ -92,7 +92,7 @@ App 'MainApp' {
 
     It 'returns no completions when cursor is not typing a this member access' {
         $result = InModuleScope WPF {
-            Complete-WPFThisProperty -inputScript "Label 'Foo' { Co }" -cursorColumn 17
+            Complete-WPFThis -inputScript "Label 'Foo' { Co }" -cursorColumn 17
         }
 
         $result | Should -Be $null

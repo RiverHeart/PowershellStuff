@@ -24,7 +24,7 @@ using namespace System.Management.Automation.Language
     any custom controls unless it's added here. Additionally, auto-complete is limited to properties but
     we should be including methods and events as well.
 #>
-function Complete-WPFThisProperty {
+function Complete-WPFThis {
     [CmdletBinding()]
     [OutputType([CommandCompletion])]
     param(
@@ -58,10 +58,6 @@ function Complete-WPFThisProperty {
     $CursorOffset = $null
     if ($PSCmdlet.ParameterSetName -eq 'ScriptInputSet') {
         $CursorOffset = [Math]::Max(0, [Math]::Min($cursorColumn, $inputScript.Length))
-
-        $tokens = $null
-        $parseErrors = $null
-        $ast = [Parser]::ParseInput($inputScript, [ref] $tokens, [ref] $parseErrors)
     } else {
         $inputScript = $ast.Extent.Text
         if (-not $positionOfCursor -or $null -eq $positionOfCursor.Offset) {
@@ -79,6 +75,12 @@ function Complete-WPFThisProperty {
     $ThisMemberMatch = [Regex]::Match($scriptUpToCursor, '(?is)\$this\.(?<member>[A-Za-z_][A-Za-z0-9_]*)?$')
     if (-not $ThisMemberMatch.Success) {
         return
+    }
+
+    if ($PSCmdlet.ParameterSetName -eq 'ScriptInputSet') {
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [Parser]::ParseInput($inputScript, [ref] $tokens, [ref] $parseErrors)
     }
 
     $ParentControlNode = Resolve-WPFControlCommandAstAtCursor -Ast $ast -CursorOffset $CursorOffset

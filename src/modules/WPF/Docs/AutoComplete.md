@@ -3,7 +3,7 @@
 This project currently supports WPF autocomplete through these mechanisms:
 
 1. `Complete-WPFEvent`
-2. `Complete-WPFThisProperty`
+2. `Complete-WPFThis`
 3. Explicitly type-casting `$this` at the top of a DSL script block (fallback)
 
 ## Event Completion
@@ -20,7 +20,7 @@ This is the primary built-in autocomplete surface for event names in the DSL wor
 
 ## `$this` Property Completion
 
-`Complete-WPFThisProperty` is used by the WPF `TabExpansion2` override to provide
+`Complete-WPFThis` is used by the WPF `TabExpansion2` override to provide
 property completion for `$this.<member>` inside DSL control scriptblocks.
 
 Context is resolved from AST command ancestry and validated against known WPF

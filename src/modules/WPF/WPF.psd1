@@ -89,7 +89,7 @@ FunctionsToExport = @(
     'Complete-WPFEvent'
     'Complete-WPFFileInfo'
     'Complete-WPFState'
-    'Complete-WPFThisProperty'
+    'Complete-WPFThis'
     'TabExpansion2'
 
     # DSL
