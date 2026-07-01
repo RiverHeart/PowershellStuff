@@ -151,7 +151,7 @@ function Complete-WPFThis {
         } elseif ($CompletionResultType -eq [CompletionResultType]::Method) {
             # NOTE:
             # Curious implementation here. It appears as though the ToolTip property is expected to be
-            # a method signature when CompletionResult is Method. The signature is auto-converted
+            # a method signature when CompletionResult is Method. The signature is auto-converted from C#
             # to Powershell syntax. As an example, here is the auto-converted code for the GetField method.
             #
             # ```
