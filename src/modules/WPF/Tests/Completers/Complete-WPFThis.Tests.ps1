@@ -8,7 +8,7 @@ Describe 'Complete-WPFThis' -Tag 'Complete-WPFThis' {
 
     BeforeEach {
         InModuleScope WPF {
-            $script:WPFControlPropertiesCache = $null
+            $script:WPFThisCompletionCache = $null
         }
 
         Mock -ModuleName WPF -CommandName Get-WPFTypeInfo -MockWith {

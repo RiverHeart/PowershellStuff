@@ -49,8 +49,8 @@ function Complete-WPFThis {
         [Hashtable] $options = $null
     )
 
-    if (-not $script:WPFControlPropertiesCache) {
-        $script:WPFControlPropertiesCache = @{
+    if (-not $script:WPFThisCompletionCache) {
+        $script:WPFThisCompletionCache = @{
             Completions = @{}
         }
     }
@@ -97,36 +97,38 @@ function Complete-WPFThis {
         $ControlName = 'Window'
     }
 
-    if (-not $script:WPFControlPropertiesCache.Completions.ContainsKey($ControlName)) {
+    # NOTE: This isn't going to work for custom controls.
+    if (-not $script:WPFThisCompletionCache.Completions.ContainsKey($ControlName)) {
         $Type = @(Get-WPFTypeInfo -Name $ControlName) | Select-Object -First 1
         if (-not $Type) {
             Write-Debug "Failed to resolve WPF type for control '$ControlName'"
             return
         }
 
-        $script:WPFControlPropertiesCache.Completions[$ControlName] = @(
-            $Type.GetProperties().Name |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                Sort-Object -Unique
+        $script:WPFThisCompletionCache.Completions[$ControlName] = @(
+            $Type |
+                Get-Member |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
+                Sort-Object -Unique -Property Name
         )
     }
 
     $MemberPrefix = $ThisMemberMatch.Groups['member'].Value
 
-    $PropertyMatches = @($script:WPFControlPropertiesCache.Completions[$ControlName] |
-        Where-Object { $_ -ilike "*$MemberPrefix*" } |
+    $CompletionMatches = @($script:WPFThisCompletionCache.Completions[$ControlName] |
+        Where-Object { $_.Name -ilike "*$MemberPrefix*" } |
         Sort-Object -Property @(
             {
                 if ([string]::IsNullOrWhiteSpace($MemberPrefix)) {
                     0
                 } else {
-                    [int]($_ -inotlike "$MemberPrefix*")
+                    [int]($_.Name -inotlike "$MemberPrefix*")
                 }
             },
-            { $_ }
+            { $_.Name }
         ))
 
-    if ($PropertyMatches.Count -eq 0) {
+    if ($CompletionMatches.Count -eq 0) {
         return
     }
 
@@ -134,13 +136,61 @@ function Complete-WPFThis {
     $ReplaceLength = $CursorOffset - $ReplaceIndex
     $CompletionCollection = [System.Collections.ObjectModel.Collection[CompletionResult]]::new()
 
-    foreach ($PropertyName in $PropertyMatches) {
-        $CompletionCollection.Add([CompletionResult]::new(
-                "`$this.$PropertyName",
-                $PropertyName,
-                [CompletionResultType]::Property,
-                "$ControlName Property"
+    # NOTE: This feels a bit heavy. Maybe this should be cached instead of the raw matches?
+    # Also, reflections isn't going to give us descriptions for members.
+    foreach ($CompletionMatch in $CompletionMatches) {
+        $CompletionResultType = switch ($CompletionMatch.MemberType) {
+            { $_ -like '*Property' } { [CompletionResultType]::Property }
+            { $_ -like '*Method' } { [CompletionResultType]::Method }
+            'Event' { [CompletionResultType]::Event }
+            default { [CompletionResultType]::None }
+        }
+
+        if ($CompletionResultType -eq [CompletionResultType]::None) {
+            #Write-Debug "Skipping completion for member '$($CompletionMatch.Name)' of type '$($CompletionMatch.MemberType)'"
+            continue
+        } elseif ($CompletionResultType -eq [CompletionResultType]::Method) {
+            # NOTE:
+            # Curious implementation here. It appears as though the ToolTip property is expected to be
+            # a method signature when CompletionResult is Method. The signature is auto-converted
+            # to Powershell syntax. As an example, here is the auto-converted code for the GetField method.
+            # As you can see, a namespace was added and stripped away from the return type. Every other signature
+            # is converted as well but fails on the return type. It's unclear if this is a bug, expected behavior,
+            # or if I'm just passing the wrong object. I tried to figure out where in the Powershell source
+            # this conversion is happening but I couldn't find it.
+            #
+            # One might hope that you could define multiple completions for the same method with different signatures
+            # and one would be wrong about that. Duplicate completions produce duplicate menu items. To prevent bloat,
+            # we're only adding one instance of each method and passing in the definition list even though it doesn't
+            # format properly.
+            #
+            #    using namespace System.Reflection
+            #
+            #    [FieldInfo] GetField(
+            #        [string] $name,
+            #        [BindingFlags] $bindingAttr)
+            #
+            #    [] System.Reflection.FieldInfo GetField(
+            #        [string] $name)
+            #
+            #    [] System.Reflection.FieldInfo IReflect.GetField(
+            #        [string] $name,
+            #        [BindingFlags] $bindingAttr)
+
+            $CompletionCollection.Add([CompletionResult]::new(
+                <# Injected Text #> "`$this.$($CompletionMatch.Name)(",
+                <# Menu Text #> "$($CompletionMatch.Name)()",
+                <# Icon Type #> $CompletionResultType,
+                <# ToolTip #> $CompletionMatch.Definition
             ))
+        } else {
+            $CompletionCollection.Add([CompletionResult]::new(
+                <# Injected Text #> "`$this.$($CompletionMatch.Name)",
+                <# Menu Text #> $CompletionMatch.Name,
+                <# Icon Type #> $CompletionResultType,
+                <# ToolTip #> $CompletionMatch.Name
+            ))
+        }
     }
 
     return [CommandCompletion]::new(
