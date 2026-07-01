@@ -89,6 +89,8 @@ FunctionsToExport = @(
     'Complete-WPFEvent'
     'Complete-WPFFileInfo'
     'Complete-WPFState'
+    'Complete-WPFThis'
+    'TabExpansion2'
 
     # DSL
 

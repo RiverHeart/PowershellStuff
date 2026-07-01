@@ -1,9 +1,10 @@
 # WPF Autocomplete Support
 
-This project currently supports WPF autocomplete through two practical mechanisms:
+This project currently supports WPF autocomplete through these mechanisms:
 
 1. `Complete-WPFEvent`
-2. Explicitly type-casting `$this` at the top of a DSL script block
+2. `Complete-WPFThis`
+3. Explicitly type-casting `$this` at the top of a DSL script block (fallback)
 
 ## Event Completion
 
@@ -17,7 +18,27 @@ Complete-WPFEvent -TypeName System.Windows.Window
 
 This is the primary built-in autocomplete surface for event names in the DSL workflow.
 
-## Property/Method Completion Hack for `$this`
+## `$this` Property Completion
+
+`Complete-WPFThis` is used by the WPF `TabExpansion2` override to provide
+property completion for `$this.<member>` inside DSL control scriptblocks.
+
+Context is resolved from AST command ancestry and validated against known WPF
+control types, so nested helper commands still complete against the enclosing
+control block.
+
+Example:
+
+```powershell
+Button 'SaveButton' {
+    $this.Co<Tab>
+}
+```
+
+Expected completions include members like `$this.Content` and `$this.ContextMenu`
+for a `Button` block.
+
+## Property/Method Completion Fallback for `$this`
 
 In DSL control script blocks, static analysis does not always infer the runtime type of `$this`.
 A practical workaround is to cast `$this` to the expected control type at the top of the block.
