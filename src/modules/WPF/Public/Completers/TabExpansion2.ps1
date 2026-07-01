@@ -1,8 +1,14 @@
+$CommandParams = @{
+    CommandType = 'Function'
+    ErrorAction = 'SilentlyContinue'
+}
 if (
-    (Get-Command TabExpansion2 -ErrorAction SilentlyContinue) -and
-    (-not (Get-Command OriginalTabExpansion2 -ErrorAction SilentlyContinue))
+    (Get-Command TabExpansion2 @CommandParams) -and
+    (-not (Get-Command OriginalTabExpansion2 @CommandParams))
 ) {
-    Copy-Item -Path Function:TabExpansion2 -Destination Function:OriginalTabExpansion2
+    Copy-Item `
+        -Path Function:\global:TabExpansion2 `
+        -Destination Function:\script:OriginalTabExpansion2
 }
 
 function TabExpansion2 {
