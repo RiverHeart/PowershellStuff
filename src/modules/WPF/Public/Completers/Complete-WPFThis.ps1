@@ -21,8 +21,7 @@ using namespace System.Management.Automation.Language
     I needed Copilot to do the heavy lifting on this one. While it works and that's a major accomplishment,
     it doesn't *feel* elegant. I'm not sure if there's a better way to do this, but I should revisit this
     later to see if there's a better way to determine the context. The way it is now it's going to fail for
-    any custom controls unless it's added here. Additionally, auto-complete is limited to properties but
-    we should be including methods and events as well.
+    any custom controls unless it's added here.
 #>
 function Complete-WPFThis {
     [CmdletBinding()]
@@ -154,7 +153,23 @@ function Complete-WPFThis {
             # Curious implementation here. It appears as though the ToolTip property is expected to be
             # a method signature when CompletionResult is Method. The signature is auto-converted
             # to Powershell syntax. As an example, here is the auto-converted code for the GetField method.
-            # As you can see, a namespace was added and stripped away from the return type. Every other signature
+            #
+            # ```
+            # using namespace System.Reflection
+            #
+            # [FieldInfo] GetField(
+            #    [string] $name,
+            #    [BindingFlags] $bindingAttr)
+            #
+            # [] System.Reflection.FieldInfo GetField(
+            #    [string] $name)
+            #
+            # [] System.Reflection.FieldInfo IReflect.GetField(
+            #    [string] $name,
+            #    [BindingFlags] $bindingAttr)
+            # ```
+            #
+            # As you can see, a `using namespace` was added and the return type shortened. Every other signature
             # is converted as well but fails on the return type. It's unclear if this is a bug, expected behavior,
             # or if I'm just passing the wrong object. I tried to figure out where in the Powershell source
             # this conversion is happening but I couldn't find it.
@@ -163,19 +178,6 @@ function Complete-WPFThis {
             # and one would be wrong about that. Duplicate completions produce duplicate menu items. To prevent bloat,
             # we're only adding one instance of each method and passing in the definition list even though it doesn't
             # format properly.
-            #
-            #    using namespace System.Reflection
-            #
-            #    [FieldInfo] GetField(
-            #        [string] $name,
-            #        [BindingFlags] $bindingAttr)
-            #
-            #    [] System.Reflection.FieldInfo GetField(
-            #        [string] $name)
-            #
-            #    [] System.Reflection.FieldInfo IReflect.GetField(
-            #        [string] $name,
-            #        [BindingFlags] $bindingAttr)
 
             $CompletionCollection.Add([CompletionResult]::new(
                 <# Injected Text #> "`$this.$($CompletionMatch.Name)(",
