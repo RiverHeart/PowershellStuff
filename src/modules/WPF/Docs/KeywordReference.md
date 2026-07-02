@@ -62,6 +62,9 @@ Scope of this page:
 * [Lookup and Composition Helpers](#lookup-and-composition-helpers)
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
+    * [Get-WPFCompletionType](#get-wpfcompletiontype)
+    * [Register-WPFCompletionType](#register-wpfcompletiontype)
+    * [Unregister-WPFCompletionType](#unregister-wpfcompletiontype)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
     * [Reference](#reference)
@@ -1050,6 +1053,34 @@ $adapterParams = @{
 Register-WPFChromeAdapter @adapterParams
 ```
 
+### Get-WPFCompletionType
+
+Returns currently registered custom completion type mappings used by `$this`
+completion.
+
+```powershell
+Get-WPFCompletionType
+Get-WPFCompletionType -Name FancyControl
+```
+
+### Register-WPFCompletionType
+
+Registers or replaces a completion type mapping for a DSL keyword/control name.
+
+```powershell
+Register-WPFCompletionType -Name FancyControl -Type ([System.Windows.Controls.TextBlock])
+Register-WPFCompletionType -Name FancyControl -Type ([System.Windows.Controls.TextBlock]) -Force
+```
+
+### Unregister-WPFCompletionType
+
+Removes one or more completion type mappings.
+
+```powershell
+Unregister-WPFCompletionType -Name FancyControl
+Unregister-WPFCompletionType -All
+```
+
 ### ConvertTo-KeyGesture
 
 Converts one or more gesture strings to WPF `KeyGesture` objects.
@@ -1203,4 +1234,8 @@ The keyword contract is intentionally simple:
 - Prefer $this for current-object configuration.
 
 If behavior changes are needed, update examples and tests in the same change.
+
+`$this` completion metadata is discovered by static .NET reflection on the
+resolved type. Instance-specific PowerShell ETS members (for example members
+added with `Add-Member` or type data script members) are not included.
 

@@ -74,7 +74,12 @@ function Resolve-WPFControlCommandAstAtCursor {
             $ControlName = if ($CommandName -ieq 'App') { 'Window' } else { $CommandName }
 
             if (-not $TypeResolutionCache.ContainsKey($ControlName)) {
-                $TypeResolutionCache[$ControlName] = @(Get-WPFTypeInfo -Name $ControlName)
+                $ResolvedType = Resolve-WPFCompletionType -Name $ControlName
+                if ($ResolvedType) {
+                    $TypeResolutionCache[$ControlName] = @($ResolvedType)
+                } else {
+                    $TypeResolutionCache[$ControlName] = @()
+                }
             }
 
             if ($TypeResolutionCache[$ControlName].Count -eq 0) {

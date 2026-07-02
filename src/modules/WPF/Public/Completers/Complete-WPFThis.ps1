@@ -17,11 +17,16 @@ using namespace System.Management.Automation.Language
     back out if not.
 
 .NOTES
+    Completion metadata is discovered via .NET type reflection on the resolved control type.
+    PowerShell ETS members (for example Add-Member, Update-TypeData, or TypeData script
+    properties applied to instances) are not included in completion results.
+
+    Custom DSL keywords can be mapped to a completion type using Register-WPFCompletionType.
+
     TODO:
     I needed Copilot to do the heavy lifting on this one. While it works and that's a major accomplishment,
     it doesn't *feel* elegant. I'm not sure if there's a better way to do this, but I should revisit this
-    later to see if there's a better way to determine the context. The way it is now it's going to fail for
-    any custom controls unless it's added here.
+    later to see if there's a better way to determine the context.
 #>
 function Complete-WPFThis {
     [CmdletBinding()]
@@ -96,19 +101,67 @@ function Complete-WPFThis {
         $ControlName = 'Window'
     }
 
-    # NOTE: This isn't going to work for custom controls.
     if (-not $script:WPFThisCompletionCache.Completions.ContainsKey($ControlName)) {
-        $Type = @(Get-WPFTypeInfo -Name $ControlName) | Select-Object -First 1
+        $Type = Resolve-WPFCompletionType -Name $ControlName
         if (-not $Type) {
             Write-Debug "Failed to resolve WPF type for control '$ControlName'"
             return
         }
 
-        $script:WPFThisCompletionCache.Completions[$ControlName] = @(
-            $Type |
-                Get-Member |
+        $BindingFlags = [System.Reflection.BindingFlags] 'Instance, Public, FlattenHierarchy'
+
+        $PropertyMembers = @(
+            $Type.GetProperties($BindingFlags) |
                 Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
-                Sort-Object -Unique -Property Name
+                Sort-Object -Unique -Property Name |
+                ForEach-Object {
+                    [pscustomobject] @{
+                        Name = $_.Name
+                        MemberType = 'Property'
+                        Definition = "$($_.PropertyType.FullName) $($_.Name)"
+                    }
+                }
+        )
+
+        $EventMembers = @(
+            $Type.GetEvents($BindingFlags) |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
+                Sort-Object -Unique -Property Name |
+                ForEach-Object {
+                    [pscustomobject] @{
+                        Name = $_.Name
+                        MemberType = 'Event'
+                        Definition = "$($_.EventHandlerType.FullName) $($_.Name)"
+                    }
+                }
+        )
+
+        $MethodMembers = @(
+            $Type.GetMethods($BindingFlags) |
+                Where-Object {
+                    -not $_.IsSpecialName -and
+                    -not [string]::IsNullOrWhiteSpace($_.Name)
+                } |
+                Group-Object -Property Name |
+                Sort-Object -Property Name |
+                ForEach-Object {
+                    $MethodName = $_.Name
+                    $OverloadDefinitions = @(
+                        $_.Group |
+                            Sort-Object -Property ToString |
+                            ForEach-Object { $_.ToString() }
+                    )
+
+                    [pscustomobject] @{
+                        Name = $MethodName
+                        MemberType = 'Method'
+                        Definition = ($OverloadDefinitions -join [Environment]::NewLine)
+                    }
+                }
+        )
+
+        $script:WPFThisCompletionCache.Completions[$ControlName] = @(
+            $PropertyMembers + $EventMembers + $MethodMembers
         )
     }
 
@@ -135,8 +188,7 @@ function Complete-WPFThis {
     $ReplaceLength = $CursorOffset - $ReplaceIndex
     $CompletionCollection = [System.Collections.ObjectModel.Collection[CompletionResult]]::new()
 
-    # NOTE: This feels a bit heavy. Maybe this should be cached instead of the raw matches?
-    # Also, reflections isn't going to give us descriptions for members.
+    # NOTE: Completion metadata is cached by resolved control name.
     foreach ($CompletionMatch in $CompletionMatches) {
         $CompletionResultType = switch ($CompletionMatch.MemberType) {
             { $_ -like '*Property' } { [CompletionResultType]::Property }
@@ -190,7 +242,7 @@ function Complete-WPFThis {
                 <# Injected Text #> "`$this.$($CompletionMatch.Name)",
                 <# Menu Text #> $CompletionMatch.Name,
                 <# Icon Type #> $CompletionResultType,
-                <# ToolTip #> $CompletionMatch.Name
+                <# ToolTip #> $CompletionMatch.Definition
             ))
         }
     }

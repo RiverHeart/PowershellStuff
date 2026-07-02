@@ -9,28 +9,22 @@ Describe 'Complete-WPFThis' -Tag 'Complete-WPFThis' {
     BeforeEach {
         InModuleScope WPF {
             $script:WPFThisCompletionCache = $null
+            Unregister-WPFCompletionType -All
         }
 
         Mock -ModuleName WPF -CommandName Get-WPFTypeInfo -MockWith {
             param([string] $Name)
 
             if ($Name -ieq 'Button') {
-                return [pscustomobject]@{} | Add-Member -MemberType ScriptMethod -Name GetProperties -Value {
-                    @(
-                        [pscustomobject]@{ Name = 'Content' }
-                        [pscustomobject]@{ Name = 'ContextMenu' }
-                        [pscustomobject]@{ Name = 'Width' }
-                    )
-                } -PassThru
+                return [System.Windows.Controls.Button]
             }
 
             if ($Name -ieq 'Window') {
-                return [pscustomobject]@{} | Add-Member -MemberType ScriptMethod -Name GetProperties -Value {
-                    @(
-                        [pscustomobject]@{ Name = 'Title' }
-                        [pscustomobject]@{ Name = 'Top' }
-                    )
-                } -PassThru
+                return [System.Windows.Window]
+            }
+
+            if ($Name -ieq 'Label') {
+                return [System.Windows.Controls.Label]
             }
 
             return $null
@@ -52,8 +46,8 @@ Window 'Main' {
             Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
         }
 
-        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Be @('$this.Content', '$this.ContextMenu')
-        @($result.CompletionMatches | Select-Object -ExpandProperty ListItemText) | Should -Be @('Content', 'ContextMenu')
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Contain '$this.Content'
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Contain '$this.ContextMenu'
     }
 
     It 'resolves to nearest control command when inside nested non-control commands' {
@@ -71,7 +65,25 @@ Window 'Main' {
             Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
         }
 
-        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Be @('$this.Content', '$this.ContextMenu')
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Contain '$this.Content'
+    }
+
+    It 'includes method completions by default' {
+        $source = @"
+Window 'Main' {
+    Button 'SaveButton' {
+        `$this.Foc
+    }
+}
+"@
+        $cursorColumn = $source.IndexOf('$this.Foc') + 9
+
+        $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
+            param($Source, $CursorColumn)
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
+        }
+
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Contain '$this.Focus('
     }
 
     It 'maps App control context to Window properties' {
@@ -87,7 +99,43 @@ App 'MainApp' {
             Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
         }
 
-        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Be @('$this.Title')
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Contain '$this.Title'
+    }
+
+    It 'supports custom keyword completion via registered completion types' {
+        $source = @"
+FancyControl 'Custom' {
+    `$this.Ti
+}
+"@
+        $cursorColumn = $source.IndexOf('$this.Ti') + 8
+
+        $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
+            param($Source, $CursorColumn)
+            Register-WPFCompletionType -Name FancyControl -Type ([System.Windows.Window])
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
+        }
+
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Contain '$this.Title'
+    }
+
+    It 'surfaces one method completion entry and includes overloads in the tooltip' {
+        $source = @"
+StringHost 'Custom' {
+    `$this.Subs
+}
+"@
+        $cursorColumn = $source.IndexOf('$this.Subs') + 10
+
+        $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
+            param($Source, $CursorColumn)
+            Register-WPFCompletionType -Name StringHost -Type ([System.String])
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
+        }
+
+        $substringCompletions = @($result.CompletionMatches | Where-Object { $_.ListItemText -eq 'Substring()' })
+        $substringCompletions.Count | Should -Be 1
+        @($substringCompletions[0].ToolTip -split "(`r`n|`n)").Count | Should -BeGreaterThan 1
     }
 
     It 'returns no completions when cursor is not typing a this member access' {
