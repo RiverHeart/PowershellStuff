@@ -13,15 +13,20 @@ if (
 
 <#
 .SYNOPSIS
-    Tab expansion for WPF DSL scripts.
+    Customized TabExpansion2 with WPF DSL support.
 
 .DESCRIPTION
-    Tab expansion for WPF DSL scripts.
+    This function is a wrapper around the built-in TabExpansion2 function and
+    is imported when the module is loaded.
 
-    This function is a wrapper around the built-in TabExpansion2 function.
-    It first attempts to complete WPF DSL script blocks using the Complete-WPFThis
+    It first attempts to complete WPF DSL script blocks using the `Complete-WPFThis`
     function. If that function returns no completions, it falls back to the
     original TabExpansion2 function.
+
+.NOTES
+    Ideally, this function would be updated to support registration of custom
+    completers so it doesn't need to be modified every time a new completer
+    is required but it is functionally sufficient for now.
 
 .EXAMPLE
     General purpose tab expansion usage
@@ -70,7 +75,12 @@ function TabExpansion2 {
         [Hashtable] $options = $null
     )
 
-    $completions = Complete-WPFThis @PSBoundParameters
+    try {
+        $completions = Complete-WPFThis @PSBoundParameters
+    } catch {
+        Write-Debug "Complete-WPFThis failed during tab expansion: $($_.Exception.Message)"
+    }
+
     if ($completions) {
         return $completions
     }
