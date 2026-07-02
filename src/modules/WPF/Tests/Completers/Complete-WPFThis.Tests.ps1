@@ -138,6 +138,39 @@ StringHost 'Custom' {
         @($substringCompletions[0].ToolTip -split "(`r`n|`n)").Count | Should -BeGreaterThan 1
     }
 
+    It 'does not surface type-literal reflection methods in instance completion context' {
+        $source = @"
+Window 'Main' {
+    `$this.GetPro
+}
+"@
+        $cursorColumn = $source.IndexOf('$this.GetPro') + 12
+
+        $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
+            param($Source, $CursorColumn)
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
+        }
+
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Not -Contain '$this.GetProperty('
+    }
+
+    It 'uses reflection fallback when completion type cannot be instantiated' {
+        $source = @"
+UriHost 'Custom' {
+    `$this.GetPro
+}
+"@
+        $cursorColumn = $source.IndexOf('$this.GetPro') + 12
+
+        $result = InModuleScope WPF -Parameters @{ Source = $source; CursorColumn = $cursorColumn } {
+            param($Source, $CursorColumn)
+            Register-WPFCompletionType -Name UriHost -Type ([System.Uri])
+            Complete-WPFThis -inputScript $Source -cursorColumn $CursorColumn
+        }
+
+        @($result.CompletionMatches | Select-Object -ExpandProperty CompletionText) | Should -Not -Contain '$this.GetProperty('
+    }
+
     It 'returns no completions when cursor is not typing a this member access' {
         $result = InModuleScope WPF {
             Complete-WPFThis -inputScript "Label 'Foo' { Co }" -cursorColumn 17

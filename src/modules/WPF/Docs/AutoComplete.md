@@ -18,10 +18,11 @@ Complete-WPFEvent -TypeName System.Windows.Window
 
 This is the primary built-in autocomplete surface for event names in the DSL workflow.
 
-## `$this` Property Completion
+## `$this` Member Completion
 
 `Complete-WPFThis` is used by the WPF `TabExpansion2` override to provide
-property completion for `$this.<member>` inside DSL control scriptblocks.
+property and method completion for `$this.<member>` inside DSL control
+scriptblocks.
 
 Context is resolved from AST command ancestry and validated against known WPF
 control types, so nested helper commands still complete against the enclosing
@@ -35,8 +36,13 @@ Button 'SaveButton' {
 }
 ```
 
-Expected completions include members like `$this.Content` and `$this.ContextMenu`
-for a `Button` block.
+Expected completions include members like `$this.Content`,
+`$this.ContextMenu`, and method entries such as `$this.Focus(` for a `Button`
+block.
+
+Method completion metadata is sourced from instance `PSObject` members when
+possible, so method tooltips reflect the control instance API instead of
+type-literal reflection members.
 
 ## Property/Method Completion Fallback for `$this`
 

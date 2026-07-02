@@ -108,61 +108,114 @@ function Complete-WPFThis {
             return
         }
 
-        $BindingFlags = [System.Reflection.BindingFlags] 'Instance, Public, FlattenHierarchy'
+        # Method overload formatting for completion tooltips is best when it comes
+        # from PSObject members on an object instance, not the [type] literal.
+        # Using [Type].PSObject.Members targets RuntimeType methods (for example
+        # GetProperty), which do not represent the members available on `$this`.
+        $CompletionTarget = $null
 
-        $PropertyMembers = @(
-            $Type.GetProperties($BindingFlags) |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
-                Sort-Object -Unique -Property Name |
-                ForEach-Object {
-                    [pscustomobject] @{
-                        Name = $_.Name
-                        MemberType = 'Property'
-                        Definition = "$($_.PropertyType.FullName) $($_.Name)"
+        if ($Type -is [type]) {
+            try {
+                # WARNING: This relies on the control type having a parameterless constructor.
+                # If it doesn't, we'll fall back to reflection metadata.
+                $CompletionTarget = [Activator]::CreateInstance($Type)
+            } catch {
+                if ($Type -eq [string]) {
+                    $CompletionTarget = [string]::Empty
+                } else {
+                    Write-Debug "Unable to create completion instance for '$($Type.FullName)'; falling back to reflection member metadata. $($_.Exception.Message)"
+                }
+            }
+        }
+
+        if ($null -ne $CompletionTarget) {
+            $Script:WPFThisCompletionCache.Completions[$ControlName] =
+                foreach ($Member in $CompletionTarget.PSObject.Members) {
+                    switch ($Member.MemberType) {
+                        'Property' {
+                            [pscustomobject] @{
+                                Name = $Member.Name
+                                MemberType = 'Property'
+                                Definition = "$($Member.TypeNameOfValue) $($Member.Name)"
+                            }
+                        }
+                        'Method' {
+                            if ($Member.Name -match '^(get_|set_|add_|remove_)') {
+                                continue
+                            }
+
+                            [pscustomobject] @{
+                                Name = $Member.Name
+                                MemberType = 'Method'
+                                Definition = @($Member.OverloadDefinitions) -join [Environment]::NewLine
+                            }
+                        }
+                        'Event' {
+                            [pscustomobject] @{
+                                Name = $Member.Name
+                                MemberType = 'Event'
+                                Definition = "$($Member.TypeNameOfValue) $($Member.Name)"
+                            }
+                        }
                     }
                 }
-        )
+        } else {
+            $BindingFlags = [System.Reflection.BindingFlags] 'Instance, Public, FlattenHierarchy'
 
-        $EventMembers = @(
-            $Type.GetEvents($BindingFlags) |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
-                Sort-Object -Unique -Property Name |
-                ForEach-Object {
-                    [pscustomobject] @{
-                        Name = $_.Name
-                        MemberType = 'Event'
-                        Definition = "$($_.EventHandlerType.FullName) $($_.Name)"
+            $PropertyMembers = @(
+                $Type.GetProperties($BindingFlags) |
+                    Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
+                    Sort-Object -Unique -Property Name |
+                    ForEach-Object {
+                        [pscustomobject] @{
+                            Name = $_.Name
+                            MemberType = 'Property'
+                            Definition = "$($_.PropertyType.FullName) $($_.Name)"
+                        }
                     }
-                }
-        )
+            )
 
-        $MethodMembers = @(
-            $Type.GetMethods($BindingFlags) |
-                Where-Object {
-                    -not $_.IsSpecialName -and
-                    -not [string]::IsNullOrWhiteSpace($_.Name)
-                } |
-                Group-Object -Property Name |
-                Sort-Object -Property Name |
-                ForEach-Object {
-                    $MethodName = $_.Name
-                    $OverloadDefinitions = @(
-                        $_.Group |
-                            Sort-Object -Property ToString |
-                            ForEach-Object { $_.ToString() }
-                    )
-
-                    [pscustomobject] @{
-                        Name = $MethodName
-                        MemberType = 'Method'
-                        Definition = ($OverloadDefinitions -join [Environment]::NewLine)
+            $EventMembers = @(
+                $Type.GetEvents($BindingFlags) |
+                    Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } |
+                    Sort-Object -Unique -Property Name |
+                    ForEach-Object {
+                        [pscustomobject] @{
+                            Name = $_.Name
+                            MemberType = 'Event'
+                            Definition = "$($_.EventHandlerType.FullName) $($_.Name)"
+                        }
                     }
-                }
-        )
+            )
 
-        $script:WPFThisCompletionCache.Completions[$ControlName] = @(
-            $PropertyMembers + $EventMembers + $MethodMembers
-        )
+            $MethodMembers = @(
+                $Type.GetMethods($BindingFlags) |
+                    Where-Object {
+                        -not $_.IsSpecialName -and
+                        -not [string]::IsNullOrWhiteSpace($_.Name)
+                    } |
+                    Group-Object -Property Name |
+                    Sort-Object -Property Name |
+                    ForEach-Object {
+                        $MethodName = $_.Name
+                        $OverloadDefinitions = @(
+                            $_.Group |
+                                Sort-Object -Property ToString |
+                                ForEach-Object { $_.ToString() }
+                        )
+
+                        [pscustomobject] @{
+                            Name = $MethodName
+                            MemberType = 'Method'
+                            Definition = ($OverloadDefinitions -join [Environment]::NewLine)
+                        }
+                    }
+            )
+
+            $script:WPFThisCompletionCache.Completions[$ControlName] = @(
+                $PropertyMembers + $EventMembers + $MethodMembers
+            )
+        }
     }
 
     $MemberPrefix = $ThisMemberMatch.Groups['member'].Value
@@ -202,34 +255,12 @@ function Complete-WPFThis {
             continue
         } elseif ($CompletionResultType -eq [CompletionResultType]::Method) {
             # NOTE:
-            # Curious implementation here. It appears as though the ToolTip property is expected to be
-            # a method signature when CompletionResult is Method. The signature is auto-converted from C#
-            # to Powershell syntax. As an example, here is the auto-converted code for the GetField method.
-            #
-            # ```
-            # using namespace System.Reflection
-            #
-            # [FieldInfo] GetField(
-            #    [string] $name,
-            #    [BindingFlags] $bindingAttr)
-            #
-            # [] System.Reflection.FieldInfo GetField(
-            #    [string] $name)
-            #
-            # [] System.Reflection.FieldInfo IReflect.GetField(
-            #    [string] $name,
-            #    [BindingFlags] $bindingAttr)
-            # ```
-            #
-            # As you can see, a `using namespace` was added and the return type shortened. Every other signature
-            # is converted as well but fails on the return type. It's unclear if this is a bug, expected behavior,
-            # or if I'm just passing the wrong object. I tried to figure out where in the Powershell source
-            # this conversion is happening but I couldn't find it.
-            #
-            # One might hope that you could define multiple completions for the same method with different signatures
-            # and one would be wrong about that. Duplicate completions produce duplicate menu items. To prevent bloat,
-            # we're only adding one instance of each method and passing in the definition list even though it doesn't
-            # format properly.
+            # Based on existing behavior in PowerShell, the ToolTip property of a CompletionResult seems
+            # to expect a method signature when the CompletionResultType is Method. The signature is
+            # auto-converted from C# to Powershell syntax. It is critical that the signature includes
+            # the return type, method name, and named parameter list for conversion to work properly.
+            # Unfortunately, the lack of an easy way to get said signature makes it difficult. The ones
+            # exposed via `MethodInfo.ToString()` lack parameter names.
 
             $CompletionCollection.Add([CompletionResult]::new(
                 <# Injected Text #> "`$this.$($CompletionMatch.Name)(",
