@@ -13,6 +13,7 @@ The DSL optimizes for readability, expressing user intent, and reducing boilerpl
 * [Design Philosophy](#design-philosophy)
   * [Code First](#code-first)
   * [Express User Intent](#express-user-intent)
+  * [One Obvious Way](#one-obvious-way)
 * [Why Use it](#why-use-it)
 * [When This Is Not a Fit](#when-this-is-not-a-fit)
 * [Requirements](#requirements)
@@ -192,6 +193,10 @@ If the quintessential app includes a menu, a body, maybe a footer and/or status 
 
 Making a control visible depending on a boolean property is another example. In C#/WPF, you need to write a visibility converter for this common scenario. In the DSL you add `State @{ IsFullScreen = $true }` to your `Window`/`App` and `Link Visibility -ToState IsFullScreen -Invert` to each property you want to toggle visibility on and it infers what you want to happen.
 
+## One Obvious Way
+
+I *really* like the [Zen of Python](https://peps.python.org/pep-0020/#the-zen-of-python), especially "There should be one-- and preferably only one --obvious way to do it". If there's one thing that grinds my gears it's the constant flux of framework boilerplate. Progress is going to happen but ideally we design stuff with the flexibility and forethought to evolve rather than be replaced.
+
 ## Why Use It
 
 - Build WPF applications directly in PowerShell.
@@ -220,18 +225,21 @@ For a more powerful editing experience, you can install [VSCode](https://code.vi
 
 Usable for experimentation and personal tools, still evolving.
 
-Current limitations:
+**Current limitations:**
 
-- Editor autocomplete is limited.
+- Editor autocomplete is limited but growing. See [AutoComplete](./Docs/AutoComplete.md) for details
 - Error reporting still needs improvement.
 - Some DSL areas are more mature than others.
 - Documentation is still catching up with implementation changes.
+- No PowershellGallery for ease of installation.
+    - Kind of pointless to go through the trouble if no one else is using this.
+    - And I haven't decided on a name yet.
 
 ## Why Make This?
 
 Many reasons, but a few big ones:
 
-- WinForms is limited compared to WPF
+- WinForms' controls and styling are limited compared to WPF
 - WPF requires too much ceremony.
 - Non-trivial XAML *feels* overwhelming (to me).
 - C# is powerful, but the tooling and boilerplate can make it feel heavy.

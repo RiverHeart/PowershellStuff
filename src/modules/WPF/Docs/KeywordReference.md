@@ -1235,8 +1235,3 @@ The keyword contract is intentionally simple:
 - Prefer $this for current-object configuration.
 
 If behavior changes are needed, update examples and tests in the same change.
-
-`$this` completion metadata is discovered by static .NET reflection on the
-resolved type. Instance-specific PowerShell ETS members (for example members
-added with `Add-Member` or type data script members) are not included.
-

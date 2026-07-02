@@ -40,14 +40,15 @@ Expected completions include members like `$this.Content`,
 `$this.ContextMenu`, and method entries such as `$this.Focus(` for a `Button`
 block.
 
-Method completion metadata is sourced from instance `PSObject` members when
-possible, so method tooltips reflect the control instance API instead of
-type-literal reflection members.
+`$this` completion metadata is discovered from the resolved .NET type (reflection)
+and, when an instance can be created, `PSObject` members so that completions reflect
+the control instance API instead of type-literal reflection members and so overload
+definitions are properly formatted for the tooltip (as they require param names in the signature).
 
-## Property/Method Completion Fallback for `$this`
+### Completion Hinting
 
-In DSL control script blocks, static analysis does not always infer the runtime type of `$this`.
-A practical workaround is to cast `$this` to the expected control type at the top of the block.
+In the event that custom completion fails, you can cast `$this` to the expected control type at the top
+of the scriptblock. This is enough signal for regular TabExpansion2 to work.
 
 Example:
 
@@ -69,9 +70,3 @@ DataGrid 'ProcessList' {
     $this.AutoGenerateColumns = $false
 }
 ```
-
-## Notes
-
-- This is an intentional workaround to improve editor assistance in DSL script blocks.
-- The cast is for tooling/autocomplete ergonomics and should not change runtime behavior when the control type is correct.
-- If the cast type is incorrect, you may hide real issues or get confusing IntelliSense suggestions.
