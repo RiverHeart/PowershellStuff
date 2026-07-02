@@ -8,7 +8,7 @@
 #>
 function Get-WPFCompletionTypeRegistry {
     [CmdletBinding()]
-    [OutputType([hashtable])]
+    [OutputType([System.Collections.IDictionary])]
     param()
 
     if (-not $script:WPFCompletionTypeRegistry) {
