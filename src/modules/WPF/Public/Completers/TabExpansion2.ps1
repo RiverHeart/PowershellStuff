@@ -11,6 +11,40 @@ if (
         -Destination Function:\script:OriginalTabExpansion2
 }
 
+<#
+.SYNOPSIS
+    Tab expansion for WPF DSL scripts.
+
+.DESCRIPTION
+    Tab expansion for WPF DSL scripts.
+
+    This function is a wrapper around the built-in TabExpansion2 function.
+    It first attempts to complete WPF DSL script blocks using the Complete-WPFThis
+    function. If that function returns no completions, it falls back to the
+    original TabExpansion2 function.
+
+.EXAMPLE
+    General purpose tab expansion usage
+
+    $Script = ' "Foo". '
+    $CursorColumn = $Script.ToString().IndexOf('.') + 1
+    TabExpansion2 -inputScript $script -cursorColumn $cursorColumn |
+        ForEach-Object { $_.CompletionMatches.CompletionText }
+
+.EXAMPLE
+    Auto complete `$this` members inside WPF DSL script blocks.
+
+    $Script = {
+        Window 'Main' {
+            Button 'SaveButton' {
+                $this.Co
+            }
+        }
+    }
+    $CursorColumn = $Script.ToString().IndexOf('$this.Co') + 8
+    TabExpansion2 -inputScript $script -cursorColumn $cursorColumn |
+        ForEach-Object { $_.CompletionMatches.CompletionText }
+#>
 function TabExpansion2 {
     [CmdletBinding(DefaultParameterSetName = 'ScriptInputSet')]
     [OutputType([System.Management.Automation.CommandCompletion])]
