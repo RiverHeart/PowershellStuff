@@ -38,4 +38,38 @@ Describe 'ListView' -Tag 'ListView' {
         $Result.View.Columns[0].Header | Should -Be 'Name'
         $Result.View.Columns[0].DisplayMemberBinding.Path.Path | Should -Be 'ProcessName'
     }
+
+    It 'Should not re-add GridViewColumn when ListView is nested inside Grid' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        {
+            $ErrorActionPreference = 'Stop'
+
+            $null = Window "Window_$Id" {
+                Grid "Grid_$Id" {
+                    Row {
+                        Column {
+                            ListView "ListView_$Id" {
+                                GridView {
+                                    GridViewColumn {
+                                        $this.Header = 'Amount'
+                                        $this.DisplayMemberBinding = Binding 'Amount'
+                                    }
+
+                                    GridViewColumn {
+                                        $this.Header = 'Interest'
+                                        $this.DisplayMemberBinding = Binding 'Interest'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } | Should -Not -Throw
+
+        $ListView = Reference "ListView_$Id"
+        $ListView.View | Should -BeOfType [System.Windows.Controls.GridView]
+        $ListView.View.Columns.Count | Should -Be 2
+    }
 }
