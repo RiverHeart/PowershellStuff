@@ -11,16 +11,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.datagrid
 #>
 function DataGrid {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-DataGrid')]
     [OutputType([void], [System.Windows.Controls.DataGrid])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -30,10 +31,11 @@ function DataGrid {
     }
 
     try {
-        $DataGrid = [System.Windows.Controls.DataGrid] @{
-            Name = $Name
+        $DataGrid = [System.Windows.Controls.DataGrid]::new()
+        if ($Name -ne '__Nameless__') {
+            $DataGrid.Name = $Name
+            Register-WPFObject $Name $DataGrid
         }
-        Register-WPFObject $Name $DataGrid
         Add-WPFType $DataGrid 'Control'
     } catch {
         Write-Error "Failed to create '$Name' (DataGrid) with error: $_"

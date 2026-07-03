@@ -17,16 +17,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.window
 #>
 function App {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-App')]
     [OutputType([void], [System.Windows.Window])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -38,11 +39,14 @@ function App {
     $ContextId = New-WPFControlContext -Name $Name -Activate
 
     try {
-        $Window = [System.Windows.Window] @{
-            Name = $Name
-        }
+        $Window = [System.Windows.Window]::new()
         Set-WPFControlContext -InputObject $Window -ContextId $ContextId
-        Register-WPFObject -Name $Name -InputObject $Window -ContextId $ContextId -Overwrite
+        if ($Name -ne '__Nameless__') {
+            Register-WPFObject -Name $Name -InputObject $Window -ContextId $ContextId -Overwrite
+            $Window.Name = $Name
+        }
+
+        # Create stable reference to the window for use in child controls
         Register-WPFObject -Name '__WPFWindow' -InputObject $Window -ContextId $ContextId -Overwrite
         $Window.Resources['WPFDialogCloseReason'] = 'User'
 

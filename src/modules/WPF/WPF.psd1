@@ -89,6 +89,8 @@ FunctionsToExport = @(
     'Complete-WPFEvent'
     'Complete-WPFFileInfo'
     'Complete-WPFState'
+    'Complete-WPFThis'
+    'TabExpansion2'
 
     # DSL
 
@@ -167,6 +169,7 @@ FunctionsToExport = @(
     'Get-WPFFileInfo'
     'Get-WPFFileSelection'
     'Get-WPFTextInput'
+    'Get-WPFCompletionType'
     'New-WPFObservableState'
     'New-WPFPoint'
     'New-WPFProject'
@@ -174,12 +177,14 @@ FunctionsToExport = @(
     'New-WPFVariableList'
     'Get-WPFMenu'
     'Get-WPFWindow'
+    'Register-WPFCompletionType'
     'Register-WPFChromeAdapter'
     'Register-WPFObject'
     'Set-WPFClipboard'
     'Set-WPFWindowFullScreen'
     'Show-WPFWindow'
     'Switch-WPFTheme'
+    'Unregister-WPFCompletionType'
     'Unregister-WPFObject'
     'Use-WPFTheme'
 )

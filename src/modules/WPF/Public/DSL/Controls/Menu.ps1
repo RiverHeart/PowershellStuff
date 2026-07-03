@@ -12,16 +12,17 @@
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.menu
 #>
 function Menu {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-Menu')]
     [OutputType([void], [System.Windows.Controls.Menu])]
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
         [ValidatePattern('^\w+$')]
-        [string] $Name,
+        [string] $Name = '__Nameless__',
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -31,10 +32,11 @@ function Menu {
     }
 
     try {
-        $Menu = [System.Windows.Controls.Menu] @{
-            Name = $Name
+        $Menu = [System.Windows.Controls.Menu]::new()
+        if ($Name -ne '__Nameless__') {
+            $Menu.Name = $Name
+            Register-WPFObject $Name $Menu
         }
-        Register-WPFObject $Name $Menu
         Add-WPFType $Menu 'Control'
 
         # Register as stable __WPFMenu alias if parent is a Window
