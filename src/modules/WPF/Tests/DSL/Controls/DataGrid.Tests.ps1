@@ -41,6 +41,10 @@ Describe 'DataGrid' -Tag 'DataGrid' {
     It 'Should not re-add DataGridColumn when DataGrid is nested inside Grid' {
         $Id = [guid]::NewGuid().ToString('N')
 
+        InModuleScope WPF {
+            Mock Write-Warning {}
+        }
+
         {
             $ErrorActionPreference = 'Stop'
 
@@ -60,5 +64,11 @@ Describe 'DataGrid' -Tag 'DataGrid' {
 
         $DataGrid = Reference "DataGrid_$Id"
         $DataGrid.Columns.Count | Should -Be 2
+
+        InModuleScope WPF {
+            Should -Invoke Write-Warning -Times 0 -Exactly -ParameterFilter {
+                $Message -like 'Duplicate DataGridColumn add prevented*'
+            }
+        }
     }
 }

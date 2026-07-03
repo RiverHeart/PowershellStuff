@@ -49,6 +49,10 @@ function New-WPFVariableList {
     $IsCollectorOwner = $InputObject -and (Test-WPFType -InputObject $InputObject -Type 'CollectorOwner')
     if ($IsCollectorOwner) {
         $PSVars.Add([psvariable]::new('WPFCollectChildren', $true))
+    } else {
+        # Explicitly shadow collection mode in non-owner contexts so collector
+        # intent does not leak into nested control scriptblocks.
+        $PSVars.Add([psvariable]::new('WPFCollectChildren', $false))
     }
 
     if ($AdditionalVariables) {

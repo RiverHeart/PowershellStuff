@@ -250,7 +250,7 @@ Describe 'Grid' -Tag 'Grid' {
             $Grid = [System.Windows.Controls.Grid]::new()
 
             $PSVars = New-WPFVariableList -InputObject $Grid
-            @($PSVars | Where-Object Name -eq 'WPFCollectChildren').Count | Should -Be 0
+            ($PSVars | Where-Object Name -eq 'WPFCollectChildren').Value | Should -BeFalse
         }
     }
 

@@ -42,6 +42,10 @@ Describe 'ListView' -Tag 'ListView' {
     It 'Should not re-add GridViewColumn when ListView is nested inside Grid' {
         $Id = [guid]::NewGuid().ToString('N')
 
+        InModuleScope WPF {
+            Mock Write-Warning {}
+        }
+
         {
             $ErrorActionPreference = 'Stop'
 
@@ -71,5 +75,11 @@ Describe 'ListView' -Tag 'ListView' {
         $ListView = Reference "ListView_$Id"
         $ListView.View | Should -BeOfType [System.Windows.Controls.GridView]
         $ListView.View.Columns.Count | Should -Be 2
+
+        InModuleScope WPF {
+            Should -Invoke Write-Warning -Times 0 -Exactly -ParameterFilter {
+                $Message -like 'Duplicate GridViewColumn add prevented*'
+            }
+        }
     }
 }
