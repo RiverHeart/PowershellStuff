@@ -15,12 +15,13 @@ The DSL optimizes for readability, expressing user intent, and reducing boilerpl
   * [Express User Intent](#express-user-intent)
   * [One Obvious Way](#one-obvious-way)
 * [Why Use it](#why-use-it)
-* [When This Is Not a Fit](#when-this-is-not-a-fit)
+* [When Not To Use It](#when-not-to-use-it)
 * [Requirements](#requirements)
 * [Project Status](#project-status)
 * [Project Goals](#project-goals)
 * [Getting Started](#getting-started)
-* [Prior Art](#prior-art)
+* [Similar Projects](#similar-projects)
+  * [Prior Art](#prior-art)
 * [Documentation](#documentation)
 * [Resources](#resources)
 
@@ -193,7 +194,7 @@ If the quintessential app includes a menu, a body, maybe a footer and/or status 
 
 Making a control visible depending on a boolean property is another example. In C#/WPF, you need to write a visibility converter for this common scenario. In the DSL you add `State @{ IsFullScreen = $true }` to your `Window`/`App` and `Link Visibility -ToState IsFullScreen -Invert` to each property you want to toggle visibility on and it infers what you want to happen.
 
-## One Obvious Way
+### One Obvious Way
 
 I *really* like the [Zen of Python](https://peps.python.org/pep-0020/#the-zen-of-python), especially "There should be one-- and preferably only one --obvious way to do it". If there's one thing that grinds my gears it's the constant flux of framework boilerplate. Progress is going to happen but ideally we design stuff with the flexibility and forethought to evolve rather than be replaced.
 
@@ -204,11 +205,14 @@ I *really* like the [Zen of Python](https://peps.python.org/pep-0020/#the-zen-of
 - Reduce boilerplate compared to typical C#/XAML-first workflows.
 - Keep setup friction low for beginners and prototyping.
 
-## When This Is Not a Fit
+## When Not To Use It
 
+- You need cross-platform support.
 - You need to ship a standalone binary/exe. This project intentionally avoids third-party modules, so binary distribution is not a supported workflow.
 - Your team requires a XAML-first designer workflow.
 - You need long-term API stability right now.
+- You need a guarantee I'll work on this forever.
+    - Microsoft seems to believe they own our computers more than we do. If I migrate to Linux full-time it'll make it difficult to work on this unless it turns into a work project.
 
 ## Requirements
 
@@ -245,6 +249,7 @@ Many reasons, but a few big ones:
 - C# is powerful, but the tooling and boilerplate can make it feel heavy.
 - I wanted to see if a Powershell DSL for WPF applications was possible. Turns out it is!
 - If we're allowed to write legit apps in an interpreted language, like Python, I think it's only fair Powershell gets a shot.
+- Web technologies are great in a lot of ways: browser sandboxing, cross platform, built-in accessibility features, ease of distribution via the internet and Electron, the simplicity of vanilla HTML/CSS/Javascript... and then there are all the issues with it, both as a technology and for developing applications, which I shan't bother to recount except to claim as motivation for wanting an enjoyable desktop app authoring experience.
 
 ## Project Goals
 
@@ -310,10 +315,11 @@ Use `-Bare` for a more minimal starter without the default File menu shell:
 New-WPFProject MyApp -Bare
 ```
 
-## Prior Art
+## Similar Projects
+
+### Prior Art
 
 I always knew that there were WPF PowerShell modules out there but I didn't think anyone had made a serious effort at a code first implementation. Most of what I've seen up till this point has just loaded XAML. While searching for more examples to DSL-ify I came across [this tutorial](https://learn.microsoft.com/en-us/archive/msdn-magazine/2011/july/msdn-magazine-windows-powershell-with-wpf-secrets-to-building-a-wpf-application-in-windows-powershell) which uses a `WPK` module. Turns out there were a few projects that attempted what I'm playing with now.
-
 
 * **PowerBoots (2008):** Early attempt to integrate WPF with PowerShell.
 * **WPK (2009):** Microsoft's attempt to standardize a UI-generation kit for administrative tool building.
