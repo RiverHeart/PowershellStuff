@@ -1,9 +1,10 @@
 # WPF Autocomplete Support
 
-This project currently supports WPF autocomplete through two practical mechanisms:
+This project currently supports WPF autocomplete through these mechanisms:
 
 1. `Complete-WPFEvent`
-2. Explicitly type-casting `$this` at the top of a DSL script block
+2. `Complete-WPFThis`
+3. Explicitly type-casting `$this` at the top of a DSL script block (fallback)
 
 ## Event Completion
 
@@ -17,10 +18,37 @@ Complete-WPFEvent -TypeName System.Windows.Window
 
 This is the primary built-in autocomplete surface for event names in the DSL workflow.
 
-## Property/Method Completion Hack for `$this`
+## `$this` Member Completion
 
-In DSL control script blocks, static analysis does not always infer the runtime type of `$this`.
-A practical workaround is to cast `$this` to the expected control type at the top of the block.
+`Complete-WPFThis` is used by the WPF `TabExpansion2` override to provide
+property and method completion for `$this.<member>` inside DSL control
+scriptblocks.
+
+Context is resolved from AST command ancestry and validated against known WPF
+control types, so nested helper commands still complete against the enclosing
+control block.
+
+Example:
+
+```powershell
+Button 'SaveButton' {
+    $this.Co<Tab>
+}
+```
+
+Expected completions include members like `$this.Content`,
+`$this.ContextMenu`, and method entries such as `$this.Focus(` for a `Button`
+block.
+
+`$this` completion metadata is discovered from the resolved .NET type (reflection)
+and, when an instance can be created, `PSObject` members so that completions reflect
+the control instance API instead of type-literal reflection members and so overload
+definitions are properly formatted for the tooltip (as they require param names in the signature).
+
+### Completion Hinting
+
+In the event that custom completion fails, you can cast `$this` to the expected control type at the top
+of the scriptblock. This is enough signal for regular TabExpansion2 to work.
 
 Example:
 
@@ -42,9 +70,3 @@ DataGrid 'ProcessList' {
     $this.AutoGenerateColumns = $false
 }
 ```
-
-## Notes
-
-- This is an intentional workaround to improve editor assistance in DSL script blocks.
-- The cast is for tooling/autocomplete ergonomics and should not change runtime behavior when the control type is correct.
-- If the cast type is incorrect, you may hide real issues or get confusing IntelliSense suggestions.

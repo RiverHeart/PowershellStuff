@@ -62,6 +62,9 @@ Scope of this page:
 * [Lookup and Composition Helpers](#lookup-and-composition-helpers)
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
+    * [Get-WPFCompletionType](#get-wpfcompletiontype)
+    * [Register-WPFCompletionType](#register-wpfcompletiontype)
+    * [Unregister-WPFCompletionType](#unregister-wpfcompletiontype)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
     * [Reference](#reference)
@@ -87,6 +90,8 @@ ControlName 'Name' {
 Behavior notes:
 
 - Inside the scriptblock, $this is the object currently being configured.
+- Tab completion for $this members is context-aware and resolves against the nearest enclosing DSL control command.
+- Method tooltip signatures are derived from instance `PSObject` metadata when available, avoiding type-literal reflection members.
 - Controls created inside another control are auto-attached to the parent.
 - Most controls return nothing when auto-attached, otherwise they return the created object.
 - Return behavior is based on the created control's parent state and whether the `WPFCollectChildren` is set to true in the caller scope.
@@ -1049,6 +1054,34 @@ $adapterParams = @{
 Register-WPFChromeAdapter @adapterParams
 ```
 
+### Get-WPFCompletionType
+
+Returns currently registered custom completion type mappings used by `$this`
+completion.
+
+```powershell
+Get-WPFCompletionType
+Get-WPFCompletionType -Name FancyControl
+```
+
+### Register-WPFCompletionType
+
+Registers or replaces a completion type mapping for a DSL keyword/control name.
+
+```powershell
+Register-WPFCompletionType -Name FancyControl -Type ([System.Windows.Controls.TextBlock])
+Register-WPFCompletionType -Name FancyControl -Type ([System.Windows.Controls.TextBlock]) -Force
+```
+
+### Unregister-WPFCompletionType
+
+Removes one or more completion type mappings.
+
+```powershell
+Unregister-WPFCompletionType -Name FancyControl
+Unregister-WPFCompletionType -All
+```
+
 ### ConvertTo-KeyGesture
 
 Converts one or more gesture strings to WPF `KeyGesture` objects.
@@ -1202,4 +1235,3 @@ The keyword contract is intentionally simple:
 - Prefer $this for current-object configuration.
 
 If behavior changes are needed, update examples and tests in the same change.
-
