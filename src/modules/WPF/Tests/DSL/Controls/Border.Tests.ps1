@@ -57,11 +57,9 @@ Describe 'Border DSL' -Tag 'Border' {
 
     It 'Should return border object when grid child-collection context is active' {
         $Id = [guid]::NewGuid().ToString('N')
-        InModuleScope WPF {
-            $script:Parent = [System.Windows.Controls.Grid]::new()
-            Add-WPFType $script:Parent 'CollectorOwner'
-            $script:PSVars = New-WPFVariableList -InputObject $script:Parent
-        }
+        $Parent = [System.Windows.Controls.Grid]::new()
+        Add-WPFType $Parent 'CollectorOwner'
+        $PSVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {
             Border "Border_$Id" {
