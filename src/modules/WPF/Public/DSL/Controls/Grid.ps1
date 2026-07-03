@@ -45,6 +45,7 @@ function Grid {
             Register-WPFObject $Name $Grid
         }
         Add-WPFType $Grid 'Control'
+        Add-WPFType $Grid 'CollectorOwner'
     } catch {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
     }

@@ -64,6 +64,7 @@ Scope of this page:
     * [MultiTrigger](#multitrigger)
     * [UseStyle](#usestyle)
 * [Lookup and Composition Helpers](#lookup-and-composition-helpers)
+    * [Add-WPFType](#add-wpftype)
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
     * [Get-WPFCompletionType](#get-wpfcompletiontype)
@@ -1076,6 +1077,27 @@ UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
 ```
 
 ## Lookup and Composition Helpers
+
+### Add-WPFType
+
+Annotates an object with WPF DSL metadata using a custom `PSTypeName`.
+
+This is an advanced extension helper intended for custom DSL/control authors. Use it when you create WPF objects outside the built-in keywords and need the DSL to treat them like known control categories.
+
+Examples include:
+
+* Marking a custom control-like object as `Control`
+* Marking a collection-owner object as `CollectorOwner`
+
+```powershell
+$Border = [System.Windows.Controls.Border]::new()
+Add-WPFType -InputObject $Border -Type Control
+```
+
+```powershell
+$Grid = [System.Windows.Controls.Grid]::new()
+Add-WPFType -InputObject $Grid -Type CollectorOwner
+```
 
 ### Get-WPFChromeAdapter
 
