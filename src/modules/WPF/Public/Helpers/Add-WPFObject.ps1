@@ -46,7 +46,7 @@ function Add-WPFObject {
             $Child -is [System.Windows.Controls.DataGridColumn]
         ) {
             if ($InputObject.Columns.IndexOf($Child) -ge 0) {
-                Write-Warning "Duplicate DataGridColumn add prevented for '$ChildName' ($ChildType) on '$SelfName' ($SelfType). This usually indicates a child-collection scope leak."
+                Write-Warning "Duplicate DataGridColumn add prevented for header '$($Child.Header)' ($ChildType) on '$SelfName' ($SelfType). This usually indicates a child-collection scope leak."
                 continue
             }
 
@@ -67,7 +67,7 @@ function Add-WPFObject {
             $Child -is [System.Windows.Controls.GridViewColumn]
         ) {
             if ($InputObject.Columns.IndexOf($Child) -ge 0) {
-                Write-Warning "Duplicate GridViewColumn add prevented for '$ChildName' ($ChildType) on '$SelfName' ($SelfType). This usually indicates a child-collection scope leak."
+                Write-Warning "Duplicate GridViewColumn add prevented for header '$($Child.Header)' ($ChildType) on '$SelfName' ($SelfType). This usually indicates a child-collection scope leak."
                 continue
             }
 
