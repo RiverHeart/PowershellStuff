@@ -45,9 +45,9 @@ function New-WPFVariableList {
         $PSVars.Add([psvariable]::new('WPFFactoryContext', $true))
     }
 
-    # Grid layout is declarative in this DSL: children declared inside Row/Column
-    # still need to be returned so Grid can assign row/column coordinates.
-    if ($InputObject -is [System.Windows.Controls.Grid]) {
+    # Collector ownership is explicit and must be declared by the owning keyword.
+    $IsCollectorOwner = $InputObject -and (Test-WPFType -InputObject $InputObject -Type 'CollectorOwner')
+    if ($IsCollectorOwner) {
         $PSVars.Add([psvariable]::new('WPFCollectChildren', $true))
     }
 

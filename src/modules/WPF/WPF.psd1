@@ -162,6 +162,7 @@ FunctionsToExport = @(
     'Path'
 
     # Helpers
+    'Add-WPFType'
     'Add-WPFObject'
     'Convert-SvgToXaml'
     'ConvertTo-KeyGesture'

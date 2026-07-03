@@ -9,7 +9,7 @@ function Test-WPFType {
         [ValidateSet(
             'Control', 'Handler', 'Shape', 'GridDefinition',
             'Command', 'DataGridColumn', 'ListViewView',
-            'GridViewColumn'
+            'GridViewColumn', 'CollectorOwner'
         )]
         [string[]] $Type
     )

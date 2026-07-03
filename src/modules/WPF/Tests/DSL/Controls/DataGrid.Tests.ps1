@@ -37,4 +37,28 @@ Describe 'DataGrid' -Tag 'DataGrid' {
 
         $Result.ItemsSource | Should -Be $Items
     }
+
+    It 'Should not re-add DataGridColumn when DataGrid is nested inside Grid' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        {
+            $ErrorActionPreference = 'Stop'
+
+            $null = Window "Window_$Id" {
+                Grid "Grid_$Id" {
+                    Row {
+                        Column {
+                            DataGrid "DataGrid_$Id" {
+                                DataGridTextColumn 'Name' 'Name' {}
+                                DataGridTextColumn 'Value' 'Value' {}
+                            }
+                        }
+                    }
+                }
+            }
+        } | Should -Not -Throw
+
+        $DataGrid = Reference "DataGrid_$Id"
+        $DataGrid.Columns.Count | Should -Be 2
+    }
 }

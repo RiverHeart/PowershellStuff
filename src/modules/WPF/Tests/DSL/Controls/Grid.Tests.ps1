@@ -227,6 +227,33 @@ Describe 'Grid' -Tag 'Grid' {
         $Parent.Content.Name | Should -Be -ExpectedValue "Body_$Id"
     }
 
+    It 'Should tag Grid as a collector owner' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Grid = Grid "GridOwner_$Id" { }
+
+        $Grid.PSTypeNames | Should -Contain 'Custom.WPF.CollectorOwner'
+    }
+
+    It 'Should enable collection mode from explicit collector-owner metadata' {
+        InModuleScope WPF {
+            $Button = [System.Windows.Controls.Button]::new()
+            Add-WPFType $Button 'CollectorOwner'
+
+            $PSVars = New-WPFVariableList -InputObject $Button
+            ($PSVars | Where-Object Name -eq 'WPFCollectChildren').Value | Should -BeTrue
+        }
+    }
+
+    It 'Should not enable collection mode for raw Grid instances without collector-owner metadata' {
+        InModuleScope WPF {
+            $Grid = [System.Windows.Controls.Grid]::new()
+
+            $PSVars = New-WPFVariableList -InputObject $Grid
+            @($PSVars | Where-Object Name -eq 'WPFCollectChildren').Count | Should -Be 0
+        }
+    }
+
     It 'Should skip block when invoked with negative prefix' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Window]::new()
