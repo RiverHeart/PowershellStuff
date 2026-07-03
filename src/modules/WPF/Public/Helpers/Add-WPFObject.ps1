@@ -13,15 +13,19 @@ function Add-WPFObject {
     foreach($Child in $ChildObjects) {
         $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
         $ChildType = $Child.GetType().Name
+        $ChildParentProperty = $Child.PSObject.Properties['Parent']
+        $ChildParent = if ($ChildParentProperty) { $Child.Parent } else { $null }
 
         # Ignore if object is correctly parented
-        if ($InputObject -eq $Child.Parent) {
+        if ($ChildParentProperty -and $InputObject -eq $ChildParent) {
             Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
             continue
-        } elseif ($Child.Parent -and ($Child.Parent -ne $InputObject)) {
+        } elseif ($ChildParentProperty -and $ChildParent -and ($ChildParent -ne $InputObject)) {
             # If child has incorrect parent, unattach child.{
-            Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($Child.Parent.Name)' $($Child.Parent.GetType().Name))"
-            $Child.Parent.RemoveChild($Child)
+            Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($ChildParent.Name)' $($ChildParent.GetType().Name))"
+            if ($ChildParent.PSObject.Methods['RemoveChild']) {
+                $ChildParent.RemoveChild($Child)
+            }
         }
 
         # FrameworkElementFactory tree: factories attach to other factories or to ControlTemplate.
@@ -43,6 +47,30 @@ function Add-WPFObject {
         ) {
             Write-Debug "Adding DataGridColumn '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
             $InputObject.Columns.Add($Child)
+            continue
+        }
+        elseif (
+            $InputObject -is [System.Windows.Controls.ListView] -and
+            $Child -is [System.Windows.Controls.GridView]
+        ) {
+            Write-Debug "Setting ListView view '$ChildName' ($ChildType) on '$SelfName' ($SelfType)"
+            $InputObject.View = $Child
+            continue
+        }
+        elseif (
+            $InputObject -is [System.Windows.Controls.GridView] -and
+            $Child -is [System.Windows.Controls.GridViewColumn]
+        ) {
+            Write-Debug "Adding GridViewColumn '$ChildName' ($ChildType) to '$SelfName' ($SelfType)"
+            $InputObject.Columns.Add($Child)
+            continue
+        }
+        elseif (
+            $InputObject -is [System.Windows.Controls.GridViewColumn] -and
+            $Child -is [System.Windows.Controls.GridViewColumnHeader]
+        ) {
+            Write-Debug "Setting GridViewColumn header '$ChildName' ($ChildType) on '$SelfName' ($SelfType)"
+            $InputObject.Header = $Child
             continue
         }
         # Special handling for adding GridDefinitions to Grid.

@@ -29,6 +29,10 @@ Scope of this page:
     * [DockPanel](#dockpanel)
     * [DataGrid](#datagrid)
     * [DataGridTextColumn](#datagridtextcolumn)
+    * [ListView](#listview)
+    * [GridView](#gridview)
+    * [GridViewColumn](#gridviewcolumn)
+    * [GridViewColumnHeader](#gridviewcolumnheader)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
     * [MenuItem](#menuitem)
@@ -407,6 +411,62 @@ DataGrid 'ProcessList' {
     DataGridTextColumn 'CPU' (Binding 'CpuPercent') {
         UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
         UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+    }
+}
+```
+
+### ListView
+
+Creates a ListView. Use a nested `GridView` block to define columns.
+
+```powershell
+ListView 'ProcessList' {
+    $this.ItemsSource = Get-Process
+
+    GridView {
+        GridViewColumn {
+            $this.Header = 'Name'
+            $this.DisplayMemberBinding = [System.Windows.Data.Binding] 'ProcessName'
+        }
+    }
+}
+```
+
+### GridView
+
+Creates a GridView and auto-attaches it when declared inside a `ListView` block.
+
+```powershell
+ListView 'ProcessList' {
+    GridView {
+        GridViewColumn {
+            $this.Header = 'Name'
+        }
+    }
+}
+```
+
+### GridViewColumn
+
+Creates a GridViewColumn and auto-attaches it when declared inside a `GridView` block.
+
+```powershell
+GridView {
+    GridViewColumn {
+        $this.Header = 'CPU'
+        $this.DisplayMemberBinding = [System.Windows.Data.Binding] 'CPU'
+    }
+}
+```
+
+### GridViewColumnHeader
+
+Creates a GridViewColumnHeader and assigns it to the parent `GridViewColumn` header.
+
+```powershell
+GridViewColumn {
+    GridViewColumnHeader {
+        $this.Content = 'CPU %'
     }
 }
 ```

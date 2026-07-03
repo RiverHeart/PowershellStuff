@@ -32,7 +32,8 @@ function Add-WPFType {
         [Parameter(Mandatory)]
         [ValidateSet(
             'Control', 'Handler', 'Shape', 'GridDefinition',
-            'Command', 'DataGridColumn'
+            'Command', 'DataGridColumn', 'ListViewView',
+            'GridViewColumn'
         )]
         [string] $Type,
 
