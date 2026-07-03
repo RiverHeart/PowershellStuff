@@ -71,3 +71,4 @@ For repeatable automation, use the wrapper script:
 * Add Home/End keyboard navigation (optional: PageUp/PageDown)
 * Show user-friendly dialogs for image load/open errors
 * Persist last opened folder between runs
+* Obnoxiously, WPF doesn't support two finger horizontal scroll. Non-trivial hacks are available to address it.

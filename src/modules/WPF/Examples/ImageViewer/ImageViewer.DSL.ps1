@@ -485,6 +485,7 @@ App 'Window' {
                 $this.VerticalScrollbarVisibility = [ScrollBarVisibility]::Auto
                 $this.HorizontalScrollbarVisibility = [ScrollBarVisibility]::Auto
                 $this.Background = 'Transparent'
+                $this.PanningMode = [PanningMode]::Both
 
                 On PreviewMouseWheel {
                     param($sender, $event)
