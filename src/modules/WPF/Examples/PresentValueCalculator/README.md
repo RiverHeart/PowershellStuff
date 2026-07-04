@@ -1,5 +1,5 @@
 # Present Value Calculator
 
-Reimplementation of the WPK [example](https://learn.microsoft.com/en-us/powershell/scripting/samples/creating-a-graphical-date-picker?view=powershell-7.5).
+Reimplementation of the WPK [example](https://learn.microsoft.com/en-us/archive/msdn-magazine/2011/july/msdn-magazine-windows-powershell-with-wpf-secrets-to-building-a-wpf-application-in-windows-powershell).
 
 ![PresentValueCalculator](./PresentValueCalculator.png)
