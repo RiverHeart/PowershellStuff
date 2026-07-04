@@ -2,9 +2,10 @@
 
 This project currently supports WPF autocomplete through these mechanisms:
 
-1. `Complete-WPFEvent`
-2. `Complete-WPFThis`
-3. Explicitly type-casting `$this` at the top of a DSL script block (fallback)
+1. Argument Completers
+2. TabExpansion2 hooks
+3. VSCode Snippets
+4. Explicitly type-casting `$this` at the top of a DSL script block (fallback)
 
 ## Event Completion
 

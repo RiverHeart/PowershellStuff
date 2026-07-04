@@ -21,13 +21,9 @@
 		"description": "Button",
 		"body": [
 			"Button '${1:Name}' {",
-			"\t$self.Content = '${2:Content}'",
-			"\t$self.Width = ${3:Width}",
-			"\t$self.Height = ${4:Height}",
-			"\t$self.IsEnabled = ${5|$True,$False|}",
-			"\n",
-			"When '${6|Click,ContextMenuClosing,ContextMenuOpening,DataContextChanged,DragEnter,DragLeave,DragOver,Drop,FocusableChanged,GiveFeedback,GotFocus,GotKeyboardFocus,GotMouseCapture,GotStylusCapture,GotTouchCapture,Initialized,IsEnabledChanged,IsHitTestVisibleChanged,IsKeyboardFocusedChanged,IsKeyboardFocusWithinChanged,IsMouseCapturedChanged,IsMouseCaptureWithinChanged,IsMouseDirectlyOverChanged,IsStylusCapturedChanged,IsStylusCaptureWithinChanged,IsStylusDirectlyOverChanged,IsVisibleChanged,KeyDown,KeyUp,LayoutUpdated,Loaded,LostFocus,LostKeyboardFocus,LostMouseCapture,LostStylusCapture,LostTouchCapture,ManipulationBoundaryFeedback,ManipulationCompleted,ManipulationDelta,ManipulationInertiaStarting,ManipulationStarted,ManipulationStarting,MouseDoubleClick,MouseDown,MouseEnter,MouseLeave,MouseLeftButtonDown,MouseLeftButtonUp,MouseMove,MouseRightButtonDown,MouseRightButtonUp,MouseUp,MouseWheel,PreviewDragEnter,PreviewDragLeave,PreviewDragOver,PreviewDrop,PreviewGiveFeedback,PreviewGotKeyboardFocus,PreviewKeyDown,PreviewKeyUp,PreviewLostKeyboardFocus,PreviewMouseDoubleClick,PreviewMouseDown,PreviewMouseLeftButtonDown,PreviewMouseLeftButtonUp,PreviewMouseMove,PreviewMouseRightButtonDown,PreviewMouseRightButtonUp,PreviewMouseUp,PreviewMouseWheel,PreviewQueryContinueDrag,PreviewStylusButtonDown,PreviewStylusButtonUp,PreviewStylusDown,PreviewStylusInAirMove,PreviewStylusInRange,PreviewStylusMove,PreviewStylusOutOfRange,PreviewStylusSystemGesture,PreviewStylusUp,PreviewTextInput,PreviewTouchDown,PreviewTouchMove,PreviewTouchUp,QueryContinueDrag,QueryCursor,RequestBringIntoView,SizeChanged,SourceUpdated,StylusButtonDown,StylusButtonUp,StylusDown,StylusEnter,StylusInAirMove,StylusInRange,StylusLeave,StylusMove,StylusOutOfRange,StylusSystemGesture,StylusUp,TargetUpdated,TextInput,ToolTipClosing,ToolTipOpening,TouchDown,TouchEnter,TouchLeave,TouchMove,TouchUp,Unloaded|}' {",
-			"\t\t${7:HandlerLogic}",
+			"\t\\$this.Content = '${2:Content}'",
+			"\tOn ${4:Click} {",
+			"\t\t${5:# TODO: event handler}",
 			"\t}",
 			"}"
 		]
@@ -38,7 +34,10 @@
 		"description": "DatePicker",
 		"body": [
 			"DatePicker '${1:Name}' {",
-			"\t${2:When}",
+			"\t\\$this.SelectedDate = [datetime]::Today",
+			"\tOn ${2:SelectedDateChanged} {",
+			"\t\t${3:# TODO: handle date change}",
+			"\t}",
 			"}"
 		]
 	},
@@ -47,8 +46,14 @@
 		"prefix": "wpf-grid",
 		"description": "Grid",
 		"body": [
-			"Grid '${1:Name}' {",
-			"\t${2:GridRow}",
+			"Grid '${1:Body}' {",
+			"\tRow {",
+			"\t\tColumn {",
+			"\t\t\tVStackPanel {",
+			"\t\t\t\t\\${2:# Content}",
+			"\t\t\t}",
+			"\t\t}",
+			"\t}",
 			"}"
 		]
 	},
@@ -57,9 +62,10 @@
 		"prefix": "wpf-stackpanel",
 		"description": "StackPanel",
 		"body": [
-			"StackPanel '${1:Name}' {",
-			"\t$self.Orientation = [Orientation]::${2|Vertical,Horizontal|}",
-			"\t${3:Control}",
+			"StackPanel '${1:StackPanel}' {",
+			"\t\\$this.Orientation = '${2|Vertical,Horizontal|}'",
+			"",
+			"\t\\${3:# Content}",
 			"}"
 		]
 	},
@@ -69,13 +75,132 @@
 		"description": "Window",
 		"body": [
 			"Window '${1:Name}' {",
-			"\t$self.Title = '${2:Title}'",
-			"\t$self.SizeToContent = ${3|WidthAndHeight,Manual,Width,Height|}",
-			"\t$self.Height = ${4:0}",
-			"\t$self.Width = ${5:0}",
-			"\t$self.WindowStartupLocation = [WindowStartupLocation]::CenterScreen",
-			"\n",
-			"\t${6:Control}",
+			"\t\\$this.Title = '${2:Title}'",
+			"\t\\$this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen",
+			"\t\\$this.Width = ${3:900}",
+			"\t\\$this.Height = ${4:600}",
+			"",
+			"\t${5:# TODO: add content here}",
+			"",
+			"} | Show-WPFWindow"
+		]
+	},
+	"App": {
+		"scope": "powershell",
+		"prefix": "wpf-app",
+		"description": "App shell with Content/Footer/StatusBar",
+		"body": [
+			"App '${1:MainApp}' {",
+			"\t\\$this.Title = '${2:Title}'",
+			"\t\\$this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen",
+			"\tState @{}",
+			"",
+			"\tContent {",
+			"\t\t${3:# TODO: add content here}",
+			"\t}",
+			"",
+			"\tFooter {}",
+			"",
+			"\tStatusBar {}",
+			"\t}",
+			"} | Show-WPFWindow"
+		]
+	},
+	"MenuItem Path": {
+		"scope": "powershell",
+		"prefix": "wpf-menuitem-path",
+		"description": "MenuItem with path shorthand",
+		"body": [
+			"MenuItem '${1:_File/_Action}' {",
+			"\tOn Click {",
+			"\t\t${2:# TODO: menu action}",
+			"\t}",
+			"}"
+		]
+	},
+	"DataGrid": {
+		"scope": "powershell",
+		"prefix": "wpf-datagrid",
+		"description": "DataGrid with explicit columns",
+		"body": [
+			"DataGrid '${1:Name}' {",
+			"\t\\$this.AutoGenerateColumns = \\$false",
+			"\t\\$this.ItemsSource = ${2:Get-Process}",
+			"",
+			"\tDataGridTextColumn '${3:Name}' '${4:ProcessName}' {",
+			"\t\t${5:# Optional column styling}",
+			"\t}",
+			"}"
+		]
+	},
+	"DataGridTextColumn": {
+		"scope": "powershell",
+		"prefix": "wpf-datagrid-column",
+		"description": "DataGridTextColumn with binding path",
+		"body": [
+			"DataGridTextColumn '${1:Header}' '${2:PropertyName}' {",
+			"\t\\$this.Width = [System.Windows.Controls.DataGridLength]::new(${3:1}, [System.Windows.Controls.DataGridLengthUnitType]::Star)",
+			"\t${4:# Optional styles}",
+			"}"
+		]
+	},
+	"Command": {
+		"scope": "powershell",
+		"prefix": "wpf-command",
+		"description": "Command with optional gesture",
+		"body": [
+			"Command '${1:Action}' '${2:Gesture}' {",
+			"\tExecute {",
+			"\t\t${3:# TODO: execute logic}",
+			"\t}",
+			"\tCanExecute {",
+			"\t\t${4:\\$true}",
+			"\t}",
+			"}"
+		]
+	},
+	"Key Gesture": {
+		"scope": "powershell",
+		"prefix": "wpf-key",
+		"description": "Key gesture handler (PreviewKeyDown sugar)",
+		"body": [
+			"Key '${1:KeyOrGesture}' {",
+			"\t${2:# TODO: key action}",
+			"}"
+		]
+	},
+	"Link State Map": {
+		"scope": "powershell",
+		"prefix": "wpf-link-state-map",
+		"description": "Link property to state with value map",
+		"body": [
+			"Link ${1:Text} -ToState ${2:IsBusy} -Map @{",
+			"\t\\$true = '${3:Working...}'",
+			"\t\\$false = '${4:Ready}'",
+			"}"
+		]
+	},
+	"Bind To State Path": {
+		"scope": "powershell",
+		"prefix": "wpf-bind-state",
+		"description": "Bind property to state path",
+		"body": [
+			"Bind ${1:Visibility} -To Window.Tag.${2:IsBusy} ${3:-Invert}"
+		]
+	},
+	"TimedEvent Async": {
+		"scope": "powershell",
+		"prefix": "wpf-timed-event",
+		"description": "TimedEvent with Work and OnComplete",
+		"body": [
+			"TimedEvent '${1:Name}' ${2:3000} {",
+			"\tWork {",
+			"\t\t${3:Action}",
+			"\t}",
+			"\tOnComplete {",
+			"\t\tparam(\\$Result, \\$Sender)",
+			"\t\t${4:# TODO: update UI from result}",
+			"\t}",
 			"}"
 		]
 	}
