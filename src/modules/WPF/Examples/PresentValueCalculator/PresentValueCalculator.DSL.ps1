@@ -25,6 +25,8 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
+Import "$PSScriptRoot/PresentValueCalculator.Styles.ps1"
+
 $Amount = 1000
 $Interest = 0.46
 $NumberOfYears = 2
@@ -57,7 +59,7 @@ function Get-PresentValue {
             Amount = $Amount
             Interest = $Interest
             NumberOfYears = $NumberOfYears
-            PresentValue = $Amount / [Math]::Pow((1 + $Interest), $NumberOfYears)
+            PresentValue = [Math]::Round($Amount / [Math]::Pow((1 + $Interest), $NumberOfYears), 2)
         }
 
         Write-Output $Result
@@ -97,86 +99,103 @@ App 'PresentValueCalculator' {
     }
 
     Content {
-        VStackPanel {
-            Label { $this.Content = 'Amount:' }
-            TextBox 'AmountTextBox' {
-                $this.Text = $Amount
+        HStackPanel {
+            $this.Margin = '10'
+
+            VStackPanel {
+                Label { $this.Content = 'Amount:' }
+                TextBox 'AmountTextBox' {
+                    $this.Text = $Amount
+                }
+
+                Label { $this.Content = 'Interest:' }
+                TextBox 'InterestTextBox' {
+                    $this.Text = $Interest
+                }
+
+                Label { $this.Content = 'Number of Years:' }
+                TextBox 'NumberOfYearsTextBox' {
+                    $this.Text = $NumberOfYears
+                }
+
+                Label { $this.Content = 'Max' }
+                TextBox 'MaxTextBox' {
+                    # Keep defaults in ascending order so Calculate produces visible rows.
+                    $this.Text = 2000
+                }
+
+                Label { $this.Content = 'Step' }
+                TextBox 'StepTextBox' {
+                    $this.Text = 100
+                }
+
+                Button 'CalculateButton' {
+                    $this.Content = 'Calculate'
+                    $this.Margin = '0,10,0,0'
+                    $this.Add_Click({
+                        Write-Debug "Calculating present value for Amount=$Amount, Interest=$Interest, NumberOfYears=$NumberOfYears"
+                        $Amount = [double] (Reference AmountTextBox -Property 'Text')
+                        $Interest = [double] (Reference InterestTextBox -Property 'Text')
+                        $NumberOfYears = [int] (Reference NumberOfYearsTextBox -Property 'Text')
+                        $Max = [double] (Reference MaxTextBox -Property 'Text')
+                        $Step = [Math]::Abs([int] (Reference StepTextBox -Property 'Text'))
+
+                        if ($Step -lt 1) {
+                            $Step = 1
+                        }
+
+                        if ($Max -lt $Amount) {
+                            Write-Debug "Max was less than Amount; clamping Max to Amount so at least one row is produced."
+                            $Max = $Amount
+                        }
+
+                        $AppState = Reference PresentValueCalculator -Property 'Tag'
+                        $AppState.Results = @(
+                            Get-Range -Start $Amount -End $Max -Step $Step |
+                            Get-PresentValue -Interest $Interest -NumberOfYears $NumberOfYears
+                        )
+                    })
+                }
             }
 
-            Label { $this.Content = 'Interest:' }
-            TextBox 'InterestTextBox' {
-                $this.Text = $Interest
-            }
+            Grid {
+                $this.Margin = '20,0,0,0'
+                $this.HorizontalAlignment = 'Left'
 
-            Label { $this.Content = 'Number of Years:' }
-            TextBox 'NumberOfYearsTextBox' {
-                $this.Text = $NumberOfYears
-            }
-
-            Label { $this.Content = 'Max' }
-            TextBox 'MaxTextBox' {
-                # Keep defaults in ascending order so Calculate produces visible rows.
-                $this.Text = 2000
-            }
-
-            Label { $this.Content = 'Step' }
-            TextBox 'StepTextBox' {
-                $this.Text = 100
-            }
-
-            Button 'CalculateButton' {
-                $this.Content = 'Calculate'
-                $this.Margin = '0,10,0,0'
-                $this.Add_Click({
-                    Write-Debug "Calculating present value for Amount=$Amount, Interest=$Interest, NumberOfYears=$NumberOfYears"
-                    $Amount = [double] (Reference AmountTextBox -Property 'Text')
-                    $Interest = [double] (Reference InterestTextBox -Property 'Text')
-                    $NumberOfYears = [int] (Reference NumberOfYearsTextBox -Property 'Text')
-                    $Max = [double] (Reference MaxTextBox -Property 'Text')
-                    $Step = [Math]::Abs([int] (Reference StepTextBox -Property 'Text'))
-
-                    if ($Step -lt 1) {
-                        $Step = 1
+                Row Fit {
+                    Column {
+                        Label { $this.Content = 'Results:' }
                     }
+                }
 
-                    if ($Max -lt $Amount) {
-                        Write-Debug "Max was less than Amount; clamping Max to Amount so at least one row is produced."
-                        $Max = $Amount
-                    }
+                Row Expand {
+                    Column {
+                        ListView 'ResultsListView' {
+                            $this.Margin = '0,10,0,0'
+                            $this.Width = 300
+                            $this.VerticalAlignment = 'Stretch'
 
-                    $AppState = Reference PresentValueCalculator -Property 'Tag'
-                    $AppState.Results = @(
-                        Get-Range -Start $Amount -End $Max -Step $Step |
-                        Get-PresentValue -Interest $Interest -NumberOfYears $NumberOfYears
-                    )
-                })
-            }
+                            Link ItemsSource -ToState Results
 
-            ListView 'ResultsListView' {
-                $this.Margin = '0,10,0,0'
-                $this.Height = 200
-                $this.Width = 300
-                Link ItemsSource -ToState Results
-
-                GridView {
-                    GridViewColumn {
-                        $this.Header = 'Amount'
-                        $this.DisplayMemberBinding = Binding 'Amount'
-                    }
-
-                    GridViewColumn {
-                        $this.Header = 'Present Value'
-                        $this.DisplayMemberBinding = Binding 'PresentValue'
-                    }
-
-                    GridViewColumn {
-                        $this.Header = 'Interest'
-                        $this.DisplayMemberBinding = Binding 'Interest'
-                    }
-
-                    GridViewColumn {
-                        $this.Header = 'Number of Years'
-                        $this.DisplayMemberBinding = Binding 'NumberOfYears'
+                            GridView {
+                                GridViewColumn {
+                                    $this.Header = 'Amount'
+                                    $this.DisplayMemberBinding = Binding 'Amount'
+                                }
+                                GridViewColumn {
+                                    $this.Header = 'Present Value'
+                                    $this.DisplayMemberBinding = Binding 'PresentValue'
+                                }
+                                GridViewColumn {
+                                    $this.Header = 'Interest'
+                                    $this.DisplayMemberBinding = Binding 'Interest'
+                                }
+                                GridViewColumn {
+                                    $this.Header = 'Number of Years'
+                                    $this.DisplayMemberBinding = Binding 'NumberOfYears'
+                                }
+                            }
+                        }
                     }
                 }
             }
