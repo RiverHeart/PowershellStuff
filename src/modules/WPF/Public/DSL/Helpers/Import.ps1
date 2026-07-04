@@ -12,6 +12,10 @@
     allows splitting up a project without going into module territory and it
     fits the DSL style of doing things so here we are.
 
+    TODO:
+    * Guard against recursive imports
+    * Guard against importing the same file multiple times.
+
 .PARAMETER Path
     File path or glob pattern to import. Supports wildcards like .\Functions\*.ps1.
 
