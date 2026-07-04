@@ -161,6 +161,7 @@ FunctionsToExport = @(
 
     # DSL/Shapes
     'Path'
+    'Rectangle'
 
     # Helpers
     'Add-WPFType'

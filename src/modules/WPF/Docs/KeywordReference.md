@@ -538,6 +538,28 @@ Path 'images/arrow-left.svg' {
 }
 ```
 
+### Rectangle
+
+Creates a WPF Rectangle shape that can be used directly in a control body or
+inside a template-like container.
+
+```powershell
+Border 'Banner' {
+    Rectangle 'BannerFill' {
+        $this.Width = 200
+        $this.Height = 100
+        $this.Fill = LinearGradientBrush {
+            $this.StartPoint = '0,0'
+            $this.EndPoint = '1,1'
+            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Yellow', 0.0))
+            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Red', 0.25))
+            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Blue', 0.75))
+            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('LimeGreen', 1.0))
+        }
+    }
+}
+```
+
 ## Commands and Events
 
 ### Command
