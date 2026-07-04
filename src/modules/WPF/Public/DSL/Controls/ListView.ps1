@@ -7,6 +7,9 @@
 
     -ListView 'MyListView' { ...code... }
 
+.NOTES
+    TODO: Find a way to get rid of the ghost column.
+
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.listview
 #>
