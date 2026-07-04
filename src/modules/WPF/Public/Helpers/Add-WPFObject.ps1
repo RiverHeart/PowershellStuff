@@ -21,8 +21,8 @@ function Add-WPFObject {
             Write-Debug "$SelfName ($SelfType) is already a parent of '$ChildName' ($ChildType)"
             continue
         } elseif ($ChildParentProperty -and $ChildParent -and ($ChildParent -ne $InputObject)) {
-            # If child has incorrect parent, unattach child.{
-            Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($ChildParent.Name)' $($ChildParent.GetType().Name))"
+            # If child has incorrect parent, unattach child.
+            Write-Debug "Removing child object '$ChildName' ($ChildType) from '$($ChildParent.Name)' ($($ChildParent.GetType().Name))"
             if ($ChildParent.PSObject.Methods['RemoveChild']) {
                 $ChildParent.RemoveChild($Child)
             }
