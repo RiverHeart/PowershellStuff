@@ -50,6 +50,10 @@ function Column {
     $PSVars = New-WPFVariableList -InputObject $Parent
     $Children = @($ScriptBlock.InvokeWithContext($null, $PSVars))
 
+    if ($Children.Count -gt 1 -and -not $Parent.AllowPackedCells) {
+        throw "This grid isn't configured to allow multiple children per cell. Use a StackPanel or other container to group multiple children into a single child. To opt out of this behavior, set `AllowPackedCells = `$true` on the grid."
+    }
+
     return [pscustomobject] @{
         PSTypeName = 'WPF.Grid.ColumnSpec'
         Width = [System.Windows.GridLength] $Width

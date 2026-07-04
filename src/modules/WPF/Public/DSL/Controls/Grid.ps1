@@ -40,6 +40,7 @@ function Grid {
 
     try {
         $Grid = [System.Windows.Controls.Grid]::new()
+        $Grid | Add-Member -Name 'AllowPackedCells' -MemberType NoteProperty -Value $false -Force
         if ($Name -ne '__Nameless__') {
             $Grid.Name = $Name
             Register-WPFObject $Name $Grid

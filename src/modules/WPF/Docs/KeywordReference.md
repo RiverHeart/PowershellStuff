@@ -236,6 +236,8 @@ StatusBarItem 'ZoomItem' {
 
 Creates a Grid and processes Row and Column specs.
 
+Grid instances expose an `AllowPackedCells` note property. It defaults to `$false` so a cell must contain a single child unless the layout explicitly wraps multiple controls in a container. Set `AllowPackedCells = $true` to allow multiple returned children in the same cell.
+
 ```powershell
 Grid 'Body' {
     Row {

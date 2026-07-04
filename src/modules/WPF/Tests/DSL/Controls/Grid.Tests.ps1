@@ -25,6 +25,8 @@ Describe 'Grid' -Tag 'Grid' {
     It 'Should be able to add rows' {
         $Id = [guid]::NewGuid().ToString('N')
         $Grid = Grid "Grid_$Id" {
+            $this.AllowPackedCells = $true
+
             Row {
                 Column {
                     Label "Foo_$Id" {}
@@ -68,6 +70,51 @@ Describe 'Grid' -Tag 'Grid' {
 
         $Grid.RowDefinitions.Count | Should -Be -ExpectedValue 2
         $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 2
+    }
+
+    It 'Should expose AllowPackedCells as a false note property by default' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Grid = Grid "GridPackedDefault_$Id" { }
+
+        $Grid.PSObject.Properties['AllowPackedCells'] | Should -Not -BeNullOrEmpty
+        $Grid.AllowPackedCells | Should -BeFalse
+    }
+
+    It 'Should throw when multiple children are returned to a packed cell by default' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        {
+            Grid "GridPackedReject_$Id" {
+                Row {
+                    Column {
+                        Label "PackedA_$Id" { }
+                        Label "PackedB_$Id" { }
+                    }
+                }
+            }
+        } | Should -Throw -ExpectedMessage "*This grid isn't configured to allow multiple children per cell.*"
+    }
+
+    It 'Should allow multiple children per cell when AllowPackedCells is enabled' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Grid = Grid "GridPackedAllow_$Id" {
+            $this.AllowPackedCells = $true
+
+            Row {
+                Column {
+                    Label "PackedC_$Id" { }
+                    Label "PackedD_$Id" { }
+                }
+            }
+        }
+
+        $Grid.Children | Should -HaveCount 2
+        [System.Windows.Controls.Grid]::GetRow($Grid.Children[0]) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($Grid.Children[0]) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetRow($Grid.Children[1]) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($Grid.Children[1]) | Should -Be 0
     }
 
     It 'Should not fail resolving row and column definition types' {
