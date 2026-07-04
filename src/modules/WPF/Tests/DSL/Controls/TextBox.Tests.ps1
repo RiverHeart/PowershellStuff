@@ -51,6 +51,7 @@ Describe 'TextBox' -Tag 'TextBox' {
     It 'Should return textbox object when grid child-collection context is active' {
         $Id = [guid]::NewGuid().ToString('N')
         $Parent = [System.Windows.Controls.Grid]::new()
+        Add-WPFType $Parent 'CollectorOwner'
         $PSVars = New-WPFVariableList -InputObject $Parent
 
         $Result = {

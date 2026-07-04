@@ -29,6 +29,10 @@ Scope of this page:
     * [DockPanel](#dockpanel)
     * [DataGrid](#datagrid)
     * [DataGridTextColumn](#datagridtextcolumn)
+    * [ListView](#listview)
+    * [GridView](#gridview)
+    * [GridViewColumn](#gridviewcolumn)
+    * [GridViewColumnHeader](#gridviewcolumnheader)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
     * [MenuItem](#menuitem)
@@ -44,6 +48,7 @@ Scope of this page:
 * [Binding and Resources](#binding-and-resources)
     * [State](#state)
     * [Bind](#bind)
+    * [Link](#link)
     * [BindProperty](#bindproperty)
     * [Binding](#binding)
     * [ValueConverter](#valueconverter)
@@ -60,6 +65,7 @@ Scope of this page:
     * [MultiTrigger](#multitrigger)
     * [UseStyle](#usestyle)
 * [Lookup and Composition Helpers](#lookup-and-composition-helpers)
+    * [Add-WPFType](#add-wpftype)
     * [Get-WPFChromeAdapter](#get-wpfchromeadapter)
     * [Register-WPFChromeAdapter](#register-wpfchromeadapter)
     * [Get-WPFCompletionType](#get-wpfcompletiontype)
@@ -230,6 +236,8 @@ StatusBarItem 'ZoomItem' {
 ### Grid
 
 Creates a Grid and processes Row and Column specs.
+
+Grid instances expose an `AllowPackedCells` note property. It defaults to `$false` so a cell must contain a single child unless the layout explicitly wraps multiple controls in a container. Set `AllowPackedCells = $true` to allow multiple returned children in the same cell.
 
 ```powershell
 Grid 'Body' {
@@ -407,6 +415,62 @@ DataGrid 'ProcessList' {
     DataGridTextColumn 'CPU' (Binding 'CpuPercent') {
         UseStyle 'RightAlignedDataGridHeader' $this -TargetType HeaderStyle
         UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
+    }
+}
+```
+
+### ListView
+
+Creates a ListView. Use a nested `GridView` block to define columns.
+
+```powershell
+ListView 'ProcessList' {
+    $this.ItemsSource = Get-Process
+
+    GridView {
+        GridViewColumn {
+            $this.Header = 'Name'
+            $this.DisplayMemberBinding = [System.Windows.Data.Binding] 'ProcessName'
+        }
+    }
+}
+```
+
+### GridView
+
+Creates a GridView and auto-attaches it when declared inside a `ListView` block.
+
+```powershell
+ListView 'ProcessList' {
+    GridView {
+        GridViewColumn {
+            $this.Header = 'Name'
+        }
+    }
+}
+```
+
+### GridViewColumn
+
+Creates a GridViewColumn and auto-attaches it when declared inside a `GridView` block.
+
+```powershell
+GridView {
+    GridViewColumn {
+        $this.Header = 'CPU'
+        $this.DisplayMemberBinding = [System.Windows.Data.Binding] 'CPU'
+    }
+}
+```
+
+### GridViewColumnHeader
+
+Creates a GridViewColumnHeader and assigns it to the parent `GridViewColumn` header.
+
+```powershell
+GridViewColumn {
+    GridViewColumnHeader {
+        $this.Content = 'CPU %'
     }
 }
 ```
@@ -714,6 +778,13 @@ Link Text -Property Count
 Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
 ```
 
+When choosing between the two modes:
+
+- Prefer `-ToState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
+- `-ToState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
+- Prefer `-Property` for regular WPF binding paths and custom sources (`-Self`, `-ElementName`, `-Source`, `-TemplatedParent`).
+- In `-Property` mode with no explicit source selector, binding uses inherited `DataContext`.
+
 `-Path` is supported as an alias for `-Property`:
 
 ```powershell
@@ -1016,6 +1087,27 @@ UseStyle 'RightAlignedDataGridCell' $this -TargetType ElementStyle
 ```
 
 ## Lookup and Composition Helpers
+
+### Add-WPFType
+
+Annotates an object with WPF DSL metadata using a custom `PSTypeName`.
+
+This is an advanced extension helper intended for custom DSL/control authors. Use it when you create WPF objects outside the built-in keywords and need the DSL to treat them like known control categories.
+
+Examples include:
+
+* Marking a custom control-like object as `Control`
+* Marking a collection-owner object as `CollectorOwner`
+
+```powershell
+$Border = [System.Windows.Controls.Border]::new()
+Add-WPFType -InputObject $Border -Type Control
+```
+
+```powershell
+$Grid = [System.Windows.Controls.Grid]::new()
+Add-WPFType -InputObject $Grid -Type CollectorOwner
+```
 
 ### Get-WPFChromeAdapter
 

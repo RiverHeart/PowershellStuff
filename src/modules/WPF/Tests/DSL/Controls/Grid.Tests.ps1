@@ -25,6 +25,8 @@ Describe 'Grid' -Tag 'Grid' {
     It 'Should be able to add rows' {
         $Id = [guid]::NewGuid().ToString('N')
         $Grid = Grid "Grid_$Id" {
+            $this.AllowPackedCells = $true
+
             Row {
                 Column {
                     Label "Foo_$Id" {}
@@ -68,6 +70,51 @@ Describe 'Grid' -Tag 'Grid' {
 
         $Grid.RowDefinitions.Count | Should -Be -ExpectedValue 2
         $Grid.ColumnDefinitions.Count | Should -Be -ExpectedValue 2
+    }
+
+    It 'Should expose AllowPackedCells as a false note property by default' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Grid = Grid "GridPackedDefault_$Id" { }
+
+        $Grid.PSObject.Properties['AllowPackedCells'] | Should -Not -BeNullOrEmpty
+        $Grid.AllowPackedCells | Should -BeFalse
+    }
+
+    It 'Should throw when multiple children are returned to a packed cell by default' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        {
+            Grid "GridPackedReject_$Id" {
+                Row {
+                    Column {
+                        Label "PackedA_$Id" { }
+                        Label "PackedB_$Id" { }
+                    }
+                }
+            }
+        } | Should -Throw -ExpectedMessage "*This grid isn't configured to allow multiple children per cell.*"
+    }
+
+    It 'Should allow multiple children per cell when AllowPackedCells is enabled' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Grid = Grid "GridPackedAllow_$Id" {
+            $this.AllowPackedCells = $true
+
+            Row {
+                Column {
+                    Label "PackedC_$Id" { }
+                    Label "PackedD_$Id" { }
+                }
+            }
+        }
+
+        $Grid.Children | Should -HaveCount 2
+        [System.Windows.Controls.Grid]::GetRow($Grid.Children[0]) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($Grid.Children[0]) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetRow($Grid.Children[1]) | Should -Be 0
+        [System.Windows.Controls.Grid]::GetColumn($Grid.Children[1]) | Should -Be 0
     }
 
     It 'Should not fail resolving row and column definition types' {
@@ -225,6 +272,33 @@ Describe 'Grid' -Tag 'Grid' {
         @($Result).Count | Should -Be -ExpectedValue 0
         $Parent.Content | Should -Not -BeNullOrEmpty
         $Parent.Content.Name | Should -Be -ExpectedValue "Body_$Id"
+    }
+
+    It 'Should tag Grid as a collector owner' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Grid = Grid "GridOwner_$Id" { }
+
+        $Grid.PSTypeNames | Should -Contain 'Custom.WPF.CollectorOwner'
+    }
+
+    It 'Should enable collection mode from explicit collector-owner metadata' {
+        InModuleScope WPF {
+            $Button = [System.Windows.Controls.Button]::new()
+            Add-WPFType $Button 'CollectorOwner'
+
+            $PSVars = New-WPFVariableList -InputObject $Button
+            ($PSVars | Where-Object Name -eq 'WPFCollectChildren').Value | Should -BeTrue
+        }
+    }
+
+    It 'Should not enable collection mode for raw Grid instances without collector-owner metadata' {
+        InModuleScope WPF {
+            $Grid = [System.Windows.Controls.Grid]::new()
+
+            $PSVars = New-WPFVariableList -InputObject $Grid
+            ($PSVars | Where-Object Name -eq 'WPFCollectChildren').Value | Should -BeFalse
+        }
     }
 
     It 'Should skip block when invoked with negative prefix' {

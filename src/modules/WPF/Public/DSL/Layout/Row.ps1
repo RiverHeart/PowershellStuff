@@ -8,15 +8,18 @@
     -Row Expand { ...code... }
 #>
 function Row {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Height')]
     [Alias('-Row')]
     [OutputType([pscustomobject])]
     param(
-        # Keep this as object so callers can use intuitive tokens like Fit and Expand.
-        [Parameter(Position=0)]
-        [object] $Height = [System.Windows.GridLength]::Auto,
+        # Keep this as string so callers can use intuitive tokens like Fit and Expand.
+        [Parameter(ParameterSetName = 'Height', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
+        [ValidateNotNullOrEmpty()]
+        [string] $Height = [System.Windows.GridLength]::Auto,
 
-        [Parameter(Position=1)]
+        [Parameter(Mandatory, ParameterSetName = 'Height', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -28,10 +31,6 @@ function Row {
     if ($MyInvocation.InvocationName.StartsWith('-')) {
         Write-WPFDisabledBlockWarning -Invocation $MyInvocation
         return
-    }
-
-    if (-not $ScriptBlock) {
-        throw 'Row requires a scriptblock.'
     }
 
     $Parent = $PSCmdlet.GetVariableValue('this')

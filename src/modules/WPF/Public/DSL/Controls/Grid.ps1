@@ -40,11 +40,13 @@ function Grid {
 
     try {
         $Grid = [System.Windows.Controls.Grid]::new()
+        $Grid | Add-Member -Name 'AllowPackedCells' -MemberType NoteProperty -Value $false -Force
         if ($Name -ne '__Nameless__') {
             $Grid.Name = $Name
             Register-WPFObject $Name $Grid
         }
         Add-WPFType $Grid 'Control'
+        Add-WPFType $Grid 'CollectorOwner'
     } catch {
         Write-Error "Failed to create '$Name' (Grid) with error: $_"
     }
@@ -65,6 +67,7 @@ function Grid {
     for ($RowIndex = 0; $RowIndex -lt $Rows.Count; $RowIndex++) {
         $Row = $Rows[$RowIndex]
         if ($null -eq $Row) {
+            Write-Debug "[Row=$RowIndex] Skipping null row"
             continue
         }
 
@@ -73,13 +76,17 @@ function Grid {
         }
 
         if ($Grid.RowDefinitions.Count -le $RowIndex) {
+            Write-Debug "[Row=$RowIndex] Adding row definition"
             $Grid.RowDefinitions.Add((New-WPFGridRow -Height $Row.Height))
         }
 
         $Columns = @($Row.Columns)
         for ($ColumnIndex = 0; $ColumnIndex -lt $Columns.Count; $ColumnIndex++) {
+            Write-Debug "[Row=$RowIndex Column=$ColumnIndex] Processing column"
+
             $Column = $Columns[$ColumnIndex]
             if ($null -eq $Column) {
+                Write-Debug "[Row=$RowIndex Column=$ColumnIndex] Skipping null column"
                 continue
             }
 
@@ -88,6 +95,7 @@ function Grid {
             }
 
             if ($Grid.ColumnDefinitions.Count -le $ColumnIndex) {
+                Write-Debug "[Row=$RowIndex Column=$ColumnIndex] Adding column definition"
                 $Grid.ColumnDefinitions.Add((New-WPFGridColumn -Width $Column.Width))
             }
 
@@ -95,10 +103,12 @@ function Grid {
                 if ($null -eq $Child) {
                     continue
                 }
+                $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
+                $ChildType = $Child.GetType().Name
 
+                Write-Debug "[Row=$RowIndex Column=$ColumnIndex] Setting child '$ChildName' ($ChildType) position"
                 [System.Windows.Controls.Grid]::SetRow($Child, $RowIndex)
                 [System.Windows.Controls.Grid]::SetColumn($Child, $ColumnIndex)
-                Add-WPFObject $Grid $Child
             }
         }
     }

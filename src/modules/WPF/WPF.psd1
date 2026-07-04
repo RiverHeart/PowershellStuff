@@ -104,6 +104,10 @@ FunctionsToExport = @(
     'Button'
     'DataGrid'
     'DataGridTextColumn'
+    'ListView'
+    'GridView'
+    'GridViewColumn'
+    'GridViewColumnHeader'
     'DatePicker'
     'DockPanel'
     'Image'
@@ -158,6 +162,7 @@ FunctionsToExport = @(
     'Path'
 
     # Helpers
+    'Add-WPFType'
     'Add-WPFObject'
     'Convert-SvgToXaml'
     'ConvertTo-KeyGesture'

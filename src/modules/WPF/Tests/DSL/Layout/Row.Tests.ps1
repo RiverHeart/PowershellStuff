@@ -6,6 +6,10 @@ Describe 'Row' -Tag 'Row' {
 
     It 'Should return a row specification with columns' {
         $Id = [guid]::NewGuid().ToString('N')
+        $this = Grid {
+            $this.AllowPackedCells = $true
+        }
+
         $Row = Row {
             Column {
                 Label "Foobar_$Id" {}

@@ -10,6 +10,25 @@ Use the development log for dated progress entries and in-flight investigation n
 
 ## Design Notes
 
+### Collector Ownership
+
+Collection mode for nested DSL scriptblocks is opt-in and must be declared explicitly by collector-owner keywords.
+
+Current owner set:
+
+* `Grid`
+
+Important distinction:
+
+* A control may consume collection-backed children without being a collector owner.
+* For example, `GridView` consumes `GridViewColumn` children, but it should not propagate `WPFCollectChildren` into nested control creation.
+
+Guidance for new keywords:
+
+* If a keyword needs child objects to be returned for later layout or deferred attachment processing, mark the created object with `Custom.WPF.CollectorOwner` via `Add-WPFType`.
+* Do not rely on CLR type checks like `-is [System.Windows.Controls.Grid]` to infer collector behavior.
+* Add a focused regression test proving the collector owner marker is required and that nested non-owner controls do not over-collect.
+
 ### State Input Model
 
 For a summary of attempts to move `State` from explicit hashtable input to scriptblock syntax, including context-binding failures and tradeoffs, see [StateScriptBlockSyntaxInvestigation.md](StateScriptBlockSyntaxInvestigation.md).

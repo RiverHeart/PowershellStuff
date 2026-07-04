@@ -8,15 +8,18 @@
     -Column Expand { ...code... }
 #>
 function Column {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Width')]
     [Alias('-Column')]
     [OutputType([pscustomobject])]
     param(
-        # Keep this as object so callers can use intuitive tokens like Fit and Expand.
-        [Parameter(Position=0)]
-        [object] $Width = [System.Windows.GridLength]::Auto,
+        # Keep this as string so callers can use intuitive tokens like Fit and Expand.
+        [Parameter(ParameterSetName = 'Width', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
+        [ValidateNotNullOrEmpty()]
+        [string] $Width = [System.Windows.GridLength]::Auto,
 
-        [Parameter(Position=1)]
+        [Parameter(Mandatory, ParameterSetName = 'Width', Position = 1)]
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
         [ScriptBlock] $ScriptBlock
     )
 
@@ -30,13 +33,9 @@ function Column {
         return
     }
 
-    if (-not $ScriptBlock) {
-        throw 'Column requires a scriptblock.'
-    }
-
     $Parent = $PSCmdlet.GetVariableValue('this')
     if ($Parent -and $Parent -isnot [System.Windows.Controls.Grid]) {
-        throw "Cannot add column to $($Parent.Name) ($($Parent.GetType().Name)"
+        throw "Cannot add column to $($Parent.Name) ($($Parent.GetType().Name))"
     }
 
     # Support intuitive names
@@ -49,6 +48,10 @@ function Column {
 
     $PSVars = New-WPFVariableList -InputObject $Parent
     $Children = @($ScriptBlock.InvokeWithContext($null, $PSVars))
+
+    if ($Children.Count -gt 1 -and -not $Parent.AllowPackedCells) {
+        throw "This grid isn't configured to allow multiple children per cell. Use a StackPanel or other container to group multiple children into a single child. To opt out of this behavior, set `AllowPackedCells = `$true` on the grid."
+    }
 
     return [pscustomobject] @{
         PSTypeName = 'WPF.Grid.ColumnSpec'
