@@ -927,11 +927,15 @@ Configure the brush directly with `$this`. Keep Theme/Style shorthand for
 property-like declarations; this keyword is plain WPF object configuration.
 
 ```powershell
-LinearGradientBrush 'AccentBackground' {
+$AccentBackground = LinearGradientBrush 'AccentBackground' {
     $this.StartPoint = '0,0'
     $this.EndPoint = '1,0'
     GradientStop '#FF0A84FF' 0
     GradientStop '#FF086FD5' 1
+}
+
+Rectangle 'BannerFill' {
+    $this.Fill = $AccentBackground
 }
 ```
 
