@@ -18,9 +18,8 @@
         LinearGradientBrush 'WindowBackground' {
             $this.StartPoint = '0,0'
             $this.EndPoint = '1,0'
-            # GradientStop additions use the underlying WPF object API.
-            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF0A84FF', 0))
-            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF086FD5', 1))
+            GradientStop '#FF0A84FF' 0
+            GradientStop '#FF086FD5' 1
         }
     }
 
@@ -29,10 +28,10 @@
         $this.Fill = LinearGradientBrush {
             $this.StartPoint = '0,0'
             $this.EndPoint = '1,1'
-            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Yellow', 0.0))
-            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Red', 0.25))
-            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Blue', 0.75))
-            $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('LimeGreen', 1.0))
+            GradientStop 'Yellow' 0.0
+            GradientStop 'Red' 0.25
+            GradientStop 'Blue' 0.75
+            GradientStop 'LimeGreen' 1.0
         }
     }
 #>

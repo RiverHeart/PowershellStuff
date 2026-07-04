@@ -130,8 +130,8 @@ Describe 'Theme' -Tag 'Theme' {
             LinearGradientBrush 'WindowBackground' {
                 $this.StartPoint = '0,0'
                 $this.EndPoint = '1,0'
-                $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF0A84FF', 0))
-                $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF086FD5', 1))
+                GradientStop '#FF0A84FF' 0
+                GradientStop '#FF086FD5' 1
             }
         }
 

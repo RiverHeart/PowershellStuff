@@ -142,6 +142,7 @@ FunctionsToExport = @(
     'Key'
     'Link'
     'On'
+    'GradientStop'
     'LinearGradientBrush'
     'MultiTrigger'
     'Reference'

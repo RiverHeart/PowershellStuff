@@ -7,6 +7,7 @@ Use the development log for dated progress entries and in-flight investigation n
 ## Backlog Candidates
 
 - Improve error handling so child object failures bubble up cleanly and produce a useful call stack.
+- Evaluate global resource support so keyed LinearGradientBrush definitions can be referenced outside Theme contexts (for example, style-only workflows). Current keyed behavior is Theme-only because there is no Application.Resources or module-level global resource registry path yet.
 
 ## Design Notes
 
