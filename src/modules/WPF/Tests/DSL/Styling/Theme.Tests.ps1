@@ -121,6 +121,45 @@ Describe 'Theme' -Tag 'Theme' {
         $button.Background.Color.ToString() | Should -Be -ExpectedValue '#FF123456'
     }
 
+    It 'Should support LinearGradientBrush entries inside Theme blocks' {
+        $id = [guid]::NewGuid().ToString('N')
+        $themeName = "Gradient_$id"
+        $window = [System.Windows.Window]::new()
+
+        Theme $themeName {
+            LinearGradientBrush 'WindowBackground' {
+                $this.StartPoint = '0,0'
+                $this.EndPoint = '1,0'
+                $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF0A84FF', 0))
+                $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF086FD5', 1))
+            }
+        }
+
+        $psVars = New-WPFVariableList -InputObject $window
+        { Resource Background WindowBackground }.InvokeWithContext($null, $psVars) | Out-Null
+
+        Use-WPFTheme -Name $themeName -Root $window
+
+        $window.Background | Should -BeOfType ([System.Windows.Media.LinearGradientBrush])
+        $window.Background.GradientStops.Count | Should -Be 2
+        $window.Background.GradientStops[0].Color.ToString() | Should -Be '#FF0A84FF'
+        $window.Background.GradientStops[1].Color.ToString() | Should -Be '#FF086FD5'
+    }
+
+    It 'Should reject scriptblock-only LinearGradientBrush usage inside Theme blocks' {
+        $id = [guid]::NewGuid().ToString('N')
+        $themeName = "GradientMissingKey_$id"
+
+        {
+            Theme $themeName {
+                LinearGradientBrush {
+                    $this.StartPoint = '0,0'
+                    $this.EndPoint = '1,1'
+                }
+            } -ErrorAction Stop
+        } | Should -Throw
+    }
+
     It 'Should support explicit key delimiter syntax with a trailing colon' {
         $id = [guid]::NewGuid().ToString('N')
         $themeName = "ThemeDelimiter_$id"

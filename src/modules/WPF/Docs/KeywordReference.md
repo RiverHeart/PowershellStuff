@@ -873,6 +873,15 @@ Defines a named theme dictionary.
 Theme 'Light' {
     Brush 'WindowBackground' '#FFFFFF'
 }
+
+Theme 'Accent' {
+    LinearGradientBrush 'WindowBackground' {
+        $this.StartPoint = '0,0'
+        $this.EndPoint = '1,0'
+        $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF0A84FF', 0))
+        $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF086FD5', 1))
+    }
+}
 ```
 
 ### Brush
@@ -881,6 +890,38 @@ Adds a brush entry to the current Theme.
 
 ```powershell
 Brush 'Foreground' '#111111'
+```
+
+### LinearGradientBrush
+
+Creates a linear gradient brush. When called inside `Theme`, the brush is stored
+as a theme resource. In other contexts, the configured brush object is returned
+so it can be assigned directly to properties like `Fill`.
+
+Configure the brush directly with `$this`. Keep Theme/Style shorthand for
+property-like declarations; this keyword is plain WPF object configuration.
+
+```powershell
+LinearGradientBrush 'AccentBackground' {
+    $this.StartPoint = '0,0'
+    $this.EndPoint = '1,0'
+    # GradientStop additions use the underlying WPF object API.
+    $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF0A84FF', 0))
+    $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('#FF086FD5', 1))
+}
+```
+
+```powershell
+Rectangle 'BannerFill' {
+    $this.Fill = LinearGradientBrush {
+        $this.StartPoint = '0,0'
+        $this.EndPoint = '1,1'
+        $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Yellow', 0.0))
+        $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Red', 0.25))
+        $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('Blue', 0.75))
+        $this.GradientStops.Add([System.Windows.Media.GradientStop]::new('LimeGreen', 1.0))
+    }
+}
 ```
 
 ## Styles
@@ -956,7 +997,8 @@ For Theme and Style script bodies, property assignment uses the colon-delimited 
 
 - Theme shorthand: `Key: Value` forwards to `Brush Key Value`.
 - Style shorthand: `Property: Value` forwards to `Setter Property Value`.
-- Explicit `Brush` and `Setter` calls remain fully supported.
+- Object-configuration keywords use `$this` directly and do not participate in shorthand dispatch.
+- Explicit `Brush`, `LinearGradientBrush`, and `Setter` calls remain fully supported.
 - Bare command form without a colon (for example, `Background Value`) is not
     shorthand syntax and should be treated as normal command invocation behavior.
 
