@@ -142,6 +142,8 @@ FunctionsToExport = @(
     'Key'
     'Link'
     'On'
+    'GradientStop'
+    'LinearGradientBrush'
     'MultiTrigger'
     'Reference'
     'Resource'
@@ -160,6 +162,7 @@ FunctionsToExport = @(
 
     # DSL/Shapes
     'Path'
+    'Rectangle'
 
     # Helpers
     'Add-WPFType'

@@ -39,6 +39,7 @@ Scope of this page:
     * [StatusBar](#statusbar)
 * [Shapes](#shapes)
     * [Path](#path)
+    * [Rectangle](#rectangle)
 * [Commands and Events](#commands-and-events)
     * [Command](#command)
     * [Key](#key)
@@ -55,6 +56,8 @@ Scope of this page:
     * [Resource](#resource)
     * [Theme](#theme)
     * [Brush](#brush)
+    * [LinearGradientBrush](#lineargradientbrush)
+    * [GradientStop](#gradientstop)
 * [Styles](#styles)
     * [Style](#style)
     * [ExtendStyle](#extendstyle)
@@ -538,6 +541,28 @@ Path 'images/arrow-left.svg' {
 }
 ```
 
+### Rectangle
+
+Creates a WPF Rectangle shape that can be used directly in a control body or
+inside a template-like container.
+
+```powershell
+Border 'Banner' {
+    Rectangle 'BannerFill' {
+        $this.Width = 200
+        $this.Height = 100
+        $this.Fill = LinearGradientBrush {
+            $this.StartPoint = '0,0'
+            $this.EndPoint = '1,1'
+            GradientStop 'Yellow' 0.0
+            GradientStop 'Red' 0.25
+            GradientStop 'Blue' 0.75
+            GradientStop 'LimeGreen' 1.0
+        }
+    }
+}
+```
+
 ## Commands and Events
 
 ### Command
@@ -873,6 +898,15 @@ Defines a named theme dictionary.
 Theme 'Light' {
     Brush 'WindowBackground' '#FFFFFF'
 }
+
+Theme 'Accent' {
+    LinearGradientBrush 'WindowBackground' {
+        $this.StartPoint = '0,0'
+        $this.EndPoint = '1,0'
+        GradientStop '#FF0A84FF' 0
+        GradientStop '#FF086FD5' 1
+    }
+}
 ```
 
 ### Brush
@@ -881,6 +915,54 @@ Adds a brush entry to the current Theme.
 
 ```powershell
 Brush 'Foreground' '#111111'
+```
+
+### LinearGradientBrush
+
+Creates a linear gradient brush. When called inside `Theme`, the brush is stored
+as a theme resource. In other contexts, the configured brush object is returned
+so it can be assigned directly to properties like `Fill`.
+
+Configure the brush directly with `$this`. Keep Theme/Style shorthand for
+property-like declarations; this keyword is plain WPF object configuration.
+
+```powershell
+$AccentBackground = LinearGradientBrush {
+    $this.StartPoint = '0,0'
+    $this.EndPoint = '1,0'
+    GradientStop '#FF0A84FF' 0
+    GradientStop '#FF086FD5' 1
+}
+
+Rectangle 'BannerFill' {
+    $this.Fill = $AccentBackground
+}
+```
+
+```powershell
+Rectangle 'BannerFill' {
+    $this.Fill = LinearGradientBrush {
+        $this.StartPoint = '0,0'
+        $this.EndPoint = '1,1'
+        GradientStop 'Yellow' 0.0
+        GradientStop 'Red' 0.25
+        GradientStop 'Blue' 0.75
+        GradientStop 'LimeGreen' 1.0
+    }
+}
+```
+
+### GradientStop
+
+Adds a gradient stop to the current `LinearGradientBrush`.
+
+```powershell
+LinearGradientBrush {
+    GradientStop 'Yellow' 0.0
+    GradientStop 'Red' 0.25
+    GradientStop 'Blue' 0.75
+    GradientStop 'LimeGreen' 1.0
+}
 ```
 
 ## Styles
@@ -956,7 +1038,8 @@ For Theme and Style script bodies, property assignment uses the colon-delimited 
 
 - Theme shorthand: `Key: Value` forwards to `Brush Key Value`.
 - Style shorthand: `Property: Value` forwards to `Setter Property Value`.
-- Explicit `Brush` and `Setter` calls remain fully supported.
+- Object-configuration keywords use `$this` directly and do not participate in shorthand dispatch.
+- Explicit `Brush`, `LinearGradientBrush`, and `Setter` calls remain fully supported.
 - Bare command form without a colon (for example, `Background Value`) is not
     shorthand syntax and should be treated as normal command invocation behavior.
 
