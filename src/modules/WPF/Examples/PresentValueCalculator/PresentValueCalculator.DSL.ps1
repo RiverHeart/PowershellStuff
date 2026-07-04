@@ -97,90 +97,86 @@ App 'PresentValueCalculator' {
     }
 
     Content {
-        Grid 'PresentValueCalculatorGrid' {
-            Row {
-                Column {
-                    Label { $this.Content = 'Amount:' }
-                    TextBox 'AmountTextBox' {
-                        $this.Text = $Amount
-                    }
-
-                    Label { $this.Content = 'Interest:' }
-                    TextBox 'InterestTextBox' {
-                        $this.Text = $Interest
-                    }
-
-                    Label { $this.Content = 'Number of Years:' }
-                    TextBox 'NumberOfYearsTextBox' {
-                        $this.Text = $NumberOfYears
-                    }
-                }
+        VStackPanel {
+            Label { $this.Content = 'Amount:' }
+            TextBox 'AmountTextBox' {
+                $this.Text = $Amount
             }
 
-            Row {
-                Column {
-                    Label { $this.Content = 'Max' }
-                    TextBox 'MaxTextBox' {
-                        $this.Text = 500
-                    }
-
-                    Label { $this.Content = 'Step' }
-                    TextBox 'StepTextBox' {
-                        $this.Text = 100
-                    }
-                }
+            Label { $this.Content = 'Interest:' }
+            TextBox 'InterestTextBox' {
+                $this.Text = $Interest
             }
 
-            Row {
-                Column {
-                    Button {
-                        $this.Content = 'Calculate'
-                        $this.Margin = '0,10,0,0'
-                        $this.Add_Click({
-                            $Amount = Reference AmountTextBox -Property 'Text'
-                            $Interest = Reference InterestTextBox -Property 'Text'
-                            $NumberOfYears = Reference NumberOfYearsTextBox -Property 'Text'
-                            $Max = Reference MaxTextBox -Property 'Text'
-                            $Step = Reference StepTextBox -Property 'Text'
-                            $AppState = Reference PresentValueCalculator -Property 'Tag'
-                            $AppState.Results = @(
-                                Get-Range -Start $Amount -End $Max -Step $Step |
-                                Get-PresentValue -Interest $Interest -NumberOfYears $NumberOfYears
-                            )
-                        })
-                    }
-                }
+            Label { $this.Content = 'Number of Years:' }
+            TextBox 'NumberOfYearsTextBox' {
+                $this.Text = $NumberOfYears
             }
 
-            Row {
-                Column {
-                    ListView 'ResultsListView' {
-                        $this.Margin = '0,10,0,0'
-                        $this.Height = 200
-                        $this.Width = 300
-                        Link ItemsSource -Property Results
+            Label { $this.Content = 'Max' }
+            TextBox 'MaxTextBox' {
+                # Keep defaults in ascending order so Calculate produces visible rows.
+                $this.Text = 2000
+            }
 
-                        GridView {
-                            GridViewColumn {
-                                $this.Header = 'Amount'
-                                $this.DisplayMemberBinding = Binding 'Amount'
-                            }
+            Label { $this.Content = 'Step' }
+            TextBox 'StepTextBox' {
+                $this.Text = 100
+            }
 
-                            GridViewColumn {
-                                $this.Header = 'Present Value'
-                                $this.DisplayMemberBinding = Binding 'PresentValue'
-                            }
+            Button 'CalculateButton' {
+                $this.Content = 'Calculate'
+                $this.Margin = '0,10,0,0'
+                $this.Add_Click({
+                    Write-Debug "Calculating present value for Amount=$Amount, Interest=$Interest, NumberOfYears=$NumberOfYears"
+                    $Amount = [double] (Reference AmountTextBox -Property 'Text')
+                    $Interest = [double] (Reference InterestTextBox -Property 'Text')
+                    $NumberOfYears = [int] (Reference NumberOfYearsTextBox -Property 'Text')
+                    $Max = [double] (Reference MaxTextBox -Property 'Text')
+                    $Step = [Math]::Abs([int] (Reference StepTextBox -Property 'Text'))
 
-                            GridViewColumn {
-                                $this.Header = 'Interest'
-                                $this.DisplayMemberBinding = Binding 'Interest'
-                            }
+                    if ($Step -lt 1) {
+                        $Step = 1
+                    }
 
-                            GridViewColumn {
-                                $this.Header = 'Number of Years'
-                                $this.DisplayMemberBinding = Binding 'NumberOfYears'
-                            }
-                        }
+                    if ($Max -lt $Amount) {
+                        Write-Debug "Max was less than Amount; clamping Max to Amount so at least one row is produced."
+                        $Max = $Amount
+                    }
+
+                    $AppState = Reference PresentValueCalculator -Property 'Tag'
+                    $AppState.Results = @(
+                        Get-Range -Start $Amount -End $Max -Step $Step |
+                        Get-PresentValue -Interest $Interest -NumberOfYears $NumberOfYears
+                    )
+                })
+            }
+
+            ListView 'ResultsListView' {
+                $this.Margin = '0,10,0,0'
+                $this.Height = 200
+                $this.Width = 300
+                Link ItemsSource -ToState Results
+
+                GridView {
+                    GridViewColumn {
+                        $this.Header = 'Amount'
+                        $this.DisplayMemberBinding = Binding 'Amount'
+                    }
+
+                    GridViewColumn {
+                        $this.Header = 'Present Value'
+                        $this.DisplayMemberBinding = Binding 'PresentValue'
+                    }
+
+                    GridViewColumn {
+                        $this.Header = 'Interest'
+                        $this.DisplayMemberBinding = Binding 'Interest'
+                    }
+
+                    GridViewColumn {
+                        $this.Header = 'Number of Years'
+                        $this.DisplayMemberBinding = Binding 'NumberOfYears'
                     }
                 }
             }
