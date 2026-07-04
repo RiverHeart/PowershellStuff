@@ -48,6 +48,7 @@ Scope of this page:
 * [Binding and Resources](#binding-and-resources)
     * [State](#state)
     * [Bind](#bind)
+    * [Link](#link)
     * [BindProperty](#bindproperty)
     * [Binding](#binding)
     * [ValueConverter](#valueconverter)
@@ -776,6 +777,13 @@ Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
 Link Text -Property Count
 Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
 ```
+
+When choosing between the two modes:
+
+- Prefer `-ToState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
+- `-ToState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
+- Prefer `-Property` for regular WPF binding paths and custom sources (`-Self`, `-ElementName`, `-Source`, `-TemplatedParent`).
+- In `-Property` mode with no explicit source selector, binding uses inherited `DataContext`.
 
 `-Path` is supported as an alias for `-Property`:
 
