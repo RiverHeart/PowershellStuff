@@ -38,6 +38,10 @@ function Update-WPFObject {
     $thisName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
     $thisType = $InputObject.GetType().Name
     $PSVars = New-WPFVariableList -InputObject $InputObject
+    $templateTargetType = $PSCmdlet.GetVariableValue('WPFTemplateTargetType')
+    if ($templateTargetType -is [Type]) {
+        $PSVars.Add([psvariable]::new('WPFTemplateTargetType', $templateTargetType))
+    }
     $strictUnexpectedChild = Test-WPFStrictUnexpectedChildMode
 
     Write-Debug "Updating WPF object '$thisName' ($thisType)"

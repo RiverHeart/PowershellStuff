@@ -13,17 +13,17 @@
     Style 'MyButton' Button {
         Template {
             Border 'TemplateBorder' {
-                Setter Background ButtonBackground -Resource
-                Setter CornerRadius 8
+                Background: ButtonBackground -Resource
+                CornerRadius: 8
 
                 ContentPresenter {
-                    Setter HorizontalAlignment ([HorizontalAlignment]::Stretch)
-                    Setter VerticalAlignment ([VerticalAlignment]::Stretch)
+                    HorizontalAlignment: ([HorizontalAlignment]::Stretch)
+                    VerticalAlignment: ([VerticalAlignment]::Stretch)
                 }
             }
 
             Trigger IsMouseOver $true {
-                Setter Background ButtonHoverBackground -Resource -Target 'TemplateBorder'
+                Background: ButtonHoverBackground -Resource -Target 'TemplateBorder'
             }
         }
     }
@@ -49,7 +49,10 @@ function Template {
 
     $template = [System.Windows.Controls.ControlTemplate]::new($style.TargetType)
 
-    $PSVars = New-WPFVariableList -InputObject $template
+    $TemplateVars = @(
+        [psvariable]::new('WPFTemplateTargetType', $style.TargetType)
+    )
+    $PSVars = New-WPFVariableList -InputObject $template -AdditionalVariables $TemplateVars
 
     $ScriptBlock.InvokeWithContext($null, $PSVars) | Out-Null
 

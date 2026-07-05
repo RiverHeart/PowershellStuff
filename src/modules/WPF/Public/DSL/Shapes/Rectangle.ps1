@@ -28,7 +28,7 @@
 function Rectangle {
     [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-Rectangle')]
-    [OutputType([void], [System.Windows.Shapes.Rectangle])]
+    [OutputType([void], [System.Windows.Shapes.Rectangle], [System.Windows.FrameworkElementFactory])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
         [ValidateScript({ $_ -isnot [scriptblock] })]
@@ -42,6 +42,24 @@ function Rectangle {
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
         Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
+
+    if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
+        if ($Name -ne '__Nameless__') {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Shapes.Rectangle], $Name)
+        } else {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Shapes.Rectangle])
+        }
+
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent) {
+            Add-WPFObject $Parent $Factory
+        }
+
+        Update-WPFObject $Factory $ScriptBlock
+
+        if (-not $Parent) { return $Factory }
         return
     }
 

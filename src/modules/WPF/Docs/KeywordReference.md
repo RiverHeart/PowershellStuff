@@ -19,6 +19,7 @@ Scope of this page:
     * [Row](#row)
     * [Column](#column)
     * [Border](#border)
+    * [ContentPresenter](#contentpresenter)
     * [Button](#button)
     * [Label](#label)
     * [TextBlock](#textblock)
@@ -61,6 +62,7 @@ Scope of this page:
 * [Styles](#styles)
     * [Style](#style)
     * [ExtendStyle](#extendstyle)
+    * [Template](#template)
     * [Setter](#setter)
     * [Chrome](#chrome)
     * [Trigger](#trigger)
@@ -303,6 +305,20 @@ Border 'Card' {
 
 Border {
     Label 'BodyText' {}
+}
+```
+
+### ContentPresenter
+
+Creates a WPF `ContentPresenter` and supports named and nameless forms.
+
+Inside `Template`, `ContentPresenter` emits a template factory node so it can
+be nested under controls like `Grid`, `Border`, and `DockPanel`.
+
+```powershell
+ContentPresenter 'BodyPresenter' {
+    Setter HorizontalAlignment ([HorizontalAlignment]::Stretch)
+    Setter VerticalAlignment ([VerticalAlignment]::Stretch)
 }
 ```
 
@@ -1008,6 +1024,34 @@ Style 'ButtonBase' Button {
 Style 'ButtonAccent' Button {
     ExtendStyle 'ButtonBase'
     Setter Background '#0A84FF'
+}
+```
+
+### Template
+
+Defines a `ControlTemplate` for the current style target type.
+
+Nested controls inside `Template` are built as template-factory visual tree
+nodes. Trigger and setter behavior remains the same as other style contexts.
+
+In template factory contexts, shorthand setter values also support
+`TemplateBinding PropertyName` string syntax.
+
+```powershell
+Style Button {
+    Template {
+        Grid {
+            Border 'TemplateBorder' {
+                ContentPresenter 'BodyPresenter' {
+                    Margin: 8
+                }
+            }
+        }
+
+        Trigger IsMouseOver $true {
+            Setter Opacity 0.9 -Target 'TemplateBorder'
+        }
+    }
 }
 ```
 

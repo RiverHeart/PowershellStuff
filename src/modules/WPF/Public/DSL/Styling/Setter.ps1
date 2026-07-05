@@ -71,6 +71,31 @@ function Setter {
             if ($Resource) {
                 $context.SetResourceReference($descriptor.DependencyProperty, [string] $Value)
             } else {
+                $templateBindingMatch = $null
+                if ($Value -is [string]) {
+                    $templateBindingMatch = [System.Text.RegularExpressions.Regex]::Match(
+                        $Value,
+                        '^\s*TemplateBinding\s+([\w\.]+)\s*$',
+                        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+                    )
+                }
+
+                if ($templateBindingMatch -and $templateBindingMatch.Success) {
+                    $boundPropertyName = $templateBindingMatch.Groups[1].Value
+                    $templateTargetType = $PSCmdlet.GetVariableValue('WPFTemplateTargetType')
+                    $bindingOwnerType = if ($templateTargetType -is [Type]) { $templateTargetType } else { $context.Type }
+
+                    $boundDescriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($boundPropertyName, $bindingOwnerType, $bindingOwnerType)
+                    if (-not $boundDescriptor) {
+                        Write-Error "Setter: TemplateBinding property '$boundPropertyName' is not a dependency property on type '$($bindingOwnerType.FullName)'."
+                        return
+                    }
+
+                    $templateBinding = [System.Windows.TemplateBindingExtension]::new($boundDescriptor.DependencyProperty)
+                    $context.SetValue($descriptor.DependencyProperty, $templateBinding)
+                    return
+                }
+
                 $propertyType = $descriptor.PropertyType
                 $resolvedValue = if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {
                     try {

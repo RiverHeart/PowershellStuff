@@ -20,17 +20,27 @@
     }
 #>
 function ContentPresenter {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [OutputType([void], [System.Windows.Controls.ContentPresenter], [System.Windows.FrameworkElementFactory])]
     param(
-        [Parameter(Position = 0)]
+        [Parameter(ParameterSetName = 'Name', Position = 0)]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
+        [ValidatePattern('^\w+$')]
+        [string] $Name = '__Nameless__',
+
+        [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
+        [Parameter(ParameterSetName = 'ScriptBlock', Position = 0)]
         [scriptblock] $ScriptBlock
     )
 
     $InFactoryContext = $PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true
 
     if ($InFactoryContext) {
-        $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
+        if ($Name -ne '__Nameless__') {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter], $Name)
+        } else {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
+        }
 
         $Parent = $PSCmdlet.GetVariableValue('this')
         if ($Parent) {
@@ -46,6 +56,10 @@ function ContentPresenter {
     }
 
     $Presenter = [System.Windows.Controls.ContentPresenter]::new()
+    if ($Name -ne '__Nameless__') {
+        $Presenter.Name = $Name
+        Register-WPFObject $Name $Presenter
+    }
 
     $Parent = $PSCmdlet.GetVariableValue('this')
     if ($Parent) {

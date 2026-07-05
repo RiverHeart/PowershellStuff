@@ -13,7 +13,7 @@
 function DockPanel {
     [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     [Alias('-DockPanel')]
-    [OutputType([void], [System.Windows.Controls.DockPanel])]
+    [OutputType([void], [System.Windows.Controls.DockPanel], [System.Windows.FrameworkElementFactory])]
     param(
         [Parameter(ParameterSetName = 'Name', Position = 0)]
         [ValidateScript({ $_ -isnot [scriptblock] })]
@@ -27,6 +27,24 @@ function DockPanel {
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
         Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        return
+    }
+
+    if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
+        if ($Name -ne '__Nameless__') {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.DockPanel], $Name)
+        } else {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.DockPanel])
+        }
+
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent) {
+            Add-WPFObject $Parent $Factory
+        }
+
+        Update-WPFObject $Factory $ScriptBlock
+
+        if (-not $Parent) { return $Factory }
         return
     }
 
