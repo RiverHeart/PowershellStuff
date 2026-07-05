@@ -159,6 +159,11 @@ Both forms are supported and equivalent for top-level style property setters.
   - Example: `TextBlock.Foreground: 'Black'` inside a template `ContentPresenter` block.
 - `Trigger` and `MultiTrigger` condition properties also accept owner-qualified dependency-property syntax.
   - Example: `Trigger ToolTipService.IsEnabled $false { ... }`
+- `Resource` and `BindProperty` target properties also accept owner-qualified dependency-property syntax.
+  - Example: `Resource TextBlock.Foreground ForegroundBrush`
+  - Example: `BindProperty 'ToolTipService.IsEnabled' ToolTipEnabled -Source $state`
+- `DataTrigger` supports attached properties through standard WPF binding path syntax rather than dependency-property name resolution.
+  - Example: `DataTrigger '(ToolTipService.IsEnabled)' $false -Self { ... }`
 - Template root blocks still use explicit DSL keywords (`Border`, `Trigger`, etc.); shorthand applies to factory element property statements, not Template-level orchestration.
 
 ### Property resolution precedence and delimiter

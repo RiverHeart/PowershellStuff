@@ -133,11 +133,11 @@ function BindProperty {
             return
         }
 
-        # Resolve the target dependency property descriptor
+        # Resolve the target dependency property
         $TargetType = $Target.GetType()
-        $DepPropDescriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $TargetType, $TargetType)
+        $ResolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $TargetType
 
-        if (-not $DepPropDescriptor) {
+        if (-not $ResolvedProperty) {
             Write-Error "BindProperty: Property '$Property' is not a valid dependency property on type '$($TargetType.FullName)'."
             return
         }
@@ -171,7 +171,7 @@ function BindProperty {
         }
 
         # Apply the binding using BindingOperations
-        $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $DepPropDescriptor.DependencyProperty, $binding)
+        $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $ResolvedProperty.DependencyProperty, $binding)
         Write-Verbose "BindProperty: Successfully bound '$Property' on $($TargetType.Name) to '$Path'."
     }
 }

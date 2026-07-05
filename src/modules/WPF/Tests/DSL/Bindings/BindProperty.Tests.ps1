@@ -115,6 +115,27 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $BindingApplied.Path.Path | Should -Be 'Value'
     }
 
+    It 'Should bind owner-qualified attached-property targets' {
+        $Button = [System.Windows.Controls.Button]::new()
+        $State = New-WPFObservableState @{
+            ToolTipEnabled = $true
+        }
+
+        BindProperty -InputObject $Button -Property 'ToolTipService.IsEnabled' -Path ToolTipEnabled -Source $State
+
+        $BindingApplied = [System.Windows.Data.BindingOperations]::GetBinding(
+            $Button,
+            [System.Windows.Controls.ToolTipService]::IsEnabledProperty
+        )
+
+        $BindingApplied | Should -Not -BeNullOrEmpty
+        $BindingApplied.Path.Path | Should -Be 'ToolTipEnabled'
+        [System.Windows.Controls.ToolTipService]::GetIsEnabled($Button) | Should -BeTrue
+
+        $State.ToolTipEnabled = $false
+        [System.Windows.Controls.ToolTipService]::GetIsEnabled($Button) | Should -BeFalse
+    }
+
     It 'Should reject invalid property names' {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
 

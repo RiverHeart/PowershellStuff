@@ -1161,6 +1161,14 @@ Style 'PrimaryButton' Button {
 
 Adds a data trigger to the current Style or ControlTemplate.
 
+Attached properties are supported through standard WPF binding path syntax.
+
+```powershell
+DataTrigger '(ToolTipService.IsEnabled)' $false -Self {
+    Setter Opacity 0.6
+}
+```
+
 ```powershell
 Style 'PrimaryButton' Button {
     DataTrigger 'IsEnabled' $false -Self {

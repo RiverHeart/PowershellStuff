@@ -121,6 +121,28 @@ Describe 'Theme' -Tag 'Theme' {
         $button.Background.Color.ToString() | Should -Be -ExpectedValue '#FF123456'
     }
 
+    It 'Should support owner-qualified attached-property names with Resource' {
+        $id = [guid]::NewGuid().ToString('N')
+        $themeName = "AttachedResourceTheme_$id"
+        $window = [System.Windows.Window]::new()
+        $presenter = [System.Windows.Controls.ContentPresenter]::new()
+
+        Theme $themeName {
+            Brush 'AttachedForeground' '#102030'
+        }
+
+        $window.Content = $presenter
+
+        $psVars = New-WPFVariableList -InputObject $presenter
+        { Resource TextBlock.Foreground AttachedForeground }.InvokeWithContext($null, $psVars) | Out-Null
+
+        Use-WPFTheme -Name $themeName -Root $window
+
+        $foreground = $presenter.GetValue([System.Windows.Documents.TextElement]::ForegroundProperty)
+        $foreground | Should -Not -BeNullOrEmpty
+        $foreground.Color.ToString() | Should -Be -ExpectedValue '#FF102030'
+    }
+
     It 'Should support LinearGradientBrush entries inside Theme blocks' {
         $id = [guid]::NewGuid().ToString('N')
         $themeName = "Gradient_$id"
