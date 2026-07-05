@@ -131,7 +131,7 @@ function Trigger {
         }
 
         $trigger = [System.Windows.Trigger]::new()
-    $trigger.Property = $resolvedProperty.DependencyProperty
+        $trigger.Property = $resolvedProperty.DependencyProperty
         $trigger.Value = $triggerValue
 
         if ($SourceName) {
