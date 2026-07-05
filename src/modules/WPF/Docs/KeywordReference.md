@@ -63,6 +63,7 @@ Scope of this page:
     * [Style](#style)
     * [ExtendStyle](#extendstyle)
     * [Template](#template)
+    * [TemplateBinding](#templatebinding)
     * [Setter](#setter)
     * [Chrome](#chrome)
     * [Trigger](#trigger)
@@ -1034,15 +1035,21 @@ Defines a `ControlTemplate` for the current style target type.
 Nested controls inside `Template` are built as template-factory visual tree
 nodes. Trigger and setter behavior remains the same as other style contexts.
 
-In template factory contexts, shorthand setter values also support
-`TemplateBinding PropertyName` string syntax.
+In template factory contexts, shorthand setter values support the preferred
+`(TemplateBinding PropertyName)` form.
+
+The legacy `TemplateBinding PropertyName` string syntax remains supported for
+compatibility.
 
 ```powershell
 Style Button {
     Template {
         Grid {
             Border 'TemplateBorder' {
+                Background: (TemplateBinding Background)
+
                 ContentPresenter 'BodyPresenter' {
+                    Content: (TemplateBinding Content)
                     Margin: 8
                 }
             }
@@ -1054,6 +1061,19 @@ Style Button {
     }
 }
 ```
+
+### TemplateBinding
+
+Creates a `TemplateBindingExtension` for use inside `Template` visual trees.
+
+Use it as a value expression in template factory setter shorthand.
+
+```powershell
+Background: (TemplateBinding Background)
+Content: (TemplateBinding Content)
+```
+
+`TemplateBinding` must be used inside a `Template` context.
 
 ### Setter
 
@@ -1160,6 +1180,14 @@ Style 'PrimaryButton' Button {
 ### DataTrigger
 
 Adds a data trigger to the current Style or ControlTemplate.
+
+Attached properties are supported through standard WPF binding path syntax.
+
+```powershell
+DataTrigger '(ToolTipService.IsEnabled)' $false -Self {
+    Setter Opacity 0.6
+}
+```
 
 ```powershell
 Style 'PrimaryButton' Button {

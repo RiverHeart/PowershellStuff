@@ -93,13 +93,13 @@ function MultiTrigger {
                 $sourceName = $entryObject.PSObject.Properties['SourceName'].Value
             }
 
-            $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($propertyName, $targetType, $targetType)
-            if (-not $descriptor) {
+            $resolvedProperty = Resolve-WPFDependencyProperty -Property $propertyName -TargetType $targetType
+            if (-not $resolvedProperty) {
                 Write-Error "MultiTrigger: Property '$propertyName' is not a dependency property on type '$($targetType.FullName)'."
                 return
             }
 
-            $propertyType = $descriptor.PropertyType
+            $propertyType = $resolvedProperty.PropertyType
             $conditionValue = if ($null -ne $rawValue -and $propertyType -and -not $propertyType.IsInstanceOfType($rawValue)) {
                 try {
                     [System.Management.Automation.LanguagePrimitives]::ConvertTo($rawValue, $propertyType)
@@ -126,7 +126,7 @@ function MultiTrigger {
             }
 
             $wpfCondition = [System.Windows.Condition]::new()
-            $wpfCondition.Property = $descriptor.DependencyProperty
+            $wpfCondition.Property = $resolvedProperty.DependencyProperty
             $wpfCondition.Value = $conditionValue
 
             if (-not [string]::IsNullOrWhiteSpace($sourceName)) {

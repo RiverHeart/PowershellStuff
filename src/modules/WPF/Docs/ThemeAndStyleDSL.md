@@ -155,6 +155,18 @@ Both forms are supported and equivalent for top-level style property setters.
 - `Setter` flags that are context-specific remain context-specific with shorthand.
   - Example: `-Target` and `-Scope Chrome` are trigger/template-context features and are not valid on top-level style shorthand statements. Chrome trigger targeting is inferred by nesting `Trigger` inside `Chrome { ... }`.
 - In template factory element blocks (for example `Border { ... }`, `ContentPresenter { ... }`, `ScrollViewer { ... }` inside `Template`), property command shorthand also maps to `Setter`.
+- In template factory element blocks, `Setter` now accepts owner-qualified dependency-property syntax (`Owner.Property`) for attached-property scenarios.
+  - Example: `TextBlock.Foreground: 'Black'` inside a template `ContentPresenter` block.
+- Template-bound values can use the preferred keyword form `Property: (TemplateBinding Name)`.
+  - Example: `Background: (TemplateBinding Background)`
+  - The legacy string form `Property: 'TemplateBinding Name'` remains supported for compatibility.
+- `Trigger` and `MultiTrigger` condition properties also accept owner-qualified dependency-property syntax.
+  - Example: `Trigger ToolTipService.IsEnabled $false { ... }`
+- `Resource` and `BindProperty` target properties also accept owner-qualified dependency-property syntax.
+  - Example: `Resource TextBlock.Foreground ForegroundBrush`
+  - Example: `BindProperty 'ToolTipService.IsEnabled' ToolTipEnabled -Source $state`
+- `DataTrigger` supports attached properties through standard WPF binding path syntax rather than dependency-property name resolution.
+  - Example: `DataTrigger '(ToolTipService.IsEnabled)' $false -Self { ... }`
 - Template root blocks still use explicit DSL keywords (`Border`, `Trigger`, etc.); shorthand applies to factory element property statements, not Template-level orchestration.
 
 ### Property resolution precedence and delimiter

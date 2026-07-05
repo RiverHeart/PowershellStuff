@@ -36,13 +36,13 @@ function Resource {
         }
 
         $type = $target.GetType()
-        $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $type, $type)
+        $resolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $type
 
-        if (-not $descriptor) {
+        if (-not $resolvedProperty) {
             Write-Error "Resource: Property '$Property' is not a dependency property on type '$($type.FullName)'."
             return
         }
 
-        $target.SetResourceReference($descriptor.DependencyProperty, $Key)
+        $target.SetResourceReference($resolvedProperty.DependencyProperty, $Key)
     }
 }

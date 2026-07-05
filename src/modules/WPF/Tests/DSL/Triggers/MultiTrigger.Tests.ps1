@@ -54,6 +54,34 @@ Describe 'MultiTrigger' -Tag 'MultiTrigger' {
         $trigger.Setters[0].TargetName | Should -Be -ExpectedValue 'TemplateRoot'
     }
 
+    It 'Should support owner-qualified attached-property names in multi trigger conditions' {
+        $id = [guid]::NewGuid().ToString('N')
+        $styleName = "MultiTriggerAttachedPropertyButton_$id"
+        $button = [System.Windows.Controls.Button]::new()
+
+        Style $styleName Button {
+            Setter Opacity 1.0
+
+            MultiTrigger @(
+                @{ Property = 'ToolTipService.IsEnabled'; Value = $false }
+                @{ Property = 'IsDefault'; Value = $true }
+            ) {
+                Setter Opacity 0.3
+            }
+        }
+
+        $psVars = New-WPFVariableList -InputObject $button
+        { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $button.Opacity | Should -Be -ExpectedValue 1.0
+
+        $button.IsDefault = $true
+        $button.Opacity | Should -Be -ExpectedValue 1.0
+
+        [System.Windows.Controls.ToolTipService]::SetIsEnabled($button, $false)
+        $button.Opacity | Should -Be -ExpectedValue 0.3
+    }
+
     It 'Should reject multi trigger usage outside style or template contexts' {
         $button = [System.Windows.Controls.Button]::new()
         $psVars = New-WPFVariableList -InputObject $button

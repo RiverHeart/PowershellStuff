@@ -13,8 +13,8 @@ Style Button {
 
     Template {
         Grid {
-            Width: 'TemplateBinding Width'
-            Height: 'TemplateBinding Height'
+            Width: (TemplateBinding Width)
+            Height: (TemplateBinding Height)
             # Outer Rectangle with rounded corners
             Rectangle 'OuterRect' {
                 HorizontalAlignment: ([HorizontalAlignment]::Stretch)
@@ -22,20 +22,20 @@ Style Button {
                 RadiusX: 20
                 RadiusY: 20
                 Fill: 'Transparent'
-                Stroke: 'TemplateBinding Background'
+                Stroke: (TemplateBinding Background)
                 StrokeThickness: 5
             }
             Rectangle 'InnerRect' {
                 RadiusX: 20
                 RadiusY: 20
-                Fill: 'TemplateBinding Background'
+                Fill: (TemplateBinding Background)
                 Stroke: 'Transparent'
                 StrokeThickness: 20
             }
             DockPanel 'ContentPresenterPanel' {
                 ContentPresenter 'ContentPresenter' {
                     Margin: 20
-                    Content: 'TemplateBinding Content'
+                    Content: (TemplateBinding Content)
                 }
             }
         }

@@ -62,15 +62,20 @@ function Setter {
                 return
             }
 
-            $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $context.Type, $context.Type)
-            if (-not $descriptor) {
+            $resolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $context.Type
+            if (-not $resolvedProperty) {
                 Write-Error "Setter: Property '$Property' is not a dependency property on type '$($context.Type.FullName)'."
                 return
             }
 
             if ($Resource) {
-                $context.SetResourceReference($descriptor.DependencyProperty, [string] $Value)
+                $context.SetResourceReference($resolvedProperty.DependencyProperty, [string] $Value)
             } else {
+                if ($Value -is [System.Windows.TemplateBindingExtension]) {
+                    $context.SetValue($resolvedProperty.DependencyProperty, $Value)
+                    return
+                }
+
                 $templateBindingMatch = $null
                 if ($Value -is [string]) {
                     $templateBindingMatch = [System.Text.RegularExpressions.Regex]::Match(
@@ -80,23 +85,25 @@ function Setter {
                     )
                 }
 
+                # Legacy compatibility path: prefer the TemplateBinding keyword
+                # form over this magic string sentinel in new DSL code.
                 if ($templateBindingMatch -and $templateBindingMatch.Success) {
                     $boundPropertyName = $templateBindingMatch.Groups[1].Value
                     $templateTargetType = $PSCmdlet.GetVariableValue('WPFTemplateTargetType')
                     $bindingOwnerType = if ($templateTargetType -is [Type]) { $templateTargetType } else { $context.Type }
 
-                    $boundDescriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($boundPropertyName, $bindingOwnerType, $bindingOwnerType)
-                    if (-not $boundDescriptor) {
+                    $resolvedTemplateProperty = Resolve-WPFDependencyProperty -Property $boundPropertyName -TargetType $bindingOwnerType
+                    if (-not $resolvedTemplateProperty) {
                         Write-Error "Setter: TemplateBinding property '$boundPropertyName' is not a dependency property on type '$($bindingOwnerType.FullName)'."
                         return
                     }
 
-                    $templateBinding = [System.Windows.TemplateBindingExtension]::new($boundDescriptor.DependencyProperty)
-                    $context.SetValue($descriptor.DependencyProperty, $templateBinding)
+                    $templateBinding = [System.Windows.TemplateBindingExtension]::new($resolvedTemplateProperty.DependencyProperty)
+                    $context.SetValue($resolvedProperty.DependencyProperty, $templateBinding)
                     return
                 }
 
-                $propertyType = $descriptor.PropertyType
+                $propertyType = $resolvedProperty.PropertyType
                 $resolvedValue = if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {
                     try {
                         [System.Management.Automation.LanguagePrimitives]::ConvertTo($Value, $propertyType)
@@ -121,7 +128,7 @@ function Setter {
                 } else {
                     $Value
                 }
-                $context.SetValue($descriptor.DependencyProperty, $resolvedValue)
+                $context.SetValue($resolvedProperty.DependencyProperty, $resolvedValue)
             }
             return
         }
@@ -177,8 +184,8 @@ function Setter {
             return
         }
 
-        $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $targetType, $targetType)
-        if (-not $descriptor) {
+        $resolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $targetType
+        if (-not $resolvedProperty) {
             Write-Error "Setter: Property '$Property' is not a dependency property on type '$($targetType.FullName)'."
             return
         }
@@ -186,7 +193,7 @@ function Setter {
         $setterValue = if ($Resource) {
             [System.Windows.DynamicResourceExtension]::new([string] $Value)
         } else {
-            $propertyType = $descriptor.PropertyType
+            $propertyType = $resolvedProperty.PropertyType
             if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {
                 try {
                     [System.Management.Automation.LanguagePrimitives]::ConvertTo($Value, $propertyType)
@@ -213,7 +220,7 @@ function Setter {
             }
         }
 
-        $setter = [System.Windows.Setter]::new($descriptor.DependencyProperty, $setterValue)
+        $setter = [System.Windows.Setter]::new($resolvedProperty.DependencyProperty, $setterValue)
         if ($Target) {
             if ($triggerOwner -ne 'ControlTemplate') {
                 Write-Error 'Setter: -Target is only supported for triggers owned by ControlTemplate.'
