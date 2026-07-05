@@ -157,6 +157,9 @@ Both forms are supported and equivalent for top-level style property setters.
 - In template factory element blocks (for example `Border { ... }`, `ContentPresenter { ... }`, `ScrollViewer { ... }` inside `Template`), property command shorthand also maps to `Setter`.
 - In template factory element blocks, `Setter` now accepts owner-qualified dependency-property syntax (`Owner.Property`) for attached-property scenarios.
   - Example: `TextBlock.Foreground: 'Black'` inside a template `ContentPresenter` block.
+- Template-bound values can use the preferred keyword form `Property: (TemplateBinding Name)`.
+  - Example: `Background: (TemplateBinding Background)`
+  - The legacy string form `Property: 'TemplateBinding Name'` remains supported for compatibility.
 - `Trigger` and `MultiTrigger` condition properties also accept owner-qualified dependency-property syntax.
   - Example: `Trigger ToolTipService.IsEnabled $false { ... }`
 - `Resource` and `BindProperty` target properties also accept owner-qualified dependency-property syntax.

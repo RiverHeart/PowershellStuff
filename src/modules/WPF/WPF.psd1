@@ -152,6 +152,7 @@ FunctionsToExport = @(
     'Style'
     'Theme'
     'Template'
+    'TemplateBinding'
     'TimedEvent'
     'Work'
     'OnComplete'

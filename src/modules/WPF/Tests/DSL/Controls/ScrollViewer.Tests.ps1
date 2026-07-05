@@ -219,6 +219,47 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue '#FF483D8B'
     }
 
+    It 'Should support TemplateBinding keyword values in template factory shorthand' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "TemplateBindingKeywordFactoryStyle_$Id"
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    Background: (TemplateBinding Background)
+                }
+            }
+        }
+
+        $Button.Background = [System.Windows.Media.Brushes]::DarkSlateBlue
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateBorder = $Button.Template.FindName('TemplateBorder', $Button)
+
+        $TemplateBorder | Should -Not -Be $null
+        $TemplateBorder.Background | Should -Not -Be $null
+        $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue '#FF483D8B'
+    }
+
+    It 'Should reject TemplateBinding keyword usage for invalid properties' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "TemplateBindingKeywordInvalidStyle_$Id"
+
+        {
+            Style $StyleName Button {
+                Template {
+                    Border 'TemplateBorder' {
+                        Background: (TemplateBinding NotAProperty)
+                    }
+                }
+            } -ErrorAction Stop
+        } | Should -Throw -ExpectedMessage "*TemplateBinding: Property 'NotAProperty' is not a dependency property on type 'System.Windows.Controls.Button'.*"
+    }
+
     It 'Should support owner-qualified attached-property names in template factory shorthand' {
         $Id = [guid]::NewGuid().ToString('N')
         $StyleName = "TemplateAttachedPropertyStyle_$Id"
