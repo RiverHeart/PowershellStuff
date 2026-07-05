@@ -218,4 +218,48 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $TemplateBorder.Background | Should -Not -Be $null
         $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue '#FF483D8B'
     }
+
+    It 'Should support owner-qualified attached-property names in template factory shorthand' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "TemplateAttachedPropertyStyle_$Id"
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    ContentPresenter 'TemplatePresenter' {
+                        Content: 'Template content'
+                        TextBlock.Foreground: 'Black'
+                    }
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Button.ApplyTemplate() | Out-Null
+        $Presenter = $Button.Template.FindName('TemplatePresenter', $Button)
+
+        $Presenter | Should -Not -Be $null
+        $ForegroundBrush = $Presenter.GetValue([System.Windows.Documents.TextElement]::ForegroundProperty)
+        $ForegroundBrush | Should -Not -Be $null
+        $ForegroundBrush.GetType().FullName | Should -Be -ExpectedValue 'System.Windows.Media.SolidColorBrush'
+        $ForegroundBrush.Color.ToString() | Should -Be -ExpectedValue '#FF000000'
+    }
+
+    It 'Should reject invalid owner-qualified property names in template factory shorthand' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "TemplateInvalidAttachedPropertyStyle_$Id"
+
+        {
+            Style $StyleName Button {
+                Template {
+                    Border 'TemplateBorder' {
+                        NotAType.NotAProperty: 42
+                    }
+                }
+            } -ErrorAction Stop
+        } | Should -Throw -ExpectedMessage "*Property 'NotAType.NotAProperty' is not a dependency property on type 'System.Windows.Controls.Border'.*"
+    }
 }

@@ -67,6 +67,28 @@ Describe 'Trigger' -Tag 'Trigger' {
         $trigger.Setters[0].TargetName | Should -Be -ExpectedValue 'TemplateRoot'
     }
 
+    It 'Should support owner-qualified attached-property names in style triggers' {
+        $id = [guid]::NewGuid().ToString('N')
+        $styleName = "TriggerAttachedPropertyButton_$id"
+        $button = [System.Windows.Controls.Button]::new()
+
+        Style $styleName Button {
+            Opacity: 1.0
+
+            Trigger ToolTipService.IsEnabled $false {
+                Opacity: 0.5
+            }
+        }
+
+        $psVars = New-WPFVariableList -InputObject $button
+        { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $button.Opacity | Should -Be -ExpectedValue 1.0
+
+        [System.Windows.Controls.ToolTipService]::SetIsEnabled($button, $false)
+        $button.Opacity | Should -Be -ExpectedValue 0.5
+    }
+
     It 'Should reject trigger usage outside style or template contexts' {
         $button = [System.Windows.Controls.Button]::new()
         $psVars = New-WPFVariableList -InputObject $button

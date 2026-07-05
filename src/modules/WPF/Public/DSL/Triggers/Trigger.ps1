@@ -98,13 +98,13 @@ function Trigger {
             return
         }
 
-        $descriptor = [System.ComponentModel.DependencyPropertyDescriptor]::FromName($Property, $targetType, $targetType)
-        if (-not $descriptor) {
+        $resolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $targetType
+        if (-not $resolvedProperty) {
             Write-Error "Trigger: Property '$Property' is not a dependency property on type '$($targetType.FullName)'."
             return
         }
 
-        $propertyType = $descriptor.PropertyType
+        $propertyType = $resolvedProperty.PropertyType
         $triggerValue = if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {
             try {
                 [System.Management.Automation.LanguagePrimitives]::ConvertTo($Value, $propertyType)
@@ -131,7 +131,7 @@ function Trigger {
         }
 
         $trigger = [System.Windows.Trigger]::new()
-        $trigger.Property = $descriptor.DependencyProperty
+    $trigger.Property = $resolvedProperty.DependencyProperty
         $trigger.Value = $triggerValue
 
         if ($SourceName) {
