@@ -10,8 +10,13 @@
     current target and calls SetResourceReference so the property consumes
     that keyed value and updates when the active resource dictionary changes.
 
+.NOTES
     Use this when you want a control property, such as Background or Foreground,
     to track a theme resource instead of a fixed value.
+
+    If you only need a brush or object inside one script, a PowerShell variable
+    is usually simpler. Use a WPF resource when the value should be named in the
+    UI, shared across controls, or updated by theme switching.
 
 .EXAMPLE
     Theme 'Light' {

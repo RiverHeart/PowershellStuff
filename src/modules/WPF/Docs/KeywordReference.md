@@ -908,6 +908,10 @@ In WPF, a resource is a keyed entry in a `ResourceDictionary`, such as a brush,
 style, or template. `Resource` is the consuming side: it applies that keyed
 value to the current control or style target.
 
+If you only need a brush or object inside one script, a PowerShell variable is
+usually simpler. Use a WPF resource when the value should be named in the UI,
+shared across controls, or updated by theme switching.
+
 ```powershell
 Theme 'Light' {
     Brush 'WindowBackground' '#FFFFFF'

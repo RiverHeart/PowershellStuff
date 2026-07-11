@@ -46,6 +46,17 @@ This document summarizes the current WPF DSL support for:
   - Use this to consume a value from the active `ResourceDictionary`; it does
     not declare the resource itself.
 
+### Variables vs resources
+
+Use a PowerShell variable when the object is local to one script and does not
+need WPF theme semantics. That is the simplest option for fixed brushes or
+other shared values used only within the current file.
+
+Use a WPF resource when the value has a semantic name in the UI, may be reused
+across multiple controls or styles, or should change automatically when the
+active theme changes. In that case, the theme dictionary owns the value and the
+`Resource` keyword consumes it.
+
 ### Styles
 
 - `Style <Name> <TargetType> { ... }`
