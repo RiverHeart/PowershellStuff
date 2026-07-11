@@ -43,6 +43,8 @@ This document summarizes the current WPF DSL support for:
   - Switches between two theme names.
 - `Resource <Property> <Key>`
   - Binds a dependency property to a dynamic resource key on the current object.
+  - Use this to consume a value from the active `ResourceDictionary`; it does
+    not declare the resource itself.
 
 ### Styles
 
@@ -208,6 +210,10 @@ Use one of these:
 - `Resource Background ButtonBackground`
 
 Avoid hard-coded brush assignments when you expect runtime theme changes.
+
+When you use `Resource`, the resource key must already exist in a theme or
+other `ResourceDictionary`. In WPF terms, the control property is the consumer
+and the dictionary entry is the source.
 
 ## Style Scoping
 

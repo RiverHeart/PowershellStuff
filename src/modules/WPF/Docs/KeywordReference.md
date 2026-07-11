@@ -902,7 +902,21 @@ Binding 'WorkingSet64' -ScriptBlock {
 
 ### Resource
 
-Binds a dependency property to a dynamic resource key.
+Binds a dependency property to a WPF resource key through `DynamicResource`.
+
+In WPF, a resource is a keyed entry in a `ResourceDictionary`, such as a brush,
+style, or template. `Resource` is the consuming side: it applies that keyed
+value to the current control or style target.
+
+```powershell
+Theme 'Light' {
+    Brush 'WindowBackground' '#FFFFFF'
+}
+
+Window 'Main' {
+    Resource Background WindowBackground
+}
+```
 
 ```powershell
 Resource Background WindowBackground
