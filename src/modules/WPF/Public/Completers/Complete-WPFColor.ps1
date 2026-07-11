@@ -10,6 +10,16 @@ using namespace System.Management.Automation.Language
 .DESCRIPTION
     Provides auto-complete for colors defined in System.Windows.Media.Colors.
 
+.NOTES
+    Absolute madness... `ff` returns nothing. `FF` returns completions even
+    though these are the test completions
+
+    CompletionText ListItemText     ResultType ToolTip
+    -------------- ------------     ---------- -------
+    '#ff'          ff           ParameterValue Hex color
+    '#FFFFFACD'  LemonChiffon ParameterValue Color
+    '#FFFFDAB9'  PeachPuff    ParameterValue Color
+
 .EXAMPLE
     Complete a color
 

@@ -58,7 +58,6 @@ foreach ($Path in $Paths) {
 #--------------------------
 
 Register-TabExpansionHook -FunctionName 'Complete-WPFThis' -Type 'Completer' -Force
-Register-TabExpansionHook -FunctionName 'Format-CompletionResultAsHexCode' -Type 'Modifier' -Force
 
 # Export Resources
 #-----------------

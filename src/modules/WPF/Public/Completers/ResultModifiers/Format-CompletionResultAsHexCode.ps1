@@ -1,6 +1,8 @@
 using namespace System.Collections.ObjectModel
 using namespace System.Management.Automation
 
+<# WARNING: Non-functional. Keeping for reference #>
+
 <#
 .SYNOPSIS
     Formats completion results as hex codes.
@@ -60,19 +62,18 @@ function Format-CompletionResultAsHexCode {
 
     process {
         $formattedCompletionMatches = [Collection[CompletionResult]]::new()
+        $CommandCompletionWasModified = $false
 
         foreach ($completion in $CommandCompletion.CompletionMatches) {
             $completionText = $completion.CompletionText
 
             try {
-                if ($completionText -match '^[0-9A-Fa-f]{6}$') {
-                    $formattedCompletionMatches.Add([CompletionResult]::new(
-                        <# Text to insert #> "$completionText",
-                        <# Text displayed in the list #> $completion.ListItemText,
-                        <# Icon Type #> $completion.ResultType,
-                        <# Tooltip #> $completion.ToolTip
-                    ))
-                    $formattedCompletionMatches[0].
+                if ($completionText.StartsWith('#')) {
+                    if (-not $CommandCompletionWasModified) {
+                        $CommandCompletionWasModified = $true
+                        $CommandCompletion.ReplacementIndex -= 1
+                        $CommandCompletion.ReplacementLength += 1
+                    }
                 } else {
                     $formattedCompletionMatches.Add($completion)
                 }
