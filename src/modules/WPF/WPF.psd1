@@ -85,11 +85,13 @@ FunctionsToExport = @(
 
     # Completers
     'Complete-WPFApplicationCommand'
+    'Complete-WPFColor'
     'Complete-WPFRegisteredObject'
     'Complete-WPFEvent'
     'Complete-WPFFileInfo'
     'Complete-WPFState'
     'Complete-WPFThis'
+    'Register-TabExpansionHook'
     'TabExpansion2'
 
     # DSL
