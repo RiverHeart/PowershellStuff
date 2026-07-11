@@ -75,7 +75,7 @@ function Setter {
             }
 
             if ($Resource) {
-                $context.SetResourceReference($resolvedProperty.DependencyProperty, [string] $Value)
+                $context.SetResourceReference($resolvedProperty.DependencyProperty, $Value)
             } else {
                 if ($Value -is [System.Windows.TemplateBindingExtension]) {
                     $context.SetValue($resolvedProperty.DependencyProperty, $Value)
@@ -203,7 +203,7 @@ function Setter {
         }
 
         $setterValue = if ($Resource) {
-            [System.Windows.DynamicResourceExtension]::new([string] $Value)
+            [System.Windows.DynamicResourceExtension]::new($Value)
         } else {
             $propertyType = $resolvedProperty.PropertyType
             if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {

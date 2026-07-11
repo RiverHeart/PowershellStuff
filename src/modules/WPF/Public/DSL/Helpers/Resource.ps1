@@ -21,8 +21,8 @@ function Resource {
         [string] $Property,
 
         [Parameter(Mandatory, Position = 1)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Key,
+        [ValidateNotNull()]
+        [object] $Key,
 
         [Parameter(ValueFromPipeline)]
         [object] $InputObject
@@ -32,6 +32,11 @@ function Resource {
         $target = if ($null -ne $InputObject) { $InputObject } else { $PSCmdlet.GetVariableValue('this') }
         if (-not $target) {
             Write-Error "Resource: Unable to resolve target object for property '$Property'."
+            return
+        }
+
+        if ($Key -is [string] -and [string]::IsNullOrWhiteSpace($Key)) {
+            Write-Error "Resource: Resource key for property '$Property' cannot be empty."
             return
         }
 
