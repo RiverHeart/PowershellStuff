@@ -37,12 +37,12 @@ function Resource {
     [OutputType([void])]
     param(
         [Parameter(Mandatory, Position = 0)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Property,
-
-        [Parameter(Mandatory, Position = 1)]
         [ValidateNotNull()]
         [object] $Key,
+
+        [Parameter(Mandatory, Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Property,
 
         [Parameter(ValueFromPipeline)]
         [object] $InputObject

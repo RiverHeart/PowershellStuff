@@ -918,12 +918,12 @@ Theme 'Light' {
 }
 
 Window 'Main' {
-    Resource Background WindowBackground
+    Resource WindowBackground Background
 }
 ```
 
 ```powershell
-Resource Background WindowBackground
+Resource WindowBackground Background
 ```
 
 ### Theme

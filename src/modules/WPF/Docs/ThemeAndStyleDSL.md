@@ -41,7 +41,7 @@ This document summarizes the current WPF DSL support for:
   - Applies a registered theme to a root element by swapping theme dictionaries.
 - `Toggle-WPFTheme [-LightName Light] [-DarkName Dark] [-Root <FrameworkElement>]`
   - Switches between two theme names.
-- `Resource <Property> <Key>`
+- `Resource <Key> <Property>`
   - Binds a dependency property to a dynamic resource key on the current object.
   - Use this to consume a value from the active `ResourceDictionary`; it does
     not declare the resource itself.
@@ -176,7 +176,7 @@ Both forms are supported and equivalent for top-level style property setters.
 - `Trigger` and `MultiTrigger` condition properties also accept owner-qualified dependency-property syntax.
   - Example: `Trigger ToolTipService.IsEnabled $false { ... }`
 - `Resource` and `BindProperty` target properties also accept owner-qualified dependency-property syntax.
-  - Example: `Resource TextBlock.Foreground ForegroundBrush`
+  - Example: `Resource ForegroundBrush TextBlock.Foreground`
   - Example: `BindProperty 'ToolTipService.IsEnabled' ToolTipEnabled -Source $state`
 - `DataTrigger` supports attached properties through standard WPF binding path syntax rather than dependency-property name resolution.
   - Example: `DataTrigger '(ToolTipService.IsEnabled)' $false -Self { ... }`
@@ -218,7 +218,7 @@ Theme toggling updates live only when styles/properties are bound through dynami
 Use one of these:
 
 - `Setter Background ButtonBackground -Resource`
-- `Resource Background ButtonBackground`
+- `Resource ButtonBackground Background`
 
 Avoid hard-coded brush assignments when you expect runtime theme changes.
 
