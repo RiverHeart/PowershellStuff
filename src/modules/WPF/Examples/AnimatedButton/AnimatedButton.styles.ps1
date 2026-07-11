@@ -6,10 +6,11 @@ $GrayBlueGradientBrush = LinearGradientBrush {
     GradientStop 'DarkGray' 1
 }
 
-$GradientStopCollection =
-$LinearGradientBrush = LinearGradientBrush {
+# StaticResources are just PowerShell variables
+$GlassGradientBrush = LinearGradientBrush {
     $this.StartPoint = '0,0'
     $this.EndPoint = '1,1'
+    $this.Opacity = 0.75
     $this.GradientStops = GradientStopCollection {
         GradientStop WhiteSmoke 0.2
         GradientStop Transparent 0.4
@@ -20,8 +21,12 @@ $LinearGradientBrush = LinearGradientBrush {
     }
 }
 
+Style Window {
+    Background: Black
+}
+
 Style Button {
-    Width: 80
+    Width: 90
     Margin: 10
     Background: $GrayBlueGradientBrush
 
@@ -29,6 +34,8 @@ Style Button {
         Grid {
             Width: (TemplateBinding Width)
             Height: (TemplateBinding Height)
+            ClipToBounds: $true
+
             # Outer Rectangle with rounded corners
             Rectangle 'OuterRect' {
                 HorizontalAlignment: ([HorizontalAlignment]::Stretch)
@@ -39,6 +46,7 @@ Style Button {
                 Stroke: (TemplateBinding Background)
                 StrokeThickness: 5
             }
+
             # Inner Rectangle with rounded corners
             Rectangle 'InnerRect' {
                 RadiusX: 20
@@ -47,19 +55,20 @@ Style Button {
                 Stroke: 'Transparent'
                 StrokeThickness: 20
             }
+
             # Glass Rectangle
             Rectangle 'GlassCube' {
                 HorizontalAlignment: ([HorizontalAlignment]::Stretch)
                 VerticalAlignment: ([VerticalAlignment]::Stretch)
-                Fill: (TemplateBinding Background)
+                Fill: $GlassGradientBrush
                 StrokeThickness: 2
                 RadiusX: 10
                 RadiusY: 10
-                Opacity: 0
+                Opacity: 1
                 RenderTransformOrigin: '0.5,0.5'
                 Stroke: (LinearGradientBrush {
-                    $this.StartPoint = '0,0'
-                    $this.EndPoint = '1,1'
+                    $this.StartPoint = '0.5,0'
+                    $this.EndPoint = '0.5,1'
                     $this.GradientStops = GradientStopCollection {
                         GradientStop LightBlue 0.0
                         GradientStop Gray 1.0
@@ -67,6 +76,7 @@ Style Button {
                 })
                 BitmapEffect: ([System.Windows.Media.Effects.BevelBitmapEffect]::new())
             }
+
             DockPanel 'ContentPresenterPanel' {
                 ContentPresenter 'ContentPresenter' {
                     Margin: 20
