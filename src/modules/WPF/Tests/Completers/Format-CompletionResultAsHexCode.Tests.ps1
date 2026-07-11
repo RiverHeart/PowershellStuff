@@ -30,15 +30,16 @@ Describe 'Format-CompletionResultAsHexCode' -Tag 'Format-CompletionResultAsHexCo
     }
 
     BeforeEach {
-        $script:previousTabExpansionRegistry = $global:TabExpansionRegistry
-        $global:TabExpansionRegistry = @{
-            TabCompleters    = @{}
-            ResultModifiers  = @{}
-        }
+        $script:previousTabExpansionHooks = @(Get-TabExpansionHook)
+        Reset-TabExpansion2 -NoDefaultHooks
     }
 
     AfterEach {
-        $global:TabExpansionRegistry = $script:previousTabExpansionRegistry
+        Reset-TabExpansion2 -NoDefaultHooks
+
+        foreach ($Hook in $script:previousTabExpansionHooks) {
+            Register-TabExpansionHook -Name $Hook.Name -Type $Hook.Type -ScriptBlock $Hook.ScriptBlock -Force
+        }
     }
 
     It 'formats six-digit hex completions and preserves command completion metadata' {

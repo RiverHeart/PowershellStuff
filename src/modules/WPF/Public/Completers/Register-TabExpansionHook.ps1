@@ -43,16 +43,11 @@ function Register-TabExpansionHook {
         [switch] $Force
     )
 
-    if (-not $global:TabExpansionRegistry) {
-        $global:TabExpansionRegistry = @{
-            TabCompleters = @{}
-            ResultModifiers = @{}
-        }
-    }
+    $Registry = Get-WPFTabExpansionRegistry
 
     $TargetRegistry = switch ($Type) {
-        'Completer' { $global:TabExpansionRegistry.TabCompleters }
-        'Modifier'  { $global:TabExpansionRegistry.ResultModifiers }
+        'Completer' { $Registry.TabCompleters }
+        'Modifier'  { $Registry.ResultModifiers }
         default     { throw "Invalid type '$Type'. Must be 'Completer' or 'Modifier'." }
     }
 

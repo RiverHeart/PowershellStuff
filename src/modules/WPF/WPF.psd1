@@ -91,8 +91,11 @@ FunctionsToExport = @(
     'Complete-WPFFileInfo'
     'Complete-WPFState'
     'Complete-WPFThis'
+    'Get-TabExpansionHook'
     'Register-TabExpansionHook'
+    'Reset-TabExpansion2'
     'TabExpansion2'
+    'Unregister-TabExpansionHook'
 
     # DSL
 

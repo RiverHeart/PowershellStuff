@@ -62,18 +62,24 @@ function Format-CompletionResultAsHexCode {
 
     process {
         $formattedCompletionMatches = [Collection[CompletionResult]]::new()
-        $CommandCompletionWasModified = $false
 
         foreach ($completion in $CommandCompletion.CompletionMatches) {
             $completionText = $completion.CompletionText
 
             try {
-                if ($completionText.StartsWith('#')) {
-                    if (-not $CommandCompletionWasModified) {
-                        $CommandCompletionWasModified = $true
-                        $CommandCompletion.ReplacementIndex -= 1
-                        $CommandCompletion.ReplacementLength += 1
+                if ($completionText -match '^[0-9A-Fa-f]{6}$') {
+                    $ListItemText = if ([string]::IsNullOrEmpty($completion.ListItemText)) {
+                        $completionText
+                    } else {
+                        $completion.ListItemText
                     }
+
+                    $formattedCompletionMatches.Add([CompletionResult]::new(
+                        <# Text to insert #> "#$completionText",
+                        <# Text displayed in the list #> $ListItemText,
+                        <# Icon Type #> $completion.ResultType,
+                        <# Tooltip #> $completion.ToolTip
+                    ))
                 } else {
                     $formattedCompletionMatches.Add($completion)
                 }

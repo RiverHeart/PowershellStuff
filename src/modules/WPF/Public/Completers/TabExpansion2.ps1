@@ -77,21 +77,15 @@ function TabExpansion2 {
 
     $Completions = $null
 
-    # Create a registry to hold custom tab completers and result modifiers. This allows us to
-    # register new completers and modifiers without having to modify this function every time.
-    if (-not $global:TabExpansionRegistry) {
-        $global:TabExpansionRegistry = @{
-            TabCompleters = @{}
-            ResultModifiers = @{}
-        }
-    }
+    # Create or retrieve the module-level registry for custom tab completers and result modifiers.
+    $Registry = Get-WPFTabExpansionRegistry
 
     #-------------------------
     # Custom Tab Completers
     #-------------------------
 
     try {
-        $TabCompleters = $global:TabExpansionRegistry.TabCompleters.GetEnumerator()
+        $TabCompleters = $Registry.TabCompleters.GetEnumerator()
         $Completions = $TabCompleters |
             ForEach-Object {
                 & $_.Value @PSBoundParameters
@@ -134,9 +128,9 @@ function TabExpansion2 {
     # Result Modifiers
     #--------------------------
 
-    if ($global:TabExpansionRegistry.ResultModifiers.Count -gt 0) {
+    if ($Registry.ResultModifiers.Count -gt 0) {
         try {
-            foreach ($ResultModifier in $global:TabExpansionRegistry.ResultModifiers.GetEnumerator()) {
+            foreach ($ResultModifier in $Registry.ResultModifiers.GetEnumerator()) {
                 $ModifiedCompletions = @(
                     & $ResultModifier.Value -CommandCompletion $Completions
                 )
