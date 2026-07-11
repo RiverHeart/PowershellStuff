@@ -58,6 +58,7 @@ Scope of this page:
     * [Theme](#theme)
     * [Brush](#brush)
     * [LinearGradientBrush](#lineargradientbrush)
+    * [GradientStopCollection](#gradientstopcollection)
     * [GradientStop](#gradientstop)
 * [Styles](#styles)
     * [Style](#style)
@@ -961,17 +962,40 @@ Rectangle 'BannerFill' {
     $this.Fill = LinearGradientBrush {
         $this.StartPoint = '0,0'
         $this.EndPoint = '1,1'
-        GradientStop 'Yellow' 0.0
-        GradientStop 'Red' 0.25
-        GradientStop 'Blue' 0.75
-        GradientStop 'LimeGreen' 1.0
+        $this.GradientStops = GradientStopCollection {
+            GradientStop 'Yellow' 0.0
+            GradientStop 'Red' 0.25
+            GradientStop 'Blue' 0.75
+            GradientStop 'LimeGreen' 1.0
+        }
     }
+}
+```
+
+### GradientStopCollection
+
+Creates a `GradientStopCollection` for use in `LinearGradientBrush`.
+
+```powershell
+$glassStops = GradientStopCollection {
+    GradientStop 'WhiteSmoke' 0.2
+    GradientStop 'Transparent' 0.4
+    GradientStop 'WhiteSmoke' 0.5
+    GradientStop 'Transparent' 0.75
+    GradientStop 'WhiteSmoke' 0.9
+    GradientStop 'Transparent' 1.0
+}
+
+$glassBrush = LinearGradientBrush {
+    $this.StartPoint = '0,0'
+    $this.EndPoint = '1,1'
+    $this.GradientStops = $glassStops
 }
 ```
 
 ### GradientStop
 
-Adds a gradient stop to the current `LinearGradientBrush`.
+Adds a gradient stop to the current `LinearGradientBrush` or `GradientStopCollection`.
 
 ```powershell
 LinearGradientBrush {
