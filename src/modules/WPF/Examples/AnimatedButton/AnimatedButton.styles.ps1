@@ -59,6 +59,32 @@ Resources {
                 Setter -Property 'Rectangle.Stroke' -Target 'OuterRect' -Value ([SystemColors]::HighlightBrushKey) -Resource
             }
 
+            # Animations that start when mouse enters and leaves button.
+            EventTrigger 'Mouse.MouseEnter' {
+                BeginStoryboard 'mouseEnterBeginStoryboard' {
+                    Storyboard {
+                        # This animation makes the glass rectangle shrink in the X direction.
+                        DoubleAnimation `
+                            -Target 'GlassCube' `
+                            -Property '(Rectangle.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)' `
+                            -By -0.1 `
+                            -Duration '0:0:0.5'
+
+                        # This animation makes the glass rectangle shrink in the Y direction.
+                        DoubleAnimation `
+                            -Target 'GlassCube' `
+                            -Property '(Rectangle.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)' `
+                            -By -0.1 `
+                            -Duration '0:0:0.5'
+                    }
+                }
+            }
+
+            EventTrigger 'Mouse.MouseLeave' {
+                # Stopping the storyboard sets animated properties back to default.
+                StopStoryboard 'mouseEnterBeginStoryboard'
+            }
+
             Grid {
                 Width: (TemplateBinding Width)
                 Height: (TemplateBinding Height)
@@ -94,6 +120,10 @@ Resources {
                     RadiusY: 10
                     Opacity: 1
                     RenderTransformOrigin: '0.5,0.5'
+                    $ScaleTransform = [System.Windows.Media.ScaleTransform]::new(1.0, 1.0)
+                    $TransformGroup = [System.Windows.Media.TransformGroup]::new()
+                    $TransformGroup.Children.Add($ScaleTransform) | Out-Null
+                    RenderTransform: $TransformGroup
                     Stroke: (LinearGradientBrush {
                         $this.StartPoint = '0.5,0'
                         $this.EndPoint = '0.5,1'
