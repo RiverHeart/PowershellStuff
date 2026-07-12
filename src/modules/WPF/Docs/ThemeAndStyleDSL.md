@@ -45,6 +45,8 @@ This document summarizes the current WPF DSL support for:
   - Binds a dependency property to a dynamic resource key on the current object.
   - Use this to consume a value from the active `ResourceDictionary`; it does
     not declare the resource itself.
+  - Think of it as pointing a property at a named entry, not copying the entry
+    into the object or mutating the resource.
 
 ### Variables vs resources
 
@@ -56,6 +58,11 @@ Use a WPF resource when the value has a semantic name in the UI, may be reused
 across multiple controls or styles, or should change automatically when the
 active theme changes. In that case, the theme dictionary owns the value and the
 `Resource` keyword consumes it.
+
+In practice, that means the property is the consumer and the resource key is the
+thing it points at. The control does not get a new property; it just uses the
+value currently stored under that key, and WPF can refresh the property later if
+the active dictionary changes.
 
 ### Styles
 
@@ -225,6 +232,10 @@ Avoid hard-coded brush assignments when you expect runtime theme changes.
 When you use `Resource`, the resource key must already exist in a theme or
 other `ResourceDictionary`. In WPF terms, the control property is the consumer
 and the dictionary entry is the source.
+
+That distinction matters because a `Resource` call is not a declaration. It only
+works where there is an existing target object and a property to apply the key
+to.
 
 ## Style Scoping
 
