@@ -85,6 +85,27 @@ Resources {
                 StopStoryboard 'mouseEnterBeginStoryboard'
             }
 
+            #---------------------------------------------------------------------------------
+            # TODO:
+            #
+            # There is no earthly way we're going to resolve that property with that
+            # insane property path. Maybe there's some hidden built-in property resolver.
+            # If not, I may need to come back to this.
+            #---------------------------------------------------------------------------------
+            #
+            # Animation fires when button is clicked, causing glass to spin.
+            # EventTrigger 'Button.Click' {
+            #     BeginStoryboard {
+            #         Storyboard {
+            #             DoubleAnimation `
+            #                 -Target 'glassCube' `
+            #                 -Property '(Rectangle.RenderTransform).(TransformGroup.Children)[1].(RotateTransform.Angle)' `
+            #                 -By 360 `
+            #                 -Duration '0:0:0.5'
+            #         }
+            #     }
+            # }
+
             Grid {
                 Width: (TemplateBinding Width)
                 Height: (TemplateBinding Height)
