@@ -11,6 +11,7 @@
   * [Explicit Setting](#explicit-setter)
   * [Scope and compatibility notes](#scope-and-compatibility-notes)
   * [Property resolution precedence and delimiter](#property-resolution-precedence-and-delimiter)
+* [Resource Consumption Cheatsheet](#resource-consumption-cheatsheet)
 * [How dynamic theme updates work](#how-dynamic-theme-updates-work)
 * [Style Scoping](#named-vs-implicit-styles)
   * [Named Styles](#named-styles)
@@ -217,6 +218,55 @@ Style 'ExampleButton' Button {
   }
 }
 ```
+
+## Resource Consumption Cheatsheet
+
+Use this quick rule when choosing between `Setter -Resource` and `Resource`.
+
+| You are doing this | Use | Why |
+|---|---|---|
+| Defining style values inside `Style`, `Trigger`, `DataTrigger`, `MultiTrigger`, or template factory blocks | `Setter <Property> <Key> -Resource` (or implicit shorthand like `Background: Key -Resource`) | You are building a style setter entry that resolves through `DynamicResource`. |
+| Setting a property directly on the current object in a control block | `Resource <Key> <Property>` | You are binding a live object's dependency property to a resource key via `SetResourceReference`. |
+| Assigning a fixed value/object (no resource lookup) | `Setter <Property> <Value>` or direct property assignment | No dynamic resource indirection is needed. |
+
+### Side-by-side examples
+
+Style context (`Setter -Resource`):
+
+```powershell
+Style Button {
+  Background: GrayBlueGradientBrush -Resource
+}
+```
+
+Live control context (`Resource`):
+
+```powershell
+Button 'SaveButton' {
+  Resource GrayBlueGradientBrush Background
+}
+```
+
+Fixed value (not resource-backed):
+
+```powershell
+Style Button {
+  Setter Margin 10
+}
+```
+
+### SystemColors key usage
+
+`[System.Windows.SystemColors]::HighlightBrushKey` is a resource key, not a brush value.
+Use it with dynamic resource semantics:
+
+```powershell
+Trigger IsMouseOver $true {
+  Setter Stroke ([System.Windows.SystemColors]::HighlightBrushKey) -Target OuterRect -Resource
+}
+```
+
+If you use the key without `-Resource`/`Resource`, you are passing the key object itself as a value, which is usually not what you want.
 
 ## How dynamic theme updates work
 

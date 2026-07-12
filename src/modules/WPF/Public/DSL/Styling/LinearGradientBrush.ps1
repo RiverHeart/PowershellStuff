@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
-    Adds a linear gradient brush resource entry to the current theme dictionary.
+    Adds a linear gradient brush resource entry to the current dictionary scope.
 
 .DESCRIPTION
     Creates a LinearGradientBrush and optionally configures it inside a trailing
     script block.
 
-    When called inside Theme, the brush is stored under a key on the current
-    Theme dictionary. In other contexts, the configured brush object is returned
-    so it can be assigned directly to properties like Fill.
+    When called inside Theme or Resources, the brush is stored under a key on
+    the current ResourceDictionary. In other contexts, the configured brush
+    object is returned so it can be assigned directly to properties like Fill.
 
     Use `$this` to set brush properties directly. Method calls are available
     only when the WPF API requires them, such as adding gradient stops.
@@ -59,7 +59,7 @@ function LinearGradientBrush {
     $dictionary = $PSCmdlet.GetVariableValue('this')
     if ($dictionary -is [System.Windows.ResourceDictionary]) {
         if ($PSCmdlet.ParameterSetName -ne 'Keyed') {
-            Write-Error 'LinearGradientBrush inside Theme requires a resource key.'
+            Write-Error 'LinearGradientBrush inside a ResourceDictionary requires a resource key.'
             return
         }
 
@@ -68,7 +68,7 @@ function LinearGradientBrush {
     }
 
     if ($PSCmdlet.ParameterSetName -eq 'Keyed') {
-        Write-Error "LinearGradientBrush key '$Key' is only valid inside Theme. Use the scriptblock-only form when assigning to properties such as Fill."
+        Write-Error "LinearGradientBrush key '$Key' is only valid inside Resources/Theme dictionary scopes. Use the scriptblock-only form when assigning to properties such as Fill."
         return
     }
 

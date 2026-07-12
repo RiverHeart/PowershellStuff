@@ -54,6 +54,7 @@ Scope of this page:
     * [BindProperty](#bindproperty)
     * [Binding](#binding)
     * [ValueConverter](#valueconverter)
+    * [Resources](#resources)
     * [Resource](#resource)
     * [Theme](#theme)
     * [Brush](#brush)
@@ -900,6 +901,34 @@ Binding 'WorkingSet64' -ScriptBlock {
 }
 ```
 
+### Resources
+
+Evaluates a block against the current target's `ResourceDictionary`, mirroring
+XAML `*.Resources` scopes.
+
+Use this to declare brushes, styles, and other dictionary-backed values where
+they should be resolved by normal WPF resource lookup.
+
+```powershell
+Window 'Main' {
+    Resources {
+        LinearGradientBrush 'GrayBlueGradientBrush' {
+            $this.StartPoint = '0,0'
+            $this.EndPoint = '1,1'
+            GradientStop 'DarkGray' 0
+            GradientStop '#CCCCFF' 0.5
+            GradientStop 'DarkGray' 1
+        }
+
+        Style Button {
+            Setter Background GrayBlueGradientBrush -Resource
+            Setter Width 80
+            Setter Margin 10
+        }
+    }
+}
+```
+
 ### Resource
 
 Binds a dependency property to a WPF resource key through `DynamicResource`.
@@ -947,7 +976,8 @@ Theme 'Accent' {
 
 ### Brush
 
-Adds a brush entry to the current Theme.
+Adds a brush entry to the current `ResourceDictionary` scope, such as `Theme`
+or `Resources`.
 
 ```powershell
 Brush 'Foreground' '#111111'
@@ -955,9 +985,10 @@ Brush 'Foreground' '#111111'
 
 ### LinearGradientBrush
 
-Creates a linear gradient brush. When called inside `Theme`, the brush is stored
-as a theme resource. In other contexts, the configured brush object is returned
-so it can be assigned directly to properties like `Fill`.
+Creates a linear gradient brush. When called inside `Theme` or `Resources`, the
+brush is stored as a keyed dictionary resource. In other contexts, the
+configured brush object is returned so it can be assigned directly to
+properties like `Fill`.
 
 Configure the brush directly with `$this`. Keep Theme/Style shorthand for
 property-like declarations; this keyword is plain WPF object configuration.

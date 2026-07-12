@@ -148,6 +148,7 @@ FunctionsToExport = @(
     'MultiTrigger'
     'Reference'
     'Resource'
+    'Resources'
     'Setter'
     'State'
     'Style'
