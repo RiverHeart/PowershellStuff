@@ -67,6 +67,27 @@ Describe 'Trigger' -Tag 'Trigger' {
         $trigger.Setters[0].TargetName | Should -Be -ExpectedValue 'TemplateRoot'
     }
 
+    It 'Should resolve short owner names for template trigger setters with targets' {
+        $template = [System.Windows.Controls.ControlTemplate]::new([System.Windows.Controls.Button])
+        $psVars = New-WPFVariableList -InputObject $template
+
+        {
+            Trigger IsEnabled $false {
+                Setter Rectangle.Stroke ([System.Windows.Media.Brushes]::Red) -Target 'TemplateRoot'
+            }
+        }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $template.Triggers.Count | Should -Be -ExpectedValue 1
+
+        $trigger = $template.Triggers[0]
+        $trigger.Setters.Count | Should -Be -ExpectedValue 1
+
+        $setter = $trigger.Setters[0]
+        $setter.TargetName | Should -Be -ExpectedValue 'TemplateRoot'
+        $setter.Property.Name | Should -Be -ExpectedValue 'Stroke'
+        $setter.Property.OwnerType.FullName | Should -Be -ExpectedValue 'System.Windows.Shapes.Shape'
+    }
+
     It 'Should support owner-qualified attached-property names in style triggers' {
         $id = [guid]::NewGuid().ToString('N')
         $styleName = "TriggerAttachedPropertyButton_$id"

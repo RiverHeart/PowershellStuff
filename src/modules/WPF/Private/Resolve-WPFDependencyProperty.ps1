@@ -35,33 +35,74 @@ function Resolve-WPFDependencyProperty {
     function Resolve-OwnerType {
         param(
             [Parameter(Mandatory)]
-            [string] $OwnerTypeName
+            [string] $OwnerTypeName,
+
+            [Parameter(Mandatory)]
+            [string] $PropertyName
         )
 
-        if ($script:WPFDependencyOwnerTypeCache.ContainsKey($OwnerTypeName)) {
-            return $script:WPFDependencyOwnerTypeCache[$OwnerTypeName]
+        $cacheKey = "$OwnerTypeName|$PropertyName"
+        if ($script:WPFDependencyOwnerTypeCache.ContainsKey($cacheKey)) {
+            return $script:WPFDependencyOwnerTypeCache[$cacheKey]
         }
 
         $ResolvedType = [System.Type]::GetType($OwnerTypeName, $false, $true)
+
         if (-not $ResolvedType) {
+            $candidateTypes = [System.Collections.Generic.List[Type]]::new()
             foreach ($Assembly in [System.AppDomain]::CurrentDomain.GetAssemblies()) {
                 try {
-                    $Match = $Assembly.ExportedTypes | Where-Object {
-                        $_.Name -ieq $OwnerTypeName -or $_.FullName -ieq $OwnerTypeName
-                    } | Select-Object -First 1
+                    foreach ($type in $Assembly.ExportedTypes) {
+                        if ($type.Name -ieq $OwnerTypeName -or $type.FullName -ieq $OwnerTypeName) {
+                            $candidateTypes.Add($type)
+                        }
+                    }
                 } catch {
                     continue
                 }
+            }
 
-                if ($Match) {
-                    $ResolvedType = $Match
-                    break
+            if ($candidateTypes.Count -gt 0) {
+                $bestScore = [int]::MinValue
+                $bestType = $null
+                foreach ($candidate in $candidateTypes) {
+                    $score = 0
+
+                    if ($candidate.FullName -ieq $OwnerTypeName) {
+                        $score += 1000
+                    } elseif ($candidate.Name -ieq $OwnerTypeName) {
+                        $score += 100
+                    }
+
+                    if ([System.Windows.DependencyObject].IsAssignableFrom($candidate)) {
+                        $score += 100
+                    }
+
+                    if ($candidate.Namespace -and $candidate.Namespace.StartsWith('System.Windows', [System.StringComparison]::OrdinalIgnoreCase)) {
+                        $score += 50
+                    }
+
+                    $propertyField = $candidate.GetField("${PropertyName}Property", [System.Reflection.BindingFlags]::Public -bor [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::FlattenHierarchy)
+                    if ($propertyField -and $propertyField.FieldType -eq [System.Windows.DependencyProperty]) {
+                        $score += 200
+                    }
+
+                    if (
+                        $null -eq $bestType -or
+                        $score -gt $bestScore -or
+                        ($score -eq $bestScore -and $candidate.FullName -lt $bestType.FullName)
+                    ) {
+                        $bestType = $candidate
+                        $bestScore = $score
+                    }
                 }
+
+                $ResolvedType = $bestType
             }
         }
 
         if ($ResolvedType) {
-            $script:WPFDependencyOwnerTypeCache[$OwnerTypeName] = $ResolvedType
+            $script:WPFDependencyOwnerTypeCache[$cacheKey] = $ResolvedType
         }
 
         return $ResolvedType
@@ -93,7 +134,7 @@ function Resolve-WPFDependencyProperty {
         }
     }
 
-    $OwnerType = Resolve-OwnerType -OwnerTypeName $OwnerTypeName
+    $OwnerType = Resolve-OwnerType -OwnerTypeName $OwnerTypeName -PropertyName $PropertyName
     if (-not $OwnerType) {
         return $null
     }
