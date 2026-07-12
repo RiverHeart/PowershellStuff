@@ -99,13 +99,11 @@ function Find-AstNode {
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
-        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(Mandatory,ParameterSetName='ByTabExpansion2Context')]
         [switch] $ContainsCursor,
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
-        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [int] $CursorOffset
     )
@@ -113,9 +111,7 @@ function Find-AstNode {
     if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
         $Ast = $ScriptBlock.Ast
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByFilePath') {
-        $ResolvedFilePath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($FilePath)
-        $null = $tokens = $errors = $null
-        $Ast = [System.Management.Automation.Language.Parser]::ParseFile($ResolvedFilePath, [ref] $tokens, [ref] $errors)
+        $Ast = Import-Ast -FilePath $FilePath
     }
 
     $HasContainsCursor = $PSBoundParameters.ContainsKey('ContainsCursor')
