@@ -12,3 +12,12 @@
 ## PowerShell WPF Integration
 
 - https://app.pluralsight.com/library/courses/PowerShell-guis-building-wpf-free/table-of-contents
+
+## PSScriptAnalyzer
+
+TODO: Evaluate for DSL best practice guidance
+
+- https://devblogs.microsoft.com/scripting/psscriptanalyzer-deep-dive-part-1-of-4/
+- https://devblogs.microsoft.com/scripting/psscriptanalyzer-deep-dive-part-2-of-4/
+- https://devblogs.microsoft.com/scripting/psscriptanalyzer-deep-dive-part-3-of-4/
+- https://devblogs.microsoft.com/scripting/psscriptanalyzer-deep-dive-part-4-of-4/
