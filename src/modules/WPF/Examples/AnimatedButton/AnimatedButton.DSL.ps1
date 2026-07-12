@@ -22,13 +22,13 @@ $DebugPreference = 'Continue'
 
 Import-Module ../.. -Force
 
-Import .\AnimatedButton.styles.ps1
-
 Window 'Window' {
     $this.Title = 'Animated Button'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.Width = 900
     $this.Height = 600
+
+    Import .\AnimatedButton.styles.ps1
 
     StackPanel 'Content' {
         $this.Orientation = 'Vertical'
