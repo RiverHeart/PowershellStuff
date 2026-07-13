@@ -62,6 +62,25 @@ Describe 'Style implicit setter syntax' -Tag 'Style' {
         $button.Style.Setters[0].Value.ResourceKey | Should -Be -ExpectedValue 'ButtonBackground'
     }
 
+    It 'Preserves object resource keys for -Resource setters' {
+        $id = [guid]::NewGuid().ToString('N')
+        $styleName = "ImplicitSetterObjectResourceButton_$id"
+        $button = [System.Windows.Controls.Button]::new()
+        $resourceKey = [System.Windows.SystemColors]::HighlightBrushKey
+
+        Style $styleName Button {
+            Background: $resourceKey -Resource
+        }
+
+        $psVars = New-WPFVariableList -InputObject $button
+        { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $button.Style | Should -Not -BeNullOrEmpty
+        $button.Style.Setters.Count | Should -Be -ExpectedValue 1
+        $button.Style.Setters[0].Value | Should -BeOfType ([System.Windows.DynamicResourceExtension])
+        $button.Style.Setters[0].Value.ResourceKey | Should -Be -ExpectedValue $resourceKey
+    }
+
     It 'Supports explicit property delimiter syntax with a trailing colon' {
         $id = [guid]::NewGuid().ToString('N')
         $styleName = "ImplicitSetterDelimiterButton_$id"

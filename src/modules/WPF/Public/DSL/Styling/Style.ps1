@@ -18,6 +18,9 @@ using namespace System.Management.Automation.Language
     Named styles are applied using UseStyle. Typed styles are registered by
     target type and auto-applied during control creation.
 
+    When called inside Resources, styles are added to that ResourceDictionary
+    instead of the module-level style tables.
+
     To support implicit style syntax (for example: Background: 'Red'), Style
     performs a lightweight AST pass first to identify candidate command names,
     then injects temporary helper functions into the scriptblock execution
@@ -103,6 +106,17 @@ function Style {
     # Execute once with injected helpers and WPF DSL variables. This keeps
     # normal scriptblock behavior intact while enabling shorthand commands.
     $null = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
+
+    $resourceDictionary = $PSCmdlet.GetVariableValue('this')
+    if ($resourceDictionary -is [System.Windows.ResourceDictionary]) {
+        if ($isNamedStyle) {
+            $resourceDictionary[$Name] = $style
+        } else {
+            # Match XAML implicit style behavior by using TargetType as the key.
+            $resourceDictionary[$resolvedType] = $style
+        }
+        return
+    }
 
     if ($isNamedStyle) {
         $script:WPFStyleTable[$Name] = $style

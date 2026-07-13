@@ -54,10 +54,12 @@ Scope of this page:
     * [BindProperty](#bindproperty)
     * [Binding](#binding)
     * [ValueConverter](#valueconverter)
+    * [Resources](#resources)
     * [Resource](#resource)
     * [Theme](#theme)
     * [Brush](#brush)
     * [LinearGradientBrush](#lineargradientbrush)
+    * [GradientStopCollection](#gradientstopcollection)
     * [GradientStop](#gradientstop)
 * [Styles](#styles)
     * [Style](#style)
@@ -899,12 +901,58 @@ Binding 'WorkingSet64' -ScriptBlock {
 }
 ```
 
-### Resource
+### Resources
 
-Binds a dependency property to a dynamic resource key.
+Evaluates a block against the current target's `ResourceDictionary`, mirroring
+XAML `*.Resources` scopes.
+
+Use this to declare brushes, styles, and other dictionary-backed values where
+they should be resolved by normal WPF resource lookup.
 
 ```powershell
-Resource Background WindowBackground
+Window 'Main' {
+    Resources {
+        LinearGradientBrush 'GrayBlueGradientBrush' {
+            $this.StartPoint = '0,0'
+            $this.EndPoint = '1,1'
+            GradientStop 'DarkGray' 0
+            GradientStop '#CCCCFF' 0.5
+            GradientStop 'DarkGray' 1
+        }
+
+        Style Button {
+            Setter Background GrayBlueGradientBrush -Resource
+            Setter Width 80
+            Setter Margin 10
+        }
+    }
+}
+```
+
+### Resource
+
+Binds a dependency property to a WPF resource key through `DynamicResource`.
+
+In WPF, a resource is a keyed entry in a `ResourceDictionary`, such as a brush,
+style, or template. `Resource` is the consuming side: it applies that keyed
+value to the current control or style target.
+
+If you only need a brush or object inside one script, a PowerShell variable is
+usually simpler. Use a WPF resource when the value should be named in the UI,
+shared across controls, or updated by theme switching.
+
+```powershell
+Theme 'Light' {
+    Brush 'WindowBackground' '#FFFFFF'
+}
+
+Window 'Main' {
+    Resource WindowBackground Background
+}
+```
+
+```powershell
+Resource WindowBackground Background
 ```
 
 ### Theme
@@ -928,7 +976,8 @@ Theme 'Accent' {
 
 ### Brush
 
-Adds a brush entry to the current Theme.
+Adds a brush entry to the current `ResourceDictionary` scope, such as `Theme`
+or `Resources`.
 
 ```powershell
 Brush 'Foreground' '#111111'
@@ -936,9 +985,10 @@ Brush 'Foreground' '#111111'
 
 ### LinearGradientBrush
 
-Creates a linear gradient brush. When called inside `Theme`, the brush is stored
-as a theme resource. In other contexts, the configured brush object is returned
-so it can be assigned directly to properties like `Fill`.
+Creates a linear gradient brush. When called inside `Theme` or `Resources`, the
+brush is stored as a keyed dictionary resource. In other contexts, the
+configured brush object is returned so it can be assigned directly to
+properties like `Fill`.
 
 Configure the brush directly with `$this`. Keep Theme/Style shorthand for
 property-like declarations; this keyword is plain WPF object configuration.
@@ -961,17 +1011,40 @@ Rectangle 'BannerFill' {
     $this.Fill = LinearGradientBrush {
         $this.StartPoint = '0,0'
         $this.EndPoint = '1,1'
-        GradientStop 'Yellow' 0.0
-        GradientStop 'Red' 0.25
-        GradientStop 'Blue' 0.75
-        GradientStop 'LimeGreen' 1.0
+        $this.GradientStops = GradientStopCollection {
+            GradientStop 'Yellow' 0.0
+            GradientStop 'Red' 0.25
+            GradientStop 'Blue' 0.75
+            GradientStop 'LimeGreen' 1.0
+        }
     }
+}
+```
+
+### GradientStopCollection
+
+Creates a `GradientStopCollection` for use in `LinearGradientBrush`.
+
+```powershell
+$glassStops = GradientStopCollection {
+    GradientStop 'WhiteSmoke' 0.2
+    GradientStop 'Transparent' 0.4
+    GradientStop 'WhiteSmoke' 0.5
+    GradientStop 'Transparent' 0.75
+    GradientStop 'WhiteSmoke' 0.9
+    GradientStop 'Transparent' 1.0
+}
+
+$glassBrush = LinearGradientBrush {
+    $this.StartPoint = '0,0'
+    $this.EndPoint = '1,1'
+    $this.GradientStops = $glassStops
 }
 ```
 
 ### GradientStop
 
-Adds a gradient stop to the current `LinearGradientBrush`.
+Adds a gradient stop to the current `LinearGradientBrush` or `GradientStopCollection`.
 
 ```powershell
 LinearGradientBrush {

@@ -64,12 +64,18 @@ function Setter {
 
             $resolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $context.Type
             if (-not $resolvedProperty) {
-                Write-Error "Setter: Property '$Property' is not a dependency property on type '$($context.Type.FullName)'."
+                $ownerQualifiedHint = if ($Property -match '\.') {
+                    " Owner-qualified syntax is only for attached or owner-qualified dependency properties. For normal properties, use the unqualified name (for example, 'BitmapEffect' instead of 'Rectangle.BitmapEffect')."
+                } else {
+                    ''
+                }
+
+                Write-Error "Setter: Property '$Property' is not a dependency property on type '$($context.Type.FullName)'.$ownerQualifiedHint"
                 return
             }
 
             if ($Resource) {
-                $context.SetResourceReference($resolvedProperty.DependencyProperty, [string] $Value)
+                $context.SetResourceReference($resolvedProperty.DependencyProperty, $Value)
             } else {
                 if ($Value -is [System.Windows.TemplateBindingExtension]) {
                     $context.SetValue($resolvedProperty.DependencyProperty, $Value)
@@ -186,12 +192,18 @@ function Setter {
 
         $resolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $targetType
         if (-not $resolvedProperty) {
-            Write-Error "Setter: Property '$Property' is not a dependency property on type '$($targetType.FullName)'."
+            $ownerQualifiedHint = if ($Property -match '\.') {
+                " Owner-qualified syntax is only for attached or owner-qualified dependency properties. For normal properties, use the unqualified name (for example, 'BitmapEffect' instead of 'Rectangle.BitmapEffect')."
+            } else {
+                ''
+            }
+
+            Write-Error "Setter: Property '$Property' is not a dependency property on type '$($targetType.FullName)'.$ownerQualifiedHint"
             return
         }
 
         $setterValue = if ($Resource) {
-            [System.Windows.DynamicResourceExtension]::new([string] $Value)
+            [System.Windows.DynamicResourceExtension]::new($Value)
         } else {
             $propertyType = $resolvedProperty.PropertyType
             if ($null -ne $Value -and $propertyType -and -not $propertyType.IsInstanceOfType($Value)) {

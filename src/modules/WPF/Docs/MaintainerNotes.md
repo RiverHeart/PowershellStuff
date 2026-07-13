@@ -90,3 +90,10 @@ See [RelayCommandSyntaxProposal.md](RelayCommandSyntaxProposal.md) for the propo
 - Move dated progress updates into `Docs/DevLog/`.
 - Move durable backlog items into GitHub issues once the module gets its own repository.
 - Keep private scratch notes outside the repo until they are worth sharing.
+
+
+## Pre-AI Commit
+
+For anyone who cares.
+
+https://github.com/RiverHeart/PowershellStuff/commit/7c7aa15707a1f8f36cc1d0209bcf7658075b39b3

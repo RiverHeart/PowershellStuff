@@ -18,7 +18,7 @@ Describe 'Theme' -Tag 'Theme' {
         }
 
         $psVars = New-WPFVariableList -InputObject $window
-        { Resource Background WindowBackground }.InvokeWithContext($null, $psVars) | Out-Null
+        { Resource WindowBackground Background }.InvokeWithContext($null, $psVars) | Out-Null
 
         Use-WPFTheme -Name $light -Root $window
         $window.Background.Color.ToString() | Should -Be -ExpectedValue '#FFFFFFFF'
@@ -91,7 +91,7 @@ Describe 'Theme' -Tag 'Theme' {
         }
 
         $psVars = New-WPFVariableList -InputObject $window
-        { Resource Background WindowBackground }.InvokeWithContext($null, $psVars) | Out-Null
+        { Resource WindowBackground Background }.InvokeWithContext($null, $psVars) | Out-Null
 
         Use-WPFTheme -Name $themeName -Root $window
         $window.Background.Color.ToString() | Should -Be -ExpectedValue '#FFABCDEF'
@@ -111,10 +111,10 @@ Describe 'Theme' -Tag 'Theme' {
         $window.Content = $button
 
         $windowVars = New-WPFVariableList -InputObject $window
-        { Resource Background WindowBackground }.InvokeWithContext($null, $windowVars) | Out-Null
+        { Resource WindowBackground Background }.InvokeWithContext($null, $windowVars) | Out-Null
 
         $buttonVars = New-WPFVariableList -InputObject $button
-        { Resource Background ButtonBackground }.InvokeWithContext($null, $buttonVars) | Out-Null
+        { Resource ButtonBackground Background }.InvokeWithContext($null, $buttonVars) | Out-Null
 
         Use-WPFTheme -Name $themeName -Root $window
         $window.Background.Color.ToString() | Should -Be -ExpectedValue '#FFEEEEEE'
@@ -134,7 +134,7 @@ Describe 'Theme' -Tag 'Theme' {
         $window.Content = $presenter
 
         $psVars = New-WPFVariableList -InputObject $presenter
-        { Resource TextBlock.Foreground AttachedForeground }.InvokeWithContext($null, $psVars) | Out-Null
+        { Resource AttachedForeground TextBlock.Foreground }.InvokeWithContext($null, $psVars) | Out-Null
 
         Use-WPFTheme -Name $themeName -Root $window
 
@@ -158,7 +158,7 @@ Describe 'Theme' -Tag 'Theme' {
         }
 
         $psVars = New-WPFVariableList -InputObject $window
-        { Resource Background WindowBackground }.InvokeWithContext($null, $psVars) | Out-Null
+        { Resource WindowBackground Background }.InvokeWithContext($null, $psVars) | Out-Null
 
         Use-WPFTheme -Name $themeName -Root $window
 
@@ -192,7 +192,7 @@ Describe 'Theme' -Tag 'Theme' {
         }
 
         $psVars = New-WPFVariableList -InputObject $window
-        { Resource Background WindowBackground }.InvokeWithContext($null, $psVars) | Out-Null
+        { Resource WindowBackground Background }.InvokeWithContext($null, $psVars) | Out-Null
 
         Use-WPFTheme -Name $themeName -Root $window
         $window.Background.Color.ToString() | Should -Be -ExpectedValue '#FF112233'
@@ -210,10 +210,10 @@ Describe 'Theme' -Tag 'Theme' {
         }
 
         $psVars = New-WPFVariableList -InputObject $window
-        { Resource Background Brush }.InvokeWithContext($null, $psVars) | Out-Null
+        { Resource Brush Background }.InvokeWithContext($null, $psVars) | Out-Null
 
         $secondVars = New-WPFVariableList -InputObject $secondWindow
-        { Resource Background 'Get-Date' }.InvokeWithContext($null, $secondVars) | Out-Null
+        { Resource 'Get-Date' Background }.InvokeWithContext($null, $secondVars) | Out-Null
 
         Use-WPFTheme -Name $themeName -Root $window
         Use-WPFTheme -Name $themeName -Root $secondWindow

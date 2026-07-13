@@ -106,6 +106,34 @@ Describe 'ScrollViewer' -Tag 'ScrollViewer' {
         $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue '#FF223344'
     }
 
+    It 'Should preserve object resource keys in template factory shorthand statements' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "FactoryObjectResourceStyle_$Id"
+        $Window = [System.Windows.Window]::new()
+        $Button = [System.Windows.Controls.Button]::new()
+        $expectedColor = ([System.Windows.SystemColors]::HighlightBrush).Color.ToString()
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    Background: ([System.Windows.SystemColors]::HighlightBrushKey) -Resource
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Window.Content = $Button
+
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateBorder = $Button.Template.FindName('TemplateBorder', $Button)
+
+        $TemplateBorder | Should -Not -BeNullOrEmpty
+        $TemplateBorder.Background | Should -BeOfType ([System.Windows.Media.SolidColorBrush])
+        $TemplateBorder.Background.Color.ToString() | Should -Be -ExpectedValue $expectedColor
+    }
+
     It 'Should support explicit property delimiter syntax in template factory statements' {
         $Id = [guid]::NewGuid().ToString('N')
         $ThemeName = "FactoryDelimiterTheme_$Id"

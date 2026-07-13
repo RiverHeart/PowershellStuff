@@ -1,7 +1,7 @@
 # WPF PowerShell
 
 > [!WARNING]
-> Experimental project. APIs, syntax, and behavior may change.
+> Experimental project. Functional but APIs, syntax, and behavior may change without notice.
 
 A code-first PowerShell DSL for building WPF desktop applications that doesn't require a single line of XAML.
 
@@ -10,20 +10,16 @@ The DSL optimizes for readability, expressing user intent, and reducing boilerpl
 ## Table of Contents
 
 * [Flagship Example](#flagship-example)
-* [Design Philosophy](#design-philosophy)
-  * [Code First](#code-first)
-  * [Express User Intent](#express-user-intent)
-  * [One Obvious Way](#one-obvious-way)
+* [Who Is This For?](#who-is-this-for)
 * [Why Use it](#why-use-it)
 * [When Not To Use It](#when-not-to-use-it)
-* [Requirements](#requirements)
+* [System Requirements](#system-requirements)
 * [Project Status](#project-status)
 * [Project Goals](#project-goals)
 * [Getting Started](#getting-started)
 * [Similar Projects](#similar-projects)
   * [Prior Art](#prior-art)
 * [Documentation](#documentation)
-* [Resources](#resources)
 
 ## Flagship Example
 
@@ -178,25 +174,21 @@ App 'Window' {
 } | Show-WPFWindow
 ```
 
-## Design Philosophy
+## Who Is This For?
 
-### Code First
+Primarily, GUI development beginners and PowerShell aficionados. Seasoned WPF developers are already at home with C#/XAML and would be unlikely to use this DSL.
 
-This DSL is intentionally code-first.
+## Why Make This?
 
-Interoperability with XAML is possible in principle, but the main workflow here is closer to HTML/CSS/JavaScript ergonomics: structure, style, and behavior can be authored in a unified code-first workflow, while still being split across files when that keeps a project maintainable.
+Many reasons, but a few big ones:
 
-### Express User Intent
-
-Many frameworks make complex things easy at the cost of making simple things hard. Even if a complex thing is easy, the way it's exposed to the user may still be unintuitive. The DSL hopes to address these pain points by helping express the user's intent. If something is common that should become a happy path. If something is not obvious the abstraction might need tweaked.
-
-If the quintessential app includes a menu, a body, maybe a footer and/or status bar, it shouldn't be hard to create that. With that in mind, the DSL isn't going to force you to figure out how `Menu` interacts with `DockPanel` and how `Window` can only have a single child container so you need to stick your `DockPanel/Menu` combo into another container so you can place your `Button` and `StatusBar` and figure out how those work. Those are unimportant implementation details when you're just getting started. If you use `App` instead of a `Window`, you get `Menu`, `Content`, `Footer` and `StatusBar` blocks.
-
-Making a control visible depending on a boolean property is another example. In C#/WPF, you need to write a visibility converter for this common scenario. In the DSL you add `State @{ IsFullScreen = $true }` to your `Window`/`App` and `Link Visibility -ToState IsFullScreen -Invert` to each property you want to toggle visibility on and it infers what you want to happen.
-
-### One Obvious Way
-
-I *really* like the [Zen of Python](https://peps.python.org/pep-0020/#the-zen-of-python), especially "There should be one-- and preferably only one --obvious way to do it". If there's one thing that grinds my gears it's the constant flux of framework boilerplate. Progress is going to happen but ideally we design stuff with the flexibility and forethought to evolve rather than be replaced.
+- WinForms' controls and styling are limited compared to WPF
+- WPF requires too much ceremony.
+- Non-trivial XAML *feels* overwhelming (to me).
+- C# is powerful, but the tooling and boilerplate can make it feel heavy.
+- I wanted to see if a Powershell DSL for WPF applications was possible. Turns out it is!
+- If we're allowed to write legit apps in an interpreted language, like Python, I think it's only fair Powershell gets a shot.
+- Web technologies are great in a lot of ways: browser sandboxing, cross platform, built-in accessibility features, ease of distribution via the internet and Electron, the simplicity of vanilla HTML/CSS/Javascript... and then there are all the issues with it, both as a technology and for developing applications, which I shan't bother to recount except to claim as motivation for wanting an enjoyable desktop app authoring experience.
 
 ## Why Use It
 
@@ -214,7 +206,7 @@ I *really* like the [Zen of Python](https://peps.python.org/pep-0020/#the-zen-of
 - You need a guarantee I'll work on this forever.
     - Microsoft seems to believe they own our computers more than we do. If I migrate to Linux full-time it'll make it difficult to work on this unless it turns into a work project.
 
-## Requirements
+## System Requirements
 
 - Windows
 - PowerShell 5 compatibility (project goal)
@@ -238,18 +230,6 @@ Usable for experimentation and personal tools, still evolving.
 - No PowershellGallery for ease of installation.
     - Kind of pointless to go through the trouble if no one else is using this.
     - And I haven't decided on a name yet.
-
-## Why Make This?
-
-Many reasons, but a few big ones:
-
-- WinForms' controls and styling are limited compared to WPF
-- WPF requires too much ceremony.
-- Non-trivial XAML *feels* overwhelming (to me).
-- C# is powerful, but the tooling and boilerplate can make it feel heavy.
-- I wanted to see if a Powershell DSL for WPF applications was possible. Turns out it is!
-- If we're allowed to write legit apps in an interpreted language, like Python, I think it's only fair Powershell gets a shot.
-- Web technologies are great in a lot of ways: browser sandboxing, cross platform, built-in accessibility features, ease of distribution via the internet and Electron, the simplicity of vanilla HTML/CSS/Javascript... and then there are all the issues with it, both as a technology and for developing applications, which I shan't bother to recount except to claim as motivation for wanting an enjoyable desktop app authoring experience.
 
 ## Project Goals
 
@@ -329,6 +309,7 @@ I always knew that there were WPF PowerShell modules out there but I didn't thin
 
 - [AutomationSmokeMode](./Docs/AutomationSmokeMode.md)
 - [Autocomplete Guidance](./Docs/AutoComplete.md)
+- [Design Philosophy](./Docs/DesignPhilosophy.md)
 - [Theme and Style DSL Reference](./Docs/ThemeAndStyleDSL.md)
 - [Chrome Adapter Proposal](./Docs/ChromeAdapterProposal.md)
 - [Documenting This DSL](./Docs/DocumentingTheDSL.md)
@@ -340,14 +321,4 @@ I always knew that there were WPF PowerShell modules out there but I didn't thin
 - [Repository Migration Plan](./Docs/RepositoryMigrationPlan.md)
 - [Development Log](./Docs/DevLog/2026-05.md)
 - [Examples](./Examples)
-
-## Resources
-
-- Kevin Marquette's DSL Guide
-    - https://powershellexplained.com/2017-02-26-Powershell-DSL-intro-to-domain-specific-languages-part-1/
-    - https://powershellexplained.com/2017-03-04-Powershell-DSL-example-RDCMan/
-    - https://powershellexplained.com/2017-03-13-Powershell-DSL-design-patterns/
-    - https://powershellexplained.com/2017-05-05-PowerShell-TypeExtension-DSL-part-4/
-    - https://powershellexplained.com/2017-05-18-Powershell-TypeExtension-DSL-part-5/
-- https://app.pluralsight.com/library/courses/PowerShell-guis-building-wpf-free/table-of-contents
-
+- [DSL Development Resources](./Docs/DSLDevelopmentResources.md)

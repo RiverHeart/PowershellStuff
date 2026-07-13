@@ -11,6 +11,7 @@
   * [Explicit Setting](#explicit-setter)
   * [Scope and compatibility notes](#scope-and-compatibility-notes)
   * [Property resolution precedence and delimiter](#property-resolution-precedence-and-delimiter)
+* [Resource Consumption Cheatsheet](#resource-consumption-cheatsheet)
 * [How dynamic theme updates work](#how-dynamic-theme-updates-work)
 * [Style Scoping](#named-vs-implicit-styles)
   * [Named Styles](#named-styles)
@@ -41,8 +42,28 @@ This document summarizes the current WPF DSL support for:
   - Applies a registered theme to a root element by swapping theme dictionaries.
 - `Toggle-WPFTheme [-LightName Light] [-DarkName Dark] [-Root <FrameworkElement>]`
   - Switches between two theme names.
-- `Resource <Property> <Key>`
+- `Resource <Key> <Property>`
   - Binds a dependency property to a dynamic resource key on the current object.
+  - Use this to consume a value from the active `ResourceDictionary`; it does
+    not declare the resource itself.
+  - Think of it as pointing a property at a named entry, not copying the entry
+    into the object or mutating the resource.
+
+### Variables vs resources
+
+Use a PowerShell variable when the object is local to one script and does not
+need WPF theme semantics. That is the simplest option for fixed brushes or
+other shared values used only within the current file.
+
+Use a WPF resource when the value has a semantic name in the UI, may be reused
+across multiple controls or styles, or should change automatically when the
+active theme changes. In that case, the theme dictionary owns the value and the
+`Resource` keyword consumes it.
+
+In practice, that means the property is the consumer and the resource key is the
+thing it points at. The control does not get a new property; it just uses the
+value currently stored under that key, and WPF can refresh the property later if
+the active dictionary changes.
 
 ### Styles
 
@@ -163,7 +184,7 @@ Both forms are supported and equivalent for top-level style property setters.
 - `Trigger` and `MultiTrigger` condition properties also accept owner-qualified dependency-property syntax.
   - Example: `Trigger ToolTipService.IsEnabled $false { ... }`
 - `Resource` and `BindProperty` target properties also accept owner-qualified dependency-property syntax.
-  - Example: `Resource TextBlock.Foreground ForegroundBrush`
+  - Example: `Resource ForegroundBrush TextBlock.Foreground`
   - Example: `BindProperty 'ToolTipService.IsEnabled' ToolTipEnabled -Source $state`
 - `DataTrigger` supports attached properties through standard WPF binding path syntax rather than dependency-property name resolution.
   - Example: `DataTrigger '(ToolTipService.IsEnabled)' $false -Self { ... }`
@@ -198,6 +219,55 @@ Style 'ExampleButton' Button {
 }
 ```
 
+## Resource Consumption Cheatsheet
+
+Use this quick rule when choosing between `Setter -Resource` and `Resource`.
+
+| You are doing this | Use | Why |
+|---|---|---|
+| Defining style values inside `Style`, `Trigger`, `DataTrigger`, `MultiTrigger`, or template factory blocks | `Setter <Property> <Key> -Resource` (or implicit shorthand like `Background: Key -Resource`) | You are building a style setter entry that resolves through `DynamicResource`. |
+| Setting a property directly on the current object in a control block | `Resource <Key> <Property>` | You are binding a live object's dependency property to a resource key via `SetResourceReference`. |
+| Assigning a fixed value/object (no resource lookup) | `Setter <Property> <Value>` or direct property assignment | No dynamic resource indirection is needed. |
+
+### Side-by-side examples
+
+Style context (`Setter -Resource`):
+
+```powershell
+Style Button {
+  Background: GrayBlueGradientBrush -Resource
+}
+```
+
+Live control context (`Resource`):
+
+```powershell
+Button 'SaveButton' {
+  Resource GrayBlueGradientBrush Background
+}
+```
+
+Fixed value (not resource-backed):
+
+```powershell
+Style Button {
+  Setter Margin 10
+}
+```
+
+### SystemColors key usage
+
+`[System.Windows.SystemColors]::HighlightBrushKey` is a resource key, not a brush value.
+Use it with dynamic resource semantics:
+
+```powershell
+Trigger IsMouseOver $true {
+  Setter Stroke ([System.Windows.SystemColors]::HighlightBrushKey) -Target OuterRect -Resource
+}
+```
+
+If you use the key without `-Resource`/`Resource`, you are passing the key object itself as a value, which is usually not what you want.
+
 ## How dynamic theme updates work
 
 Theme toggling updates live only when styles/properties are bound through dynamic resources.
@@ -205,9 +275,17 @@ Theme toggling updates live only when styles/properties are bound through dynami
 Use one of these:
 
 - `Setter Background ButtonBackground -Resource`
-- `Resource Background ButtonBackground`
+- `Resource ButtonBackground Background`
 
 Avoid hard-coded brush assignments when you expect runtime theme changes.
+
+When you use `Resource`, the resource key must already exist in a theme or
+other `ResourceDictionary`. In WPF terms, the control property is the consumer
+and the dictionary entry is the source.
+
+That distinction matters because a `Resource` call is not a declaration. It only
+works where there is an existing target object and a property to apply the key
+to.
 
 ## Style Scoping
 
