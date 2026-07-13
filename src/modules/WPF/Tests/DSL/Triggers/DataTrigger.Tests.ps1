@@ -45,6 +45,28 @@ Describe 'DataTrigger' -Tag 'DataTrigger' {
         $trigger.Setters[0].TargetName | Should -Be -ExpectedValue 'TemplateRoot'
     }
 
+    It 'Should support attached-property paths in style data triggers via binding path syntax' {
+        $id = [guid]::NewGuid().ToString('N')
+        $styleName = "DataTriggerAttachedPropertyButton_$id"
+        $button = [System.Windows.Controls.Button]::new()
+
+        Style $styleName Button {
+            Setter Opacity 1.0
+
+            DataTrigger '(ToolTipService.IsEnabled)' $false -Self {
+                Setter Opacity 0.35
+            }
+        }
+
+        $psVars = New-WPFVariableList -InputObject $button
+        { UseStyle $styleName }.InvokeWithContext($null, $psVars) | Out-Null
+
+        $button.Opacity | Should -Be -ExpectedValue 1.0
+
+        [System.Windows.Controls.ToolTipService]::SetIsEnabled($button, $false)
+        $button.Opacity | Should -Be -ExpectedValue 0.35
+    }
+
     It 'Should reject data trigger usage outside style or template contexts' {
         $button = [System.Windows.Controls.Button]::new()
         $psVars = New-WPFVariableList -InputObject $button
