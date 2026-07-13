@@ -24,7 +24,7 @@
     }
 
     Window 'Main' {
-        Resource Background WindowBackground
+        Resource WindowBackground Background
     }
 
 .NOTES

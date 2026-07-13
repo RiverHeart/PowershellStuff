@@ -13,7 +13,7 @@ using namespace System.Windows.Controls
 #>
 
 # Change to the script directory if we're not in it.
-if (-not $PSScriptRoot -ne $PWD) {
+if ($PSScriptRoot -and $PWD -ne $PSScriptRoot) {
     Set-Location $PSScriptRoot
 }
 

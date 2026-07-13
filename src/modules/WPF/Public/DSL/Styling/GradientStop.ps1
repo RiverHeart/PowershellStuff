@@ -30,7 +30,6 @@ function GradientStop {
         [Parameter(Mandatory, Position = 1)]
         [double] $Offset,
 
-        [Parameter(ValueFromPipeline)]
         [object] $InputObject
     )
 

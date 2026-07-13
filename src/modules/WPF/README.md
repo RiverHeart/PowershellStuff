@@ -176,7 +176,7 @@ App 'Window' {
 
 ## Who Is This For?
 
-Primarily, beginners to user WPF and PowerShell aficionados. Seasoned WPF developers are already at home with C#/XAML and would be unlikely to use this DSL.
+Primarily, GUI development beginners and PowerShell aficionados. Seasoned WPF developers are already at home with C#/XAML and would be unlikely to use this DSL.
 
 ## Why Make This?
 
