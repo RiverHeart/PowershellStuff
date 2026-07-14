@@ -3,23 +3,18 @@
     Returns the module-level tab central hook registry.
 
 .DESCRIPTION
-    Returns the registry containing tab completers and result modifiers registered
-    with TabCentral.
+    Returns the registry containing tab completers and result modifiers
+    registered with TabCentral.
 #>
 function Get-TabCentralRegistry {
     [CmdletBinding()]
     [OutputType([hashtable])]
-    param()
+    param ()
 
     if (-not $script:TabExpansionRegistry) {
-        if ($global:TabExpansionRegistry -is [hashtable]) {
-            $script:TabExpansionRegistry = $global:TabExpansionRegistry
-            Remove-Variable -Name TabExpansionRegistry -Scope Global -ErrorAction SilentlyContinue
-        } else {
-            $script:TabExpansionRegistry = [ordered] @{
-                TabCompleters = @{}
-                ResultModifiers = @{}
-            }
+        $script:TabExpansionRegistry = [ordered] @{
+            TabCompleters = @{}
+            ResultModifiers = @{}
         }
     }
 

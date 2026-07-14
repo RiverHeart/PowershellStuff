@@ -1,5 +1,16 @@
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
+# Capture the currently active TabExpansion2 function (if any) so TabCentral can
+# safely fall back without depending on global function copying.
+$CommandParams = @{
+    Name = 'TabExpansion2'
+    CommandType = 'Function'
+    ErrorAction = 'SilentlyContinue'
+}
+if ((Get-Command @CommandParams) -and (-not $script:OriginalTabExpansion2)) {
+    $script:OriginalTabExpansion2 = (Get-Command @CommandParams).ScriptBlock
+}
+
 # Populate Module Scope
 #------------------------
 
@@ -13,6 +24,11 @@ foreach ($Path in $Paths) {
         ForEach-Object {
             . $_.FullName
         }
+}
+
+# Respect a caller-defined preference from profile; otherwise default to disabled.
+if (-not (Get-Variable -Name 'TabCentralEnabled' -Scope Global -ErrorAction SilentlyContinue)) {
+    $global:TabCentralEnabled = $false
 }
 
 # Export Resources
@@ -44,16 +60,26 @@ try {
     throw "Failed to load module manifest '$ManifestPath'. Error: $_"
 }
 
-$FunctionsToExport = if ($Manifest.ContainsKey('FunctionsToExport')) { $Manifest.FunctionsToExport } else { @() }
-$CmdletsToExport = if ($Manifest.ContainsKey('CmdletsToExport')) { $Manifest.CmdletsToExport } else { @() }
-$VariablesToExport = if ($Manifest.ContainsKey('VariablesToExport')) { $Manifest.VariablesToExport } else { @() }
-$AliasesToExport = if ($Manifest.ContainsKey('AliasesToExport')) { $Manifest.AliasesToExport } else { @() }
+$FunctionsToExport = if ($Manifest.ContainsKey('FunctionsToExport') -and $null -ne $Manifest.FunctionsToExport) { @($Manifest.FunctionsToExport) } else { @() }
+$CmdletsToExport = if ($Manifest.ContainsKey('CmdletsToExport') -and $null -ne $Manifest.CmdletsToExport) { @($Manifest.CmdletsToExport) } else { @() }
+$VariablesToExport = if ($Manifest.ContainsKey('VariablesToExport') -and $null -ne $Manifest.VariablesToExport) { @($Manifest.VariablesToExport) } else { @() }
+$AliasesToExport = if ($Manifest.ContainsKey('AliasesToExport') -and $null -ne $Manifest.AliasesToExport) { @($Manifest.AliasesToExport) } else { @() }
 
-Export-ModuleMember `
-    -Function $FunctionsToExport `
-    -Cmdlet $CmdletsToExport `
-    -Variable $VariablesToExport `
-    -Alias $AliasesToExport
+$ExportParams = @{}
+if ($FunctionsToExport.Count -gt 0) {
+    $ExportParams.Function = $FunctionsToExport
+}
+if ($CmdletsToExport.Count -gt 0) {
+    $ExportParams.Cmdlet = $CmdletsToExport
+}
+if ($VariablesToExport.Count -gt 0) {
+    $ExportParams.Variable = $VariablesToExport
+}
+if ($AliasesToExport.Count -gt 0) {
+    $ExportParams.Alias = $AliasesToExport
+}
+
+Export-ModuleMember @ExportParams
 
 
 # Resource Cleanup

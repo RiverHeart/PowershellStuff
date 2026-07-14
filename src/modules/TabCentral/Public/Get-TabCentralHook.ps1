@@ -22,7 +22,7 @@ function Get-TabCentralHook {
         [string[]] $Name
     )
 
-    $Registry = Get-WPFTabExpansionRegistry
+    $Registry = Get-TabCentralRegistry
 
     $HookTables = @()
     switch ($Type) {

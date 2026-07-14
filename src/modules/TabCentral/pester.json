@@ -1,0 +1,30 @@
+{
+  "TestSuite": "TabCentral",
+  "Run": {
+    "Path": [
+      "Tests"
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  },
+  "Filter": {
+    "Tag": [],
+    "ExcludeTag": []
+  },
+  "Coverage": {
+    "Enabled": true,
+    "Path": [
+      "TabCentral.psm1",
+      "Public",
+      "Private"
+    ],
+    "CoveragePercentTarget": 70,
+    "OutputFormat": "JaCoCo",
+    "OutputPath": "artifacts/coverage/TabCentral.coverage.xml",
+    "ExcludeTests": true,
+    "RecursePaths": true,
+    "UseBreakpoints": true,
+    "SingleHitBreakpoints": true
+  }
+}

@@ -42,7 +42,7 @@ function Register-TabCentralHook {
         [switch] $Force
     )
 
-    $Registry = Get-WPFTabCentralRegistry
+    $Registry = Get-TabCentralRegistry
 
     $TargetRegistry = switch ($Type) {
         'Completer' { $Registry.TabCompleters }

@@ -31,7 +31,7 @@ function Unregister-TabCentralHook {
         [switch] $All
     )
 
-    $Registry = Get-WPFTabExpansionRegistry
+    $Registry = Get-TabCentralRegistry
 
     if ($All) {
         $Registry.TabCompleters.Clear()

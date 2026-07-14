@@ -1,53 +1,39 @@
-$CommandParams = @{
-    CommandType = 'Function'
-    ErrorAction = 'SilentlyContinue'
-}
-if (
-    (Get-Command TabExpansion2 @CommandParams) -and
-    (-not (Get-Command OriginalTabExpansion2 @CommandParams))
-) {
-    Copy-Item `
-        -Path Function:\global:TabExpansion2 `
-        -Destination Function:\script:OriginalTabExpansion2
-}
-
 <#
 .SYNOPSIS
     Customized TabExpansion2 with support for TabCentral hooks.
 
 .DESCRIPTION
-    This function is a wrapper around the built-in TabExpansion2 function and
-    is imported when the module is loaded.
-
-    It first attempts to complete tab expansion using custom TabCentral hooks.
-    If no custom completions are found, it falls back to the original TabExpansion2 function.
+    This function is a wrapper around the active TabExpansion2 implementation.
+    When TabCentral is enabled, it first attempts to complete tab expansion
+    using registered TabCentral hooks. If no custom completion is produced,
+    it falls back to the original behavior.
 
 .EXAMPLE
     General purpose tab expansion usage
 
     $Script = ' "Foo". '
     $CursorColumn = $Script.ToString().IndexOf('.') + 1
-    TabExpansion2 -inputScript $script -cursorColumn $cursorColumn |
+    TabExpansion2 -inputScript $Script -cursorColumn $CursorColumn |
         ForEach-Object { $_.CompletionMatches.CompletionText }
 #>
 function TabExpansion2 {
     [CmdletBinding(DefaultParameterSetName = 'ScriptInputSet')]
     [OutputType([System.Management.Automation.CommandCompletion])]
     param(
-        [Parameter(ParameterSetName = 'ScriptInputSet', Mandatory = $true, Position = 0)]
+        [Parameter(ParameterSetName = 'ScriptInputSet', Mandatory, Position = 0)]
         [AllowEmptyString()]
         [string] $inputScript,
 
         [Parameter(ParameterSetName = 'ScriptInputSet', Position = 1)]
         [int] $cursorColumn = $inputScript.Length,
 
-        [Parameter(ParameterSetName = 'AstInputSet', Mandatory = $true, Position = 0)]
+        [Parameter(ParameterSetName = 'AstInputSet', Mandatory, Position = 0)]
         [System.Management.Automation.Language.Ast] $ast,
 
-        [Parameter(ParameterSetName = 'AstInputSet', Mandatory = $true, Position = 1)]
+        [Parameter(ParameterSetName = 'AstInputSet', Mandatory, Position = 1)]
         [System.Management.Automation.Language.Token[]] $tokens,
 
-        [Parameter(ParameterSetName = 'AstInputSet', Mandatory = $true, Position = 2)]
+        [Parameter(ParameterSetName = 'AstInputSet', Mandatory, Position = 2)]
         [System.Management.Automation.Language.IScriptPosition] $positionOfCursor,
 
         [Parameter(ParameterSetName = 'ScriptInputSet', Position = 2)]
@@ -55,14 +41,30 @@ function TabExpansion2 {
         [Hashtable] $options = $null
     )
 
+    # Preserve standard shell behavior unless explicitly enabled.
+    if (-not $global:TabCentralEnabled) {
+        if ($script:OriginalTabExpansion2) {
+            return (& $script:OriginalTabExpansion2 @PSBoundParameters)
+        }
+
+        if ($PSCmdlet.ParameterSetName -eq 'ScriptInputSet') {
+            return [System.Management.Automation.CommandCompletion]::CompleteInput(
+                $inputScript,
+                $cursorColumn,
+                $options
+            )
+        }
+
+        return [System.Management.Automation.CommandCompletion]::CompleteInput(
+            $ast,
+            $tokens,
+            $positionOfCursor,
+            $options
+        )
+    }
+
     $Completions = $null
-
-    # Create or retrieve the module-level registry for custom tab completers and result modifiers.
     $Registry = Get-TabCentralRegistry
-
-    #-------------------------
-    # Custom Tab Completers
-    #-------------------------
 
     try {
         $TabCompleters = $Registry.TabCompleters.GetEnumerator()
@@ -72,22 +74,13 @@ function TabExpansion2 {
             } |
             Where-Object { $_ -is [System.Management.Automation.CommandCompletion] } |
             Select-Object -First 1
-
-        if ($Completions) {
-            Write-Debug 'Using custom tab completer result.'
-        }
     } catch {
         Write-Debug "Custom TabCentral hook failed during tab expansion: $($_.Exception.Message)"
     }
 
-    #--------------------------
-    # Original TabExpansion2
-    #--------------------------
-
     if (-not $Completions) {
-        if (Get-Command OriginalTabExpansion2 -ErrorAction SilentlyContinue) {
-            #Write-Host "Falling back to OriginalTabExpansion2"
-            $Completions = OriginalTabExpansion2 @PSBoundParameters
+        if ($script:OriginalTabExpansion2) {
+            $Completions = & $script:OriginalTabExpansion2 @PSBoundParameters
         } elseif ($PSCmdlet.ParameterSetName -eq 'ScriptInputSet') {
             $Completions = [System.Management.Automation.CommandCompletion]::CompleteInput(
                 $inputScript,
@@ -103,10 +96,6 @@ function TabExpansion2 {
             )
         }
     }
-
-    #--------------------------
-    # Result Modifiers
-    #--------------------------
 
     if ($Registry.ResultModifiers.Count -gt 0) {
         try {
