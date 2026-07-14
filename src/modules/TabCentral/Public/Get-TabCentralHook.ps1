@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-    Returns registered TabExpansion2 hooks.
+    Returns registered TabCentral hooks.
 
 .DESCRIPTION
     Lists custom tab completers and result modifiers from the module-level
-    tab expansion registry.
+    tab central registry.
 
 .EXAMPLE
-    Get-TabExpansionHook
+    Get-TabCentralHook
 
 .EXAMPLE
-    Get-TabExpansionHook -Type Completer -Name Complete-WPFThis
+    Get-TabCentralHook -Type Completer -Name Complete-Example
 #>
-function Get-TabExpansionHook {
+function Get-TabCentralHook {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param(

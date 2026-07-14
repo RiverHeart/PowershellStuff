@@ -1,50 +1,11 @@
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
-# NOTE: I should probably separate classes from functions and load them first to avoid
-# issues. I could also require classes to be named like `*.class.ps1` to make it
-# easier to identify and load them first.
-
 # Populate Module Scope
 #------------------------
-
-$script:LastDialogResult = $false
-$script:LastDialogCloseReason = 'Unknown'
-
-# Create module var to map context ids to control tables
-if (-not $Script:WPFControlRegistry) {
-    $Script:WPFControlRegistry = [ordered] @{
-        ActiveContextId = $null
-        Contexts        = @{}
-    }
-}
-
-if (-not $Script:WPFThemeTable) {
-    $Script:WPFThemeTable = @{}
-}
-
-if (-not $Script:WPFStyleTable) {
-    $Script:WPFStyleTable = @{}
-}
-
-if (-not $Script:WPFImplicitStyleTable) {
-    $Script:WPFImplicitStyleTable = @{}
-}
-
-if (-not $Script:WPFThemeState) {
-    $Script:WPFThemeState = [ordered]@{
-        ActiveTheme = $null
-    }
-}
-
-# Load FileInfo objects
-if (-not $Script:WPFFileInfo) {
-    $Script:WPFFileInfo = Import-PowerShellDataFile -Path "$ModuleRoot/Private/Data/FileInfo.psd1"
-}
 
 $Paths = @(
     'Private'
     'Public'
-    'TypeConverters'
 )
 
 foreach ($Path in $Paths) {
@@ -53,14 +14,6 @@ foreach ($Path in $Paths) {
             . $_.FullName
         }
 }
-
-# Customize TabExpansion2
-#--------------------------
-
-# We shouldn't override the default tab expansion behavior without
-# some form of user opt-in but I'm not sure what the best solution is
-# and no one else is using this yet.
-Register-TabExpansionHook -FunctionName 'Complete-WPFThis' -Type 'Completer' -Force
 
 # Export Resources
 #-----------------
@@ -81,7 +34,7 @@ Register-TabExpansionHook -FunctionName 'Complete-WPFThis' -Type 'Completer' -Fo
 # being exported. As a seasoned Powershell user this is confusing and I'm sure that AI agents
 # will also struggle with this. So for the sake of clarity and to avoid confusion, I'm going
 # to do it this way until it becomes an issue, even if it is redundant.
-$ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'WPF.psd1'
+$ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'TabCentral.psd1'
 if (-not (Test-Path -Path $ManifestPath)) {
     throw "Module manifest not found at '$ManifestPath'."
 }

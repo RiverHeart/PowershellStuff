@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Returns the module-level tab expansion hook registry.
+    Returns the module-level tab central hook registry.
 
 .DESCRIPTION
-    Provides access to tab completer and result modifier hooks used by the
-    WPF TabExpansion2 wrapper.
+    Returns the registry containing tab completers and result modifiers registered
+    with TabCentral.
 #>
-function Get-WPFTabExpansionRegistry {
+function Get-TabCentralRegistry {
     [CmdletBinding()]
     [OutputType([hashtable])]
     param()

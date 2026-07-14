@@ -1,21 +1,21 @@
 <#
 .SYNOPSIS
-    Removes one or more TabExpansion2 hooks.
+    Removes one or more TabCentral hooks.
 
 .DESCRIPTION
     Removes registered tab completers and result modifiers from the module-level
-    tab expansion registry.
+    tab central registry.
 
 .EXAMPLE
-    Unregister-TabExpansionHook -Name Complete-WPFThis -Type Completer
+    Unregister-TabCentralHook -Name Complete-WPFThis -Type Completer
 
 .EXAMPLE
-    Unregister-TabExpansionHook -Name Test*
+    Unregister-TabCentralHook -Name Test*
 
 .EXAMPLE
-    Unregister-TabExpansionHook -All
+    Unregister-TabCentralHook -All
 #>
-function Unregister-TabExpansionHook {
+function Unregister-TabCentralHook {
     [CmdletBinding(DefaultParameterSetName = 'ByName')]
     [OutputType([void])]
     param(

@@ -4,19 +4,18 @@
 
 .DESCRIPTION
     This function allows you to register a custom tab completer script block that will be invoked during
-    tab expansion. The registered script block will be called with the same parameters as the
-    Complete-WPFThis function, allowing you to provide custom completions for specific scenarios.
+    tab expansion.
 
 .NOTES
-    Tab completers must return CommandCompletion objects. See the Complete-WPFThis function for more details.
+    Tab completers must return CommandCompletion objects.
 
 .EXAMPLE
-    Register-TabExpansionHook -Name 'MyCompleter' -Type 'Completer' -ScriptBlock {
+    Register-TabCentralHook -Name 'MyCompleter' -Type 'Completer' -ScriptBlock {
         param($CommandName, $ParameterName, $WordToComplete, $CommandAst, $FakeBoundParameters)
         # Custom completion logic here
     }
 #>
-function Register-TabExpansionHook {
+function Register-TabCentralHook {
     [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
     param (
         [Parameter(Mandatory,ParameterSetName='ScriptBlock')]
@@ -43,7 +42,7 @@ function Register-TabExpansionHook {
         [switch] $Force
     )
 
-    $Registry = Get-WPFTabExpansionRegistry
+    $Registry = Get-WPFTabCentralRegistry
 
     $TargetRegistry = switch ($Type) {
         'Completer' { $Registry.TabCompleters }

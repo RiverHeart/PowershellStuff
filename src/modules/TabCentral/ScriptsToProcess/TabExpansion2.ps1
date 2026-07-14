@@ -13,40 +13,20 @@ if (
 
 <#
 .SYNOPSIS
-    Customized TabExpansion2 with WPF DSL support.
+    Customized TabExpansion2 with support for TabCentral hooks.
 
 .DESCRIPTION
     This function is a wrapper around the built-in TabExpansion2 function and
     is imported when the module is loaded.
 
-    It first attempts to complete WPF DSL script blocks using the `Complete-WPFThis`
-    function. If that function returns no completions, it falls back to the
-    original TabExpansion2 function.
-
-.NOTES
-    Ideally, this function would be updated to support registration of custom
-    completers so it doesn't need to be modified every time a new completer
-    is required but it is functionally sufficient for now.
+    It first attempts to complete tab expansion using custom TabCentral hooks.
+    If no custom completions are found, it falls back to the original TabExpansion2 function.
 
 .EXAMPLE
     General purpose tab expansion usage
 
     $Script = ' "Foo". '
     $CursorColumn = $Script.ToString().IndexOf('.') + 1
-    TabExpansion2 -inputScript $script -cursorColumn $cursorColumn |
-        ForEach-Object { $_.CompletionMatches.CompletionText }
-
-.EXAMPLE
-    Auto complete `$this` members inside WPF DSL script blocks.
-
-    $Script = {
-        Window 'Main' {
-            Button 'SaveButton' {
-                $this.Co
-            }
-        }
-    }
-    $CursorColumn = $Script.ToString().IndexOf('$this.Co') + 8
     TabExpansion2 -inputScript $script -cursorColumn $cursorColumn |
         ForEach-Object { $_.CompletionMatches.CompletionText }
 #>
@@ -78,7 +58,7 @@ function TabExpansion2 {
     $Completions = $null
 
     # Create or retrieve the module-level registry for custom tab completers and result modifiers.
-    $Registry = Get-WPFTabExpansionRegistry
+    $Registry = Get-TabCentralRegistry
 
     #-------------------------
     # Custom Tab Completers
@@ -97,7 +77,7 @@ function TabExpansion2 {
             Write-Debug 'Using custom tab completer result.'
         }
     } catch {
-        Write-Debug "Complete-WPFThis failed during tab expansion: $($_.Exception.Message)"
+        Write-Debug "Custom TabCentral hook failed during tab expansion: $($_.Exception.Message)"
     }
 
     #--------------------------
@@ -144,6 +124,5 @@ function TabExpansion2 {
         }
     }
 
-    #Write-Host "Returning $($Completions.Count) completions"
     return $Completions
 }
