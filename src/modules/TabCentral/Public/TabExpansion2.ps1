@@ -67,13 +67,20 @@ function TabExpansion2 {
     $Registry = Get-TabCentralRegistry
 
     try {
-        $TabCompleters = $Registry.TabCompleters.GetEnumerator()
-        $Completions = $TabCompleters |
-            ForEach-Object {
-                & $_.Value @PSBoundParameters
-            } |
-            Where-Object { $_ -is [System.Management.Automation.CommandCompletion] } |
-            Select-Object -First 1
+        foreach ($TabCompleter in $Registry.TabCompleters.GetEnumerator()) {
+            $Hook = $TabCompleter.Value
+            $CompletionCandidates = @(& $Hook.Callable @PSBoundParameters)
+            foreach ($CompletionCandidate in $CompletionCandidates) {
+                if ($CompletionCandidate -is [System.Management.Automation.CommandCompletion]) {
+                    $Completions = $CompletionCandidate
+                    break
+                }
+            }
+
+            if ($Completions) {
+                break
+            }
+        }
     } catch {
         Write-Debug "Custom TabCentral hook failed during tab expansion: $($_.Exception.Message)"
     }
@@ -97,14 +104,17 @@ function TabExpansion2 {
         }
     }
 
-    if ($Registry.ResultModifiers.Count -gt 0) {
+    if ($Completions.Count -gt 0) {
         try {
             foreach ($ResultModifier in $Registry.ResultModifiers.GetEnumerator()) {
+                $Hook = $ResultModifier.Value
                 $ModifiedCompletions = @(
-                    & $ResultModifier.Value -CommandCompletion $Completions
+                    & $Hook.Callable -CommandCompletion $Completions
                 )
 
-                if (($ModifiedCompletions.Count -eq 1) -and ($ModifiedCompletions[0] -is [System.Management.Automation.CommandCompletion])) {
+                if ($ModifiedCompletions.Count -eq 1 -and
+                    $ModifiedCompletions[0] -is [System.Management.Automation.CommandCompletion]
+                ) {
                     $Completions = $ModifiedCompletions[0]
                 }
             }

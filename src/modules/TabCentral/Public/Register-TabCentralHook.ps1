@@ -14,63 +14,63 @@
         param($CommandName, $ParameterName, $WordToComplete, $CommandAst, $FakeBoundParameters)
         # Custom completion logic here
     }
+
+.EXAMPLE
+    Get-WPFTabCentralHook | Register-TabCentralHook -Force
 #>
 function Register-TabCentralHook {
-    [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
+    [CmdletBinding()]
+    [OutputType([void], [pscustomobject])]
     param (
-        [Parameter(Mandatory,ParameterSetName='ScriptBlock')]
-        [ValidateNotNullOrEmpty()]
-        [string] $Name,
-
-        [Parameter(Mandatory,ParameterSetName='ScriptBlock')]
-        [ValidateNotNullOrEmpty()]
-        [ScriptBlock] $ScriptBlock,
-
-        # This can be a CmdletInfo or a FunctionInfo object.
-        [Parameter(Mandatory,ParameterSetName='Function')]
-        [ValidateScript({ $_ -is [System.Management.Automation.FunctionInfo] -or $_ -is [System.Management.Automation.CmdletInfo] })]
-        [Object] $Function,
-
-        [Parameter(Mandatory,ParameterSetName='FunctionName')]
-        [ValidateNotNullOrEmpty()]
-        [string] $FunctionName,
+        [Parameter(Mandatory)]
+        [ValidateScript({
+            $_ -is [string] -or
+            $_ -is [scriptblock] -or
+            $_ -is [FunctionInfo] -or
+            $_ -is [CmdletInfo]
+        })]
+        [object] $Callable,
 
         [Parameter(Mandatory)]
         [ValidateSet('Completer', 'Modifier')]
         [string] $Type,
 
-        [switch] $Force
+        [Parameter(HelpMessage='The name of the hook. Mandatory only when using a scriptblock')]
+        [ValidateNotNullOrEmpty()]
+        [string] $Name,
+
+        [Parameter(HelpMessage='The source of the hook. Mandatory only when using a scriptblock')]
+        [ValidateNotNullOrEmpty()]
+        [string] $Source,
+
+        [switch] $Force,
+        [switch] $PassThru
     )
 
-    $Registry = Get-TabCentralRegistry
+    process {
+        $HookParams = $PSBoundParameters
+        $HookParams.Remove('PassThru')
+        $HookParams.Remove('Force')
 
-    $TargetRegistry = switch ($Type) {
-        'Completer' { $Registry.TabCompleters }
-        'Modifier'  { $Registry.ResultModifiers }
-        default     { throw "Invalid type '$Type'. Must be 'Completer' or 'Modifier'." }
-    }
+        $Hook = New-TabCentralHook @HookParams
+        $Registry = Get-TabCentralRegistry
+        $TargetRegistry = switch ($Hook.Type) {
+            'Completer' { $Registry.TabCompleters }
+            'Modifier' { $Registry.ResultModifiers }
+        }
 
-    if ($PSCmdlet.ParameterSetName -eq 'Function') {
-        $Name = $Function.Name
-        $ScriptBlock = $Function.ScriptBlock
-    } elseif ($PSCmdlet.ParameterSetName -eq 'FunctionName') {
-        try {
-            $Function = Get-Command $FunctionName -CommandType Function -ErrorAction Stop
-            $Name = $Function.Name
-            $ScriptBlock = $Function.ScriptBlock
-        } catch {
-            Write-Warning "Function '$FunctionName' not found."
-            return
+        if ($TargetRegistry.ContainsKey($Hook.Name)) {
+            if (-not $Force) {
+                Write-Error "Hook '$($Hook.Name)' already registered as '$($Hook.Type)'."
+                return
+            }
+        }
+
+        Write-Verbose "Registering hook '$($Hook.Name)' as '$($Hook.Type)'."
+        $TargetRegistry[$Hook.Name] = $Hook
+
+        if ($PassThru) {
+            return $Hook
         }
     }
-
-    if ($TargetRegistry.ContainsKey($Name)) {
-        if (-not $Force) {
-            Write-Error "The provided script block is already registered as a TabExpansion hook of type '$Type'."
-            return
-        }
-    }
-
-    Write-Verbose "Registering TabExpansion hook '$Name' of type '$Type'."
-    $TargetRegistry[$Name] = $ScriptBlock
 }

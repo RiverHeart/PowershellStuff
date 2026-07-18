@@ -76,6 +76,7 @@ FunctionsToExport = @(
     'Register-TabCentralHook'
     'Reset-TabExpansion2'
     'TabExpansion2'
+    'New-TabCentralHook'
     'Unregister-TabCentralHook'
 )
 

@@ -52,6 +52,21 @@ $Global:TabCentralEnabled = $false
 
 ## Hook Registration
 
+TabCentral supports two registration styles:
+
+- Direct registration with `-Name`, `-Type`, and `-ScriptBlock`.
+- Descriptor pipeline registration, for example:
+	`Get-WPFTabCentralHook | Register-TabCentralHook`.
+
+### Descriptor Contract
+
+When using pipeline registration, each object should include:
+
+- `Name` (string, required)
+- `Type` (`Completer` or `Modifier`, required)
+- `Callable` (script block, function, or cmdlet, preferred) or `ScriptBlock` (script block, supported for compatibility)
+- `Source` (string, optional)
+
 Register a completer hook:
 
 ```powershell
@@ -86,6 +101,19 @@ List and remove hooks:
 ```powershell
 Get-TabCentralHook
 Unregister-TabCentralHook -Name 'Complete-Example' -Type Completer
+```
+
+Register from descriptors returned by another module:
+
+```powershell
+Get-WPFTabCentralHook | Register-TabCentralHook -Force
+```
+
+Validate descriptors before registration:
+
+```powershell
+Get-WPFTabCentralHook | Test-TabCentralHookDescriptor
+Get-WPFTabCentralHook | Test-TabCentralHookDescriptor -PassThru | Register-TabCentralHook -Force
 ```
 
 ## Cross-Module Integration Example

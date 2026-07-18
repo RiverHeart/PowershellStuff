@@ -7,9 +7,14 @@ $CommandParams = @{
     CommandType = 'Function'
     ErrorAction = 'SilentlyContinue'
 }
-if ((Get-Command @CommandParams) -and (-not $script:OriginalTabExpansion2)) {
+if (Get-Command @CommandParams) {
     $script:OriginalTabExpansion2 = (Get-Command @CommandParams).ScriptBlock
 }
+
+Update-TypeData `
+    -TypeName 'TabCentral.Hook' `
+    -DefaultDisplayPropertySet Name, Type, Source, Callable `
+    -Force
 
 # Populate Module Scope
 #------------------------
@@ -24,6 +29,21 @@ foreach ($Path in $Paths) {
         ForEach-Object {
             . $_.FullName
         }
+}
+
+$ModuleTabExpansion = Get-Command -Name 'TabExpansion2' -CommandType Function -ErrorAction SilentlyContinue
+if ($ModuleTabExpansion) {
+    $script:TabCentralTabExpansion2 = $ModuleTabExpansion.ScriptBlock
+}
+
+# If import occurred while a previous TabCentral TabExpansion2 was still global,
+# do not treat that implementation as the original fallback.
+if ($script:OriginalTabExpansion2) {
+    try {
+        Assert-TabCentralOwnsExpansion -TargetScriptBlock $script:OriginalTabExpansion2
+        $script:OriginalTabExpansion2 = $null
+    } catch {
+    }
 }
 
 # Respect a caller-defined preference from profile; otherwise default to disabled.
@@ -80,6 +100,24 @@ if ($AliasesToExport.Count -gt 0) {
 }
 
 Export-ModuleMember @ExportParams
+
+
+# Restore the original global TabExpansion2 when the module unloads, but only
+# if the current global function is owned by this TabCentral instance.
+$OnRemoveScript = {
+    try {
+        Assert-TabCentralOwnsExpansion
+
+        if ($script:OriginalTabExpansion2 -and
+            $script:TabCentralTabExpansion2 -and
+            -not [object]::ReferenceEquals($script:OriginalTabExpansion2, $script:TabCentralTabExpansion2)
+        ) {
+            Set-Item -Path Function:\global:TabExpansion2 -Value $script:OriginalTabExpansion2 -Force -ErrorAction Stop
+        }
+    } catch {
+    }
+}
+$ExecutionContext.SessionState.Module.OnRemove += $OnRemoveScript
 
 
 # Resource Cleanup
