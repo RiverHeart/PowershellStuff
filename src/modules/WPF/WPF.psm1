@@ -54,14 +54,6 @@ foreach ($Path in $Paths) {
         }
 }
 
-# Customize TabExpansion2
-#--------------------------
-
-# We shouldn't override the default tab expansion behavior without
-# some form of user opt-in but I'm not sure what the best solution is
-# and no one else is using this yet.
-Register-TabExpansionHook -FunctionName 'Complete-WPFThis' -Type 'Completer' -Force
-
 # Export Resources
 #-----------------
 
