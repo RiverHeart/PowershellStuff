@@ -49,8 +49,8 @@ function Register-TabCentralHook {
 
     process {
         $HookParams = $PSBoundParameters
-        $HookParams.Remove('PassThru')
-        $HookParams.Remove('Force')
+        $null = $HookParams.Remove('PassThru')
+        $null = $HookParams.Remove('Force')
 
         $Hook = New-TabCentralHook @HookParams
         $Registry = Get-TabCentralRegistry

@@ -9,9 +9,9 @@
 #>
 function Disable-TabCentral {
     [CmdletBinding()]
-    [OutputType([bool])]
+    [OutputType([void])]
     param ()
 
+    Write-Verbose "Disabling TabCentral hook processing."
     $global:TabCentralEnabled = $false
-    return $global:TabCentralEnabled
 }
