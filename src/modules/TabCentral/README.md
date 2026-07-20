@@ -1,149 +1,50 @@
 # TabCentral
 
-TabCentral provides a central hook registry for PowerShell tab completion.
-It exposes a `TabExpansion2` wrapper that can run registered completer and
-modifier hooks when explicitly enabled.
+Tab Central is a PowerShell module that allows the user to easily customize and manage `TabExpansion2`, PowerShell's native autocomplete function.
 
-## Design
+## Table of Contents
 
-- WPF-agnostic core module.
-- Explicit opt-in behavior via `Enable-TabCentral` and `Disable-TabCentral`.
-- Module-scoped hook registry accessed through public hook cmdlets.
+* [Why Make It?](#why-make-it)
+* [What Is TabExpansion2](#what-is-tabexpansion2)
+* [What Does Tab Central Give Me?](#what-does-tab-central-give-me)
+* [Prior Art](#prior-art)
 
-## Quick Start
+## Why Make It?
 
-```powershell
-Import-Module TabCentral
+Tab Central was created for several reasons:
+* To provide auto-completion of `$this` for my WPF DSL module.
+* To provide an extensible version of `TabExpansion2`.
+* To make custom tab expansion opt-in.
+* To make custom tab expansion module agnostic.
 
-# Explicitly enable TabCentral hook processing for this session.
-Enable-TabCentral
+The first reason stemmed from work on the WPF DSL. I wanted to auto-complete object properties within script blocks such as `Window { $this.^ }`, similar to how it works for classes, and I wanted to do it without creating a VSCode extension. `TabExpansion2` is not extensible without replacing the native function entirely so that's what I did and exporting a customized `TabExpansion2` function from my module was sufficient to solve the problem but introduced a new one. By exporting `TabExpansion2` from the module I was overriding the user's version without explicit permission and that seemed rude.
 
-# Confirm active hooks.
-Get-TabCentralHook
+It was apparent that I would need to make custom Tab Expansion opt-in. Creating a function like `Enable-WPFTabExpansion` would satisfy the goal but still required overriding the user's version of `TabExpansion2` which was a suboptimal outcome. Creating a tab expansion focused module would solve the opt-in problem but required that I make the `TabExpansion2` function extensible.
+
+And so my journey began and ended here.
+
+## What Is TabExpansion2
+
+`TabExpansion` is the name of the built-in PowerShell function that provide tab completion. As the name suggests, the function is called whenever you press `<Tab>` and auto-completes whatever you've typed. `TabExpansion2` works by returning a `CommandCompletion` object which contains an array of `CompletionResults` which PSReadline and VSCode both use to auto-complete your input (or at least I think that's how it works). If you're interested, you can inspect the code yourself by entering `${function:TabExpansion2}` from the terminal.
+
+Unfortunately, it is neither extensible nor well documented.
+
+## What Does Tab Central Give Me?
+
+Tab Central gives you an extensible version `TabExpansion2` and functions that enable you to easily register custom tab completers and result modifiers which I shall heretofore refer to as **Completers** and **Modifiers**. **Completers** are custom auto-complete functions that run before native auto-complete. **Modifiers** are functions which change the completion objects before `TabExpansion2` returns them.
+
+Additionally, Tab Central is designed to allow easy integration with other modules. For instance, registering tab completion for my WPF module is as easy as adding the following to your VSCode profile.
+
+```pwsh
+$env:PSModulePath += ';C:\Repos\PowershellStuff\src\modules'
+Enable-TabCentral -Verbose
+Register-TabCentralHook -Module WPF
 ```
 
-Disable at any time:
+The above code block adds the path to modules in this repository to `PSModulePath` for discovery, calls `Enable-TabCentral` to enable custom completions and registers all the hooks in the `WPF` module by reading the module metadata. That metadata can be included with any module that wants to enable registration with Tab Central.
 
-```powershell
-Disable-TabCentral
-```
+You can register individual functions but this is the preferred way to integrate modules.
 
-## Session Behavior
+## Prior Art
 
-On import, TabCentral initializes `$Global:TabCentralEnabled` to `$false` only
-if the variable is not already defined. This lets callers set defaults in their
-profile while preserving explicit session control.
-
-## Profile Default
-
-Add this to your PowerShell profile if you want TabCentral enabled by default:
-
-```powershell
-Import-Module TabCentral
-$Global:TabCentralEnabled = $true
-```
-
-If you want the module loaded but disabled by default:
-
-```powershell
-Import-Module TabCentral
-$Global:TabCentralEnabled = $false
-```
-
-## Hook Registration
-
-TabCentral supports two registration styles:
-
-- Direct registration with `-Name`, `-Type`, and `-ScriptBlock`.
-- Descriptor pipeline registration, for example:
-	`Get-WPFTabCentralHook | Register-TabCentralHook`.
-
-### Descriptor Contract
-
-When using pipeline registration, each object should include:
-
-- `Name` (string, required)
-- `Type` (`Completer` or `Modifier`, required)
-- `Callable` (script block, function, or cmdlet, preferred) or `ScriptBlock` (script block, supported for compatibility)
-- `Source` (string, optional)
-
-Register a completer hook:
-
-```powershell
-Register-TabCentralHook -Name 'Complete-Example' -Type Completer -ScriptBlock {
-	param(
-		[string] $inputScript,
-		[int] $cursorColumn,
-		[System.Management.Automation.Language.Ast] $ast,
-		[System.Management.Automation.Language.Token[]] $tokens,
-		[System.Management.Automation.Language.IScriptPosition] $positionOfCursor,
-		[hashtable] $options
-	)
-
-	# Return $null when your hook does not apply.
-	return $null
-}
-```
-
-Register a modifier hook:
-
-```powershell
-Register-TabCentralHook -Name 'Modify-Example' -Type Modifier -ScriptBlock {
-	param([System.Management.Automation.CommandCompletion] $CommandCompletion)
-
-	# Return a single CommandCompletion instance.
-	return $CommandCompletion
-}
-```
-
-List and remove hooks:
-
-```powershell
-Get-TabCentralHook
-Unregister-TabCentralHook -Name 'Complete-Example' -Type Completer
-```
-
-Register from descriptors returned by another module:
-
-```powershell
-Get-WPFTabCentralHook | Register-TabCentralHook -Force
-```
-
-Validate descriptors before registration:
-
-```powershell
-Get-WPFTabCentralHook | Test-TabCentralHookDescriptor
-Get-WPFTabCentralHook | Test-TabCentralHookDescriptor -PassThru | Register-TabCentralHook -Force
-```
-
-## Cross-Module Integration Example
-
-A module can import TabCentral and register hooks only when TabCentral is
-available, without taking a hard dependency on WPF or any specific DSL.
-
-```powershell
-if (Get-Module -ListAvailable -Name TabCentral) {
-	Import-Module TabCentral -ErrorAction Stop
-
-	Register-TabCentralHook -Name 'Complete-MyModule' -Type Completer -ScriptBlock {
-		param(
-			[string] $inputScript,
-			[int] $cursorColumn,
-			[System.Management.Automation.Language.Ast] $ast,
-			[System.Management.Automation.Language.Token[]] $tokens,
-			[System.Management.Automation.Language.IScriptPosition] $positionOfCursor,
-			[hashtable] $options
-		)
-
-		# Return a CommandCompletion when matched, else $null.
-		return $null
-	}
-}
-```
-
-## Troubleshooting
-
-- If completion behavior looks unchanged, run `Enable-TabCentral`.
-- If a hook throws, TabCentral catches and logs debug output, then falls back to
-  standard completion behavior.
-- To clear all hooks, run `Reset-TabExpansion2`.
+* [Nightroman's TabExpansion2](https://github.com/nightroman/FarNet/blob/main/PowerShellFar/TabExpansion2.ps1)
