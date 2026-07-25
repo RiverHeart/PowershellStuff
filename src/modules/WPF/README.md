@@ -200,8 +200,9 @@ Many reasons, but a few big ones:
 ## When Not To Use It
 
 - You need cross-platform support.
+    - [PSAvalonia](https://github.com/ironmansoftware/psavalonia) suggests this might be possible if I swap the backend but I don't have the motivation to pursue that currently.
 - You need to ship a standalone binary/exe. This project intentionally avoids third-party modules, so binary distribution is not a supported workflow.
-- Your team requires a XAML-first designer workflow.
+- You team requires a XAML-first designer workflow.
 - You need long-term API stability right now.
 - You need a guarantee I'll work on this forever.
     - Microsoft seems to believe they own our computers more than we do. If I migrate to Linux full-time it'll make it difficult to work on this unless it turns into a work project.
