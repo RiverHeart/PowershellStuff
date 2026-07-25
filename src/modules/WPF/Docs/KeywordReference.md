@@ -779,16 +779,16 @@ Bind IsEnabled -To Window.Tag.IsFileLoaded
 
 Unified binding sugar that delegates to existing binding keywords.
 
-Use `-ToState` for state-style binding (delegates to `Bind`):
+Use `-FromState` for state-style binding (delegates to `Bind`):
 
 ```powershell
-Link Visibility -ToState IsFullScreen -Invert
+Link Visibility -FromState IsFullScreen -Invert
 ```
 
 Map state values without writing a converter block:
 
 ```powershell
-Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+Link ToolTip -FromState IsCopyFeedbackActive -Map @{
     $true  = 'Copied to clipboard'
     $false = 'Copy image to clipboard'
 }
@@ -798,7 +798,7 @@ Map entries should be final values/objects, not deferred scriptblocks. For
 control content values, evaluate the object at map creation time:
 
 ```powershell
-Link Content -ToState IsCopyFeedbackActive -Map @{
+Link Content -FromState IsCopyFeedbackActive -Map @{
     $true  = (Path 'images/clipboard-check-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
     $false = (Path 'images/clipboard-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
 }
@@ -808,7 +808,7 @@ Link Content -ToState IsCopyFeedbackActive -Map @{
 `-Default` for unmatched values:
 
 ```powershell
-Link Content -ToState FigureDrawingPreset -Map @{
+Link Content -FromState FigureDrawingPreset -Map @{
     Quick    = '2 min'
     Balanced = '5 min'
     Long     = '10 min'
@@ -824,8 +824,8 @@ Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
 
 When choosing between the two modes:
 
-- Prefer `-ToState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
-- `-ToState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
+- Prefer `-FromState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
+- `-FromState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
 - Prefer `-Property` for regular WPF binding paths and custom sources (`-Self`, `-ElementName`, `-Source`, `-TemplatedParent`).
 - In `-Property` mode with no explicit source selector, binding uses inherited `DataContext`.
 

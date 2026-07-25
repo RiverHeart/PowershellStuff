@@ -8,7 +8,7 @@ Describe 'Link' -Tag 'Link' {
         $command | Should -Not -Be $null
     }
 
-    It 'Should delegate state mode to Bind with -ToState' {
+    It 'Should delegate state mode to Bind with -FromState' {
         $id = [guid]::NewGuid().ToString('N')
         $windowName = "Window_$id"
         $labelName = "Label_$id"
@@ -19,7 +19,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -ToState IsReady -Converter {
+                Link Content -FromState IsReady -Converter {
                     if ($_) { 'Ready' } else { 'Not Ready' }
                 }
             }
@@ -45,7 +45,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -ToState IsReady -Map @{
+                Link Content -FromState IsReady -Map @{
                     $true  = 'Ready'
                     $false = 'Not Ready'
                 }
@@ -72,7 +72,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -ToState IsReady -Map @{
+                Link Content -FromState IsReady -Map @{
                     True  = 'Ready'
                     False = 'Not Ready'
                 }
@@ -105,7 +105,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -ToState IsReady -Map @{
+                Link Content -FromState IsReady -Map @{
                     $true  = $activeContent
                     $false = $inactiveContent
                 }
@@ -134,7 +134,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -ToState IsReady -Map @{
+                Link Content -FromState IsReady -Map @{
                     $true  = { 'Ready' }
                     $false = 'Not Ready'
                 }
@@ -155,7 +155,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -ToState Mode -Map @{
+                Link Content -FromState Mode -Map @{
                     Ready = 'Ready'
                     Busy  = 'Busy'
                 } -Default 'Fallback'
@@ -180,7 +180,7 @@ Describe 'Link' -Tag 'Link' {
                 }
 
                 Label $labelName {
-                    Link Content -ToState Mode -Map @{
+                    Link Content -FromState Mode -Map @{
                         Ready = 'Ready'
                     } -StrictMap
                 }
@@ -190,19 +190,19 @@ Describe 'Link' -Tag 'Link' {
 
     It 'Should reject combining -Map with -Converter in state mode' {
         {
-            $null = Link Content -ToState IsReady -Map @{ $true = 'Ready' } -Converter { 'x' } -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
+            $null = Link Content -FromState IsReady -Map @{ $true = 'Ready' } -Converter { 'x' } -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
         } | Should -Throw
     }
 
     It 'Should reject -Default without -Map in state mode' {
         {
-            $null = Link Content -ToState IsReady -Default 'Fallback' -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
+            $null = Link Content -FromState IsReady -Default 'Fallback' -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
         } | Should -Throw
     }
 
     It 'Should reject combining -Default with -StrictMap in state mode' {
         {
-            $null = Link Content -ToState IsReady -Map @{ $true = 'Ready' } -Default 'Fallback' -StrictMap -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
+            $null = Link Content -FromState IsReady -Map @{ $true = 'Ready' } -Default 'Fallback' -StrictMap -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
         } | Should -Throw
     }
 

@@ -30,11 +30,11 @@ Delegates to `Bind`
 
 **Shape:**
 ```
-Link <TargetProperty> -ToState <StatePropertyName> [-Invert] [-Converter <scriptblock>]
+Link <TargetProperty> -FromState <StatePropertyName> [-Invert] [-Converter <scriptblock>]
 ```
 
 ### Semantics
-* `-ToState` is resolved against current window/app state (equivalent source as existing `Bind` usage).
+* `-FromState` is resolved against current window/app state (equivalent source as existing `Bind` usage).
 * `-Invert` and `-Converter` preserve current `Bind` semantics.
 
 ### WPF binding-style linking
@@ -80,16 +80,16 @@ Link -AsBinding -Property <SourcePropertyOrPath> [source selector params] [-Scri
 * `-Path` reflects WPF internals and remains available for familiarity and compatibility.
 
 **Dispatch Rules (Deterministic)**
-1. If `-ToState` is supplied, dispatch to `Bind`.
+1. If `-FromState` is supplied, dispatch to `Bind`.
 2. Else if `-AsBinding` is supplied, dispatch to `Binding`.
 3. Else dispatch to `BindProperty` using `-Property`/`-Path` and any source selector.
-4. Error on mixed-mode combinations (for example `-ToState` with `-Self`, or `-ToState` with `-AsBinding`).
+4. Error on mixed-mode combinations (for example `-FromState` with `-Self`, or `-FromState` with `-AsBinding`).
 
 **Examples**
 
 ```powershell
 # State -> target property (Bind)
-Link Visibility -ToState IsFullScreen -Invert
+Link Visibility -FromState IsFullScreen -Invert
 
 # DataContext binding (BindProperty with implicit DataContext)
 Link Text -Property Count
@@ -113,7 +113,7 @@ Link Text -Path CurrentFile.Name
 ## Testing Requirements
 
 **Dispatch tests:**
-* `-ToState` routes to `Bind` behavior.
+* `-FromState` routes to `Bind` behavior.
 * `-Property` with selector routes to `BindProperty` behavior.
 * `-AsBinding` returns `Binding` result (if included in v1).
 
@@ -133,5 +133,5 @@ Link Text -Path CurrentFile.Name
 
 ## Open Decisions
 * Include `-AsBinding` in v1 or defer to v1.1.
-* Whether `-ToState` should accept full dotted path or state-member-only names in v1.
+* Whether `-FromState` should accept full dotted path or state-member-only names in v1.
 * Whether to include convenience map operators (`-Map`, `-Invert`) in WPF mode or keep them state-only for clarity.

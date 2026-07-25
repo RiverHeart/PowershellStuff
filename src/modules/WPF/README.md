@@ -87,7 +87,7 @@ App 'Window' {
 
     Menu 'Menu' {
         $this.Height = 25
-        Link Visibility -ToState IsFullScreen -Invert
+        Link Visibility -FromState IsFullScreen -Invert
 
         MenuItem '(F)ile/(O)pen' {
             Command 'Open' {
@@ -138,7 +138,7 @@ App 'Window' {
         StackPanel 'ButtonPanel' {
             $this.Orientation = [Orientation]::Horizontal
             $this.HorizontalAlignment = [HorizontalAlignment]::Center
-            Link Visibility -ToState IsFullScreen -Invert
+            Link Visibility -FromState IsFullScreen -Invert
 
             Button 'BackButton' {
                 Bind IsEnabled -To Window.Tag.IsFileLoaded
@@ -153,7 +153,7 @@ App 'Window' {
     }
 
     StatusBar {
-        Link Visibility -ToState IsFullScreen -Invert
+        Link Visibility -FromState IsFullScreen -Invert
 
         StatusBarItem 'StatusFileItem' {
             Dock Left

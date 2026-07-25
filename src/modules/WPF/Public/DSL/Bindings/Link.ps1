@@ -13,10 +13,10 @@
     alias for users who prefer WPF-native terminology.
 
 .EXAMPLE
-    Link Visibility -ToState IsFullScreen -Invert
+    Link Visibility -FromState IsFullScreen -Invert
 
 .EXAMPLE
-    Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+    Link ToolTip -FromState IsCopyFeedbackActive -Map @{
         $true  = 'Copied to clipboard'
         $false = 'Copy image to clipboard'
     }
@@ -42,7 +42,7 @@ function Link {
         [Parameter(Mandatory, ParameterSetName = 'State')]
         [ValidateNotNullOrEmpty()]
         [ArgumentCompleter({ Complete-WPFState @args })]
-        [string] $ToState,
+        [string] $FromState,
 
         [Parameter(Mandatory, Position = 1, ParameterSetName = 'Property')]
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'AsBinding')]
@@ -125,13 +125,13 @@ function Link {
 
                 $Window = Get-WPFWindow
                 if ($null -eq $Window -or [string]::IsNullOrWhiteSpace($Window.Name)) {
-                    Write-Error 'Link: Unable to resolve the current window context for -ToState mode.'
+                    Write-Error 'Link: Unable to resolve the current window context for -FromState mode.'
                     return
                 }
 
                 $BindParams = @{
                     Property = $TargetProperty
-                    To       = "$($Window.Name).Tag.$ToState"
+                    To       = "$($Window.Name).Tag.$FromState"
                 }
 
                 if ($HasMap) {

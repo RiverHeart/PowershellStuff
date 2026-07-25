@@ -175,7 +175,7 @@ App 'PresentValueCalculator' {
                             $this.Width = 300
                             $this.VerticalAlignment = 'Stretch'
 
-                            Link ItemsSource -ToState Results
+                            Link ItemsSource -FromState Results
 
                             GridView {
                                 GridViewColumn {
