@@ -25,6 +25,7 @@ function GradientStop {
     param(
         [Parameter(Mandatory, Position = 0)]
         [ValidateNotNullOrEmpty()]
+        [ArgumentCompleter({ Complete-WPFColor @args })]
         [string] $Color,
 
         [Parameter(Mandatory, Position = 1)]
@@ -52,7 +53,13 @@ function GradientStop {
         }
 
         try {
-            $convertedColor = [System.Windows.Media.ColorConverter]::ConvertFromString($Color)
+            $normalizedColor = if ($Color -match '^(?<Hex>([0-9A-Fa-f]{3})|([0-9A-Fa-f]{4})|([0-9A-Fa-f]{6})|([0-9A-Fa-f]{8}))$') {
+                "#$($Matches['Hex'])"
+            } else {
+                $Color
+            }
+
+            $convertedColor = [System.Windows.Media.ColorConverter]::ConvertFromString($normalizedColor)
             $stop = [System.Windows.Media.GradientStop]::new([System.Windows.Media.Color] $convertedColor, $Offset)
 
             if ($Parent -is [System.Windows.Media.LinearGradientBrush]) {

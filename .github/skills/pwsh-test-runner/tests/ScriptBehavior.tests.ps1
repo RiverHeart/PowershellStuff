@@ -1,5 +1,6 @@
 Describe 'test-runner skill scripts' {
     BeforeAll {
+        $script:InvokeTestSource = Join-Path -Path $PSScriptRoot -ChildPath '../scripts/Invoke-Test.ps1'
         $script:InvokeTestCoverageSource = Join-Path -Path $PSScriptRoot -ChildPath '../scripts/Invoke-TestCoverage.ps1'
         $script:InvokeNewCodeGateSource = Join-Path -Path $PSScriptRoot -ChildPath '../scripts/Invoke-NewCodeGate.ps1'
 
@@ -28,6 +29,56 @@ Describe 'test-runner skill scripts' {
                 Text = ($output -join [Environment]::NewLine)
             }
         }
+
+        function script:New-TestRunnerSandbox {
+            param(
+                [Parameter(Mandatory)]
+                [string] $RootPath
+            )
+
+            $scriptsPath = Join-Path -Path $RootPath -ChildPath 'scripts'
+            $suitePath = Join-Path -Path $RootPath -ChildPath 'suite'
+            $testsPath = Join-Path -Path $suitePath -ChildPath 'Tests'
+            New-Item -Path $scriptsPath, $testsPath -ItemType Directory -Force | Out-Null
+
+            Copy-Item -Path $script:InvokeTestSource -Destination (Join-Path -Path $scriptsPath -ChildPath 'Invoke-Test.ps1') -Force
+
+            @"
+{
+    "isRoot": true,
+    "TestSuites": [
+        {
+            "Name": "Fake",
+            "ConfigPath": "suite/pester.json"
+        }
+    ]
+}
+"@ | Set-Content -Path (Join-Path -Path $RootPath -ChildPath 'pester.json') -NoNewline
+
+            @"
+{
+    "TestSuite": "Fake",
+    "Run": {
+        "Path": [
+            "Tests"
+        ]
+    },
+    "Output": {
+        "Verbosity": "None"
+    }
+}
+"@ | Set-Content -Path (Join-Path -Path $suitePath -ChildPath 'pester.json') -NoNewline
+
+        "Describe 'Selected test' { It 'passes' { `$true | Should -BeTrue } }" |
+        Set-Content -Path (Join-Path -Path $testsPath -ChildPath 'Selected.tests.ps1') -NoNewline
+        "Describe 'Unselected test' { It 'fails' { `$true | Should -BeFalse } }" |
+        Set-Content -Path (Join-Path -Path $testsPath -ChildPath 'Unselected.tests.ps1') -NoNewline
+
+        return [pscustomobject] @{
+        RootPath = $RootPath
+        EntryScriptPath = (Join-Path -Path $scriptsPath -ChildPath 'Invoke-Test.ps1')
+        }
+    }
 
         function script:New-TestCoverageSandbox {
             param(
@@ -169,6 +220,33 @@ exit /b 0
                 EntryScriptPath = (Join-Path -Path $RootPath -ChildPath 'Invoke-NewCodeGate.ps1')
                 CoveragePath = (Join-Path -Path $RootPath -ChildPath 'coverage.xml')
             }
+        }
+    }
+
+    Context 'Invoke-Test execution options' {
+        It 'accepts Suite as an alias and limits execution to a suite-relative path' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'focused-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1')
+
+            $run.Text | Should -Match 'Test Suite: Fake'
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
+            $run.Text | Should -Not -Match 'Unselected test'
+        }
+
+        It 'enables detailed Pester console output when requested' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'detailed-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-TestSuite', 'Fake', '-Path', 'Tests/Selected.tests.ps1', '-DetailedOutput')
+
+            $run.Text | Should -Match 'Starting discovery in'
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
         }
     }
 

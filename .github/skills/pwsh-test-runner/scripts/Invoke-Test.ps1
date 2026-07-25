@@ -24,6 +24,10 @@
 .PARAMETER TestSuite
     Name of the configured test suite to run.
 
+.PARAMETER Path
+    Optional test paths to run instead of the paths configured by the suite. Relative paths
+    are resolved from the directory containing the suite configuration.
+
 .PARAMETER ListSuites
     Lists configured test suites and exits.
 
@@ -39,6 +43,9 @@
 .PARAMETER DebugOutput
     Enables debug output only for this invocation.
 
+.PARAMETER DetailedOutput
+    Enables detailed Pester console output for this invocation.
+
 .PARAMETER ShowPassed
     Also prints passing tests in addition to non-passing tests.
 
@@ -50,6 +57,9 @@
 
 .EXAMPLE
     ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -DebugOutput
+
+.EXAMPLE
+    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -Suite Example -Path Tests/Feature.tests.ps1 -DetailedOutput
 
 .EXAMPLE
     ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -Tag DataGrid -PassThru
@@ -66,6 +76,7 @@ param (
     [Parameter(Mandatory, ParameterSetName = 'Run')]
     [Parameter(Mandatory, ParameterSetName = 'ListTags')]
     [ValidateNotNullOrEmpty()]
+    [Alias('Suite')]
     [string] $TestSuite,
 
     [Parameter(Mandatory, ParameterSetName = 'List')]
@@ -80,7 +91,12 @@ param (
     [Parameter(ParameterSetName = 'Run')]
     [string[]] $ExcludeTag,
 
+    [Parameter(ParameterSetName = 'Run')]
+    [ValidateNotNullOrEmpty()]
+    [string[]] $Path,
+
     [switch] $DebugOutput,
+    [switch] $DetailedOutput,
     [switch] $ShowPassed,
     [switch] $PassThru
 )
@@ -435,8 +451,14 @@ function Convert-SingleSuiteManifestToSuiteList {
             return
         }
     }
+    $RequestedPath = if ($null -ne $Path -and $Path.Count -gt 0) {
+        @($Path)
+    } else {
+        @($SuiteConfig.Run.Path)
+    }
+
     $ResolvedPath = @()
-    foreach ($PathEntry in @($SuiteConfig.Run.Path)) {
+    foreach ($PathEntry in $RequestedPath) {
         if ([System.IO.Path]::IsPathRooted($PathEntry)) {
             $Resolved = Resolve-Path -Path $PathEntry -ErrorAction SilentlyContinue
         } else {
@@ -531,7 +553,13 @@ function Convert-SingleSuiteManifestToSuiteList {
         $Configuration = [PesterConfiguration]::Default
         $Configuration.Run.Path = $ResolvedPath
         $Configuration.Run.PassThru = $true
-        $Configuration.Output.Verbosity = if ($SuiteConfig.Output.Verbosity) { [string] $SuiteConfig.Output.Verbosity } else { 'None' }
+        $Configuration.Output.Verbosity = if ($DetailedOutput) {
+            'Detailed'
+        } elseif ($SuiteConfig.Output.Verbosity) {
+            [string] $SuiteConfig.Output.Verbosity
+        } else {
+            'None'
+        }
 
         $EffectiveIncludeTags = if ($null -ne $Tag -and $Tag.Count -gt 0) { $Tag } else { @($SuiteConfig.Filter.Tag) }
         if ($EffectiveIncludeTags.Count -gt 0) {

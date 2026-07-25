@@ -2,12 +2,16 @@
   "isRoot": true,
   "TestSuites": [
     {
+      "Name": "TestRunnerSkills",
+      "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
+    },
+    {
       "Name": "WPF",
       "ConfigPath": "src/modules/WPF/pester.json"
     },
     {
-      "Name": "TestRunnerSkills",
-      "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
+      "Name": "TabCentral",
+      "ConfigPath": "src/modules/TabCentral/pester.json"
     }
   ]
 }
