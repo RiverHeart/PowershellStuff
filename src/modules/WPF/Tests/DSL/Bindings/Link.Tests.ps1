@@ -19,7 +19,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -FromState IsReady -Converter {
+                Link Content -FromState IsReady -Transform {
                     if ($_) { 'Ready' } else { 'Not Ready' }
                 }
             }
@@ -188,9 +188,9 @@ Describe 'Link' -Tag 'Link' {
         } | Should -Throw
     }
 
-    It 'Should reject combining -Map with -Converter in state mode' {
+    It 'Should reject combining -Map with -Transform in state mode' {
         {
-            $null = Link Content -FromState IsReady -Map @{ $true = 'Ready' } -Converter { 'x' } -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
+            $null = Link Content -FromState IsReady -Map @{ $true = 'Ready' } -Transform { 'x' } -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
         } | Should -Throw
     }
 

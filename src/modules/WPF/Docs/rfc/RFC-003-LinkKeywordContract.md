@@ -30,12 +30,12 @@ Delegates to `Bind`
 
 **Shape:**
 ```
-Link <TargetProperty> -FromState <StatePropertyName> [-Invert] [-Converter <scriptblock>]
+Link <TargetProperty> -FromState <StatePropertyName> [-Invert] [-Transform <scriptblock>]
 ```
 
 ### Semantics
 * `-FromState` is resolved against current window/app state (equivalent source as existing `Bind` usage).
-* `-Invert` and `-Converter` preserve current `Bind` semantics.
+* `-Invert` and `-Transform` preserve current `Bind` semantics.
 
 ### WPF binding-style linking
 

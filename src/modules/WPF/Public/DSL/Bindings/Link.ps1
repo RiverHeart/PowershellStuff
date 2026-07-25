@@ -51,7 +51,7 @@ function Link {
         [string] $Property,
 
         [Parameter(ParameterSetName = 'State')]
-        [scriptblock] $Converter,
+        [scriptblock] $Transform,
 
         [Parameter(ParameterSetName = 'State')]
         [hashtable] $Map,
@@ -108,8 +108,8 @@ function Link {
                 $HasMap = $PSBoundParameters.ContainsKey('Map')
                 $HasDefault = $PSBoundParameters.ContainsKey('Default')
 
-                if ($HasMap -and $PSBoundParameters.ContainsKey('Converter')) {
-                    Write-Error 'Link: Specify either -Map or -Converter in state mode, not both.'
+                if ($HasMap -and $PSBoundParameters.ContainsKey('Transform')) {
+                    Write-Error 'Link: Specify either -Map or -Transform in state mode, not both.'
                     return
                 }
 
@@ -177,8 +177,8 @@ function Link {
 
                         return $SourceValue
                     }.GetNewClosure()
-                } elseif ($PSBoundParameters.ContainsKey('Converter')) {
-                    $BindParams.Converter = $Converter
+                } elseif ($PSBoundParameters.ContainsKey('Transform')) {
+                    $BindParams.Converter = $Transform
                 }
 
                 if ($Invert) {
