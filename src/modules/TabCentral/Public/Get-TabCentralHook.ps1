@@ -25,12 +25,18 @@ function Get-TabCentralHook {
     $Registry = Get-TabCentralRegistry
 
     if (-not $Type -or $Type -eq 'Completer') {
-        $Registry.TabCompleters |
-            Where-Object { -not $Name -or $Name -like $_.Name }
+        $Registry.TabCompleters.Values |
+            Where-Object {
+                $HookName = $_.Name
+                -not $Name -or @($Name | Where-Object { $HookName -like $_ }).Count -gt 0
+            }
     }
 
     if (-not $Type -or $Type -eq 'Modifier') {
-        $Registry.ResultModifiers |
-            Where-Object { -not $Name -or $Name -like $_.Name }
+        $Registry.ResultModifiers.Values |
+            Where-Object {
+                $HookName = $_.Name
+                -not $Name -or @($Name | Where-Object { $HookName -like $_ }).Count -gt 0
+            }
     }
 }

@@ -46,7 +46,7 @@ function Assert-Property {
     if ($Is -and $InputObject.$Name -isnot $Is) {
         throw "Property '$Name' must be of type '$Is'."
     }
-    if ($IsAny -and ($InputObject.$Name -isnot $IsAny)) {
+    if ($IsAny) {
         $MatchFound = $false
         foreach($Type in $IsAny) {
             if ($InputObject.$Name -is $Type) {
