@@ -1,6 +1,6 @@
 Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     It 'Uses PreviewKeyDown on the window for keyboard navigation reliability' {
-        $ScriptPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/ImageViewer.DSL.ps1'
+        $ScriptPath = Join-Path $PSScriptRoot '../ImageViewer.DSL.ps1'
         $Content = Get-Content -Path $ScriptPath -Raw
 
         $Content | Should -Match 'On\s+PreviewKeyDown\s*\{'
@@ -8,7 +8,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Only navigates left/right when the focused ScrollViewer is not horizontally scrollable' {
-        $ScriptPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/ImageViewer.DSL.ps1'
+        $ScriptPath = Join-Path $PSScriptRoot '../ImageViewer.DSL.ps1'
         $Content = Get-Content -Path $ScriptPath -Raw
 
         $LeftPattern = '''Left''\s*\{\s*if \(Test-ImageViewerShouldNavigate\)'
@@ -17,7 +17,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
         $Content | Should -Match $LeftPattern
         $Content | Should -Match $SpacePattern
 
-        $HelperPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Test-ImageViewerShouldNavigate.ps1'
+        $HelperPath = Join-Path $PSScriptRoot '../functions/Test-ImageViewerShouldNavigate.ps1'
         $HelperContent = Get-Content -Path $HelperPath -Raw
 
         $HelperContent | Should -Match 'Get-WPFMenu'
@@ -27,7 +27,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Builds a deterministic figure drawing schedule for a 20-minute session' {
-        $SchedulePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/New-ImageViewerFigureDrawSchedule.ps1'
+        $SchedulePath = Join-Path $PSScriptRoot '../functions/New-ImageViewerFigureDrawSchedule.ps1'
         . $SchedulePath
 
         $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 20 -Preset Balanced
@@ -43,7 +43,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Caps figure drawing schedule by image count when images are limited' {
-        $SchedulePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/New-ImageViewerFigureDrawSchedule.ps1'
+        $SchedulePath = Join-Path $PSScriptRoot '../functions/New-ImageViewerFigureDrawSchedule.ps1'
         . $SchedulePath
 
         $Schedule = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 6 -Preset Balanced
@@ -54,7 +54,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Uses warmer timing in Warmup than StudyHeavy for equal session length' {
-        $SchedulePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/New-ImageViewerFigureDrawSchedule.ps1'
+        $SchedulePath = Join-Path $PSScriptRoot '../functions/New-ImageViewerFigureDrawSchedule.ps1'
         . $SchedulePath
 
         $Warmup = New-ImageViewerFigureDrawSchedule -TotalMinutes 20 -ImageCount 200 -Preset Warmup
@@ -72,10 +72,10 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Uses F6 to toggle figure drawing mode through the time-based prompt flow' {
-        $DslPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/ImageViewer.DSL.ps1'
+        $DslPath = Join-Path $PSScriptRoot '../ImageViewer.DSL.ps1'
         $DslContent = Get-Content -Path $DslPath -Raw
 
-        $TogglePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerToggleFigureDrawingMode.ps1'
+        $TogglePath = Join-Path $PSScriptRoot '../functions/Invoke-ImageViewerToggleFigureDrawingMode.ps1'
         $ToggleContent = Get-Content -Path $TogglePath -Raw
 
         $DslContent | Should -Match 'Invoke-ImageViewerToggleFigureDrawingMode'
@@ -85,7 +85,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Shows a right sidebar in figure drawing mode with countdown and pause/play controls' {
-        $DslPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/ImageViewer.DSL.ps1'
+        $DslPath = Join-Path $PSScriptRoot '../ImageViewer.DSL.ps1'
         $DslContent = Get-Content -Path $DslPath -Raw
 
         $DslContent | Should -Match "Border 'FigureDrawingSidebar'"
@@ -96,7 +96,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Formats figure drawing countdown values using TimeSpan text output' {
-        $CountdownPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerUpdateFigureDrawingCountdown.ps1'
+        $CountdownPath = Join-Path $PSScriptRoot '../functions/Invoke-ImageViewerUpdateFigureDrawingCountdown.ps1'
         $CountdownContent = Get-Content -Path $CountdownPath -Raw
 
         $CountdownContent | Should -Match 'TimeSpan\]::FromSeconds'
@@ -107,7 +107,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Pins slideshow timer navigation to the window context id captured at start' {
-        $StartPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Start-ImageViewerSlideshow.ps1'
+        $StartPath = Join-Path $PSScriptRoot '../functions/Start-ImageViewerSlideshow.ps1'
         $StartContent = Get-Content -Path $StartPath -Raw
 
         $StartContent | Should -Match 'Get-WPFContextId\s+-InputObject\s+\$Window'
@@ -115,7 +115,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Pins figure drawing timer callbacks to the captured window context id' {
-        $FigurePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Start-ImageViewerFigureDraw.ps1'
+        $FigurePath = Join-Path $PSScriptRoot '../functions/Start-ImageViewerFigureDraw.ps1'
         $FigureContent = Get-Content -Path $FigurePath -Raw
 
         $FigureContent | Should -Match 'Get-WPFContextId\s+-InputObject\s+\$Window'
@@ -124,7 +124,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Allows navigation helper to resolve window by explicit ContextId' {
-        $NavigatePath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerNavigate.ps1'
+        $NavigatePath = Join-Path $PSScriptRoot '../functions/Invoke-ImageViewerNavigate.ps1'
         $NavigateContent = Get-Content -Path $NavigatePath -Raw
 
         $NavigateContent | Should -Match '\[string\]\s+\$ContextId'
@@ -133,7 +133,7 @@ Describe 'ImageViewer Example' -Tag 'ImageViewer-Example' {
     }
 
     It 'Computes fit zoom from rotation-aware image bounds' {
-        $FitPath = Join-Path $PSScriptRoot '../Examples/ImageViewer/functions/Invoke-ImageViewerFitToWindow.ps1'
+        $FitPath = Join-Path $PSScriptRoot '../functions/Invoke-ImageViewerFitToWindow.ps1'
         $FitContent = Get-Content -Path $FitPath -Raw
 
         $FitContent | Should -Match 'RotationAngle\s*=\s*\[double\]\s+\$State\.RotationAngle'
