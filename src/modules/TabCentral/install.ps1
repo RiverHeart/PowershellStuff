@@ -13,7 +13,9 @@ param(
 
 Set-Location -Path $PSScriptRoot
 
-$ModulePath = if ($PSEdition -eq 'Core') {
+$ModulePath = if ($ModulePath) {
+    $ModulePath.FullName
+} elseif ($PSEdition -eq 'Core') {
     "$HOME\Documents\PowerShell\Modules\TabCentral"
 } else {
     "$HOME\Documents\WindowsPowerShell\Modules\TabCentral"
