@@ -9,6 +9,10 @@
     2) Property mode: delegates to BindProperty
     3) AsBinding mode: delegates to Binding and returns a Binding object
 
+    Directionality contract: Link always applies values in one direction,
+    from source to target. This avoids ambiguous interpretations where both
+    endpoints could be read or written.
+
     The source-side term is intentionally named -Property, with -Path kept as an
     alias for users who prefer WPF-native terminology.
 

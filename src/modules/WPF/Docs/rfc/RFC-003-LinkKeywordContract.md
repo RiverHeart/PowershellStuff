@@ -135,3 +135,4 @@ Link Text -Path CurrentFile.Name
 * Include `-AsBinding` in v1 or defer to v1.1.
 * Whether `-FromState` should accept full dotted path or state-member-only names in v1.
 * Whether to include convenience map operators (`-Map`, `-Invert`) in WPF mode or keep them state-only for clarity.
+* Directional source/target canonical syntax draft is tracked in `RFC-004-Link-SourceTarget-Direction.md`.

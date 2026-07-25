@@ -779,6 +779,8 @@ Bind IsEnabled -To Window.Tag.IsFileLoaded
 
 Unified binding sugar that delegates to existing binding keywords.
 
+Directionality contract: Link applies values in one direction only (source -> target) to reduce ambiguity.
+
 Use `-FromState` for state-style binding (delegates to `Bind`):
 
 ```powershell
