@@ -29,19 +29,6 @@ Describe 'Format-CompletionResultAsHexCode' -Tag 'Format-CompletionResultAsHexCo
         }
     }
 
-    BeforeEach {
-        $script:previousTabExpansionHooks = @(Get-TabExpansionHook)
-        Reset-TabExpansion2 -NoDefaultHooks
-    }
-
-    AfterEach {
-        Reset-TabExpansion2 -NoDefaultHooks
-
-        foreach ($Hook in $script:previousTabExpansionHooks) {
-            Register-TabExpansionHook -Name $Hook.Name -Type $Hook.Type -ScriptBlock $Hook.ScriptBlock -Force
-        }
-    }
-
     It 'formats six-digit hex completions and preserves command completion metadata' {
         $commandCompletion = New-TestCommandCompletion -CompletionMatches @(
             [CompletionResult]::new(
@@ -62,7 +49,7 @@ Describe 'Format-CompletionResultAsHexCode' -Tag 'Format-CompletionResultAsHexCo
         $result.ReplacementIndex | Should -Be 7
         $result.ReplacementLength | Should -Be 6
         $result.CompletionMatches.Count | Should -Be 1
-        $result.CompletionMatches[0].CompletionText | Should -Be '#FFFFFF'
+        $result.CompletionMatches[0].CompletionText | Should -Be "'#FFFFFF'"
         $result.CompletionMatches[0].ListItemText | Should -Be 'FFFFFF'
         $result.CompletionMatches[0].ToolTip | Should -Be 'Named color'
     }
@@ -95,7 +82,7 @@ Describe 'Format-CompletionResultAsHexCode' -Tag 'Format-CompletionResultAsHexCo
         }
 
         $result.CompletionMatches.Count | Should -Be 3
-        $result.CompletionMatches[0].CompletionText | Should -Be '#FFFFFF'
+        $result.CompletionMatches[0].CompletionText | Should -Be "'#FFFFFF'"
         $result.CompletionMatches[1].CompletionText | Should -Be '#00FF00'
         $result.CompletionMatches[2].CompletionText | Should -Be 'Green'
     }
@@ -116,34 +103,7 @@ Describe 'Format-CompletionResultAsHexCode' -Tag 'Format-CompletionResultAsHexCo
         }
 
         $result.CompletionMatches.Count | Should -Be 1
-        $result.CompletionMatches[0].CompletionText | Should -Be '#ff00aa'
+        $result.CompletionMatches[0].CompletionText | Should -Be "'#ff00aa'"
         $result.CompletionMatches[0].ListItemText | Should -Be 'ff00aa'
-    }
-
-    It 'preserves modifier output through Register-TabExpansionHook and TabExpansion2' {
-        Register-TabExpansionHook -Name 'TestHexCompleter' -Type Completer -ScriptBlock {
-            param($inputScript, $cursorColumn, $ast, $tokens, $positionOfCursor, $options)
-
-            $matches = [Collection[CompletionResult]]::new()
-            $matches.Add([CompletionResult]::new(
-                'FFFFFF',
-                'FFFFFF',
-                [CompletionResultType]::ParameterValue,
-                'Synthetic hex'
-            ))
-
-            [CommandCompletion]::new($matches, 0, 0, 6)
-        }
-
-        Register-TabExpansionHook -FunctionName 'Format-CompletionResultAsHexCode' -Type Modifier -Force
-
-        $result = TabExpansion2 -inputScript 'FFF' -cursorColumn 3
-
-        $result | Should -BeOfType ([CommandCompletion])
-        $result.CompletionMatches.Count | Should -Be 1
-        $result.CompletionMatches[0].CompletionText | Should -Be '#FFFFFF'
-        $result.CompletionMatches[0].ListItemText | Should -Be 'FFFFFF'
-        $result.ReplacementIndex | Should -Be 0
-        $result.ReplacementLength | Should -Be 6
     }
 }

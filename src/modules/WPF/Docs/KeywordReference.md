@@ -86,6 +86,8 @@ Scope of this page:
     * [Show-WPFWindow](#show-wpfwindow)
     * [New-WPFProject](#new-wpfproject)
     * [Get-WPFTextInput](#get-wpftextinput)
+* [Completers](#completers)
+    * [Complete-WPFColor](#complete-wpfcolor)
 * [Compatibility Note](#compatibility-note)
 
 
@@ -1571,6 +1573,19 @@ $Interval = Get-WPFTextInput -Prompt 'Enter slideshow interval in seconds:' -Tit
 
 ```powershell
 $Interval = Get-WPFTextInput -Prompt 'Seconds:' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
+```
+
+## Completers
+
+### Complete-WPFColor
+
+Completes WPF named colors and hexadecimal color values. Hexadecimal insertion
+text is enclosed in quotes (for example, `'#FFFFFF'`) so PowerShell does not
+interpret the hash as the start of a comment. The completion list displays the
+unquoted value (for example, `#FFFFFF`).
+
+```powershell
+Complete-WPFColor -WordToComplete 'FFFFFF'
 ```
 
 ## Compatibility Note

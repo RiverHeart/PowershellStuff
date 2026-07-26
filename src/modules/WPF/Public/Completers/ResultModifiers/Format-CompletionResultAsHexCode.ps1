@@ -9,7 +9,8 @@ using namespace System.Management.Automation
 
 .DESCRIPTION
     This function takes a CommandCompletion object and normalizes any six-digit hex
-    completion text values to a standard format (for example, "#FFFFFF").
+    completion text values to a quoted format (for example, "'#FFFFFF'") so that
+    PowerShell does not interpret the hash as the start of a comment.
 
     Because CompletionMatches is enumerated during formatting, the function rebuilds the
     collection and assigns it back to the CommandCompletion object instead of mutating the
@@ -49,7 +50,7 @@ using namespace System.Management.Automation
 
     $commandCompletion.CompletionMatches.Add($CompletionResult)
     Format-CompletionResultAsHexCode -CommandCompletion $commandCompletion
-    # Returns: [CommandCompletion] with CompletionMatches[0].CompletionText = "#FFFFFF"
+    # Returns: [CommandCompletion] with CompletionMatches[0].CompletionText = "'#FFFFFF'"
 #>
 function Format-CompletionResultAsHexCode {
     [CmdletBinding()]
@@ -75,7 +76,7 @@ function Format-CompletionResultAsHexCode {
                     }
 
                     $formattedCompletionMatches.Add([CompletionResult]::new(
-                        <# Text to insert #> "#$completionText",
+                        <# Text to insert #> "'#$completionText'",
                         <# Text displayed in the list #> $ListItemText,
                         <# Icon Type #> $completion.ResultType,
                         <# Tooltip #> $completion.ToolTip
