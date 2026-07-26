@@ -60,7 +60,7 @@ function Complete-WPFColor {
         $HexCompletions = @(
             [CompletionResult]::new(
                 <# Text to insert #> $completionText,
-                <# Text displayed in the list #> $wordToComplete,
+                <# Text displayed in the list #> $hexValue,
                 <# Result type #> [CompletionResultType]::ParameterValue,
                 <# Tooltip #> 'Hex color'
             )
