@@ -118,18 +118,26 @@ Describe 'Link' -Tag 'Link' {
     }
 
     It 'Should support directional property to property binding with explicit kinds' {
-        $label = [System.Windows.Controls.Label]::new()
-        $label.IsEnabled = $false
+        InModuleScope WPF {
+            Mock -CommandName Get-WPFWindow -MockWith {
+                throw 'Property-only links must not resolve a window context.'
+            }
 
-        Link IsEnabled -To IsHitTestVisible -FromKind Property -ToKind Property -InputObject $label
+            $label = [System.Windows.Controls.Label]::new()
+            $label.IsEnabled = $false
 
-        $binding = [System.Windows.Data.BindingOperations]::GetBinding($label, [System.Windows.UIElement]::IsHitTestVisibleProperty)
-        $binding | Should -Not -Be $null
-        $binding.Path.Path | Should -Be 'IsEnabled'
-        $binding.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::Self)
+            Link IsEnabled -To IsHitTestVisible -FromKind Property -ToKind Property -InputObject $label
 
-        $label.IsEnabled = $true
-        $label.IsHitTestVisible | Should -BeTrue
+            $binding = [System.Windows.Data.BindingOperations]::GetBinding($label, [System.Windows.UIElement]::IsHitTestVisibleProperty)
+            $binding | Should -Not -Be $null
+            $binding.Path.Path | Should -Be 'IsEnabled'
+            $binding.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::Self)
+
+            $label.IsEnabled = $true
+            $label.IsHitTestVisible | Should -BeTrue
+
+            Should -Invoke -CommandName Get-WPFWindow -Times 0 -Exactly
+        }
     }
 
     It 'Should support directional property to state binding' {

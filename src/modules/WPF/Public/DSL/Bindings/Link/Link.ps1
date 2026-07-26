@@ -54,16 +54,22 @@ function Link {
 			$PSCmdlet.GetVariableValue('this')
 		}
 
-		$Window = Get-WPFWindow
-		if ($null -eq $Window -or [string]::IsNullOrWhiteSpace($Window.Name)) {
-			Write-Error 'Link: Unable to resolve the current window context for directional mode.'
-			return
+		$SourcePropertyExists = Test-WPFLinkMember -InputObject $CurrentInputObject -MemberName $From
+		$TargetPropertyExists = Test-WPFLinkMember -InputObject $CurrentInputObject -MemberName $To
+		$Window = $null
+		$State = $null
+
+		if ($FromKind -ne 'Property' -or $ToKind -ne 'Property') {
+			$Window = Get-WPFWindow
+			if ($null -eq $Window -or [string]::IsNullOrWhiteSpace($Window.Name)) {
+				Write-Error 'Link: Unable to resolve the current window context for directional mode.'
+				return
+			}
+
+			$State = $Window.Tag
 		}
 
-		$State = $Window.Tag
-		$SourcePropertyExists = Test-WPFLinkMember -InputObject $CurrentInputObject -MemberName $From
 		$SourceStateExists = Test-WPFLinkMember -InputObject $State -MemberName $From
-		$TargetPropertyExists = Test-WPFLinkMember -InputObject $CurrentInputObject -MemberName $To
 		$TargetStateExists = Test-WPFLinkMember -InputObject $State -MemberName $To
 
 		$ResolvedSourceKind = Resolve-WPFLinkEndpointKind `

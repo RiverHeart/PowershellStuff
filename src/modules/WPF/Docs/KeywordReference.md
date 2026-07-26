@@ -807,6 +807,7 @@ Directional support in current version:
 - `State -> State`: supported (one-way)
 
 For directional `Property -> Property`, `-Map`, `-Transform`, `-Default`, `-StrictMap`, and `-Invert` are not yet supported.
+When both endpoint kinds are explicitly `Property`, `Link` uses only `-InputObject` (or the current `$this`) and does not require a window or State context.
 For directional `Property -> State`, `-Transform`, `-Map`, `-Default`, and `-StrictMap` are supported.
 For directional `Property -> State`, `-Map` and `-Transform` are mutually exclusive, and `-Default`/`-StrictMap` require `-Map`.
 For directional `Property -> State`, `-Invert` is supported and is applied before `-Map`/`-Transform`.
