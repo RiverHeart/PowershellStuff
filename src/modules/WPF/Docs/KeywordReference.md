@@ -781,6 +781,32 @@ Unified binding sugar that delegates to existing binding keywords.
 
 Directionality contract: Link applies values in one direction only (source -> target) to reduce ambiguity.
 
+Canonical directional form:
+
+```powershell
+Link <Source> -To <Target>
+```
+
+Examples:
+
+```powershell
+Link IsFileLoaded -To IsEnabled
+Link Text -To SearchQuery
+```
+
+Directional support in current version:
+
+- `State -> Property`: supported
+- `Property -> Property`: supported
+- `Property -> State`: supported
+- `State -> State`: supported (one-way)
+
+For directional `Property -> Property`, `-Map`, `-Transform`, `-Default`, `-StrictMap`, and `-Invert` are not yet supported.
+For directional `Property -> State`, `-Transform`, `-Map`, `-Default`, and `-StrictMap` are supported.
+For directional `Property -> State`, `-Map` and `-Transform` are mutually exclusive, and `-Default`/`-StrictMap` require `-Map`.
+For directional `Property -> State`, `-Invert` is supported and is applied before `-Map`/`-Transform`.
+For directional `State -> State`, source and target must be different state properties.
+
 Use `-FromState` for state-style binding (delegates to `Bind`):
 
 ```powershell
@@ -817,25 +843,13 @@ Link Content -FromState FigureDrawingPreset -Map @{
 } -Default 'Custom'
 ```
 
-Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
+`-FromState` remains supported for explicit state-style binding:
 
 ```powershell
-Link Text -Property Count
-Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
+Link Visibility -FromState IsFullScreen -Invert
 ```
 
-When choosing between the two modes:
-
-- Prefer `-FromState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
-- `-FromState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
-- Prefer `-Property` for regular WPF binding paths and custom sources (`-Self`, `-ElementName`, `-Source`, `-TemplatedParent`).
-- In `-Property` mode with no explicit source selector, binding uses inherited `DataContext`.
-
-`-Path` is supported as an alias for `-Property`:
-
-```powershell
-Link Text -Path CurrentFile.Name
-```
+For regular WPF binding paths and custom source selectors, use `BindProperty` directly.
 
 Use `-AsBinding` for advanced trigger/template scenarios (delegates to `Binding`):
 
