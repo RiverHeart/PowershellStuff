@@ -87,7 +87,7 @@ App 'Window' {
 
     Menu 'Menu' {
         $this.Height = 25
-        Link Visibility -ToState IsFullScreen -Invert
+        Link IsFullScreen -To Visibility -Invert
 
         MenuItem '(F)ile/(O)pen' {
             Command 'Open' {
@@ -138,7 +138,7 @@ App 'Window' {
         StackPanel 'ButtonPanel' {
             $this.Orientation = [Orientation]::Horizontal
             $this.HorizontalAlignment = [HorizontalAlignment]::Center
-            Link Visibility -ToState IsFullScreen -Invert
+            Link IsFullScreen -To Visibility -Invert
 
             Button 'BackButton' {
                 Bind IsEnabled -To Window.Tag.IsFileLoaded
@@ -153,7 +153,7 @@ App 'Window' {
     }
 
     StatusBar {
-        Link Visibility -ToState IsFullScreen -Invert
+        Link IsFullScreen -To Visibility -Invert
 
         StatusBarItem 'StatusFileItem' {
             Dock Left
@@ -321,5 +321,6 @@ I always knew that there were WPF PowerShell modules out there but I didn't thin
 - [Release Readiness Checklist](./Docs/ReleaseReadinessChecklist.md)
 - [Repository Migration Plan](./Docs/RepositoryMigrationPlan.md)
 - [Development Log](./Docs/DevLog/2026-05.md)
+- [RFC: Link Scriptblock Endpoints (Deferred)](./Docs/rfc/RFC-006-Link-Scriptblock-Endpoints.md)
 - [Examples](./Examples)
 - [DSL Development Resources](./Docs/DSLDevelopmentResources.md)

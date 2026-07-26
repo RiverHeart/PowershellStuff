@@ -779,16 +779,60 @@ Bind IsEnabled -To Window.Tag.IsFileLoaded
 
 Unified binding sugar that delegates to existing binding keywords.
 
-Use `-ToState` for state-style binding (delegates to `Bind`):
+`Link` is the only public command in its implementation group. Endpoint
+resolution, value conversion, and route-specific connectors are internal and
+are not exported as DSL keywords.
+
+Directionality contract: Link applies values in one direction only (source -> target) to reduce ambiguity.
+
+Canonical directional form:
 
 ```powershell
-Link Visibility -ToState IsFullScreen -Invert
+Link <Source> -To <Target>
+```
+
+Examples:
+
+```powershell
+Link IsFileLoaded -To IsEnabled
+Link Text -To SearchQuery
+Link Text -To SearchQuery -Sync
+```
+
+Directional support in current version:
+
+- `State -> Property`: supported
+- `Property -> Property`: supported
+- `Property -> State`: supported
+- `State -> State`: supported (one-way)
+
+For directional `Property -> Property`, `-Map`, `-Transform`, `-Default`, `-StrictMap`, and `-Invert` are not yet supported.
+When both endpoint kinds are explicitly `Property`, `Link` uses only `-InputObject` (or the current `$this`) and does not require a window or State context.
+For directional `Property -> State`, `-Transform`, `-Map`, `-Default`, and `-StrictMap` are supported.
+For directional `Property -> State`, `-Map` and `-Transform` are mutually exclusive, and `-Default`/`-StrictMap` require `-Map`.
+For directional `Property -> State`, `-Invert` is supported and is applied before `-Map`/`-Transform`.
+For directional `State -> State`, source and target must be different state properties.
+
+`-Sync` enables two-way synchronization for directional Property and State links:
+
+```powershell
+Link Text -To SearchQuery -Sync
+Link IsEnabled -To IsEnabled -FromKind State -ToKind Property -Sync
+```
+
+`-Sync` is not supported for `Property -> Property` or `State -> State` links.
+`-Sync` cannot be combined with `-Map`, `-Transform`, `-Default`, `-StrictMap`, or `-Invert`.
+
+Use directional state -> property binding:
+
+```powershell
+Link IsFullScreen -To Visibility -Invert
 ```
 
 Map state values without writing a converter block:
 
 ```powershell
-Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+Link IsCopyFeedbackActive -To ToolTip -Map @{
     $true  = 'Copied to clipboard'
     $false = 'Copy image to clipboard'
 }
@@ -798,7 +842,7 @@ Map entries should be final values/objects, not deferred scriptblocks. For
 control content values, evaluate the object at map creation time:
 
 ```powershell
-Link Content -ToState IsCopyFeedbackActive -Map @{
+Link IsCopyFeedbackActive -To Content -Map @{
     $true  = (Path 'images/clipboard-check-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
     $false = (Path 'images/clipboard-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
 }
@@ -808,37 +852,20 @@ Link Content -ToState IsCopyFeedbackActive -Map @{
 `-Default` for unmatched values:
 
 ```powershell
-Link Content -ToState FigureDrawingPreset -Map @{
+Link FigureDrawingPreset -To Content -Map @{
     Quick    = '2 min'
     Balanced = '5 min'
     Long     = '10 min'
 } -Default 'Custom'
 ```
 
-Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
+For regular WPF binding paths and custom source selectors, use `BindProperty` directly.
+
+Use `Binding` directly when an advanced API requires a binding object, such as
+a trigger, template, or data-grid column:
 
 ```powershell
-Link Text -Property Count
-Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
-```
-
-When choosing between the two modes:
-
-- Prefer `-ToState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
-- `-ToState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
-- Prefer `-Property` for regular WPF binding paths and custom sources (`-Self`, `-ElementName`, `-Source`, `-TemplatedParent`).
-- In `-Property` mode with no explicit source selector, binding uses inherited `DataContext`.
-
-`-Path` is supported as an alias for `-Property`:
-
-```powershell
-Link Text -Path CurrentFile.Name
-```
-
-Use `-AsBinding` for advanced trigger/template scenarios (delegates to `Binding`):
-
-```powershell
-$binding = Link -AsBinding -Property IsEnabled -Self
+$binding = Binding 'IsEnabled' -Self
 ```
 
 ### BindProperty
