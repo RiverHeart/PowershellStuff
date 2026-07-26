@@ -779,6 +779,10 @@ Bind IsEnabled -To Window.Tag.IsFileLoaded
 
 Unified binding sugar that delegates to existing binding keywords.
 
+`Link` is the only public command in its implementation group. Endpoint
+resolution, value conversion, and route-specific connectors are internal and
+are not exported as DSL keywords.
+
 Directionality contract: Link applies values in one direction only (source -> target) to reduce ambiguity.
 
 Canonical directional form:
@@ -856,10 +860,11 @@ Link FigureDrawingPreset -To Content -Map @{
 
 For regular WPF binding paths and custom source selectors, use `BindProperty` directly.
 
-Use `-AsBinding` for advanced trigger/template scenarios (delegates to `Binding`):
+Use `Binding` directly when an advanced API requires a binding object, such as
+a trigger, template, or data-grid column:
 
 ```powershell
-$binding = Link -AsBinding -Property IsEnabled -Self
+$binding = Binding 'IsEnabled' -Self
 ```
 
 ### BindProperty

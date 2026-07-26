@@ -6,6 +6,24 @@ Describe 'Link' -Tag 'Link' {
     It 'Should export Link' {
         $command = Get-Command -Name Link -Module WPF -ErrorAction Stop
         $command | Should -Not -Be $null
+        $command.Parameters.ContainsKey('AsBinding') | Should -BeFalse
+    }
+
+    It 'Should not export Link-specific implementation commands' {
+        $InternalCommands = @(
+            'Connect-WPFLinkPropertyToProperty'
+            'Connect-WPFLinkPropertyToState'
+            'Connect-WPFLinkStateToProperty'
+            'Connect-WPFLinkStateToState'
+            'Get-WPFLinkValueOptionError'
+            'New-WPFLinkValueConverter'
+            'Resolve-WPFLinkEndpointKind'
+            'Test-WPFLinkMember'
+        )
+
+        foreach ($CommandName in $InternalCommands) {
+            Get-Command -Name $CommandName -ErrorAction SilentlyContinue | Should -Be $null
+        }
     }
 
     It 'Should support directional syntax for state to property binding' {
@@ -575,7 +593,7 @@ Describe 'Link' -Tag 'Link' {
                     Link IsReady -To Content -Map @{
                         $true  = { 'Ready' }
                         $false = 'Not Ready'
-                    }
+                    } -WarningAction Continue
                 }
             }
         } 3>&1
@@ -692,12 +710,4 @@ Describe 'Link' -Tag 'Link' {
         ($errors | Out-String) | Should -Match 'cannot be combined'
     }
 
-    It 'Should return a Binding object in -AsBinding mode' {
-        $binding = Link -AsBinding -Property IsEnabled -Self
-
-        $binding | Should -Not -Be $null
-        $binding | Should -BeOfType ([System.Windows.Data.Binding])
-        $binding.Path.Path | Should -Be 'IsEnabled'
-        $binding.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::Self)
-    }
 }

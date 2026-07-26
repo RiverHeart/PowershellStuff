@@ -1,7 +1,7 @@
 # Feature Proposal: Link Keyword Contract (v1)
 
 ## Summary
-Introduce `Link` as a single entrypoint keyword for binding scenarios. `Link` is syntax sugar only and delegates to existing binding primitives (`Bind`, `BindProperty`, and optionally `Binding` for advanced output-oriented scenarios). The canonical user-facing shape is source-to-target directional syntax.
+Introduce `Link` as a single entrypoint keyword for directional binding scenarios. `Link` is syntax sugar only and delegates to existing binding primitives (`Bind` and `BindProperty`). The canonical user-facing shape is source-to-target directional syntax.
 
 ## Problem
 The current surface area exposes multiple concepts (`State`, `Bind`, `BindProperty`, `Binding`) that are each valid but increase cognitive load for common scenarios. New users are expected to struggle deciding which keyword to use.
@@ -32,23 +32,19 @@ appropriate primitive.
 Link <Source> -To <Target> [-FromKind Property|State] [-ToKind Property|State]
 ```
 
-### Advanced binding object mode
+### Binding object construction
 
-optional in v1; can defer
+`Link` does not construct or return binding objects. Advanced APIs such as
+triggers, templates, and data-grid columns use the existing `Binding` keyword
+directly:
 
-**Shape:**
+```powershell
+Binding 'IsEnabled' -TemplatedParent
 ```
-Link -AsBinding -Property <SourcePropertyOrPath> [source selector params] [-ScriptBlock <scriptblock>]
-```
-
-**Semantics:**
-* Returns a `System.Windows.Data.Binding` (delegates to `Binding`).
-* Intended for advanced APIs such as triggers/templates.
 
 **Dispatch Rules (Deterministic)**
-1. If `-AsBinding` is supplied, dispatch to `Binding`.
-2. Else use directional endpoint resolution and dispatch to `Bind` or `BindProperty`.
-3. Error on mixed-mode combinations and ambiguous endpoint resolution without explicit kinds.
+1. Use directional endpoint resolution and dispatch to `Bind` or `BindProperty`.
+2. Error on ambiguous endpoint resolution without explicit kinds.
 
 **Examples**
 
@@ -71,9 +67,6 @@ Link Text -To SearchQuery
 
 ## Testing Requirements
 
-**Dispatch tests:**
-* `-AsBinding` returns `Binding` result (if included in v1).
-
 **Directional tests:**
 * Endpoint resolution works for Property and State endpoints.
 * Ambiguous endpoint names require explicit `-FromKind`/`-ToKind`.
@@ -89,6 +82,9 @@ Link Text -To SearchQuery
 3. Keep examples in both styles during transition.
 
 ## Open Decisions
-* Include `-AsBinding` in v1 or defer to v1.1.
 * Whether to include convenience map operators (`-Map`, `-Invert`) in all directional pairings or only selected ones.
 * `-Sync` and update-trigger follow-on behavior is tracked in `RFC-004-Link-SourceTarget-Direction.md`.
+
+## Resolved Decisions
+* `-AsBinding` is excluded from `Link`. Binding-object construction has a
+	different return contract and remains the responsibility of `Binding`.
