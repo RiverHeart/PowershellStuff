@@ -1,7 +1,7 @@
 # Feature Draft: Link Source->Target Direction and Inference
 
 ## Status
-Draft
+Accepted
 
 ## Why this exists
 Current Link usage can still feel ambiguous when users are thinking in natural language rather than binding internals.
@@ -50,26 +50,43 @@ Link Text -To SearchQuery -FromKind Property -ToKind State
 ## Validation rules
 
 1. `-FromKind` and `-ToKind` must be one of `Property` or `State`.
-2. Error if source and target resolve to the same endpoint and sync is requested.
+2. Error if source and target resolve to unsupported endpoint pairing for sync.
 3. Error if source endpoint is not readable.
 4. Error if target endpoint is not writable.
 5. Error messages must include the unresolved or ambiguous endpoint name.
 
-## Sync and update trigger (follow-up)
+## Sync and update trigger
 
-This draft scopes direction and inference first. Optional follow-up flags:
+One-way remains the default behavior:
 
-- `-Sync`
-- `-UpdateTrigger PropertyChanged|LostFocus|Explicit`
+```powershell
+Link <Source> -To <Target>
+```
 
-Follow-up should only be enabled once one-way inference behavior is stable.
+`-Sync` enables two-way synchronization only for directional Property and State links:
+
+```powershell
+Link Text -To SearchQuery -Sync
+Link IsEnabled -To IsEnabled -FromKind State -ToKind Property -Sync
+```
+
+In v1, `-Sync` is intentionally constrained:
+
+- Supported pairings: `Property -> State` and `State -> Property`
+- Not supported: `Property -> Property`, `State -> State`
+- Not supported with `-Sync`: `-Map`, `-Transform`, `-Default`, `-StrictMap`, `-Invert`
+
+`-UpdateTrigger PropertyChanged|LostFocus|Explicit` remains a follow-up.
+
+Scriptblock endpoint escape hatch discussion is tracked in `RFC-006-Link-Scriptblock-Endpoints.md`.
+
 
 ## Backward-compat rollout
 
-1. Keep current Link forms working while introducing canonical `Link <Source> -To <Target>`.
-2. Publish docs with canonical form first; mark legacy forms as compatibility syntax.
-3. Add warnings for legacy forms in a later phase if desired.
-4. Remove legacy forms only when project is ready for breaking changes.
+1. Introduce canonical `Link <Source> -To <Target>`.
+2. Publish docs with canonical form first.
+3. Keep one-way as default and adopt opt-in `-Sync` for supported pairings.
+4. Treat unsupported legacy forms as breaking changes in this experimental DSL.
 
 ## Implementation checklist
 
@@ -77,10 +94,10 @@ Follow-up should only be enabled once one-way inference behavior is stable.
 2. Add optional `-FromKind` and `-ToKind` kind hints.
 3. Implement endpoint resolver helper for property/state lookup.
 4. Implement ambiguity and not-found error messages.
-5. Keep existing parameter sets functional during migration.
-6. Update Link help examples to canonical shape.
-7. Update Keyword Reference examples to canonical shape.
-8. Add migration section old->new examples.
+5. Add `-Sync` for Property/State directional links.
+6. Validate unsupported `-Sync` pairings and disallowed transform/map flags.
+7. Update Link help examples to canonical shape.
+8. Update Keyword Reference examples to canonical shape.
 
 ## Test-first plan
 
@@ -105,12 +122,13 @@ Follow-up should only be enabled once one-way inference behavior is stable.
 4. `Link <State> -To <State>` supports one-way state mirroring.
 5. Error text is actionable for ambiguity.
 6. Error text is actionable for not found endpoints.
+7. `-Sync` enables two-way updates for Property/State pairings.
+8. `-Sync` rejects `Property <-> Property` and `State <-> State`.
+9. `-Sync` rejects `-Map`, `-Transform`, `-Default`, `-StrictMap`, and `-Invert`.
 
 ### Migration tests
 
-1. Existing `-FromState` syntax still works during migration.
-2. Existing `-Property` syntax still works during migration.
-3. Canonical syntax and legacy syntax produce equivalent behavior where applicable.
+1. Canonical syntax is the primary and documented shape.
 
 ## Documentation note
 

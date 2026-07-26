@@ -5,9 +5,8 @@
 .DESCRIPTION
     Link is a thin wrapper that delegates to existing binding primitives:
 
-    1) State mode: delegates to Bind
-    2) Directional mode: resolves endpoints and delegates to Bind/BindProperty
-    3) AsBinding mode: delegates to Binding and returns a Binding object
+    1) Directional mode: resolves endpoints and delegates to Bind/BindProperty
+    2) AsBinding mode: delegates to Binding and returns a Binding object
 
     Directionality contract: Link always applies values in one direction,
     from source to target. This avoids ambiguous interpretations where both
@@ -17,10 +16,10 @@
     Link <Source> -To <Target>
 
 .EXAMPLE
-    Link Visibility -FromState IsFullScreen -Invert
+    Link IsFullScreen -To Visibility -Invert
 
 .EXAMPLE
-    Link ToolTip -FromState IsCopyFeedbackActive -Map @{
+    Link IsCopyFeedbackActive -To ToolTip -Map @{
         $true  = 'Copied to clipboard'
         $false = 'Copy image to clipboard'
     }
@@ -35,6 +34,10 @@
 .EXAMPLE
     # Property -> State directional form
     Link Text -To SearchQuery
+
+.EXAMPLE
+    # Two-way Property <-> State sync
+    Link Text -To SearchQuery -Sync
 #>
 function Link {
     [CmdletBinding(DefaultParameterSetName = 'Directional')]
@@ -56,40 +59,29 @@ function Link {
         [ValidateSet('Property', 'State')]
         [string] $ToKind,
 
-        [Parameter(Mandatory, Position = 0, ParameterSetName = 'State')]
-        [ValidateNotNullOrEmpty()]
-        [string] $TargetProperty,
-
-        [Parameter(Mandatory, ParameterSetName = 'State')]
-        [ValidateNotNullOrEmpty()]
-        [ArgumentCompleter({ Complete-WPFState @args })]
-        [string] $FromState,
-
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'AsBinding')]
         [Alias('Path')]
         [ValidateNotNullOrEmpty()]
         [string] $Property,
 
-        [Parameter(ParameterSetName = 'State')]
         [Parameter(ParameterSetName = 'Directional')]
         [scriptblock] $Transform,
 
-        [Parameter(ParameterSetName = 'State')]
         [Parameter(ParameterSetName = 'Directional')]
         [hashtable] $Map,
 
-        [Parameter(ParameterSetName = 'State')]
         [Parameter(ParameterSetName = 'Directional')]
         [AllowNull()]
         [object] $Default,
 
-        [Parameter(ParameterSetName = 'State')]
         [Parameter(ParameterSetName = 'Directional')]
         [switch] $StrictMap,
 
-        [Parameter(ParameterSetName = 'State')]
         [Parameter(ParameterSetName = 'Directional')]
         [switch] $Invert,
+
+        [Parameter(ParameterSetName = 'Directional')]
+        [switch] $Sync,
 
         [Parameter(ParameterSetName = 'AsBinding')]
         [switch] $Self,
@@ -108,7 +100,6 @@ function Link {
         [Parameter(ParameterSetName = 'AsBinding')]
         [scriptblock] $ScriptBlock,
 
-        [Parameter(ParameterSetName = 'State')]
         [Parameter(ParameterSetName = 'Directional')]
         [object] $InputObject,
 
@@ -336,6 +327,137 @@ function Link {
             $ResolvedStateObject.AddBinding($ResolvedSourceState, $StateCallback)
         }.GetNewClosure()
 
+        $InvokePropertyToState = {
+            param(
+                [string] $ResolvedSourceProperty,
+                [string] $ResolvedTargetState,
+                [object] $ResolvedState,
+                [bool] $AllowTransforms
+            )
+
+            $LocalHasMapParameter = $HasMapParameter
+            $LocalHasDefaultParameter = $HasDefaultParameter
+            $LocalHasTransformParameter = $HasTransformParameter
+            $LocalUseStrictMap = [bool] $StrictMap
+            $LocalUseInvert = [bool] $Invert
+            $LocalMap = $Map
+            $LocalDefault = $Default
+            $LocalTransform = $Transform
+
+            if (-not $AllowTransforms -and
+                ($LocalHasMapParameter -or
+                    $LocalHasTransformParameter -or
+                    $LocalHasDefaultParameter -or
+                    $LocalUseStrictMap -or
+                    $LocalUseInvert)) {
+                throw 'Link: -Sync does not support -Map, -Transform, -Default, -StrictMap, or -Invert.'
+            }
+
+            if ($AllowTransforms -and $LocalHasMapParameter -and $LocalHasTransformParameter) {
+                throw 'Link: Specify either -Map or -Transform in directional Property -> State mode, not both.'
+            }
+
+            if ($AllowTransforms -and -not $LocalHasMapParameter -and ($LocalHasDefaultParameter -or $LocalUseStrictMap)) {
+                throw 'Link: -Default and -StrictMap require -Map in directional Property -> State mode.'
+            }
+
+            if ($AllowTransforms -and $LocalHasDefaultParameter -and $LocalUseStrictMap) {
+                throw 'Link: -Default and -StrictMap cannot be combined in directional Property -> State mode.'
+            }
+
+            $UseStrictMap = $LocalUseStrictMap
+            $UseDefaultMapValue = $LocalHasDefaultParameter
+            $DefaultMapValue = $LocalDefault
+
+            if ($AllowTransforms -and $LocalHasMapParameter) {
+                $ScriptBlockMapKeys = @()
+                foreach ($MapKey in $LocalMap.Keys) {
+                    if ($LocalMap[$MapKey] -is [scriptblock]) {
+                        $ScriptBlockMapKeys += [string] $MapKey
+                    }
+                }
+
+                if ($ScriptBlockMapKeys.Count -gt 0) {
+                    $ScriptBlockMapKeyList = $ScriptBlockMapKeys -join ', '
+                    Write-Warning "Link: -Map contains scriptblock value(s) for key(s): $ScriptBlockMapKeyList. Use evaluated values/objects in -Map (for example, wrap Path calls in parentheses)."
+                }
+            }
+
+            $DirectionalValueConverter = if ($AllowTransforms) {
+                {
+                    param($Value)
+
+                    $FinalValue = $Value
+
+                    if ($LocalUseInvert) {
+                        $FinalValue = -not $FinalValue
+                    }
+
+                    if ($LocalHasMapParameter) {
+                        if ($LocalMap.Contains($FinalValue)) {
+                            return $LocalMap[$FinalValue]
+                        }
+
+                        if ($FinalValue -is [bool]) {
+                            $BoolKeyText = if ($FinalValue) { 'True' } else { 'False' }
+                            if ($LocalMap.Contains($BoolKeyText)) {
+                                return $LocalMap[$BoolKeyText]
+                            }
+                        }
+
+                        if ($UseDefaultMapValue) {
+                            return $DefaultMapValue
+                        }
+
+                        if ($UseStrictMap) {
+                            throw "Link: -Map has no entry for source value '$FinalValue'."
+                        }
+
+                        return $FinalValue
+                    }
+
+                    if ($LocalHasTransformParameter) {
+                        $TransformScript = $LocalTransform
+                        $HasParams = $TransformScript.Ast.ParamBlock -and $TransformScript.Ast.ParamBlock.Parameters.Count -gt 0
+                        if ($HasParams) {
+                            return (& $TransformScript $FinalValue)
+                        }
+
+                        $PSVars = [System.Collections.Generic.List[psvariable]]::new()
+                        $PSVars.Add([psvariable]::new('_', $FinalValue))
+                        $PSVars.Add([psvariable]::new('PSItem', $FinalValue))
+                        $results = $TransformScript.InvokeWithContext($null, $PSVars)
+                        if ($results.Count -gt 0) {
+                            return $results[0]
+                        }
+                    }
+
+                    return $FinalValue
+                }.GetNewClosure()
+            } else {
+                {
+                    param($Value)
+                    return $Value
+                }.GetNewClosure()
+            }
+
+            $DirectionalScriptBlock = {
+                $this.Mode = [System.Windows.Data.BindingMode]::OneWayToSource
+                $this.UpdateSourceTrigger = [System.Windows.Data.UpdateSourceTrigger]::PropertyChanged
+                $this.Converter = New-WPFValueConverter $DirectionalValueConverter $DirectionalValueConverter
+            }
+
+            $BindPropertyParams = @{
+                Property    = $ResolvedSourceProperty
+                Path        = $ResolvedTargetState
+                Source      = $ResolvedState
+                InputObject = $CurrentInputObject
+                ScriptBlock = $DirectionalScriptBlock
+            }
+
+            BindProperty @BindPropertyParams
+        }.GetNewClosure()
+
         $TestMemberExists = {
             param(
                 [object] $InputObject,
@@ -440,6 +562,39 @@ function Link {
                     return
                 }
 
+                if ($Sync) {
+                    if ($ResolvedSourceKind -eq 'State' -and $ResolvedTargetKind -eq 'Property') {
+                        # OneWayToSource initialization can push target's current value into state immediately.
+                        # Capture source state first so we can re-assert source precedence for State -> Property sync.
+                        $InitialSourceValue = $null
+                        if ($State.PSObject.Methods['GetValue']) {
+                            $InitialSourceValue = $State.GetValue($From)
+                        } else {
+                            $InitialSourceValue = $State.$From
+                        }
+
+                        & $InvokePropertyToState -ResolvedSourceProperty $To -ResolvedTargetState $From -ResolvedState $State -AllowTransforms $false
+                        & $InvokeStateToProperty -ResolvedTargetProperty $To -ResolvedSourceState $From
+
+                        # Restore the original source value after reverse wiring to prevent startup backflow overwrite.
+                        if ($State.PSObject.Methods['SetValue']) {
+                            $State.SetValue($From, $InitialSourceValue)
+                        } else {
+                            $State.$From = $InitialSourceValue
+                        }
+                        break
+                    }
+
+                    if ($ResolvedSourceKind -eq 'Property' -and $ResolvedTargetKind -eq 'State') {
+                        & $InvokePropertyToState -ResolvedSourceProperty $From -ResolvedTargetState $To -ResolvedState $State -AllowTransforms $false
+                        & $InvokeStateToProperty -ResolvedTargetProperty $From -ResolvedSourceState $To
+                        break
+                    }
+
+                    Write-Error 'Link: -Sync is only supported for Property and State directional links.'
+                    return
+                }
+
                 if ($ResolvedSourceKind -eq 'State' -and $ResolvedTargetKind -eq 'Property') {
                     & $InvokeStateToProperty -ResolvedTargetProperty $To -ResolvedSourceState $From
                     break
@@ -467,105 +622,7 @@ function Link {
                 }
 
                 if ($ResolvedSourceKind -eq 'Property' -and $ResolvedTargetKind -eq 'State') {
-                    if ($HasMapParameter -and $HasTransformParameter) {
-                        Write-Error 'Link: Specify either -Map or -Transform in directional Property -> State mode, not both.'
-                        return
-                    }
-
-                    if (-not $HasMapParameter -and ($PSBoundParameters.ContainsKey('Default') -or $PSBoundParameters.ContainsKey('StrictMap'))) {
-                        Write-Error 'Link: -Default and -StrictMap require -Map in directional Property -> State mode.'
-                        return
-                    }
-
-                    if ($PSBoundParameters.ContainsKey('Default') -and $PSBoundParameters.ContainsKey('StrictMap')) {
-                        Write-Error 'Link: -Default and -StrictMap cannot be combined in directional Property -> State mode.'
-                        return
-                    }
-
-                    $UseStrictMap = [bool] $StrictMap
-                    $UseDefaultMapValue = $PSBoundParameters.ContainsKey('Default')
-                    $DefaultMapValue = $Default
-
-                    if ($HasMapParameter) {
-                        $ScriptBlockMapKeys = @()
-                        foreach ($MapKey in $Map.Keys) {
-                            if ($Map[$MapKey] -is [scriptblock]) {
-                                $ScriptBlockMapKeys += [string] $MapKey
-                            }
-                        }
-
-                        if ($ScriptBlockMapKeys.Count -gt 0) {
-                            $ScriptBlockMapKeyList = $ScriptBlockMapKeys -join ', '
-                            Write-Warning "Link: -Map contains scriptblock value(s) for key(s): $ScriptBlockMapKeyList. Use evaluated values/objects in -Map (for example, wrap Path calls in parentheses)."
-                        }
-                    }
-
-                    $DirectionalValueConverter = {
-                        param($Value)
-
-                        $FinalValue = $Value
-
-                        if ($Invert) {
-                            $FinalValue = -not $FinalValue
-                        }
-
-                        if ($HasMapParameter) {
-                            if ($Map.Contains($FinalValue)) {
-                                return $Map[$FinalValue]
-                            }
-
-                            if ($FinalValue -is [bool]) {
-                                $BoolKeyText = if ($FinalValue) { 'True' } else { 'False' }
-                                if ($Map.Contains($BoolKeyText)) {
-                                    return $Map[$BoolKeyText]
-                                }
-                            }
-
-                            if ($UseDefaultMapValue) {
-                                return $DefaultMapValue
-                            }
-
-                            if ($UseStrictMap) {
-                                throw "Link: -Map has no entry for source value '$FinalValue'."
-                            }
-
-                            return $FinalValue
-                        }
-
-                        if ($HasTransformParameter) {
-                            $TransformScript = $Transform
-                            $HasParams = $TransformScript.Ast.ParamBlock -and $TransformScript.Ast.ParamBlock.Parameters.Count -gt 0
-                            if ($HasParams) {
-                                return (& $TransformScript $FinalValue)
-                            }
-
-                            $PSVars = [System.Collections.Generic.List[psvariable]]::new()
-                            $PSVars.Add([psvariable]::new('_', $FinalValue))
-                            $PSVars.Add([psvariable]::new('PSItem', $FinalValue))
-                            $results = $TransformScript.InvokeWithContext($null, $PSVars)
-                            if ($results.Count -gt 0) {
-                                return $results[0]
-                            }
-                        }
-
-                        return $FinalValue
-                    }.GetNewClosure()
-
-                    $DirectionalScriptBlock = {
-                        $this.Mode = [System.Windows.Data.BindingMode]::OneWayToSource
-                        $this.UpdateSourceTrigger = [System.Windows.Data.UpdateSourceTrigger]::PropertyChanged
-                        $this.Converter = New-WPFValueConverter $DirectionalValueConverter $DirectionalValueConverter
-                    }
-
-                    $BindPropertyParams = @{
-                        Property    = $From
-                        Path        = $To
-                        Source      = $State
-                        InputObject = $CurrentInputObject
-                        ScriptBlock = $DirectionalScriptBlock
-                    }
-
-                    BindProperty @BindPropertyParams
+                    & $InvokePropertyToState -ResolvedSourceProperty $From -ResolvedTargetState $To -ResolvedState $State -AllowTransforms $true
                     break
                 }
 
@@ -576,10 +633,6 @@ function Link {
 
                 Write-Error "Link: Directional mode does not yet support Source=$ResolvedSourceKind and Target=$ResolvedTargetKind."
                 return
-            }
-            'State' {
-                & $InvokeStateToProperty -ResolvedTargetProperty $TargetProperty -ResolvedSourceState $FromState
-                break
             }
             'AsBinding' {
                 $BindingParams = @{

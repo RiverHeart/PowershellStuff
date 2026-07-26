@@ -138,6 +138,58 @@ Describe 'Link' -Tag 'Link' {
         $window.Tag.SearchQuery | Should -Be 'cats'
     }
 
+    It 'Should support directional Property-to-State sync via -Sync' {
+        $id = [guid]::NewGuid().ToString('N')
+        $windowName = "Window_$id"
+        $textBoxName = "TextBox_$id"
+
+        $null = Window $windowName {
+            $this.Tag = New-WPFObservableState @{
+                SearchQuery = ''
+            }
+
+            TextBox $textBoxName {
+                Link Text -To SearchQuery -Sync
+            }
+        }
+
+        $window = Reference $windowName
+        $textBox = Reference $textBoxName
+
+        $textBox.Text = 'cats'
+        $window.Tag.SearchQuery | Should -Be 'cats'
+
+        $window.Tag.SearchQuery = 'dogs'
+        $textBox.Text | Should -Be 'dogs'
+    }
+
+    It 'Should support directional State-to-Property sync via -Sync' {
+        $id = [guid]::NewGuid().ToString('N')
+        $windowName = "Window_$id"
+        $textBoxName = "TextBox_$id"
+
+        $null = Window $windowName {
+            $this.Tag = New-WPFObservableState @{
+                SearchQuery = 'start'
+            }
+
+            TextBox $textBoxName {
+                Link SearchQuery -To Text -FromKind State -ToKind Property -Sync
+            }
+        }
+
+        $window = Reference $windowName
+        $textBox = Reference $textBoxName
+
+        $textBox.Text | Should -Be 'start'
+
+        $window.Tag.SearchQuery = 'next'
+        $textBox.Text | Should -Be 'next'
+
+        $textBox.Text = 'final'
+        $window.Tag.SearchQuery | Should -Be 'final'
+    }
+
     It 'Should support -Transform for directional property to state binding' {
         $id = [guid]::NewGuid().ToString('N')
         $windowName = "Window_$id"
@@ -318,6 +370,46 @@ Describe 'Link' -Tag 'Link' {
         } | Should -Throw '*cannot be combined*'
     }
 
+    It 'Should reject -Sync for directional property to property links' {
+        {
+            Link IsEnabled -To IsHitTestVisible -FromKind Property -ToKind Property -Sync -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
+        } | Should -Throw '*only supported for Property and State*'
+    }
+
+    It 'Should reject -Sync for directional state to state links' {
+        {
+            $id = [guid]::NewGuid().ToString('N')
+            $windowName = "Window_$id"
+
+            $null = Window $windowName {
+                $this.Tag = New-WPFObservableState @{
+                    SourceValue = 5
+                    MirrorValue = 0
+                }
+
+                Link SourceValue -To MirrorValue -FromKind State -ToKind State -Sync
+            } -ErrorAction Stop
+        } | Should -Throw '*only supported for Property and State*'
+    }
+
+    It 'Should reject -Sync with -Map' {
+        {
+            $id = [guid]::NewGuid().ToString('N')
+            $windowName = "Window_$id"
+            $textBoxName = "TextBox_$id"
+
+            $null = Window $windowName {
+                $this.Tag = New-WPFObservableState @{
+                    SearchQuery = ''
+                }
+
+                TextBox $textBoxName {
+                    Link Text -To SearchQuery -Sync -Map @{ cat = 'feline' }
+                }
+            } -ErrorAction Stop
+        } | Should -Throw '*does not support -Map, -Transform, -Default, -StrictMap, or -Invert*'
+    }
+
     It 'Should support directional state to state one-way propagation' {
         $id = [guid]::NewGuid().ToString('N')
         $windowName = "Window_$id"
@@ -355,7 +447,7 @@ Describe 'Link' -Tag 'Link' {
         ($errors | Out-String) | Should -Match 'distinct endpoints'
     }
 
-    It 'Should delegate state mode to Bind with -FromState' {
+    It 'Should support directional state to property transform mapping' {
         $id = [guid]::NewGuid().ToString('N')
         $windowName = "Window_$id"
         $labelName = "Label_$id"
@@ -366,7 +458,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -FromState IsReady -Transform {
+                Link IsReady -To Content -Transform {
                     if ($_) { 'Ready' } else { 'Not Ready' }
                 }
             }
@@ -392,7 +484,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -FromState IsReady -Map @{
+                Link IsReady -To Content -Map @{
                     $true  = 'Ready'
                     $false = 'Not Ready'
                 }
@@ -419,7 +511,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -FromState IsReady -Map @{
+                Link IsReady -To Content -Map @{
                     True  = 'Ready'
                     False = 'Not Ready'
                 }
@@ -452,7 +544,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -FromState IsReady -Map @{
+                Link IsReady -To Content -Map @{
                     $true  = $activeContent
                     $false = $inactiveContent
                 }
@@ -480,7 +572,7 @@ Describe 'Link' -Tag 'Link' {
                 }
 
                 Label $labelName {
-                    Link Content -FromState IsReady -Map @{
+                    Link IsReady -To Content -Map @{
                         $true  = { 'Ready' }
                         $false = 'Not Ready'
                     }
@@ -507,7 +599,7 @@ Describe 'Link' -Tag 'Link' {
             }
 
             Label $labelName {
-                Link Content -FromState Mode -Map @{
+                Link Mode -To Content -Map @{
                     Ready = 'Ready'
                     Busy  = 'Busy'
                 } -Default 'Fallback'
@@ -532,7 +624,7 @@ Describe 'Link' -Tag 'Link' {
                 }
 
                 Label $labelName {
-                    Link Content -FromState Mode -Map @{
+                    Link Mode -To Content -Map @{
                         Ready = 'Ready'
                     } -StrictMap
                 }
@@ -540,34 +632,64 @@ Describe 'Link' -Tag 'Link' {
         } | Should -Throw
     }
 
-    It 'Should reject combining -Map with -Transform in state mode' {
-        {
-            $null = Link Content -FromState IsReady -Map @{ $true = 'Ready' } -Transform { 'x' } -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
-        } | Should -Throw
+    It 'Should reject combining -Map with -Transform for directional state to property binding' {
+        $errors = & {
+            $id = [guid]::NewGuid().ToString('N')
+            $windowName = "Window_$id"
+            $labelName = "Label_$id"
+
+            $null = Window $windowName {
+                $this.Tag = New-WPFObservableState @{
+                    IsReady = $false
+                }
+
+                Label $labelName {
+                    Link IsReady -To Content -Map @{ $true = 'Ready' } -Transform { 'x' }
+                }
+            } -ErrorAction Stop
+        } 2>&1
+
+        ($errors | Out-String) | Should -Match 'either -Map or -Transform'
     }
 
-    It 'Should reject -Default without -Map in state mode' {
-        {
-            $null = Link Content -FromState IsReady -Default 'Fallback' -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
-        } | Should -Throw
+    It 'Should reject -Default without -Map for directional state to property binding' {
+        $errors = & {
+            $id = [guid]::NewGuid().ToString('N')
+            $windowName = "Window_$id"
+            $labelName = "Label_$id"
+
+            $null = Window $windowName {
+                $this.Tag = New-WPFObservableState @{
+                    IsReady = $false
+                }
+
+                Label $labelName {
+                    Link IsReady -To Content -Default 'Fallback'
+                }
+            } -ErrorAction Stop
+        } 2>&1
+
+        ($errors | Out-String) | Should -Match '-Default and -StrictMap require -Map'
     }
 
-    It 'Should reject combining -Default with -StrictMap in state mode' {
-        {
-            $null = Link Content -FromState IsReady -Map @{ $true = 'Ready' } -Default 'Fallback' -StrictMap -InputObject ([System.Windows.Controls.Label]::new()) -ErrorAction Stop
-        } | Should -Throw
-    }
+    It 'Should reject combining -Default with -StrictMap for directional state to property binding' {
+        $errors = & {
+            $id = [guid]::NewGuid().ToString('N')
+            $windowName = "Window_$id"
+            $labelName = "Label_$id"
 
-    It 'Should reject legacy property mode syntax with -Property' {
-        {
-            Link Text -Property Value -Source ([pscustomobject]@{ Value = 42 }) -InputObject ([System.Windows.Controls.TextBlock]::new()) -ErrorAction Stop
-        } | Should -Throw
-    }
+            $null = Window $windowName {
+                $this.Tag = New-WPFObservableState @{
+                    IsReady = $false
+                }
 
-    It 'Should reject legacy property mode syntax with -Path' {
-        {
-            Link Text -Path Value -Source ([pscustomobject]@{ Value = 7 }) -InputObject ([System.Windows.Controls.TextBlock]::new()) -ErrorAction Stop
-        } | Should -Throw
+                Label $labelName {
+                    Link IsReady -To Content -Map @{ $true = 'Ready' } -Default 'Fallback' -StrictMap
+                }
+            } -ErrorAction Stop
+        } 2>&1
+
+        ($errors | Out-String) | Should -Match 'cannot be combined'
     }
 
     It 'Should return a Binding object in -AsBinding mode' {

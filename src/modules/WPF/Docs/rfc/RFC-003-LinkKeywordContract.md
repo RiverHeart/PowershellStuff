@@ -9,9 +9,7 @@ The current surface area exposes multiple concepts (`State`, `Bind`, `BindProper
 ## Goals
 * Provide one obvious binding entrypoint for most scripts.
 * Keep existing keywords as escape hatches without behavior regressions.
-* Prioritize intent-oriented naming in `Link`:
-* Default source member term: `-Property`
-* Compatibility alias: `-Path`
+* Prioritize directional intent in `Link` with canonical `Link <Source> -To <Target>` syntax.
 * Preserve predictable dispatch rules that are easy to document and test.
 
 ## Non-Goals
@@ -23,19 +21,6 @@ The current surface area exposes multiple concepts (`State`, `Bind`, `BindProper
 `Link` should be sugar, not a new binding engine.
 
 ## Proposed Contract (v1)
-
-### State-style linking
-
-Delegates to `Bind`
-
-**Shape:**
-```
-Link <TargetProperty> -FromState <StatePropertyName> [-Invert] [-Transform <scriptblock>]
-```
-
-### Semantics
-* `-FromState` is resolved against current window/app state (equivalent source as existing `Bind` usage).
-* `-Invert` and `-Transform` preserve current `Bind` semantics.
 
 ### Directional linking
 
@@ -61,17 +46,13 @@ Link -AsBinding -Property <SourcePropertyOrPath> [source selector params] [-Scri
 * Intended for advanced APIs such as triggers/templates.
 
 **Dispatch Rules (Deterministic)**
-1. If `-FromState` is supplied, dispatch to `Bind`.
-2. Else if `-AsBinding` is supplied, dispatch to `Binding`.
-3. Else use directional endpoint resolution and dispatch to `Bind` or `BindProperty`.
-4. Error on mixed-mode combinations and ambiguous endpoint resolution without explicit kinds.
+1. If `-AsBinding` is supplied, dispatch to `Binding`.
+2. Else use directional endpoint resolution and dispatch to `Bind` or `BindProperty`.
+3. Error on mixed-mode combinations and ambiguous endpoint resolution without explicit kinds.
 
 **Examples**
 
 ```powershell
-# State -> target property (Bind)
-Link Visibility -FromState IsFullScreen -Invert
-
 # Directional state -> property
 Link IsFileLoaded -To IsEnabled
 
@@ -91,8 +72,6 @@ Link Text -To SearchQuery
 ## Testing Requirements
 
 **Dispatch tests:**
-* `-FromState` routes to `Bind` behavior.
-* `-Property` with selector routes to `BindProperty` behavior.
 * `-AsBinding` returns `Binding` result (if included in v1).
 
 **Directional tests:**
@@ -111,6 +90,5 @@ Link Text -To SearchQuery
 
 ## Open Decisions
 * Include `-AsBinding` in v1 or defer to v1.1.
-* Whether `-FromState` should accept full dotted path or state-member-only names in v1.
 * Whether to include convenience map operators (`-Map`, `-Invert`) in all directional pairings or only selected ones.
-* Directional source/target canonical syntax draft is tracked in `RFC-004-Link-SourceTarget-Direction.md`.
+* `-Sync` and update-trigger follow-on behavior is tracked in `RFC-004-Link-SourceTarget-Direction.md`.

@@ -792,6 +792,7 @@ Examples:
 ```powershell
 Link IsFileLoaded -To IsEnabled
 Link Text -To SearchQuery
+Link Text -To SearchQuery -Sync
 ```
 
 Directional support in current version:
@@ -807,16 +808,26 @@ For directional `Property -> State`, `-Map` and `-Transform` are mutually exclus
 For directional `Property -> State`, `-Invert` is supported and is applied before `-Map`/`-Transform`.
 For directional `State -> State`, source and target must be different state properties.
 
-Use `-FromState` for state-style binding (delegates to `Bind`):
+`-Sync` enables two-way synchronization for directional Property and State links:
 
 ```powershell
-Link Visibility -FromState IsFullScreen -Invert
+Link Text -To SearchQuery -Sync
+Link IsEnabled -To IsEnabled -FromKind State -ToKind Property -Sync
+```
+
+`-Sync` is not supported for `Property -> Property` or `State -> State` links.
+`-Sync` cannot be combined with `-Map`, `-Transform`, `-Default`, `-StrictMap`, or `-Invert`.
+
+Use directional state -> property binding:
+
+```powershell
+Link IsFullScreen -To Visibility -Invert
 ```
 
 Map state values without writing a converter block:
 
 ```powershell
-Link ToolTip -FromState IsCopyFeedbackActive -Map @{
+Link IsCopyFeedbackActive -To ToolTip -Map @{
     $true  = 'Copied to clipboard'
     $false = 'Copy image to clipboard'
 }
@@ -826,7 +837,7 @@ Map entries should be final values/objects, not deferred scriptblocks. For
 control content values, evaluate the object at map creation time:
 
 ```powershell
-Link Content -FromState IsCopyFeedbackActive -Map @{
+Link IsCopyFeedbackActive -To Content -Map @{
     $true  = (Path 'images/clipboard-check-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
     $false = (Path 'images/clipboard-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
 }
@@ -836,17 +847,11 @@ Link Content -FromState IsCopyFeedbackActive -Map @{
 `-Default` for unmatched values:
 
 ```powershell
-Link Content -FromState FigureDrawingPreset -Map @{
+Link FigureDrawingPreset -To Content -Map @{
     Quick    = '2 min'
     Balanced = '5 min'
     Long     = '10 min'
 } -Default 'Custom'
-```
-
-`-FromState` remains supported for explicit state-style binding:
-
-```powershell
-Link Visibility -FromState IsFullScreen -Invert
 ```
 
 For regular WPF binding paths and custom source selectors, use `BindProperty` directly.
