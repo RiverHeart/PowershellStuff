@@ -1,3 +1,6 @@
+$foo = 'foo'
+
+
 start: build {
     Write-Output 'Starting application'
 }
@@ -12,4 +15,8 @@ test: lint {
 
 build: test {
     Write-Output 'Executing build'
+}
+
+foo: {
+    Write-Output $foo
 }

@@ -1,4 +1,4 @@
-# Pretty Please
+# PleaseWork
 
 A small, sequential PowerShell task runner with makefile-like task declarations.
 
@@ -45,12 +45,12 @@ Task declarations must be top-level statements. Each task name and its dependenc
 words, and each declaration must end with a scriptblock body. Commands that resemble declarations
 inside a task body are not treated as additional tasks.
 
-When `-TaskFile` is omitted, Pretty Please searches the current directory and then each parent
+When `-TaskFile` is omitted, PleaseWork searches the current directory and then each parent
 directory for `TaskFile.ps1`. Task bodies run from the directory containing that file, so relative
 paths remain stable regardless of where `please` was invoked. The caller's original location is
 restored after execution, including when a task fails.
 
-Pretty Please explicitly injects `$TaskFilePath` and `$TaskFileRoot` into each task invocation. Task
+PleaseWork explicitly injects `$TaskFilePath` and `$TaskFileRoot` into each task invocation. Task
 bodies can use them for the resolved file path and its directory:
 
 ```powershell
@@ -60,7 +60,12 @@ inspect: {
 ```
 
 Only the requested task and its transitive dependencies run. Dependencies execute sequentially,
-before their dependents, and shared dependencies run once. The runner stops on terminating errors.
+before their dependents, and shared dependencies run once. Task declarations register through
+private TaskFile state, so other output produced while loading a TaskFile is never interpreted as a
+task.
+
+`-WhatIf` previews the complete resolved task plan without running it. Explicitly using `-Confirm`
+asks once for that complete plan, so a dependent cannot run after its dependency was declined.
 
 ## Task results and exit codes
 
@@ -70,11 +75,12 @@ Each task produces an internal result containing:
 TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration
 ```
 
-Before each task, Pretty Please resets `$LASTEXITCODE` to `0`. A terminating PowerShell error fails
-the task immediately. Otherwise, the last native command executed by the task determines its native
-exit status after the scriptblock finishes. A nonzero final status fails the task and prevents its
-dependents from running. Intermediate nonzero statuses do not stop the scriptblock, so task authors
-can inspect and handle expected native failures using normal PowerShell control flow.
+Before each task, PleaseWork resets `$LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to
+`Stop` for the task invocation. A PowerShell error therefore fails the task immediately. Otherwise,
+the last native command executed by the task determines its native exit status after the scriptblock
+finishes. A nonzero final status fails the task and prevents its dependents from running.
+Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle
+expected native failures using normal PowerShell control flow.
 
 Task output remains in the normal output pipeline; result objects are kept separate for orchestration
 and verbose diagnostics. The final native status remains available through `$LASTEXITCODE`.

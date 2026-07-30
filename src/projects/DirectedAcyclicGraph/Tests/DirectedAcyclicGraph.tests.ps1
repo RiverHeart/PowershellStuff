@@ -4,87 +4,101 @@ BeforeAll {
     . "$PSScriptRoot/../DirectedAcyclicGraph.ps1"
 }
 
-Describe 'Invoke-PrettyPlease' {
+Describe 'Invoke-PleaseWork' {
     BeforeEach {
-        $global:PrettyPleaseLog = [System.Collections.Generic.List[string]]::new()
+        $global:PleaseWorkLog = [System.Collections.Generic.List[string]]::new()
     }
 
     AfterEach {
-        Remove-Variable -Name PrettyPleaseLog -Scope Global -ErrorAction SilentlyContinue
+        Remove-Variable -Name PleaseWorkLog -Scope Global -ErrorAction SilentlyContinue
     }
 
     It 'runs the first declared task by default' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-first: { $global:PrettyPleaseLog.Add('first') }
-second: { $global:PrettyPleaseLog.Add('second') }
+first: { $global:PleaseWorkLog.Add('first') }
+second: { $global:PleaseWorkLog.Add('second') }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        Invoke-PrettyPlease -TaskFile $TaskFile
+        Invoke-PleaseWork -TaskFile $TaskFile
 
-        $global:PrettyPleaseLog | Should -Be @('first')
+        $global:PleaseWorkLog | Should -Be @('first')
     }
 
     It 'runs transitive dependencies before the requested task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-lint: { $global:PrettyPleaseLog.Add('lint') }
-test: lint { $global:PrettyPleaseLog.Add('test') }
-build: test { $global:PrettyPleaseLog.Add('build') }
+lint: { $global:PleaseWorkLog.Add('lint') }
+test: lint { $global:PleaseWorkLog.Add('test') }
+build: test { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         please build -TaskFile $TaskFile
 
-        $global:PrettyPleaseLog | Should -Be @('lint', 'test', 'build')
+        $global:PleaseWorkLog | Should -Be @('lint', 'test', 'build')
     }
 
     It 'runs a shared dependency only once' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-restore: { $global:PrettyPleaseLog.Add('restore') }
-lint: restore { $global:PrettyPleaseLog.Add('lint') }
-test: restore { $global:PrettyPleaseLog.Add('test') }
-build: lint test { $global:PrettyPleaseLog.Add('build') }
+restore: { $global:PleaseWorkLog.Add('restore') }
+lint: restore { $global:PleaseWorkLog.Add('lint') }
+test: restore { $global:PleaseWorkLog.Add('test') }
+build: lint test { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         please build -TaskFile $TaskFile
 
-        $global:PrettyPleaseLog | Should -Be @('restore', 'lint', 'test', 'build')
+        $global:PleaseWorkLog | Should -Be @('restore', 'lint', 'test', 'build')
     }
 
     It 'rejects a missing dependency before running any task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-build: missing { $global:PrettyPleaseLog.Add('build') }
+build: missing { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         { please build -TaskFile $TaskFile } | Should -Throw "Task 'missing' is not defined."
-        $global:PrettyPleaseLog.Count | Should -Be 0
+        $global:PleaseWorkLog.Count | Should -Be 0
     }
 
     It 'rejects a dependency cycle before running any task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-first: second { $global:PrettyPleaseLog.Add('first') }
-second: first { $global:PrettyPleaseLog.Add('second') }
+first: second { $global:PleaseWorkLog.Add('first') }
+second: first { $global:PleaseWorkLog.Add('second') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         { please first -TaskFile $TaskFile } | Should -Throw "Task dependency cycle detected for 'first'."
-        $global:PrettyPleaseLog.Count | Should -Be 0
+        $global:PleaseWorkLog.Count | Should -Be 0
     }
 
     It 'stops when a task throws a terminating error' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 test: {
-    $global:PrettyPleaseLog.Add('test')
+    $global:PleaseWorkLog.Add('test')
     throw 'test failed'
 }
-build: test { $global:PrettyPleaseLog.Add('build') }
+build: test { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         { please build -TaskFile $TaskFile } | Should -Throw 'test failed'
-        $global:PrettyPleaseLog | Should -Be @('test')
+        $global:PleaseWorkLog | Should -Be @('test')
+    }
+
+    It 'treats non-terminating PowerShell errors as task failures' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+test: {
+    $global:PleaseWorkLog.Add('test')
+    Write-Error 'test failed'
+}
+build: test { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        { please build -TaskFile $TaskFile } | Should -Throw 'test failed'
+        $global:PleaseWorkLog | Should -Be @('test')
     }
 
     It 'fails a task when its final native process exits nonzero' {
@@ -92,18 +106,18 @@ build: test { $global:PrettyPleaseLog.Add('build') }
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
 native: {
-    $global:PrettyPleaseLog.Add('native')
-    & $global:PrettyPleasePowerShellPath -NoProfile -Command 'exit 7'
+    $global:PleaseWorkLog.Add('native')
+    & $global:PleaseWorkPowerShellPath -NoProfile -Command 'exit 7'
 }
-build: native { $global:PrettyPleaseLog.Add('build') }
+build: native { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
-        $global:PrettyPleasePowerShellPath = $PowerShellPath
+        $global:PleaseWorkPowerShellPath = $PowerShellPath
 
         { please build -TaskFile $TaskFile } | Should -Throw "Task 'native' failed with exit code 7."
 
         $LASTEXITCODE | Should -Be 7
-        $global:PrettyPleaseLog | Should -Be @('native')
-        Remove-Variable -Name PrettyPleasePowerShellPath -Scope Global
+        $global:PleaseWorkLog | Should -Be @('native')
+        Remove-Variable -Name PleaseWorkPowerShellPath -Scope Global
     }
 
     It 'uses the last native exit code rather than failing on an intermediate code' {
@@ -111,26 +125,26 @@ build: native { $global:PrettyPleaseLog.Add('build') }
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
 probe: {
-    & $global:PrettyPleasePowerShellPath -NoProfile -Command 'exit 7'
-    & $global:PrettyPleasePowerShellPath -NoProfile -Command 'exit 0'
-    $global:PrettyPleaseLog.Add('probe')
+    & $global:PleaseWorkPowerShellPath -NoProfile -Command 'exit 7'
+    & $global:PleaseWorkPowerShellPath -NoProfile -Command 'exit 0'
+    $global:PleaseWorkLog.Add('probe')
 }
-build: probe { $global:PrettyPleaseLog.Add('build') }
+build: probe { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
-        $global:PrettyPleasePowerShellPath = $PowerShellPath
+        $global:PleaseWorkPowerShellPath = $PowerShellPath
 
         please build -TaskFile $TaskFile
 
-        $global:PrettyPleaseLog | Should -Be @('probe', 'build')
-        Remove-Variable -Name PrettyPleasePowerShellPath -Scope Global
+        $global:PleaseWorkLog | Should -Be @('probe', 'build')
+        Remove-Variable -Name PleaseWorkPowerShellPath -Scope Global
     }
 
     It 'lists tasks in declaration order without executing them' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-start: build { $global:PrettyPleaseLog.Add('start') }
-build: test { $global:PrettyPleaseLog.Add('build') }
-test: { $global:PrettyPleaseLog.Add('test') }
+start: build { $global:PleaseWorkLog.Add('start') }
+build: test { $global:PleaseWorkLog.Add('build') }
+test: { $global:PleaseWorkLog.Add('test') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         $Tasks = @(please -List -TaskFile $TaskFile)
@@ -139,20 +153,20 @@ test: { $global:PrettyPleaseLog.Add('test') }
         $Tasks[0].Dependencies | Should -Be @('build')
         $Tasks[0].Default | Should -BeTrue
         $Tasks[1].Default | Should -BeFalse
-        $global:PrettyPleaseLog.Count | Should -Be 0
+        $global:PleaseWorkLog.Count | Should -Be 0
     }
 
     It 'does not execute tasks under WhatIf' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-lint: { $global:PrettyPleaseLog.Add('lint') }
-test: lint { $global:PrettyPleaseLog.Add('test') }
-build: test { $global:PrettyPleaseLog.Add('build') }
+lint: { $global:PleaseWorkLog.Add('lint') }
+test: lint { $global:PleaseWorkLog.Add('test') }
+build: test { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath $TaskFile
 
         please build -TaskFile $TaskFile -WhatIf
 
-        $global:PrettyPleaseLog.Count | Should -Be 0
+        $global:PleaseWorkLog.Count | Should -Be 0
     }
 
     It 'ignores task-like commands nested inside a task body when loading declarations' {
@@ -184,15 +198,36 @@ build: {
             Should -Throw "Dependencies for task 'build' must be bare task names."
     }
 
-    It 'rejects non-task top-level statements' {
+    It 'allows non-task top-level statements' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
+$Message = 'build'
+function Get-Message {
+    $Message
+}
 Write-Output 'loading'
-build: { 'build' }
+build: { $global:PleaseWorkLog.Add((Get-Message)) }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } |
-            Should -Throw 'TaskFiles may contain only top-level task declarations.'
+        $TaskSet = Read-TaskFile -Path $TaskFile
+        $TaskSet.TaskNames | Should -Be @('build')
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('build')
+    }
+
+    It 'does not register hashtable output as a task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+@{ Name = 'injected'; Dependencies = @(); ScriptBlock = { 'injected' } }
+build: { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $TaskSet = Read-TaskFile -Path $TaskFile
+
+        $TaskSet.DefaultTask | Should -Be 'build'
+        $TaskSet.TaskNames | Should -Be @('build')
     }
 
     It 'discovers a TaskFile in a parent directory' {
@@ -200,7 +235,7 @@ build: { 'build' }
         $NestedDirectory = Join-Path $ProjectRoot 'src/deep'
         $null = New-Item -ItemType Directory -Path $NestedDirectory -Force
         @'
-build: { $global:PrettyPleaseLog.Add('build') }
+build: { $global:PleaseWorkLog.Add('build') }
 '@ | Set-Content -LiteralPath (Join-Path $ProjectRoot 'TaskFile.ps1')
         $OriginalLocation = Get-Location
 
@@ -211,7 +246,7 @@ build: { $global:PrettyPleaseLog.Add('build') }
             Set-Location $OriginalLocation
         }
 
-        $global:PrettyPleaseLog | Should -Be @('build')
+        $global:PleaseWorkLog | Should -Be @('build')
     }
 
     It 'runs tasks from the TaskFile directory and exposes its paths' {
@@ -221,9 +256,9 @@ build: { $global:PrettyPleaseLog.Add('build') }
         $TaskFile = Join-Path $ProjectRoot 'TaskFile.ps1'
         @'
 inspect: {
-    $global:PrettyPleaseWorkingDirectory = $PWD.ProviderPath
-    $global:PrettyPleaseTaskFilePath = $TaskFilePath
-    $global:PrettyPleaseTaskFileRoot = $TaskFileRoot
+    $global:PleaseWorkWorkingDirectory = $PWD.ProviderPath
+    $global:PleaseWorkTaskFilePath = $TaskFilePath
+    $global:PleaseWorkTaskFileRoot = $TaskFileRoot
 }
 '@ | Set-Content -LiteralPath $TaskFile
         $OriginalLocation = Get-Location
@@ -235,12 +270,12 @@ inspect: {
             Set-Location $OriginalLocation
         }
 
-        $global:PrettyPleaseWorkingDirectory | Should -Be $ProjectRoot
-        $global:PrettyPleaseTaskFilePath | Should -Be $TaskFile
-        $global:PrettyPleaseTaskFileRoot | Should -Be $ProjectRoot
-        Remove-Variable -Name PrettyPleaseWorkingDirectory -Scope Global
-        Remove-Variable -Name PrettyPleaseTaskFilePath -Scope Global
-        Remove-Variable -Name PrettyPleaseTaskFileRoot -Scope Global
+        $global:PleaseWorkWorkingDirectory | Should -Be $ProjectRoot
+        $global:PleaseWorkTaskFilePath | Should -Be $TaskFile
+        $global:PleaseWorkTaskFileRoot | Should -Be $ProjectRoot
+        Remove-Variable -Name PleaseWorkWorkingDirectory -Scope Global
+        Remove-Variable -Name PleaseWorkTaskFilePath -Scope Global
+        Remove-Variable -Name PleaseWorkTaskFileRoot -Scope Global
     }
 
     It 'restores the caller location after successful execution' {
@@ -271,7 +306,7 @@ fail: {
     }
 }
 
-Describe 'Invoke-PrettyPleaseTask' {
+Describe 'Invoke-PleaseWorkTask' {
     It 'injects task context and records a successful result without mixing it into output' {
         $Context = @{
             TaskFilePath = 'C:\project\TaskFile.ps1'
@@ -279,7 +314,7 @@ Describe 'Invoke-PrettyPleaseTask' {
         }
         $Result = $null
 
-        $Output = @(Invoke-PrettyPleaseTask `
+        $Output = @(Invoke-PleaseWorkTask `
             -Name inspect `
             -ScriptBlock { "$TaskFilePath|$TaskFileRoot"; 'task output' } `
             -Context $Context `
@@ -302,7 +337,7 @@ Describe 'Invoke-PrettyPleaseTask' {
         $global:LASTEXITCODE = 23
         $Result = $null
 
-        Invoke-PrettyPleaseTask `
+        Invoke-PleaseWorkTask `
             -Name powershellOnly `
             -ScriptBlock { Write-Output 'done' } `
             -Context @{} `
@@ -316,7 +351,7 @@ Describe 'Invoke-PrettyPleaseTask' {
     It 'records a terminating error before rethrowing it' {
         $Result = $null
 
-        { Invoke-PrettyPleaseTask `
+        { Invoke-PleaseWorkTask `
             -Name broken `
             -ScriptBlock { throw 'broken task' } `
             -Context @{} `
@@ -329,11 +364,42 @@ Describe 'Invoke-PrettyPleaseTask' {
     }
 }
 
+Describe 'DirectedAcyclicGraph' {
+    It 'rejects an edge that would create a cycle without changing the graph' {
+        $Graph = [DirectedAcyclicGraph]::new()
+        $Graph.AddNode('first')
+        $Graph.AddNode('second')
+        $Graph.AddEdge('first', 'second')
+
+        { $Graph.AddEdge('second', 'first') } |
+            Should -Throw "Adding edge from 'second' to 'first' would create a cycle."
+        $Graph.GetTopologicalOrder() | Should -Be @('first', 'second')
+    }
+
+    It 'rejects edges containing an unknown node' {
+        $Graph = [DirectedAcyclicGraph]::new()
+        $Graph.AddNode('known')
+
+        { $Graph.AddEdge('known', 'missing') } | Should -Throw "Node 'missing' does not exist."
+    }
+
+    It 'ignores duplicate edges' {
+        $Graph = [DirectedAcyclicGraph]::new()
+        $Graph.AddNode('first')
+        $Graph.AddNode('second')
+
+        $Graph.AddEdge('first', 'second')
+        $Graph.AddEdge('first', 'second')
+
+        $Graph.Edges['first'] | Should -Be @('second')
+    }
+}
+
 Describe 'Get-TaskFileDeclaration' {
     It 'returns ordered task metadata without executing task bodies' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-build: test lint { $global:PrettyPleaseDeclarationExecuted = $true }
+build: test lint { $global:PleaseWorkDeclarationExecuted = $true }
 test: { 'test' }
 lint: { 'lint' }
 '@ | Set-Content -LiteralPath $TaskFile
@@ -342,12 +408,12 @@ lint: { 'lint' }
 
         $Declarations.Name | Should -Be @('build', 'test', 'lint')
         $Declarations[0].Dependencies | Should -Be @('test', 'lint')
-        Get-Variable -Name PrettyPleaseDeclarationExecuted -Scope Global -ErrorAction SilentlyContinue |
+        Get-Variable -Name PleaseWorkDeclarationExecuted -Scope Global -ErrorAction SilentlyContinue |
             Should -BeNullOrEmpty
     }
 }
 
-Describe 'Invoke-PrettyPlease argument completion' {
+Describe 'Invoke-PleaseWork argument completion' {
     It 'completes task names from a discovered parent TaskFile' {
         $ProjectRoot = Join-Path $TestDrive 'project'
         $NestedDirectory = Join-Path $ProjectRoot 'src/deep'

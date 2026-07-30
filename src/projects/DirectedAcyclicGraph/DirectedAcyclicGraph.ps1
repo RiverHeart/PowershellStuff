@@ -21,10 +21,23 @@ class DirectedAcyclicGraph {
     }
 
     [void] AddEdge([string] $From, [string] $To) {
-        if ($this.Nodes -contains $From -and $this.Nodes -contains $To) {
-            $this.Edges[$From] += $To
-            $this.Log("Edge from '$From' to '$To' added.")
+        if ($this.Nodes -notcontains $From) {
+            throw [System.ArgumentException]::new("Node '$From' does not exist.")
         }
+        if ($this.Nodes -notcontains $To) {
+            throw [System.ArgumentException]::new("Node '$To' does not exist.")
+        }
+        if ($this.Edges[$From] -contains $To) {
+            return
+        }
+        if ($From -eq $To -or $this.IsReachable($To, $From)) {
+            throw [System.InvalidOperationException]::new(
+                "Adding edge from '$From' to '$To' would create a cycle."
+            )
+        }
+
+        $this.Edges[$From] += $To
+        $this.Log("Edge from '$From' to '$To' added.")
     }
 
     [void] RemoveNode([string] $Node) {
@@ -45,63 +58,25 @@ class DirectedAcyclicGraph {
         }
     }
 
-    <#
-    .DESCRIPTION
-        Checks if the directed acyclic graph contains any cycles.
+    hidden [bool] IsReachable([string] $From, [string] $To) {
+        $Pending = [Stack[string]]::new()
+        $Visited = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        $Pending.Push($From)
 
-        A cycle is a path in the graph that starts and ends at the same node, indicating
-        a circular dependency.
-
-        This method uses the DetectCycle helper method to perform a depth-first search
-        and detect cycles in the graph.
-    #>
-    [bool] HasCycle() {
-        $Visited = @{}
-        $RecStack = @{}
-
-        # Create dictionaries to keep track of visited nodes and the recursion stack
-        # Visited is self explanatory but the recursion stack is used to keep track of
-        # nodes currently in the recursion path during the depth-first search
-        foreach ($Node in $this.Nodes) {
-            $Visited[$Node] = $false
-            $RecStack[$Node] = $false
-        }
-
-        # Perform a depth-first search from each unvisited node to detect cycles
-        foreach ($Node in $this.Nodes) {
-            if (-not $Visited[$Node]) {
-                if ($this.DetectCycle($Node, $Visited, $RecStack)) {
-                    return $true
-                }
-            }
-        }
-        return $false
-    }
-
-    <#
-    .DESCRIPTION
-        A cycle is a path in the graph that starts and ends at the same node, indicating
-        a circular dependency.
-
-        The DetectCycle method is a recursive helper function used by HasCycle to determine
-        if there is a cycle starting from a specific node. It uses a recursion stack to keep
-        track of the nodes currently in the recursion path, and if it encounters a node that
-        is already in the recursion stack, a cycle is detected.
-    #>
-    [bool] DetectCycle([string] $Node, $Visited, $RecStack) {
-        $Visited[$Node] = $true
-        $RecStack[$Node] = $true
-
-        foreach ($Neighbor in $this.Edges[$Node]) {
-            if (-not $Visited[$Neighbor]) {
-                if ($this.DetectCycle($Neighbor, $Visited, $RecStack)) {
-                    return $true
-                }
-            } elseif ($RecStack[$Neighbor]) {
+        while ($Pending.Count -gt 0) {
+            $Node = $Pending.Pop()
+            if ($Node -eq $To) {
                 return $true
             }
+            if (-not $Visited.Add($Node)) {
+                continue
+            }
+
+            foreach ($Neighbor in $this.Edges[$Node]) {
+                $Pending.Push($Neighbor)
+            }
         }
-        $RecStack[$Node] = $false
+
         return $false
     }
 
@@ -196,242 +171,6 @@ class DirectedAcyclicGraph {
     }
 }
 
-function Task {
-    [CmdletBinding()]
-    [OutputType([hashtable])]
-    param(
-        [Parameter(ValueFromRemainingArguments)]
-        [object[]] $Arguments
-    )
-
-    if ($Arguments.Length -eq 0) {
-        throw "At least one argument (the scriptblock) is required."
-    }
-
-    $ScriptBlock = $Arguments[-1]
-    if (-not ($ScriptBlock -is [scriptblock])) {
-        throw [System.ArgumentException] "The last argument must be a scriptblock."
-    }
-
-    if ($Arguments.Length -gt 1) {
-        [string[]] $Dependencies = $Arguments[0..($Arguments.Length - 2)]
-    } else {
-        [string[]] $Dependencies = @()
-    }
-
-    $Task = @{
-        Name = $MyInvocation.MyCommand.Name.TrimEnd(':')
-        Dependencies = $Dependencies
-        ScriptBlock = $ScriptBlock
-    }
-    return $Task
-}
-
-<#
-.SYNOPSIS
-    Returns one or more AstNodes, filterable by types.
-
-.NOTES
-    Prior Art:
-        Apparently there's a `Find-Ast` cmdlet in PowershellEditorServices.Command
-        which gets loaded by VSCode and probably ISE as well.
-
-.EXAMPLE
-    Find the CommandAst in the given scriptblock.
-
-    Find-AstNode { Write-Host 'Foobar' } -Type CommandAst
-
-.EXAMPLE
-    Find all CommandAsts in the given scriptblock.
-
-    Find-AstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -All
-
-.EXAMPLE
-    Find a CommandAst with a specific command name using the Query parameter.
-
-    Find-AstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -Query {
-        $_.GetCommandName() -eq 'Get-Date'
-    }
-#>
-function Find-AstNode {
-    [CmdletBinding(DefaultParameterSetName='ByTabExpansion2Context')]
-    param(
-        [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=0)]
-        [scriptblock] $ScriptBlock,
-
-        [Parameter(Mandatory,ParameterSetName='ByAst',Position=0)]
-        [System.Management.Automation.Language.Ast] $Ast,
-
-        [Parameter(ParameterSetName='ByScriptBlock',Position=1)]
-        [Parameter(ParameterSetName='ByAst',Position=1)]
-        [Parameter(ParameterSetName='ByTabExpansion2Context',Position=1)]
-        [ArgumentCompleter({
-            param(
-                [string] $CommandName,
-                [string] $ParameterName,
-                [string] $WordToComplete,
-                [System.Management.Automation.Language.CommandAst] $CommandAst,
-                [System.Collections.IDictionary] $FakeBoundParameters
-            )
-
-            if (-not $script:FindAstNodeCompletionCache) {
-                $script:FindAstNodeCompletionCache =
-                    [System.Management.Automation.Language.Ast].Assembly.ExportedTypes |
-                    Where-Object {
-                        $_.BaseType -and (
-                            $_.BaseType -eq [System.Management.Automation.Language.Ast] -or
-                            $_.BaseType.IsSubclassOf([System.Management.Automation.Language.Ast])
-                        )
-                    } |
-                    Select-Object -ExpandProperty Name |
-                    Sort-Object
-            }
-
-            $Completions = $script:FindAstNodeCompletionCache |
-                Where-Object {
-                    $_.StartsWith($WordToComplete, [StringComparison]::InvariantCultureIgnoreCase)
-                }
-
-            if ($Completions.Count -gt 0) {
-                return $Completions
-            }
-            return @()  # Prevent fallback autocomplete
-        })]
-        [string[]] $Type,
-
-        [Parameter(ParameterSetName='ByScriptBlock')]
-        [Parameter(ParameterSetName='ByAst')]
-        [Parameter(ParameterSetName='ByTabExpansion2Context')]
-        [scriptblock] $Query,
-
-        [Parameter(ParameterSetName='ByScriptBlock')]
-        [Parameter(ParameterSetName='ByAst')]
-        [Parameter(ParameterSetName='ByTabExpansion2Context')]
-        [switch] $All,
-
-        [Parameter(ParameterSetName='ByScriptBlock')]
-        [Parameter(ParameterSetName='ByAst')]
-        [Parameter(ParameterSetName='ByTabExpansion2Context')]
-        [switch] $Recurse,
-
-        [Parameter(ParameterSetName='ByScriptBlock')]
-        [Parameter(ParameterSetName='ByAst')]
-        [Parameter(Mandatory,ParameterSetName='ByTabExpansion2Context')]
-        [switch] $ContainsCursor,
-
-        [Parameter(ParameterSetName='ByScriptBlock')]
-        [Parameter(ParameterSetName='ByAst')]
-        [Parameter(ParameterSetName='ByTabExpansion2Context')]
-        [int] $CursorOffset
-    )
-
-    if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
-        $Ast = $ScriptBlock.Ast
-    }
-
-    $HasContainsCursor = $PSBoundParameters.ContainsKey('ContainsCursor')
-    $HasCursorOffset = $PSBoundParameters.ContainsKey('CursorOffset')
-
-    if ($HasContainsCursor -and ((-not $HasCursorOffset) -or (-not $PSBoundParameters.ContainsKey('Ast')))) {
-        $TabExpansion2Params = $null
-        $Callstack = Get-PSCallStack | Where-Object { $_.Command -eq 'TabExpansion2' } | Select-Object -First 1
-        if ($Callstack) {
-            $TabExpansion2Params = $Callstack.InvocationInfo.BoundParameters
-        }
-
-        if ((-not $PSBoundParameters.ContainsKey('Ast')) -and $TabExpansion2Params -and $TabExpansion2Params.Ast) {
-            $Ast = $TabExpansion2Params.Ast
-        }
-
-        if (
-            $TabExpansion2Params -and
-            $TabExpansion2Params.PositionOfCursor -and
-            $null -ne $TabExpansion2Params.PositionOfCursor.Offset
-        ) {
-            $CursorOffset = [int] $TabExpansion2Params.PositionOfCursor.Offset
-            $HasCursorOffset = $true
-        }
-
-        if (-not $HasCursorOffset) {
-            Write-Error 'CursorOffset is required when ContainsCursor is specified and could not be resolved from TabExpansion2 context.'
-            return
-        }
-
-        if (-not $Ast) {
-            Write-Error 'Ast is required and could not be resolved from TabExpansion2 context.'
-            return
-        }
-    }
-
-    if ($HasCursorOffset -and -not $HasContainsCursor) {
-        Write-Error 'ContainsCursor is required when CursorOffset is specified.'
-        return
-    }
-
-    $HasCallerQuery = $PSBoundParameters.ContainsKey('Query')
-    $TypeNames = if ($Type) { $Type } else { @() }
-
-    if ($HasCallerQuery) {
-        $OriginalQuery = $Query
-
-        # Pass to Foreach-Object so query scriptblocks can reference $_.
-        $HasParamBlockParameters =
-            $null -ne $OriginalQuery.Ast.ParamBlock -and
-            $OriginalQuery.Ast.ParamBlock.Parameters.Count -gt 0
-
-        if ($HasParamBlockParameters) {
-            $EvaluateQuery = {
-                param($AstNode)
-                & $OriginalQuery $AstNode
-            }
-        } else {
-            $EvaluateQuery = {
-                param($AstNode)
-                $AstNode | ForEach-Object $OriginalQuery
-            }
-        }
-    }
-
-    $Query = {
-        param($AstNode)
-
-        if ($TypeNames.Count -gt 0) {
-            $IsExpectedType = $false
-            foreach ($T in $TypeNames) {
-                if ($AstNode.GetType().Name -eq $T) {
-                    $IsExpectedType = $true
-                    break
-                }
-            }
-
-            if (-not $IsExpectedType) {
-                return $false
-            }
-        }
-
-        if ($HasContainsCursor) {
-            if ($CursorOffset -lt $AstNode.Extent.StartOffset -or
-                $CursorOffset -gt $AstNode.Extent.EndOffset
-            ) {
-                return $false
-            }
-        }
-
-        if ($HasCallerQuery) {
-            return (& $EvaluateQuery $AstNode)
-        }
-
-        return $true
-    }
-
-    if ($All) {
-        return $Ast.FindAll($Query, $Recurse)
-    }
-
-    return $Ast.Find($Query, $Recurse)
-}
-
-
 <#
 .SYNOPSIS
     Parses ordered task declarations from a scriptblock without invoking it.
@@ -444,27 +183,26 @@ function Get-TaskDeclaration {
     )
 
     foreach ($Statement in $ScriptBlock.Ast.EndBlock.Statements) {
-        if (
-            -not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
+        # Only top-level, single-command pipelines can be task declarations.
+        if (-not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
             $Statement.PipelineElements.Count -ne 1 -or
             -not ($Statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])
         ) {
-            throw 'TaskFiles may contain only top-level task declarations.'
+            continue
         }
 
         $CommandAst = $Statement.PipelineElements[0]
         $CommandToken = $CommandAst.GetCommandName()
-        if (
-            [string]::IsNullOrEmpty($CommandToken) -or
+        # The trailing colon distinguishes task declarations from ordinary commands.
+        if ([string]::IsNullOrEmpty($CommandToken) -or
             -not $CommandToken.EndsWith(':')
         ) {
-            throw 'TaskFiles may contain only top-level task declarations.'
+            continue
         }
 
         $TaskName = $CommandToken.TrimEnd(':')
         $CommandElements = $CommandAst.CommandElements
-        if (
-            $CommandElements.Count -lt 2 -or
+        if ($CommandElements.Count -lt 2 -or
             -not ($CommandElements[-1] -is [System.Management.Automation.Language.ScriptBlockExpressionAst])
         ) {
             throw "Task '$TaskName' must end with a scriptblock body."
@@ -494,27 +232,6 @@ function Get-TaskDeclaration {
     }
 }
 
-<#
-.SYNOPSIS
-    Extracts property declaration command tokens from a script block.
-#>
-function Get-PropertyDeclaration {
-    [CmdletBinding()]
-    [OutputType([System.Collections.Generic.Dictionary[string, scriptblock]])]
-    param(
-        [Parameter(Mandatory)]
-        [scriptblock] $ScriptBlock
-    )
-
-    $PropertyDeclarationMap = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($Declaration in (Get-TaskDeclaration -ScriptBlock $ScriptBlock)) {
-        if (-not $PropertyDeclarationMap.ContainsKey($Declaration.CommandToken)) {
-            $PropertyDeclarationMap[$Declaration.CommandToken] = $null
-        }
-    }
-
-    return $PropertyDeclarationMap
-}
 
 <#
 .SYNOPSIS
@@ -586,14 +303,42 @@ function Read-TaskFile {
         throw "TaskFile '$ResolvedPath' does not declare any tasks."
     }
 
-    $TaskFunctions = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($Declaration in $Declarations) {
-        if (-not $TaskFunctions.ContainsKey($Declaration.CommandToken)) {
-            $TaskFunctions[$Declaration.CommandToken] = $function:Task
-        }
-    }
+    # Keep the TaskFile definition scope alive after this function returns. Dot-sourcing
+    # into the module binds the original task bodies to its variables and functions.
+    $TaskFileModule = New-Module -ArgumentList $TaskFileScript, $Declarations -ScriptBlock {
+        param ($ScriptBlock, $TaskDeclarations)
 
-    $Tasks = @($TaskFileScript.InvokeWithContext($TaskFunctions, $null, @()))
+        $script:RegisteredTasks = [List[hashtable]]::new()
+        foreach ($Declaration in $TaskDeclarations) {
+            $TaskName = $Declaration.Name
+            $RegisterTask = {
+                [CmdletBinding()]
+                param (
+                    [Parameter(ValueFromRemainingArguments)]
+                    [object[]] $Arguments
+                )
+
+                $Body = $Arguments[-1]
+                if ($Arguments.Length -gt 1) {
+                    [string[]] $Dependencies = $Arguments[0..($Arguments.Length - 2)]
+                } else {
+                    [string[]] $Dependencies = @()
+                }
+
+                $script:RegisteredTasks.Add(@{
+                    Name = $TaskName
+                    Dependencies = $Dependencies
+                    ScriptBlock = $Body
+                })
+            }.GetNewClosure()
+
+            Set-Item -LiteralPath "Function:$($Declaration.CommandToken)" -Value $RegisterTask
+        }
+
+        $BoundScriptBlock = $ExecutionContext.SessionState.Module.NewBoundScriptBlock($ScriptBlock)
+        $null = @(. $BoundScriptBlock)
+    }
+    $Tasks = @(& $TaskFileModule { $script:RegisteredTasks })
     $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
 
     foreach ($TaskDefinition in $Tasks) {
@@ -608,6 +353,7 @@ function Read-TaskFile {
         DefaultTask = $Tasks[0].Name
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
+        Module = $TaskFileModule
     }
 }
 
@@ -642,15 +388,15 @@ function Resolve-TaskOrder {
         $Dag.AddNode($TaskName)
         foreach ($Dependency in $Tasks[$TaskName].Dependencies) {
             & $AddTask $Dependency
-            $Dag.AddEdge($Dependency, $TaskName)
+            try {
+                $Dag.AddEdge($Dependency, $TaskName)
+            } catch [System.InvalidOperationException] {
+                throw "Task dependency cycle detected for '$Name'."
+            }
         }
     }
 
     & $AddTask $Name
-    if ($Dag.HasCycle()) {
-        throw "Task dependency cycle detected for '$Name'."
-    }
-
     return $Dag.GetTopologicalOrder()
 }
 
@@ -658,7 +404,7 @@ function Resolve-TaskOrder {
 .SYNOPSIS
     Invokes one task with explicit context and records its result.
 #>
-function Invoke-PrettyPleaseTask {
+function Invoke-PleaseWorkTask {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
@@ -676,7 +422,13 @@ function Invoke-PrettyPleaseTask {
     )
 
     $Variables = [List[System.Management.Automation.PSVariable]]::new()
+    $Variables.Add(
+        [System.Management.Automation.PSVariable]::new('ErrorActionPreference', 'Stop')
+    )
     foreach ($VariableName in $Context.Keys) {
+        if ($VariableName -eq 'ErrorActionPreference') {
+            continue
+        }
         $Variables.Add(
             [System.Management.Automation.PSVariable]::new(
                 [string] $VariableName,
@@ -694,8 +446,7 @@ function Invoke-PrettyPleaseTask {
         $TaskException = $_.Exception
         if ($null -ne $TaskException.InnerException) {
             $TaskException = $TaskException.InnerException
-            if (
-                $TaskException -is [System.Management.Automation.RuntimeException] -and
+            if ($TaskException -is [System.Management.Automation.RuntimeException] -and
                 $null -ne $TaskException.ErrorRecord
             ) {
                 $TaskError = $TaskException.ErrorRecord
@@ -736,11 +487,11 @@ function Invoke-PrettyPleaseTask {
     please build
 
 .EXAMPLE
-    Invoke-PrettyPlease -TaskFile ./tasks.ps1 -Name test
+    Invoke-PleaseWork -TaskFile ./tasks.ps1 -Name test
 #>
-function Invoke-PrettyPlease {
-    [CmdletBinding(DefaultParameterSetName='Run',SupportsShouldProcess)]
-    [Alias('pp', 'please')]
+function Invoke-PleaseWork {
+    [CmdletBinding(DefaultParameterSetName='Run',SupportsShouldProcess,ConfirmImpact='Low')]
+    [Alias('pw', 'please')]
     param (
         [Parameter(Position=0,ParameterSetName='Run')]
         [ArgumentCompleter({
@@ -797,6 +548,11 @@ function Invoke-PrettyPlease {
     }
 
     $TaskOrder = Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks
+    $TaskPlan = $TaskOrder -join ', '
+    if (-not $PSCmdlet.ShouldProcess($Name, "Run task plan: $TaskPlan")) {
+        return
+    }
+
     $TaskContext = @{
         TaskFilePath = $TaskFilePath
         TaskFileRoot = $TaskFileRoot
@@ -805,22 +561,20 @@ function Invoke-PrettyPlease {
     try {
         Set-Location -LiteralPath $TaskFileRoot
         foreach ($TaskName in $TaskOrder) {
-            if ($PSCmdlet.ShouldProcess($TaskName, 'Run task')) {
-                $TaskResult = $null
-                Invoke-PrettyPleaseTask `
-                    -Name $TaskName `
-                    -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
-                    -Context $TaskContext `
-                    -Result ([ref] $TaskResult)
+            $TaskResult = $null
+            Invoke-PleaseWorkTask `
+                -Name $TaskName `
+                -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
+                -Context $TaskContext `
+                -Result ([ref] $TaskResult)
 
-                Write-Verbose (
-                    "Completed task '$TaskName' in $($TaskResult.Duration). " +
-                    "Exit code: $($TaskResult.ExitCode)."
-                )
+            Write-Verbose (
+                "Completed task '$TaskName' in $($TaskResult.Duration). " +
+                "Exit code: $($TaskResult.ExitCode)."
+            )
 
-                if (-not $TaskResult.Succeeded) {
-                    throw "Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."
-                }
+            if (-not $TaskResult.Succeeded) {
+                throw "Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."
             }
         }
     } finally {
