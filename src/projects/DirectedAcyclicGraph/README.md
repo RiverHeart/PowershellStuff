@@ -10,6 +10,7 @@ please start
 please build
 please -List        # Lists tasks without running them
 please build -WhatIf
+please build -PassThru
 please test -TaskFile ./AnotherTaskFile.ps1
 ```
 
@@ -62,7 +63,7 @@ inspect: {
 Only the requested task and its transitive dependencies run. Dependencies execute sequentially,
 before their dependents, and shared dependencies run once. Task declarations register through
 private TaskFile state, so other output produced while loading a TaskFile is never interpreted as a
-task.
+task. PowerShell errors in top-level TaskFile setup code stop loading immediately.
 
 `-WhatIf` previews the complete resolved task plan without running it. Explicitly using `-Confirm`
 asks once for that complete plan, so a dependent cannot run after its dependency was declined.
@@ -72,7 +73,7 @@ asks once for that complete plan, so a dependent cannot run after its dependency
 Each task produces an internal result containing:
 
 ```text
-TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration
+TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration, Output
 ```
 
 Before each task, PleaseWork resets `$LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to
@@ -82,8 +83,9 @@ finishes. A nonzero final status fails the task and prevents its dependents from
 Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle
 expected native failures using normal PowerShell control flow.
 
-Task output remains in the normal output pipeline; result objects are kept separate for orchestration
-and verbose diagnostics. The final native status remains available through `$LASTEXITCODE`.
+By default, task output remains in the normal output pipeline. With `-PassThru`, PleaseWork instead
+returns one result object per executed task and stores each task's output in that result's `Output`
+property. The final native status remains available through `$LASTEXITCODE`.
 
 ## Future parallel execution
 

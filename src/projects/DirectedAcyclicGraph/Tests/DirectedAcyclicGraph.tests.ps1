@@ -230,6 +230,73 @@ build: { $global:PleaseWorkLog.Add('build') }
         $TaskSet.TaskNames | Should -Be @('build')
     }
 
+    It 'stops loading when TaskFile setup writes an error' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+Write-Error 'setup failed'
+build: { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+        $OriginalErrorActionPreference = $ErrorActionPreference
+
+        try {
+            $ErrorActionPreference = 'Continue'
+            { Read-TaskFile -Path $TaskFile } | Should -Throw 'setup failed'
+        } finally {
+            $ErrorActionPreference = $OriginalErrorActionPreference
+        }
+
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'returns one result per task with PassThru without mixing in task output' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+test: { 'test output' }
+build: test { 'build output' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Results = @(please build -TaskFile $TaskFile -PassThru)
+
+        $Results.Count | Should -Be 2
+        $Results.TaskName | Should -Be @('test', 'build')
+        $Results.Succeeded | Should -Be @($true, $true)
+        $Results[0].Output | Should -Be @('test output')
+        $Results[1].Output | Should -Be @('build output')
+    }
+
+    It 'continues to write task output without PassThru' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: { 'build output' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please build -TaskFile $TaskFile)
+
+        $Output | Should -Be @('build output')
+    }
+
+    It 'emits a failed task result with PassThru before rethrowing' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+test: {
+    'before failure'
+    throw 'test failed'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Results = [System.Collections.Generic.List[object]]::new()
+
+        {
+            please test -TaskFile $TaskFile -PassThru |
+                ForEach-Object { $Results.Add($_) }
+        } | Should -Throw 'test failed'
+
+        $Results.Count | Should -Be 1
+        $Results[0].TaskName | Should -Be 'test'
+        $Results[0].Succeeded | Should -BeFalse
+        $Results[0].Error.Exception.Message | Should -Match 'test failed'
+        $Results[0].Output | Should -BeNullOrEmpty
+    }
+
     It 'discovers a TaskFile in a parent directory' {
         $ProjectRoot = Join-Path $TestDrive 'project'
         $NestedDirectory = Join-Path $ProjectRoot 'src/deep'
@@ -414,7 +481,19 @@ Describe 'DirectedAcyclicGraph' {
         $Graph.AddEdge('first', 'second')
         $Graph.AddEdge('first', 'second')
 
-        $Graph.Edges['first'] | Should -Be @('second')
+        $Graph.GetOutgoingEdges('first') | Should -Be @('second')
+    }
+
+    It 'returns a copy of outgoing edges' {
+        $Graph = [DirectedAcyclicGraph]::new()
+        $Graph.AddNode('first')
+        $Graph.AddNode('second')
+        $Graph.AddEdge('first', 'second')
+
+        $Edges = $Graph.GetOutgoingEdges('first')
+        $Edges[0] = 'changed'
+
+        $Graph.GetOutgoingEdges('first') | Should -Be @('second')
     }
 }
 

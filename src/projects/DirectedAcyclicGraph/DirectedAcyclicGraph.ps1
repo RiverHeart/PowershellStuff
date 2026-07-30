@@ -2,8 +2,8 @@ using namespace System.Collections.Generic
 
 # Directed Acyclic Graph
 class DirectedAcyclicGraph {
-    [List[string]] $Nodes
-    [hashtable] $Edges
+    hidden [List[string]] $Nodes
+    hidden [hashtable] $Edges
     [bool] $EnableLogging
 
     DirectedAcyclicGraph() {
@@ -18,6 +18,18 @@ class DirectedAcyclicGraph {
             $this.Edges[$Node] = @()
             $this.Log("Node '$Node' added.")
         }
+    }
+
+    [bool] ContainsNode([string] $Node) {
+        return $this.Nodes -contains $Node
+    }
+
+    [string[]] GetOutgoingEdges([string] $Node) {
+        if (-not $this.ContainsNode($Node)) {
+            throw [System.ArgumentException]::new("Node '$Node' does not exist.")
+        }
+
+        return [string[]] $this.Edges[$Node]
     }
 
     [void] AddEdge([string] $From, [string] $To) {
@@ -348,6 +360,7 @@ function Read-TaskFile {
     # into the module binds the original task bodies to its variables and functions.
     $TaskFileModule = New-Module `
         -ArgumentList $TaskFileScript, $Declarations, $function:Task `
+        -ErrorAction Stop `
         -ScriptBlock {
             param ($ScriptBlock, $TaskDeclarations, $TaskRegistrar)
 
@@ -371,6 +384,7 @@ function Read-TaskFile {
             }
 
             $BoundScriptBlock = $ExecutionContext.SessionState.Module.NewBoundScriptBlock($ScriptBlock)
+            $ErrorActionPreference = 'Stop'
             $null = @(. $BoundScriptBlock)
         }
     $Tasks = @(& $TaskFileModule { $script:RegisteredTasks })
@@ -416,7 +430,7 @@ function Resolve-TaskOrder {
             throw "Task '$TaskName' is not defined."
         }
 
-        if ($Dag.Nodes -contains $TaskName) {
+        if ($Dag.ContainsNode($TaskName)) {
             return
         }
 
@@ -475,6 +489,8 @@ function Invoke-PleaseWorkTask {
     $StartedAt = [datetime]::UtcNow
     $global:LASTEXITCODE = 0
     try {
+        # InvokeWithContext returns collected output only after successful completion. If the
+        # scriptblock terminates, output written before the error is not available to the caller.
         $ScriptBlock.InvokeWithContext($null, $Variables, @())
     } catch {
         $TaskError = $_
@@ -561,7 +577,10 @@ function Invoke-PleaseWork {
 
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string] $TaskFile
+        [string] $TaskFile,
+
+        [Parameter(ParameterSetName='Run')]
+        [switch] $PassThru
     )
 
     $TaskFilePath = Resolve-TaskFilePath -Path $TaskFile
@@ -597,16 +616,41 @@ function Invoke-PleaseWork {
         Set-Location -LiteralPath $TaskFileRoot
         foreach ($TaskName in $TaskOrder) {
             $TaskResult = $null
-            Invoke-PleaseWorkTask `
-                -Name $TaskName `
-                -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
-                -Context $TaskContext `
-                -Result ([ref] $TaskResult)
+            $TaskOutput = [List[object]]::new()
+            try {
+                Invoke-PleaseWorkTask `
+                    -Name $TaskName `
+                    -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
+                    -Context $TaskContext `
+                    -Result ([ref] $TaskResult) |
+                    ForEach-Object { $TaskOutput.Add($_) }
+            } catch {
+                $TaskResult | Add-Member `
+                    -NotePropertyName Output `
+                    -NotePropertyValue $TaskOutput.ToArray()
+
+                if ($PassThru) {
+                    $TaskResult
+                } else {
+                    $TaskOutput
+                }
+                throw
+            }
+
+            $TaskResult | Add-Member `
+                -NotePropertyName Output `
+                -NotePropertyValue $TaskOutput.ToArray()
 
             Write-Verbose (
                 "Completed task '$TaskName' in $($TaskResult.Duration). " +
                 "Exit code: $($TaskResult.ExitCode)."
             )
+
+            if ($PassThru) {
+                $TaskResult
+            } else {
+                $TaskOutput
+            }
 
             if (-not $TaskResult.Succeeded) {
                 throw "Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."
