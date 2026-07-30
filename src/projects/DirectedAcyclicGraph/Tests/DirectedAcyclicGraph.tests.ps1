@@ -328,3 +328,58 @@ Describe 'Invoke-PrettyPleaseTask' {
         $Result.Error.Exception.Message | Should -Match 'broken task'
     }
 }
+
+Describe 'Get-TaskFileDeclaration' {
+    It 'returns ordered task metadata without executing task bodies' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: test lint { $global:PrettyPleaseDeclarationExecuted = $true }
+test: { 'test' }
+lint: { 'lint' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Declarations = @(Get-TaskFileDeclaration -Path $TaskFile)
+
+        $Declarations.Name | Should -Be @('build', 'test', 'lint')
+        $Declarations[0].Dependencies | Should -Be @('test', 'lint')
+        Get-Variable -Name PrettyPleaseDeclarationExecuted -Scope Global -ErrorAction SilentlyContinue |
+            Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Invoke-PrettyPlease argument completion' {
+    It 'completes task names from a discovered parent TaskFile' {
+        $ProjectRoot = Join-Path $TestDrive 'project'
+        $NestedDirectory = Join-Path $ProjectRoot 'src/deep'
+        $null = New-Item -ItemType Directory -Path $NestedDirectory -Force
+        @'
+build: { 'build' }
+bundle: { 'bundle' }
+test: { 'test' }
+'@ | Set-Content -LiteralPath (Join-Path $ProjectRoot 'TaskFile.ps1')
+        $OriginalLocation = Get-Location
+
+        try {
+            Set-Location $NestedDirectory
+            $Completion = TabExpansion2 -InputScript 'please bu' -CursorColumn 9
+        } finally {
+            Set-Location $OriginalLocation
+        }
+
+        $Completion.CompletionMatches.CompletionText | Should -Be @('build', 'bundle')
+    }
+
+    It 'completes task names from an already-bound TaskFile' {
+        $TaskFile = Join-Path $TestDrive 'AlternateTasks.ps1'
+        @'
+deploy: { 'deploy' }
+destroy: { 'destroy' }
+test: { 'test' }
+'@ | Set-Content -LiteralPath $TaskFile
+        $InputScript = "please -TaskFile '$TaskFile' de"
+
+        $Completion = TabExpansion2 -InputScript $InputScript -CursorColumn $InputScript.Length
+
+        $Completion.CompletionMatches.CompletionText | Should -Be @('deploy', 'destroy')
+    }
+}

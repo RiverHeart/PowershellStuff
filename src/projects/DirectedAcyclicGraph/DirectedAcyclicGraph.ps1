@@ -434,36 +434,15 @@ function Find-AstNode {
 
 <#
 .SYNOPSIS
-    Extracts property declaration command tokens from a script block.
-
-.DESCRIPTION
-    Scans command invocations in a script block and returns a map of property declaration
-    command tokens to their resolved names.
-
-    This is a simple extraction helper for DSL syntax processing.
-    Property declarations use the Name: Value form. Bare command names are ignored.
-
-.EXAMPLE
-    Extract property declarations from a script block.
-
-    $styleScript = {
-        FontSize: 16
-        Margin: '2,4,6,8'
-        Background: ButtonBackground -Resource
-    }
-
-    $propertyDeclarations = Get-PropertyDeclaration -ScriptBlock $styleScript
-    # Returns: @{ 'FontSize:' = 'FontSize'; 'Margin:' = 'Margin'; 'Background:' = 'Background' }
+    Parses ordered task declarations from a scriptblock without invoking it.
 #>
-function Get-PropertyDeclaration {
+function Get-TaskDeclaration {
     [CmdletBinding()]
-    [OutputType([System.Collections.Generic.Dictionary[string, scriptblock]])]
     param(
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock
     )
 
-    $PropertyDeclarationMap = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($Statement in $ScriptBlock.Ast.EndBlock.Statements) {
         if (
             -not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
@@ -492,6 +471,7 @@ function Get-PropertyDeclaration {
         }
 
         if ($CommandElements.Count -gt 2) {
+            $Dependencies = [List[string]]::new()
             foreach ($DependencyAst in $CommandElements[1..($CommandElements.Count - 2)]) {
                 if (
                     -not ($DependencyAst -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
@@ -499,11 +479,37 @@ function Get-PropertyDeclaration {
                 ) {
                     throw "Dependencies for task '$TaskName' must be bare task names."
                 }
+
+                $Dependencies.Add($DependencyAst.Value)
             }
+        } else {
+            $Dependencies = [List[string]]::new()
         }
 
-        if (-not $PropertyDeclarationMap.ContainsKey($CommandToken)) {
-            $PropertyDeclarationMap[$CommandToken] = $null
+        [pscustomobject] @{
+            Name = $TaskName
+            CommandToken = $CommandToken
+            Dependencies = $Dependencies.ToArray()
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+    Extracts property declaration command tokens from a script block.
+#>
+function Get-PropertyDeclaration {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.Dictionary[string, scriptblock]])]
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock] $ScriptBlock
+    )
+
+    $PropertyDeclarationMap = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($Declaration in (Get-TaskDeclaration -ScriptBlock $ScriptBlock)) {
+        if (-not $PropertyDeclarationMap.ContainsKey($Declaration.CommandToken)) {
+            $PropertyDeclarationMap[$Declaration.CommandToken] = $null
         }
     }
 
@@ -542,6 +548,23 @@ function Resolve-TaskFilePath {
     throw "Could not find 'TaskFile.ps1' in '$($PWD.ProviderPath)' or any parent directory."
 }
 
+<#
+.SYNOPSIS
+    Reads ordered TaskFile declaration metadata without invoking the TaskFile.
+#>
+function Get-TaskFileDeclaration {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Path
+    )
+
+    $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+    $TaskFileScript = [scriptblock]::Create([System.IO.File]::ReadAllText($ResolvedPath))
+    return Get-TaskDeclaration -ScriptBlock $TaskFileScript
+}
+
 
 <#
 .SYNOPSIS
@@ -557,14 +580,17 @@ function Read-TaskFile {
 
     $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
     $TaskFileScript = [scriptblock]::Create([System.IO.File]::ReadAllText($ResolvedPath))
-    $TaskFunctions = Get-PropertyDeclaration -ScriptBlock $TaskFileScript
+    $Declarations = @(Get-TaskFileDeclaration -Path $ResolvedPath)
 
-    if ($TaskFunctions.Count -eq 0) {
+    if ($Declarations.Count -eq 0) {
         throw "TaskFile '$ResolvedPath' does not declare any tasks."
     }
 
-    foreach ($TaskName in @($TaskFunctions.Keys)) {
-        $TaskFunctions[$TaskName] = $function:Task
+    $TaskFunctions = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($Declaration in $Declarations) {
+        if (-not $TaskFunctions.ContainsKey($Declaration.CommandToken)) {
+            $TaskFunctions[$Declaration.CommandToken] = $function:Task
+        }
     }
 
     $Tasks = @($TaskFileScript.InvokeWithContext($TaskFunctions, $null, @()))
@@ -717,6 +743,31 @@ function Invoke-PrettyPlease {
     [Alias('pp', 'please')]
     param (
         [Parameter(Position=0,ParameterSetName='Run')]
+        [ArgumentCompleter({
+            param (
+                [string] $CommandName,
+                [string] $ParameterName,
+                [string] $WordToComplete,
+                [System.Management.Automation.Language.CommandAst] $CommandAst,
+                [System.Collections.IDictionary] $FakeBoundParameters
+            )
+
+            try {
+                $TaskFilePath = Resolve-TaskFilePath -Path $FakeBoundParameters['TaskFile']
+                foreach ($Declaration in (Get-TaskFileDeclaration -Path $TaskFilePath)) {
+                    if ($Declaration.Name.StartsWith($WordToComplete, [StringComparison]::OrdinalIgnoreCase)) {
+                        [System.Management.Automation.CompletionResult]::new(
+                            $Declaration.Name,
+                            $Declaration.Name,
+                            [System.Management.Automation.CompletionResultType]::ParameterValue,
+                            $Declaration.Name
+                        )
+                    }
+                }
+            } catch {
+                return @()
+            }
+        })]
         [string] $Name,
 
         [Parameter(Mandatory,ParameterSetName='List')]

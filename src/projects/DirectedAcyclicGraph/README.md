@@ -13,6 +13,18 @@ please build -WhatIf
 please test -TaskFile ./AnotherTaskFile.ps1
 ```
 
+Task names support tab completion. Completion parses declaration metadata without invoking the
+TaskFile or any task bodies:
+
+```powershell
+please bu<Tab>                         # build
+please -TaskFile ./Release.ps1 de<Tab> # deploy
+```
+
+When `-TaskFile` is already present on the command line, completion reads that file. Otherwise it
+uses normal upward `TaskFile.ps1` discovery. A `-TaskFile` argument written later on the command line
+is not yet bound during completion, so the discovered TaskFile is used for that case.
+
 A TaskFile declares tasks as `name: dependencies { body }`. Dependencies are optional:
 
 ```powershell
