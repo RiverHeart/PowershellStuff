@@ -3,7 +3,7 @@ using namespace System.Collections.Generic
 # Directed Acyclic Graph
 class DirectedAcyclicGraph {
     [List[string]] $Nodes
-    [ordered] $Edges
+    [hashtable] $Edges
     [bool] $EnableLogging
 
     DirectedAcyclicGraph() {
@@ -193,44 +193,6 @@ class DirectedAcyclicGraph {
         if ($this.EnableLogging) {
             Write-Host $Message
         }
-    }
-}
-
-class DagScheduler {
-    [DirectedAcyclicGraph] $Dag
-
-    DagScheduler() {
-        $this.Dag = [DirectedAcyclicGraph]::new()
-    }
-
-    DagScheduler([DirectedAcyclicGraph] $Dag) {
-        $this.Dag = $Dag
-    }
-
-    [void] Schedule() {
-        $TopologicalOrder = $this.Dag.GetTopologicalOrder()
-        foreach ($Node in $TopologicalOrder) {
-            $this.Dag.Log("Executing task: $Node")
-            # Here you would execute the task associated with $Node
-            # For example, you could invoke the ScriptBlock stored in the task
-        }
-    }
-}
-
-
-function Resolve-TaskDag {
-    [CmdletBinding()]
-    param(
-        [scriptblock] $ScriptBlock
-    )
-
-    $Dag = [DirectedAcyclicGraph]::new()
-
-    $Tasks = @()
-    $Tasks += & $ScriptBlock
-    foreach ($Task in $Tasks) {
-        $Dag.AddNode($Task.Name)
-        # You can add edges here if your tasks have dependencies
     }
 }
 
@@ -529,36 +491,118 @@ function Get-PropertyDeclaration {
 }
 
 
-# Example DAG Usage
-$Dag = [DirectedAcyclicGraph]::new()
-$Dag.EnableLogging = $true
-$Dag.AddNode("A")
-$Dag.AddNode("B")
-$Dag.AddEdge("A", "B")
-Write-Output $Dag.HasCycle()  # Should output False
-$Dag.AddEdge("B", "A")
-Write-Output $Dag.HasCycle()  # Should output True
+<#
+.SYNOPSIS
+    Loads task declarations from a TaskFile.
+#>
+function Read-TaskFile {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Path
+    )
 
-# Example Task Usage
-$TaskDag = [DirectedAcyclicGraph]::new()
+    $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+    $TaskFileScript = [scriptblock]::Create([System.IO.File]::ReadAllText($ResolvedPath))
+    $TaskFunctions = Get-PropertyDeclaration -ScriptBlock $TaskFileScript
 
-$ExampleTasks = {
-    lint: { Write-Output "Executing lint" }
-    test: { Write-Output "Executing test" }
-    build: lint test { Write-Output "Executing build" }
-}
+    if ($TaskFunctions.Count -eq 0) {
+        throw "TaskFile '$ResolvedPath' does not declare any tasks."
+    }
 
-# Extract property declarations from scriptblock and turn each into an alias of Task
-$PropertyDeclarations = Get-PropertyDeclaration -ScriptBlock $ExampleTasks
-foreach ($Key in $PropertyDeclarations.Keys) {
-    $TaskDag.AddNode($Key)
-    $PropertyDeclarations.$Key = $function:Task
-    foreach($Dependency in $PropertyDeclarations.$Key.Dependencies) {
-        $TaskDag.AddEdge($Dependency, $Key)
+    foreach ($TaskName in @($TaskFunctions.Keys)) {
+        $TaskFunctions[$TaskName] = $function:Task
+    }
+
+    $Tasks = @($TaskFileScript.InvokeWithContext($TaskFunctions, $null, @()))
+    $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($TaskDefinition in $Tasks) {
+        if ($TasksByName.ContainsKey($TaskDefinition.Name)) {
+            throw "Task '$($TaskDefinition.Name)' is declared more than once."
+        }
+
+        $TasksByName.Add($TaskDefinition.Name, $TaskDefinition)
+    }
+
+    return [pscustomobject] @{
+        DefaultTask = $Tasks[0].Name
+        Tasks = $TasksByName
     }
 }
-$ExampleTasks.InvokeWithContext($PropertyDeclarations, $null, @())
 
+<#
+.SYNOPSIS
+    Resolves a task and its dependencies in execution order.
+#>
+function Resolve-TaskOrder {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Name,
 
-#[scriptblock] $TaskScriptBlock = [scriptblock]::Create($ExampleTasks)
-#Resolve-TaskDag -ScriptBlock $TaskScriptBlock
+        [Parameter(Mandatory)]
+        [Dictionary[string, hashtable]] $Tasks
+    )
+
+    $Dag = [DirectedAcyclicGraph]::new()
+
+    $AddTask = {
+        param ([string] $TaskName)
+
+        if (-not $Tasks.ContainsKey($TaskName)) {
+            throw "Task '$TaskName' is not defined."
+        }
+
+        if ($Dag.Nodes -contains $TaskName) {
+            return
+        }
+
+        $Dag.AddNode($TaskName)
+        foreach ($Dependency in $Tasks[$TaskName].Dependencies) {
+            & $AddTask $Dependency
+            $Dag.AddEdge($Dependency, $TaskName)
+        }
+    }
+
+    & $AddTask $Name
+    if ($Dag.HasCycle()) {
+        throw "Task dependency cycle detected for '$Name'."
+    }
+
+    return $Dag.GetTopologicalOrder()
+}
+
+<#
+.SYNOPSIS
+    Runs a task and its dependencies from a TaskFile.
+
+.EXAMPLE
+    please build
+
+.EXAMPLE
+    Invoke-PrettyPlease -TaskFile ./tasks.ps1 -Name test
+#>
+function Invoke-PrettyPlease {
+    [CmdletBinding()]
+    [Alias('pp', 'please')]
+    param (
+        [Parameter(Position=0)]
+        [string] $Name,
+
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string] $TaskFile = (Join-Path $PWD 'TaskFile.ps1')
+    )
+
+    $TaskSet = Read-TaskFile -Path $TaskFile
+    if ([string]::IsNullOrEmpty($Name)) {
+        $Name = $TaskSet.DefaultTask
+    }
+
+    foreach ($TaskName in (Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks)) {
+        & $TaskSet.Tasks[$TaskName].ScriptBlock
+    }
+}
