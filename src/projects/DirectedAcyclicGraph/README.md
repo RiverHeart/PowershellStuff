@@ -8,6 +8,8 @@ A small, sequential PowerShell task runner with makefile-like task declarations.
 please              # Runs the first declared task in ./TaskFile.ps1
 please start
 please build
+please -List        # Lists tasks without running them
+please build -WhatIf
 please test -TaskFile ./AnotherTaskFile.ps1
 ```
 
@@ -26,6 +28,10 @@ build: test {
     dotnet build
 }
 ```
+
+Task declarations must be top-level statements. Each task name and its dependencies must be bare
+words, and each declaration must end with a scriptblock body. Commands that resemble declarations
+inside a task body are not treated as additional tasks.
 
 Only the requested task and its transitive dependencies run. Dependencies execute sequentially,
 before their dependents, and shared dependencies run once. The runner stops on terminating errors.

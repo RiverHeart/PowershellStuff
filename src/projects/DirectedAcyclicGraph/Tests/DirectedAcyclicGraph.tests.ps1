@@ -102,4 +102,74 @@ native: {
         $LASTEXITCODE | Should -Be 7
         Remove-Variable -Name PrettyPleasePowerShellPath -Scope Global
     }
+
+    It 'lists tasks in declaration order without executing them' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+start: build { $global:PrettyPleaseLog.Add('start') }
+build: test { $global:PrettyPleaseLog.Add('build') }
+test: { $global:PrettyPleaseLog.Add('test') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Tasks = @(please -List -TaskFile $TaskFile)
+
+        $Tasks.Name | Should -Be @('start', 'build', 'test')
+        $Tasks[0].Dependencies | Should -Be @('build')
+        $Tasks[0].Default | Should -BeTrue
+        $Tasks[1].Default | Should -BeFalse
+        $global:PrettyPleaseLog.Count | Should -Be 0
+    }
+
+    It 'does not execute tasks under WhatIf' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+lint: { $global:PrettyPleaseLog.Add('lint') }
+test: lint { $global:PrettyPleaseLog.Add('test') }
+build: test { $global:PrettyPleaseLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        please build -TaskFile $TaskFile -WhatIf
+
+        $global:PrettyPleaseLog.Count | Should -Be 0
+    }
+
+    It 'ignores task-like commands nested inside a task body when loading declarations' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: {
+    nested: { 'not a declaration' }
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $TaskSet = Read-TaskFile -Path $TaskFile
+
+        $TaskSet.TaskNames | Should -Be @('build')
+    }
+
+    It 'rejects a declaration without a body scriptblock' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        'build: test' | Set-Content -LiteralPath $TaskFile
+
+        { Read-TaskFile -Path $TaskFile } |
+            Should -Throw "Task 'build' must end with a scriptblock body."
+    }
+
+    It 'rejects quoted dependency names' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        "build: 'test' { 'build' }" | Set-Content -LiteralPath $TaskFile
+
+        { Read-TaskFile -Path $TaskFile } |
+            Should -Throw "Dependencies for task 'build' must be bare task names."
+    }
+
+    It 'rejects non-task top-level statements' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+Write-Output 'loading'
+build: { 'build' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        { Read-TaskFile -Path $TaskFile } |
+            Should -Throw 'TaskFiles may contain only top-level task declarations.'
+    }
 }

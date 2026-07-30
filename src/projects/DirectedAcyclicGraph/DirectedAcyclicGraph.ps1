@@ -463,25 +463,45 @@ function Get-PropertyDeclaration {
         [scriptblock] $ScriptBlock
     )
 
-    $propertyDeclarationMap = [System.Collections.Generic.Dictionary[string, scriptblock]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $commandAsts = Find-AstNode `
-        -ScriptBlock $ScriptBlock `
-        -Type CommandAst `
-        -All `
-        -Recurse `
-        -Query {
-            param($AstNode)
-            $CommandName = $AstNode.GetCommandName()
-            return (
-                $AstNode.CommandElements.Count -ge 1 -and
-                $CommandName -ne $null -and
-                $CommandName.Length -gt 1 -and
-                $CommandName.EndsWith(':')
-            )
+    $PropertyDeclarationMap = [Dictionary[string, scriptblock]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($Statement in $ScriptBlock.Ast.EndBlock.Statements) {
+        if (
+            -not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
+            $Statement.PipelineElements.Count -ne 1 -or
+            -not ($Statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])
+        ) {
+            throw 'TaskFiles may contain only top-level task declarations.'
         }
 
-    foreach ($CommandAst in $CommandAsts) {
+        $CommandAst = $Statement.PipelineElements[0]
         $CommandToken = $CommandAst.GetCommandName()
+        if (
+            [string]::IsNullOrEmpty($CommandToken) -or
+            -not $CommandToken.EndsWith(':')
+        ) {
+            throw 'TaskFiles may contain only top-level task declarations.'
+        }
+
+        $TaskName = $CommandToken.TrimEnd(':')
+        $CommandElements = $CommandAst.CommandElements
+        if (
+            $CommandElements.Count -lt 2 -or
+            -not ($CommandElements[-1] -is [System.Management.Automation.Language.ScriptBlockExpressionAst])
+        ) {
+            throw "Task '$TaskName' must end with a scriptblock body."
+        }
+
+        if ($CommandElements.Count -gt 2) {
+            foreach ($DependencyAst in $CommandElements[1..($CommandElements.Count - 2)]) {
+                if (
+                    -not ($DependencyAst -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
+                    $DependencyAst.StringConstantType -ne [System.Management.Automation.Language.StringConstantType]::BareWord
+                ) {
+                    throw "Dependencies for task '$TaskName' must be bare task names."
+                }
+            }
+        }
+
         if (-not $PropertyDeclarationMap.ContainsKey($CommandToken)) {
             $PropertyDeclarationMap[$CommandToken] = $null
         }
@@ -528,6 +548,7 @@ function Read-TaskFile {
 
     return [pscustomobject] @{
         DefaultTask = $Tasks[0].Name
+        TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
     }
 }
@@ -586,11 +607,14 @@ function Resolve-TaskOrder {
     Invoke-PrettyPlease -TaskFile ./tasks.ps1 -Name test
 #>
 function Invoke-PrettyPlease {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='Run',SupportsShouldProcess)]
     [Alias('pp', 'please')]
     param (
-        [Parameter(Position=0)]
+        [Parameter(Position=0,ParameterSetName='Run')]
         [string] $Name,
+
+        [Parameter(Mandatory,ParameterSetName='List')]
+        [switch] $List,
 
         [Parameter()]
         [ValidateNotNullOrEmpty()]
@@ -598,11 +622,24 @@ function Invoke-PrettyPlease {
     )
 
     $TaskSet = Read-TaskFile -Path $TaskFile
+    if ($List) {
+        foreach ($TaskName in $TaskSet.TaskNames) {
+            [pscustomobject] @{
+                Name = $TaskName
+                Dependencies = [string[]] $TaskSet.Tasks[$TaskName].Dependencies
+                Default = $TaskName -eq $TaskSet.DefaultTask
+            }
+        }
+        return
+    }
+
     if ([string]::IsNullOrEmpty($Name)) {
         $Name = $TaskSet.DefaultTask
     }
 
     foreach ($TaskName in (Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks)) {
-        & $TaskSet.Tasks[$TaskName].ScriptBlock
+        if ($PSCmdlet.ShouldProcess($TaskName, 'Run task')) {
+            & $TaskSet.Tasks[$TaskName].ScriptBlock
+        }
     }
 }
