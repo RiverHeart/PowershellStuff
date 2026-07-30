@@ -249,6 +249,32 @@ build: { $global:PleaseWorkLog.Add((Get-Message)) }
         $global:PleaseWorkLog | Should -Be @('build')
     }
 
+    It 'requires script scope to mutate a top-level TaskFile variable across tasks' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$Value = 'top-level'
+changeLocal: {
+    $Value = 'local-change'
+    "local:$Value"
+}
+readAfterLocal: changeLocal { "after-local:$Value" }
+changeScript: readAfterLocal {
+    $script:Value = 'script-change'
+    "script:$Value"
+}
+readAfterScript: changeScript { "after-script:$Value" }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please readAfterScript -TaskFile $TaskFile)
+
+        $Output | Should -Be @(
+            'local:local-change'
+            'after-local:top-level'
+            'script:script-change'
+            'after-script:script-change'
+        )
+    }
+
     It 'does not register hashtable output as a task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
