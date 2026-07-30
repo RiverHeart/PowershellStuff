@@ -510,6 +510,38 @@ function Get-PropertyDeclaration {
     return $PropertyDeclarationMap
 }
 
+<#
+.SYNOPSIS
+    Resolves an explicit TaskFile or discovers one in the current directory hierarchy.
+#>
+function Resolve-TaskFilePath {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [string] $Path
+    )
+
+    if (-not [string]::IsNullOrEmpty($Path)) {
+        return (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+    }
+
+    if ($PWD.Provider.Name -ne 'FileSystem') {
+        throw 'TaskFile discovery requires a FileSystem location.'
+    }
+
+    $Directory = [System.IO.DirectoryInfo]::new($PWD.ProviderPath)
+    while ($null -ne $Directory) {
+        $Candidate = Join-Path $Directory.FullName 'TaskFile.ps1'
+        if (Test-Path -LiteralPath $Candidate -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $Candidate).ProviderPath
+        }
+
+        $Directory = $Directory.Parent
+    }
+
+    throw "Could not find 'TaskFile.ps1' in '$($PWD.ProviderPath)' or any parent directory."
+}
+
 
 <#
 .SYNOPSIS
@@ -618,10 +650,12 @@ function Invoke-PrettyPlease {
 
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string] $TaskFile = (Join-Path $PWD 'TaskFile.ps1')
+        [string] $TaskFile
     )
 
-    $TaskSet = Read-TaskFile -Path $TaskFile
+    $TaskFilePath = Resolve-TaskFilePath -Path $TaskFile
+    $TaskFileRoot = Split-Path -Parent $TaskFilePath
+    $TaskSet = Read-TaskFile -Path $TaskFilePath
     if ($List) {
         foreach ($TaskName in $TaskSet.TaskNames) {
             [pscustomobject] @{
@@ -637,9 +671,16 @@ function Invoke-PrettyPlease {
         $Name = $TaskSet.DefaultTask
     }
 
-    foreach ($TaskName in (Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks)) {
-        if ($PSCmdlet.ShouldProcess($TaskName, 'Run task')) {
-            & $TaskSet.Tasks[$TaskName].ScriptBlock
+    $TaskOrder = Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks
+    $OriginalLocation = Get-Location
+    try {
+        Set-Location -LiteralPath $TaskFileRoot
+        foreach ($TaskName in $TaskOrder) {
+            if ($PSCmdlet.ShouldProcess($TaskName, 'Run task')) {
+                & $TaskSet.Tasks[$TaskName].ScriptBlock
+            }
         }
+    } finally {
+        Set-Location -LiteralPath $OriginalLocation.Path
     }
 }
