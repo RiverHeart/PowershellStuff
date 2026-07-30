@@ -38,6 +38,18 @@ build: test { $global:PleaseWorkLog.Add('build') }
         $global:PleaseWorkLog | Should -Be @('lint', 'test', 'build')
     }
 
+    It 'resolves task and dependency names without regard to case' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+lint: { $global:PleaseWorkLog.Add('lint') }
+build: LINT { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        please BUILD -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('lint', 'build')
+    }
+
     It 'runs a shared dependency only once' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
@@ -198,6 +210,26 @@ build: {
             Should -Throw "Dependencies for task 'build' must be bare task names."
     }
 
+    It 'rejects task declarations that differ only by case before loading the TaskFile' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$global:PleaseWorkDuplicateTaskFileLoaded = $true
+FOO: { 'first' }
+foo: { 'second' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        { Read-TaskFile -Path $TaskFile } | Should -Throw "Task 'foo' is declared more than once."
+        Get-Variable -Name PleaseWorkDuplicateTaskFileLoaded -Scope Global -ErrorAction SilentlyContinue |
+            Should -BeNullOrEmpty
+    }
+
+    It 'rejects an empty task name' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        ': { ''body'' }' | Set-Content -LiteralPath $TaskFile
+
+        { Read-TaskFile -Path $TaskFile } | Should -Throw 'Task names cannot be empty.'
+    }
+
     It 'allows non-task top-level statements' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
@@ -343,6 +375,18 @@ inspect: {
         Remove-Variable -Name PleaseWorkWorkingDirectory -Scope Global
         Remove-Variable -Name PleaseWorkTaskFilePath -Scope Global
         Remove-Variable -Name PleaseWorkTaskFileRoot -Scope Global
+    }
+
+    It 'resets the working directory before each task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+move: { Set-Location $env:TEMP }
+inspect: move { $PWD.ProviderPath }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = please inspect -TaskFile $TaskFile
+
+        $Output | Should -Be $TestDrive
     }
 
     It 'restores the caller location after successful execution' {
@@ -494,6 +538,21 @@ Describe 'DirectedAcyclicGraph' {
         $Edges[0] = 'changed'
 
         $Graph.GetOutgoingEdges('first') | Should -Be @('second')
+    }
+
+    It 'removes a node and all incoming edges' {
+        $Graph = [DirectedAcyclicGraph]::new()
+        $Graph.AddNode('root')
+        $Graph.AddNode('removed')
+        $Graph.AddNode('remaining')
+        $Graph.AddEdge('root', 'removed')
+        $Graph.AddEdge('removed', 'remaining')
+
+        $Graph.RemoveNode('removed')
+
+        $Graph.ContainsNode('removed') | Should -BeFalse
+        $Graph.GetOutgoingEdges('root') | Should -BeNullOrEmpty
+        $Graph.GetTopologicalOrder() | Should -Be @('root', 'remaining')
     }
 }
 

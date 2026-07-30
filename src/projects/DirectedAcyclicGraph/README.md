@@ -44,11 +44,12 @@ build: test {
 
 Task declarations must be top-level statements. Each task name and its dependencies must be bare
 words, and each declaration must end with a scriptblock body. Commands that resemble declarations
-inside a task body are not treated as additional tasks.
+inside a task body are not treated as additional tasks. Task names are case-insensitive and must be
+unique, so declarations such as `FOO:` and `foo:` cannot appear in the same TaskFile.
 
 When `-TaskFile` is omitted, PleaseWork searches the current directory and then each parent
-directory for `TaskFile.ps1`. Task bodies run from the directory containing that file, so relative
-paths remain stable regardless of where `please` was invoked. The caller's original location is
+directory for `TaskFile.ps1`. Each task starts from the directory containing that file, so relative
+paths remain stable even if an earlier task changes location. The caller's original location is
 restored after execution, including when a task fails.
 
 PleaseWork explicitly injects `$TaskFilePath` and `$TaskFileRoot` into each task invocation. Task
@@ -82,6 +83,12 @@ the last native command executed by the task determines its native exit status a
 finishes. A nonzero final status fails the task and prevents its dependents from running.
 Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle
 expected native failures using normal PowerShell control flow.
+
+On PowerShell 7, callers can set `$PSNativeCommandUseErrorActionPreference` to `$true` to make a
+nonzero native exit code participate in PowerShell error handling. In that mode, the injected
+`$ErrorActionPreference = 'Stop'` causes the task to stop at the first failing native command.
+PleaseWork does not set this PowerShell 7-only preference so its default behavior remains compatible
+with Windows PowerShell 5.1.
 
 By default, task output remains in the normal output pipeline. With `-PassThru`, PleaseWork instead
 returns one result object per executed task and stores each task's output in that result's `Output`

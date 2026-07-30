@@ -56,7 +56,8 @@ class DirectedAcyclicGraph {
         if ($this.Nodes -contains $Node) {
             $this.Nodes.Remove($Node)
             $this.Edges.Remove($Node)
-            foreach ($key in $this.Edges.Keys) {
+            [string[]] $Keys = $this.Edges.Keys
+            foreach ($key in $Keys) {
                 $this.Edges[$key] = $this.Edges[$key] | Where-Object { $_ -ne $Node }
             }
             $this.Log("Node '$Node' removed.")
@@ -235,6 +236,7 @@ function Get-TaskDeclaration {
         [scriptblock] $ScriptBlock
     )
 
+    $TaskNames = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($Statement in $ScriptBlock.Ast.EndBlock.Statements) {
         # Only top-level, single-command pipelines can be task declarations.
         if (-not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
@@ -254,6 +256,13 @@ function Get-TaskDeclaration {
         }
 
         $TaskName = $CommandToken.TrimEnd(':')
+        if ([string]::IsNullOrEmpty($TaskName)) {
+            throw 'Task names cannot be empty.'
+        }
+        if (-not $TaskNames.Add($TaskName)) {
+            throw "Task '$TaskName' is declared more than once."
+        }
+
         $CommandElements = $CommandAst.CommandElements
         if ($CommandElements.Count -lt 2 -or
             -not ($CommandElements[-1] -is [System.Management.Automation.Language.ScriptBlockExpressionAst])
@@ -350,7 +359,7 @@ function Read-TaskFile {
 
     $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
     $TaskFileScript = [scriptblock]::Create([System.IO.File]::ReadAllText($ResolvedPath))
-    $Declarations = @(Get-TaskFileDeclaration -Path $ResolvedPath)
+    $Declarations = @(Get-TaskDeclaration -ScriptBlock $TaskFileScript)
 
     if ($Declarations.Count -eq 0) {
         throw "TaskFile '$ResolvedPath' does not declare any tasks."
@@ -613,8 +622,8 @@ function Invoke-PleaseWork {
     }
     $OriginalLocation = Get-Location
     try {
-        Set-Location -LiteralPath $TaskFileRoot
         foreach ($TaskName in $TaskOrder) {
+            Set-Location -LiteralPath $TaskFileRoot
             $TaskResult = $null
             $TaskOutput = [List[object]]::new()
             try {
