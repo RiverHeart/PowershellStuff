@@ -38,7 +38,8 @@ directory for `TaskFile.ps1`. Task bodies run from the directory containing that
 paths remain stable regardless of where `please` was invoked. The caller's original location is
 restored after execution, including when a task fails.
 
-Task bodies can use `$TaskFilePath` for the resolved file path and `$TaskFileRoot` for its directory:
+Pretty Please explicitly injects `$TaskFilePath` and `$TaskFileRoot` into each task invocation. Task
+bodies can use them for the resolved file path and its directory:
 
 ```powershell
 inspect: {
@@ -48,22 +49,29 @@ inspect: {
 
 Only the requested task and its transitive dependencies run. Dependencies execute sequentially,
 before their dependents, and shared dependencies run once. The runner stops on terminating errors.
-Native process exit codes are not converted into errors; the final native command's exit code remains
-available through `$LASTEXITCODE`.
+
+## Task results and exit codes
+
+Each task produces an internal result containing:
+
+```text
+TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration
+```
+
+Before each task, Pretty Please resets `$LASTEXITCODE` to `0`. A terminating PowerShell error fails
+the task immediately. Otherwise, the last native command executed by the task determines its native
+exit status after the scriptblock finishes. A nonzero final status fails the task and prevents its
+dependents from running. Intermediate nonzero statuses do not stop the scriptblock, so task authors
+can inspect and handle expected native failures using normal PowerShell control flow.
+
+Task output remains in the normal output pipeline; result objects are kept separate for orchestration
+and verbose diagnostics. The final native status remains available through `$LASTEXITCODE`.
 
 ## Future parallel execution
 
-Parallel execution will require an explicit result for each task rather than relying on one shared
-`$LASTEXITCODE`. Each worker runspace has its own `$LASTEXITCODE`, and completion order does not
-provide a meaningful single "last" task when several tasks run concurrently. `$LASTEXITCODE` can
-also retain the value from an earlier native command when a task does not invoke a native process.
-
-Before invoking a task, its worker should initialize the native exit status to success. When the task
-finishes, the worker should capture a result containing at least:
-
-```text
-TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt
-```
+Parallel execution will extend the same result model into each worker rather than relying on one
+shared `$LASTEXITCODE`. Each worker runspace has its own `$LASTEXITCODE`, and completion order does
+not provide a meaningful single "last" task when several tasks run concurrently.
 
 The last native command executed by that task determines its native exit status. A nonzero status or
 a terminating PowerShell error fails that task. On failure, the scheduler should stop admitting new

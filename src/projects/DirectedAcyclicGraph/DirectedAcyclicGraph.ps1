@@ -630,6 +630,80 @@ function Resolve-TaskOrder {
 
 <#
 .SYNOPSIS
+    Invokes one task with explicit context and records its result.
+#>
+function Invoke-PrettyPleaseTask {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [scriptblock] $ScriptBlock,
+
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $Context,
+
+        [Parameter(Mandatory)]
+        [ref] $Result
+    )
+
+    $Variables = [List[System.Management.Automation.PSVariable]]::new()
+    foreach ($VariableName in $Context.Keys) {
+        $Variables.Add(
+            [System.Management.Automation.PSVariable]::new(
+                [string] $VariableName,
+                $Context[$VariableName]
+            )
+        )
+    }
+
+    $StartedAt = [datetime]::UtcNow
+    $global:LASTEXITCODE = 0
+    try {
+        $ScriptBlock.InvokeWithContext($null, $Variables, @())
+    } catch {
+        $TaskError = $_
+        $TaskException = $_.Exception
+        if ($null -ne $TaskException.InnerException) {
+            $TaskException = $TaskException.InnerException
+            if (
+                $TaskException -is [System.Management.Automation.RuntimeException] -and
+                $null -ne $TaskException.ErrorRecord
+            ) {
+                $TaskError = $TaskException.ErrorRecord
+            }
+        }
+
+        $FinishedAt = [datetime]::UtcNow
+        $Result.Value = [pscustomobject] @{
+            TaskName = $Name
+            Succeeded = $false
+            ExitCode = [int] $global:LASTEXITCODE
+            Error = $TaskError
+            StartedAt = $StartedAt
+            FinishedAt = $FinishedAt
+            Duration = $FinishedAt - $StartedAt
+        }
+        throw $TaskException
+    }
+
+    $FinishedAt = [datetime]::UtcNow
+    $ExitCode = [int] $global:LASTEXITCODE
+    $Result.Value = [pscustomobject] @{
+        TaskName = $Name
+        Succeeded = $ExitCode -eq 0
+        ExitCode = $ExitCode
+        Error = $null
+        StartedAt = $StartedAt
+        FinishedAt = $FinishedAt
+        Duration = $FinishedAt - $StartedAt
+    }
+}
+
+<#
+.SYNOPSIS
     Runs a task and its dependencies from a TaskFile.
 
 .EXAMPLE
@@ -672,12 +746,30 @@ function Invoke-PrettyPlease {
     }
 
     $TaskOrder = Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks
+    $TaskContext = @{
+        TaskFilePath = $TaskFilePath
+        TaskFileRoot = $TaskFileRoot
+    }
     $OriginalLocation = Get-Location
     try {
         Set-Location -LiteralPath $TaskFileRoot
         foreach ($TaskName in $TaskOrder) {
             if ($PSCmdlet.ShouldProcess($TaskName, 'Run task')) {
-                & $TaskSet.Tasks[$TaskName].ScriptBlock
+                $TaskResult = $null
+                Invoke-PrettyPleaseTask `
+                    -Name $TaskName `
+                    -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
+                    -Context $TaskContext `
+                    -Result ([ref] $TaskResult)
+
+                Write-Verbose (
+                    "Completed task '$TaskName' in $($TaskResult.Duration). " +
+                    "Exit code: $($TaskResult.ExitCode)."
+                )
+
+                if (-not $TaskResult.Succeeded) {
+                    throw "Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."
+                }
             }
         }
     } finally {
