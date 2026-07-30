@@ -364,6 +364,29 @@ Describe 'Invoke-PleaseWorkTask' {
     }
 }
 
+Describe 'Task' {
+    It 'registers a task without writing to the output pipeline' {
+        $Registry = [System.Collections.Generic.List[hashtable]]::new()
+        $Body = { 'build' }
+
+        $Output = @(Task -Name build -Registry $Registry test lint $Body)
+
+        $Output | Should -BeNullOrEmpty
+        $Registry.Count | Should -Be 1
+        $Registry[0].Name | Should -Be 'build'
+        $Registry[0].Dependencies | Should -Be @('test', 'lint')
+        $Registry[0].ScriptBlock | Should -Be $Body
+    }
+
+    It 'requires the final argument to be a scriptblock' {
+        $Registry = [System.Collections.Generic.List[hashtable]]::new()
+
+        { Task -Name build -Registry $Registry test } |
+            Should -Throw 'The last argument must be a scriptblock.'
+        $Registry | Should -BeNullOrEmpty
+    }
+}
+
 Describe 'DirectedAcyclicGraph' {
     It 'rejects an edge that would create a cycle without changing the graph' {
         $Graph = [DirectedAcyclicGraph]::new()

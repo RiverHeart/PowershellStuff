@@ -173,6 +173,47 @@ class DirectedAcyclicGraph {
 
 <#
 .SYNOPSIS
+    Registers one task definition without writing it to the output pipeline.
+#>
+function Task {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [List[hashtable]] $Registry,
+
+        [Parameter(ValueFromRemainingArguments)]
+        [object[]] $Arguments
+    )
+
+    if ($Arguments.Length -eq 0) {
+        throw 'At least one argument (the scriptblock) is required.'
+    }
+
+    $ScriptBlock = $Arguments[-1]
+    if (-not ($ScriptBlock -is [scriptblock])) {
+        throw [System.ArgumentException]::new('The last argument must be a scriptblock.')
+    }
+
+    if ($Arguments.Length -gt 1) {
+        [string[]] $Dependencies = $Arguments[0..($Arguments.Length - 2)]
+    } else {
+        [string[]] $Dependencies = @()
+    }
+
+    $Registry.Add(@{
+        Name = $Name
+        Dependencies = $Dependencies
+        ScriptBlock = $ScriptBlock
+    })
+}
+
+<#
+.SYNOPSIS
     Parses ordered task declarations from a scriptblock without invoking it.
 #>
 function Get-TaskDeclaration {
@@ -305,39 +346,33 @@ function Read-TaskFile {
 
     # Keep the TaskFile definition scope alive after this function returns. Dot-sourcing
     # into the module binds the original task bodies to its variables and functions.
-    $TaskFileModule = New-Module -ArgumentList $TaskFileScript, $Declarations -ScriptBlock {
-        param ($ScriptBlock, $TaskDeclarations)
+    $TaskFileModule = New-Module `
+        -ArgumentList $TaskFileScript, $Declarations, $function:Task `
+        -ScriptBlock {
+            param ($ScriptBlock, $TaskDeclarations, $TaskRegistrar)
 
-        $script:RegisteredTasks = [List[hashtable]]::new()
-        foreach ($Declaration in $TaskDeclarations) {
-            $TaskName = $Declaration.Name
-            $RegisterTask = {
-                [CmdletBinding()]
-                param (
-                    [Parameter(ValueFromRemainingArguments)]
-                    [object[]] $Arguments
-                )
+            $script:RegisteredTasks = [List[hashtable]]::new()
+            foreach ($Declaration in $TaskDeclarations) {
+                $TaskName = $Declaration.Name
+                $TaskCommand = {
+                    [CmdletBinding()]
+                    param (
+                        [Parameter(ValueFromRemainingArguments)]
+                        [object[]] $Arguments
+                    )
 
-                $Body = $Arguments[-1]
-                if ($Arguments.Length -gt 1) {
-                    [string[]] $Dependencies = $Arguments[0..($Arguments.Length - 2)]
-                } else {
-                    [string[]] $Dependencies = @()
-                }
+                    & $TaskRegistrar `
+                        -Name $TaskName `
+                        -Registry $script:RegisteredTasks `
+                        -Arguments $Arguments
+                }.GetNewClosure()
 
-                $script:RegisteredTasks.Add(@{
-                    Name = $TaskName
-                    Dependencies = $Dependencies
-                    ScriptBlock = $Body
-                })
-            }.GetNewClosure()
+                Set-Item -LiteralPath "Function:$($Declaration.CommandToken)" -Value $TaskCommand
+            }
 
-            Set-Item -LiteralPath "Function:$($Declaration.CommandToken)" -Value $RegisterTask
+            $BoundScriptBlock = $ExecutionContext.SessionState.Module.NewBoundScriptBlock($ScriptBlock)
+            $null = @(. $BoundScriptBlock)
         }
-
-        $BoundScriptBlock = $ExecutionContext.SessionState.Module.NewBoundScriptBlock($ScriptBlock)
-        $null = @(. $BoundScriptBlock)
-    }
     $Tasks = @(& $TaskFileModule { $script:RegisteredTasks })
     $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
 
