@@ -1,6 +1,9 @@
 $foo = 'foo'
 
-
+<#
+.DESCRIPTION
+    Foobar
+#>
 start: build {
     Write-Output 'Starting application'
 }

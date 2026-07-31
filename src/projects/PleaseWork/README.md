@@ -1,9 +1,9 @@
-# PleaseWork
+# Please Work
 
 A small, sequential PowerShell task runner with makefile-like task declarations.
 
 ```powershell
-. ./DirectedAcyclicGraph.ps1
+. ./PleaseWork.ps1
 
 please              # Finds TaskFile.ps1 and runs its first declared task
 please start

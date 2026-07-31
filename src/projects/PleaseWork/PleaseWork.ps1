@@ -189,11 +189,15 @@ class DirectedAcyclicGraph {
     Registers one task definition without writing it to the output pipeline.
 #>
 function Task {
-    [CmdletBinding()]
+    [CmdletBinding(PositionalBinding=$false)]
     param (
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
+
+        [Parameter()]
+        [AllowNull()]
+        [System.Management.Automation.Language.CommentHelpInfo] $Help,
 
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
@@ -220,9 +224,42 @@ function Task {
 
     $Registry.Add(@{
         Name = $Name
+        Help = $Help
         Dependencies = $Dependencies
         ScriptBlock = $ScriptBlock
     })
+}
+
+<#
+.SYNOPSIS
+    Parses comment-based help associated with a task.
+#>
+function Get-TaskHelp {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]] $Comments
+    )
+
+    if ($Comments.Count -eq 0) {
+        return
+    }
+
+    $HelpSource = ($Comments -join [Environment]::NewLine) +
+        "`nfunction __PleaseWorkTaskHelp {}`n"
+    $HelpTokens = $null
+    $HelpErrors = $null
+    $HelpAst = [System.Management.Automation.Language.Parser]::ParseInput(
+        $HelpSource,
+        [ref] $HelpTokens,
+        [ref] $HelpErrors
+    )
+    $FunctionAst = $HelpAst.Find({
+            param ($AstNode)
+            $AstNode -is [System.Management.Automation.Language.FunctionDefinitionAst]
+        }, $false)
+    return $FunctionAst.GetHelpContent()
 }
 
 <#
@@ -236,8 +273,20 @@ function Get-TaskDeclaration {
         [scriptblock] $ScriptBlock
     )
 
+    $SourceText = $ScriptBlock.Ast.Extent.Text
+    $Tokens = $null
+    $ParseErrors = $null
+    $ParsedAst = [System.Management.Automation.Language.Parser]::ParseInput(
+        $SourceText,
+        [ref] $Tokens,
+        [ref] $ParseErrors
+    )
+    $CommentTokens = @($Tokens | Where-Object {
+            $_.Kind -eq [System.Management.Automation.Language.TokenKind]::Comment
+        })
+
     $TaskNames = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($Statement in $ScriptBlock.Ast.EndBlock.Statements) {
+    foreach ($Statement in $ParsedAst.EndBlock.Statements) {
         # Only top-level, single-command pipelines can be task declarations.
         if (-not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
             $Statement.PipelineElements.Count -ne 1 -or
@@ -286,10 +335,30 @@ function Get-TaskDeclaration {
             $Dependencies = [List[string]]::new()
         }
 
+        $Comments = [List[string]]::new()
+        $CommentBoundary = $CommandAst.Extent.StartOffset
+        foreach ($CommentToken in ($CommentTokens |
+                Where-Object { $_.Extent.EndOffset -le $CommentBoundary } |
+                Sort-Object { $_.Extent.StartOffset } -Descending)) {
+            $Gap = $SourceText.Substring(
+                $CommentToken.Extent.EndOffset,
+                $CommentBoundary - $CommentToken.Extent.EndOffset
+            )
+            if (-not [string]::IsNullOrWhiteSpace($Gap)) {
+                break
+            }
+
+            $Comments.Insert(0, $CommentToken.Text)
+            $CommentBoundary = $CommentToken.Extent.StartOffset
+        }
+
+        $TaskHelp = Get-TaskHelp -Comments $Comments.ToArray()
         [pscustomobject] @{
             Name = $TaskName
             CommandToken = $CommandToken
             Dependencies = $Dependencies.ToArray()
+            Comments = $Comments.ToArray()
+            Help = $TaskHelp
         }
     }
 }
@@ -376,6 +445,7 @@ function Read-TaskFile {
             $script:RegisteredTasks = [List[hashtable]]::new()
             foreach ($Declaration in $TaskDeclarations) {
                 $TaskName = $Declaration.Name
+                $TaskHelp = $Declaration.Help
                 $TaskCommand = {
                     [CmdletBinding()]
                     param (
@@ -385,6 +455,7 @@ function Read-TaskFile {
 
                     & $TaskRegistrar `
                         -Name $TaskName `
+                        -Help $TaskHelp `
                         -Registry $script:RegisteredTasks `
                         -Arguments $Arguments
                 }.GetNewClosure()
@@ -597,10 +668,16 @@ function Invoke-PleaseWork {
     $TaskSet = Read-TaskFile -Path $TaskFilePath
     if ($List) {
         foreach ($TaskName in $TaskSet.TaskNames) {
+            $Description = $TaskSet.Tasks[$TaskName].Help.Description
+            if (-not [string]::IsNullOrWhiteSpace($Description)) {
+                $Description = $Description.Trim()
+            }
+
             [pscustomobject] @{
                 Name = $TaskName
                 Dependencies = [string[]] $TaskSet.Tasks[$TaskName].Dependencies
                 Default = $TaskName -eq $TaskSet.DefaultTask
+                Description = $Description
             }
         }
         return

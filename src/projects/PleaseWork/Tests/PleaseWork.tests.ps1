@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 BeforeAll {
-    . "$PSScriptRoot/../DirectedAcyclicGraph.ps1"
+    . "$PSScriptRoot/../PleaseWork.ps1"
 }
 
 Describe 'Invoke-PleaseWork' {
@@ -165,7 +165,35 @@ test: { $global:PleaseWorkLog.Add('test') }
         $Tasks[0].Dependencies | Should -Be @('build')
         $Tasks[0].Default | Should -BeTrue
         $Tasks[1].Default | Should -BeFalse
+        @($Tasks | Where-Object { $null -ne $_.Description }).Count | Should -Be 0
         $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'lists descriptions from comment-based help only on the associated task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+<#
+.DESCRIPTION
+    Starts the build.
+#>
+start: build { 'start' }
+build: { 'build' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Declarations = @(Get-TaskFileDeclaration -Path $TaskFile)
+
+        $Declarations[0].Comments.Count | Should -Be 1
+        $Declarations[0].Comments[0] | Should -Match 'Starts the build\.'
+        $Declarations[0].Help | Should -BeOfType (
+            [System.Management.Automation.Language.CommentHelpInfo]
+        )
+        $Declarations[0].Help.Description.Trim() | Should -Be 'Starts the build.'
+        $Declarations[1].Comments | Should -BeNullOrEmpty
+        $Declarations[1].Help | Should -BeNullOrEmpty
+
+        $Tasks = @(please -List -TaskFile $TaskFile)
+        $Tasks[0].Description | Should -Be 'Starts the build.'
+        $Tasks[1].Description | Should -BeNullOrEmpty
     }
 
     It 'does not execute tasks under WhatIf' {
@@ -505,12 +533,20 @@ Describe 'Task' {
     It 'registers a task without writing to the output pipeline' {
         $Registry = [System.Collections.Generic.List[hashtable]]::new()
         $Body = { 'build' }
+        $Help = Get-TaskHelp -Comments @(
+            '<# .DESCRIPTION Builds the project. #>'
+        )
 
-        $Output = @(Task -Name build -Registry $Registry test lint $Body)
+        $Output = @(Task `
+            -Name build `
+            -Help $Help `
+            -Registry $Registry `
+            test lint $Body)
 
         $Output | Should -BeNullOrEmpty
         $Registry.Count | Should -Be 1
         $Registry[0].Name | Should -Be 'build'
+        $Registry[0].Help | Should -Be $Help
         $Registry[0].Dependencies | Should -Be @('test', 'lint')
         $Registry[0].ScriptBlock | Should -Be $Body
     }
