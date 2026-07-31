@@ -1,12 +1,19 @@
 $foo = 'foo'
 
+$env:PLEASE_DEFAULT_TASK = 'lint'
+
 <#
 .DESCRIPTION
     Foobar
 #>
 start: build {
-    Write-Output 'Starting application'
+    param(
+        [Parameter(Mandatory)]
+        [string] $foo
+    )
+    Write-Output "Starting application: $foo"
 }
+
 
 lint: {
     Write-Output 'Executing lint'

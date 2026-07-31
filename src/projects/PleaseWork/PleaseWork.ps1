@@ -1,4 +1,7 @@
 using namespace System.Collections.Generic
+using namespace System.Collections.ObjectModel
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
 
 # Directed Acyclic Graph
 class DirectedAcyclicGraph {
@@ -479,7 +482,7 @@ function Read-TaskFile {
     }
 
     return [pscustomobject] @{
-        DefaultTask = $Tasks[0].Name
+        DefaultTask = if ($env:PLEASE_DEFAULT_TASK) { $env:PLEASE_DEFAULT_TASK } else { $Tasks[0].Name }
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
         Module = $TaskFileModule
@@ -543,6 +546,9 @@ function Invoke-PleaseWorkTask {
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock,
 
+        [AllowNull()]
+        [object[]] $Arguments,
+
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Context,
 
@@ -571,7 +577,7 @@ function Invoke-PleaseWorkTask {
     try {
         # InvokeWithContext returns collected output only after successful completion. If the
         # scriptblock terminates, output written before the error is not available to the caller.
-        $ScriptBlock.InvokeWithContext($null, $Variables, @())
+        $ScriptBlock.InvokeWithContext($null, $Variables, $Arguments)
     } catch {
         $TaskError = $_
         $TaskException = $_.Exception
@@ -623,7 +629,7 @@ function Invoke-PleaseWorkTask {
 function Invoke-PleaseWork {
     [CmdletBinding(DefaultParameterSetName='Run',SupportsShouldProcess,ConfirmImpact='Low')]
     [Alias('pw', 'please')]
-    param (
+    param(
         [Parameter(Position=0,ParameterSetName='Run')]
         [ArgumentCompleter({
             param (
@@ -660,7 +666,10 @@ function Invoke-PleaseWork {
         [string] $TaskFile,
 
         [Parameter(ParameterSetName='Run')]
-        [switch] $PassThru
+        [switch] $PassThru,
+
+        [Parameter(ParameterSetName='Run',ValueFromRemainingArguments)]
+        [object[]] $RemainingArguments
     )
 
     $TaskFilePath = Resolve-TaskFilePath -Path $TaskFile
@@ -707,6 +716,7 @@ function Invoke-PleaseWork {
                 Invoke-PleaseWorkTask `
                     -Name $TaskName `
                     -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
+                    -Arguments $RemainingArguments `
                     -Context $TaskContext `
                     -Result ([ref] $TaskResult) |
                     ForEach-Object { $TaskOutput.Add($_) }
@@ -746,3 +756,67 @@ function Invoke-PleaseWork {
         Set-Location -LiteralPath $OriginalLocation.Path
     }
 }
+
+<#
+.SYNOPSIS
+    Resolves the ParamBlock in a given Scriptblock or a list
+    of ParameterAst into a RuntimeParameterDictionary.
+
+.EXAMPLE
+    Resolve-ParamBlock {
+        param(
+            [Parameter(Mandatory=$true)]
+            [ValidateNotNullOrEmpty()]
+            [string] $Name = 'foo'
+        )
+    }
+#>
+function Resolve-ParamBlock {
+    [CmdletBinding(DefaultParameterSetName='ByScriptblock')]
+    [OutputType([RuntimeDefinedParameterDictionary])]
+    param(
+        [Parameter(Mandatory,ParameterSetName='ByScriptblock',Position=0)]
+        [scriptblock] $ParamBlock,
+
+        [Parameter(Mandatory,ParameterSetName='ByParameterAst',Position=0)]
+        [ReadOnlyCollection[ParameterAst]] $ParameterAsts
+    )
+
+    if (-not $ParameterAsts) {
+        $ParameterAsts = $ParamBlock.Ast.ParamBlock.Parameters
+    }
+
+    $Parameters = [RuntimeDefinedParameterDictionary]::new()
+    foreach($ParameterAst in $ParameterAsts) {
+        $Attributes = [List`1[System.Attribute]]::new()
+        foreach($AttributeAst in $ParameterAst.Attributes) {
+            if ($AttributeAst.GetType().Name -eq 'TypeConstraintAst') {
+                # This is available already from ParameterAst
+                continue
+            }
+            $TypeName = $AttributeAst.TypeName
+            $AttributeType = $TypeName.GetReflectionAttributeType()
+            $AttributeObj = $AttributeType::new()
+            foreach($NamedArg in $AttributeAst.NamedArguments) {
+                $AttributeObj.psobject.properties |
+                    Where-Object { $_.Name -eq $NamedArg.ArgumentName } |
+                    ForEach-Object {
+                        if ($NamedArg.ExpressionOmitted) {
+                            $_.Value = $True
+                        } else {
+                            $_.Value = $NamedArg.Argument
+                        }
+                    }
+            }
+            $Attributes.Add($AttributeObj)
+        }
+        $Parameter = [RuntimeDefinedParameter]::new($ParameterAst.Name.VariablePath, $ParameterAst.StaticType, $Attributes)
+        if ($ParameterAst.DefaultValue) {
+            $Parameter.Value = $Parameter.DefaultValue
+        }
+        $Parameters.Add($Parameter.Name, $Parameter)
+    }
+
+    return $Parameters
+}
+
