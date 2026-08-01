@@ -27,6 +27,8 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 - `Save-AstDocument`: writes rendered output after parse validation
 - `Set-AstFunction`: queues replacement of one structurally selected function
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
+- `Extract-AstFunction`: queues removal of one function and returns its source text
+- `Split-PSFunction`: previews or applies extraction of top-level functions into individual files
 
 ## Function Editing
 
@@ -74,6 +76,33 @@ comment-based help immediately above the target is replaced with the function by
 
 The current MVP replaces complete function definitions. It does not yet perform semantic renames,
 body-only edits, concurrent file-change detection, atomic writes, or encoding preservation.
+
+## Function Extraction
+
+`Extract-AstFunction` is the composable transform. It queues removal of one top-level function
+from an `AstDocument` and returns a plan whose `Text` property contains the extracted definition.
+Adjacent comment-based help is included by default.
+
+`Split-PSFunction` provides the file-oriented workflow. It extracts every top-level function when
+`Name` is omitted, writes each function to `<FunctionName>.ps1`, and leaves other source content in
+place. The default mode is a preview; use `-Apply` to write the source and extracted files:
+
+```powershell
+$preview = Split-PSFunction `
+	-Path ./Module.psm1 `
+	-OutputDirectory ./Private
+
+$preview.Files
+$preview.Diff
+
+Split-PSFunction `
+	-Path ./Module.psm1 `
+	-OutputDirectory ./Private `
+	-Apply
+```
+
+Pass `-Name Get-One, Get-Two` to select functions. Existing destination files are rejected unless
+`-Force` is specified. `-WhatIf` and `-Confirm` are supported when applying the split.
 
 ## WPF DSL Transform (first pass)
 
