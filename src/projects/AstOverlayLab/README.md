@@ -25,6 +25,55 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits by index
 - `Save-AstDocument`: writes rendered output after parse validation
+- `Set-AstFunction`: queues replacement of one structurally selected function
+- `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
+
+## Function Editing
+
+`Set-AstFunction` is the composable transform. Replacement text must contain exactly one complete
+function definition:
+
+```powershell
+$document = New-AstDocument -Path ./Module.psm1
+$plan = Set-AstFunction `
+	-Document $document `
+	-Name Get-Greeting `
+	-Replacement @'
+function Get-Greeting {
+	'Hello'
+}
+'@
+
+Show-AstDiff -Document $document
+Save-AstDocument -Document $document
+```
+
+`Edit-PSFunction` provides a preview-first workflow for agents and command-line use. It returns a
+structured result containing the diff, parse diagnostics, rewrite metadata, and document. It does
+not change the file unless `-Apply` is specified:
+
+```powershell
+$preview = Edit-PSFunction `
+	-Path ./Module.psm1 `
+	-Name Get-Greeting `
+	-Replacement $replacement
+
+$preview.Diff
+
+Edit-PSFunction `
+	-Path ./Module.psm1 `
+	-Name Get-Greeting `
+	-Replacement $replacement `
+	-Apply
+```
+
+Selection is case-insensitive and restricted to top-level functions by default. Use `-Recurse` to
+include nested definitions; ambiguous matches are rejected with source locations. Contiguous
+comment-based help immediately above the target is replaced with the function by default. Use
+`-ExcludeHelp` to preserve it.
+
+The current MVP replaces complete function definitions. It does not yet perform semantic renames,
+body-only edits, concurrent file-change detection, atomic writes, or encoding preservation.
 
 ## WPF DSL Transform (first pass)
 

@@ -14,11 +14,18 @@ Describe 'New-AstDocument' {
     }
 
     It 'wraps ScriptBlock input passed via InputObject' {
-        $Overlay = New-AstDocument -InputObject { Window Main { } }
+        $Overlay = New-AstDocument -InputObject {
+            function Get-Greeting { 'hello' }
+        }
+        $Functions = @($Overlay.Ast.FindAll({
+                    param($Node)
+                    $Node -is [FunctionDefinitionAst]
+                }, $true))
 
         $Overlay | Should -Not -BeNullOrEmpty
-        $Overlay.Ast | Should -Not -BeNullOrEmpty
-        $Overlay.OriginalText | Should -Match 'Window Main'
+        $Overlay | Should -BeOfType ([AstDocument])
+        $Overlay.Ast.Extent.StartOffset | Should -Be 0
+        $Functions.Name | Should -Be 'Get-Greeting'
     }
 
     It 'wraps Ast input passed via InputObject' {
@@ -29,8 +36,17 @@ Describe 'New-AstDocument' {
         $Overlay = New-AstDocument -InputObject $Ast
 
         $Overlay | Should -Not -BeNullOrEmpty
-        $Overlay.Ast | Should -Be $Ast
+        $Overlay.Ast | Should -Not -Be $Ast
+        $Overlay.Ast.Extent.StartOffset | Should -Be 0
         $Overlay.OriginalText | Should -Be 'Window Main { }'
+    }
+
+    It 'returns an existing AstDocument without coercing or reparsing it' {
+        $Original = New-AstDocument -InputObject 'function Get-Greeting { ''hello'' }'
+
+        $Resolved = New-AstDocument -InputObject $Original
+
+        $Resolved | Should -Be $Original
     }
 
     It 'accepts pipeline input via InputObject' {
@@ -153,6 +169,235 @@ function Greet {
 
         $Diff | Should -Match '\[0\] Insert greeting before Write-Host'
         $Diff | Should -Not -Match '\[1\] Replace Write-Host with Write-Output'
+    }
+}
+
+Describe 'Set-AstFunction' {
+    It 'replaces one top-level function and its adjacent help' {
+        $Source = @'
+<#
+.SYNOPSIS
+    Old help.
+#>
+function Get-Greeting {
+    'old'
+}
+
+function Get-Unchanged {
+    'unchanged'
+}
+'@
+        $Replacement = @'
+<#
+.SYNOPSIS
+    New help.
+#>
+function Get-Greeting {
+    'new'
+}
+'@
+        $Document = New-AstDocument -InputObject $Source
+
+        $Plan = Set-AstFunction `
+            -Document $Document `
+            -Name Get-Greeting `
+            -Replacement $Replacement
+        $Validation = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.IncludedHelp | Should -BeTrue
+        $Plan.Name | Should -Be 'Get-Greeting'
+        $Validation.ParseErrorCount | Should -Be 0
+        $Validation.EditCount | Should -Be 1
+        $Validation.RenderedText | Should -Match 'New help\.'
+        $Validation.RenderedText | Should -Not -Match 'Old help\.'
+        $Validation.RenderedText | Should -Match 'Get-Unchanged'
+    }
+
+    It 'preserves adjacent help when ExcludeHelp is specified' {
+        $Source = @'
+<#
+.SYNOPSIS
+    Preserved help.
+#>
+function Get-Greeting {
+    'old'
+}
+'@
+        $Document = New-AstDocument -InputObject $Source
+
+        $Plan = Set-AstFunction `
+            -Document $Document `
+            -Name Get-Greeting `
+            -Replacement "function Get-Greeting { 'new' }" `
+            -ExcludeHelp
+        $Validation = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.IncludedHelp | Should -BeFalse
+        $Validation.RenderedText | Should -Match 'Preserved help\.'
+        $Validation.RenderedText | Should -Match "'new'"
+    }
+
+    It 'selects a top-level function without matching a nested function of the same name' {
+        $Source = @'
+function Invoke-Outer {
+    function Invoke-Target { 'nested' }
+    Invoke-Target
+}
+
+function Invoke-Target { 'top-level' }
+'@
+        $Document = New-AstDocument -InputObject $Source
+
+        $Plan = Set-AstFunction `
+            -Document $Document `
+            -Name Invoke-Target `
+            -Replacement "function Invoke-Target { 'replaced' }"
+        $Validation = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.TargetAst.Extent.StartLineNumber | Should -Be 6
+        $Validation.RenderedText | Should -Match "Invoke-Target \{ 'nested' \}"
+        $Validation.RenderedText | Should -Match "Invoke-Target \{ 'replaced' \}"
+    }
+
+    It 'requires Recurse to select a nested function' {
+        $Source = @'
+function Invoke-Outer {
+    function Invoke-Target { 'nested' }
+}
+'@
+        $Document = New-AstDocument -InputObject $Source
+
+        {
+            Set-AstFunction `
+                -Document $Document `
+                -Name Invoke-Target `
+                -Replacement "function Invoke-Target { 'new' }"
+        } | Should -Throw "Function 'Invoke-Target' was not found in the top level of the document."
+
+        $Plan = Set-AstFunction `
+            -Document $Document `
+            -Name Invoke-Target `
+            -Replacement "function Invoke-Target { 'new' }" `
+            -Recurse
+
+        $Plan.TargetAst.Extent.StartLineNumber | Should -Be 2
+    }
+
+    It 'rejects ambiguous recursive matches with source locations' {
+        $Source = @'
+function Invoke-First {
+    function Invoke-Target { 'first' }
+}
+function Invoke-Second {
+    function Invoke-Target { 'second' }
+}
+'@
+        $Document = New-AstDocument -InputObject $Source
+
+        {
+            Set-AstFunction `
+                -Document $Document `
+                -Name Invoke-Target `
+                -Replacement "function Invoke-Target { 'new' }" `
+                -Recurse
+        } | Should -Throw "Function 'Invoke-Target' is ambiguous. Matches were found at 2:5, 5:5."
+    }
+
+    It 'rejects replacement text that is not exactly one function definition' {
+        $Document = New-AstDocument -InputObject "function Get-Greeting { 'old' }"
+
+        {
+            Set-AstFunction `
+                -Document $Document `
+                -Name Get-Greeting `
+                -Replacement "function Get-One {}; function Get-Two {}"
+        } | Should -Throw 'Replacement must contain exactly one complete function definition.'
+
+        $Document.Edits.Count | Should -Be 0
+    }
+
+    It 'rejects malformed replacement text before queuing an edit' {
+        $Document = New-AstDocument -InputObject "function Get-Greeting { 'old' }"
+
+        {
+            Set-AstFunction `
+                -Document $Document `
+                -Name Get-Greeting `
+                -Replacement 'function Get-Greeting {'
+        } | Should -Throw 'Replacement text contains * parse error(s): *'
+
+        $Document.Edits.Count | Should -Be 0
+    }
+}
+
+Describe 'Edit-PSFunction' {
+    It 'accepts an existing AstDocument without coercing it to a string' {
+        $Document = New-AstDocument -InputObject 'function foo { Write-Host foo }'
+
+        $Result = Edit-PSFunction `
+            -InputObject $Document `
+            -Name foo `
+            -Replacement 'function foo { Write-Host fubar }'
+
+        $Result.Document | Should -Be $Document
+        $Result.RenderedText | Should -Be 'function foo { Write-Host fubar }'
+    }
+
+    It 'accepts a ScriptBlock and finds functions within its normalized AST' {
+        $Result = Edit-PSFunction `
+            -InputObject { function foo { Write-Host foo } } `
+            -Name foo `
+            -Replacement 'function foo { Write-Host fubar }'
+
+        $Result.ParseErrorCount | Should -Be 0
+        $Result.RenderedText | Should -Match 'function foo \{ Write-Host fubar \}'
+    }
+
+    It 'returns a preview without changing the file by default' {
+        $Path = Join-Path $TestDrive 'Preview.ps1'
+        "function Get-Greeting { 'old' }" | Set-Content -LiteralPath $Path -NoNewline
+
+        $Result = Edit-PSFunction `
+            -Path $Path `
+            -Name Get-Greeting `
+            -Replacement "function Get-Greeting { 'new' }"
+
+        $Result.Applied | Should -BeFalse
+        $Result.ParseErrorCount | Should -Be 0
+        $Result.EditCount | Should -Be 1
+        $Result.Diff | Should -Match "function Get-Greeting \{ 'new' \}"
+        [System.IO.File]::ReadAllText($Path) | Should -Be "function Get-Greeting { 'old' }"
+    }
+
+    It 'writes the validated replacement only when Apply is specified' {
+        $Path = Join-Path $TestDrive 'Apply.ps1'
+        "function Get-Greeting { 'old' }" | Set-Content -LiteralPath $Path -NoNewline
+
+        $Result = Edit-PSFunction `
+            -Path $Path `
+            -Name Get-Greeting `
+            -Replacement "function Get-Greeting { 'new' }" `
+            -Apply `
+            -Confirm:$false
+
+        $Result.Applied | Should -BeTrue
+        [System.IO.File]::ReadAllText($Path) | Should -Be "function Get-Greeting { 'new' }"
+    }
+
+    It 'does not write when Apply and WhatIf are used together' {
+        $Path = Join-Path $TestDrive 'WhatIf.ps1'
+        "function Get-Greeting { 'old' }" | Set-Content -LiteralPath $Path -NoNewline
+
+        $Result = Edit-PSFunction `
+            -Path $Path `
+            -Name Get-Greeting `
+            -Replacement "function Get-Greeting { 'new' }" `
+            -Apply `
+            -WhatIf
+
+        $Result.Applied | Should -BeFalse
+        $Result.Diff | Should -Match "function Get-Greeting \{ 'new' \}"
+        [System.IO.File]::ReadAllText($Path) | Should -Be "function Get-Greeting { 'old' }"
     }
 }
 

@@ -1,0 +1,15 @@
+{
+  "TestSuite": "AstOverlayLab",
+  "Run": {
+    "Path": [
+      "Tests"
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  },
+  "Filter": {
+    "Tag": [],
+    "ExcludeTag": []
+  }
+}
