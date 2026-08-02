@@ -14,8 +14,8 @@
       "ConfigPath": "src/modules/PleaseWork/pester.json"
     },
     {
-      "Name": "AstOverlayLab",
-      "ConfigPath": "src/projects/AstOverlayLab/pester.json"
+      "Name": "AstEditor",
+      "ConfigPath": "src/modules/AstEditor/pester.json"
     },
     {
       "Name": "TabCentral",

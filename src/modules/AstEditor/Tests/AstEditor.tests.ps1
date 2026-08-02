@@ -1,8 +1,7 @@
-$ErrorActionPreference = 'Stop'
+using module ../AstEditor.psd1
+using namespace System.Management.Automation.Language
 
-BeforeAll {
-    . "$PSScriptRoot/../AstOverlay.ps1"
-}
+$ErrorActionPreference = 'Stop'
 
 Describe 'New-AstDocument' {
     It 'parses string input via InputObject' {
@@ -56,9 +55,23 @@ Describe 'New-AstDocument' {
         $Overlay.OriginalText | Should -Be 'Window Main { }'
         $Overlay.Path | Should -Be '<memory>'
     }
+
+    It 'processes every pipeline input object' {
+        $Overlays = @('function Get-One {}', 'function Get-Two {}') |
+            New-AstDocument
+
+        $Overlays.Count | Should -Be 2
+        $Overlays[0].OriginalText | Should -Be 'function Get-One {}'
+        $Overlays[1].OriginalText | Should -Be 'function Get-Two {}'
+    }
 }
 
 Describe 'AstDocument line helpers' {
+    It 'rejects non-AstDocument arguments at runtime' {
+        { Resolve-AstDocument -Document ([pscustomobject] @{}) } |
+            Should -Throw
+    }
+
     It 'renders prepend, replace, and append edits in the expected order and indentation' {
         $Source = @'
 function Greet {
@@ -428,6 +441,24 @@ function Get-Remaining {
         $Validation.RenderedText | Should -Not -Match 'Get-Extracted'
         $Validation.RenderedText | Should -Match 'Get-Remaining'
     }
+
+    It 'does not treat class constructors or methods as top-level functions' {
+        $Source = @'
+class Example {
+    Example() {}
+    [void] Invoke() {}
+}
+
+function Get-Remaining { 'remaining' }
+'@
+        $Document = New-AstDocument -InputObject $Source
+
+        {
+            Extract-AstFunction -Document $Document -Name Example
+        } | Should -Throw "Function 'Example' was not found in the top level of the document."
+
+        $Document.Edits.Count | Should -Be 0
+    }
 }
 
 Describe 'Split-PSFunction' {
@@ -686,8 +717,9 @@ Window Main {
     }
 }
 
-Describe 'WPF Loaded-handler rewrite plan MVP' {
-    It 'builds an InsertMissingHandler plan and emits one edit' {
+InModuleScope AstEditor {
+    Describe 'WPF Loaded-handler rewrite plan MVP' {
+        It 'builds an InsertMissingHandler plan and emits one edit' {
         $Source = @"
 Window Main {
     StackPanel {
@@ -706,9 +738,9 @@ Window Main {
         $Validation.EditCount | Should -Be 1
         $Validation.ParseErrorCount | Should -Be 0
         $Validation.RenderedText | Should -Match 'plan AstOverlayLab insertion'
-    }
+        }
 
-    It 'builds a None plan when identical Loaded body already exists' {
+        It 'builds a None plan when identical Loaded body already exists' {
         $Source = @"
 Window Main {
     When 'Loaded' {
@@ -728,4 +760,5 @@ Window Main {
         $Validation.EditCount | Should -Be 0
         $Validation.ParseErrorCount | Should -Be 0
     }
+}
 }

@@ -1,16 +1,16 @@
 $ErrorActionPreference = 'Stop'
 
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
-$RepoRoot = Split-Path -Parent $ProjectRoot
+$ModulesRoot = Split-Path -Parent $PSScriptRoot
+$SourceRoot = Split-Path -Parent $ModulesRoot
 
-. "$PSScriptRoot/AstOverlay.ps1"
+Import-Module "$PSScriptRoot/AstEditor.psd1" -Force
 
-$SourcePath = Join-Path $RepoRoot 'modules/WPF/Examples/ImageViewer/ImageViewer.DSL.ps1'
+$SourcePath = Join-Path $SourceRoot 'modules/WPF/Examples/ImageViewer/ImageViewer.DSL.ps1'
 $OutputPath = Join-Path $PSScriptRoot 'ImageViewer.DSL.mutated.ps1'
 
 $Document = New-AstDocument -Path $SourcePath
 
-$Inserted = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'Loaded handler from AstOverlayLab.'"
+$Inserted = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'Loaded handler from AstEditor.'"
 if (-not $Inserted) {
     Write-Host 'Loaded handler already exists in source. Use -Force in Add-WpfDslLoadedHandler to reinsert.'
 }

@@ -1,5 +1,5 @@
 {
-  "TestSuite": "AstOverlayLab",
+  "TestSuite": "AstEditor",
   "Run": {
     "Path": [
       "Tests"

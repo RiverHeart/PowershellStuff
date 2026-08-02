@@ -1,6 +1,6 @@
-# AstOverlayLab
+# AstEditor
 
-Experimental PowerShell AST overlay framework.
+PowerShell module for editing source through immutable ASTs and validated text overlays.
 
 This project demonstrates a practical approach to AST manipulation in PowerShell:
 
@@ -12,10 +12,27 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 
 ## Files
 
-- `AstOverlay.ps1`: core classes and helper functions
+- `AstEditor.psd1`: module manifest and public export list
+- `AstEditor.psm1`: core classes and module loader
+- `Private/`: internal rewrite planning and emission helpers
+- `Public/`: exported editing commands
 - `Run-SimpleExample.ps1`: minimal demo showing prepend/replace/append line edits
 - `Run-ImageViewerMutation.ps1`: end-to-end demo against the WPF ImageViewer DSL script
-- `Tests/AstOverlay.tests.ps1`: Pester coverage for document parsing, line helpers, diff output, and WPF transform behavior
+- `Tests/AstEditor.tests.ps1`: Pester coverage for document parsing, line helpers, diff output, and WPF transform behavior
+
+## Import
+
+Use `using module` at the beginning of scripts that reference the module's classes:
+
+```powershell
+using module ./AstEditor.psd1
+
+$document = New-AstDocument -InputObject 'function Get-Greeting {}'
+$document -is [AstDocument]
+```
+
+`Import-Module ./AstEditor.psd1` is sufficient when callers use only the exported commands and do
+not include `[AstDocument]` type literals in their own script.
 
 ## Core Model
 
@@ -126,5 +143,5 @@ Output is written to:
 
 ## Notes
 
-This prototype intentionally avoids mutating PowerShell AST objects in-place.
+AstEditor intentionally avoids mutating PowerShell AST objects in-place.
 It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
