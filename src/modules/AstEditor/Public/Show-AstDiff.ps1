@@ -23,8 +23,7 @@ function Show-AstDiff {
     [OutputType([string])]
     param (
         [Parameter(Mandatory)]
-        [ValidateScript({ Test-AstDocumentInstance -InputObject $_ })]
-        [object] $Document,
+        [AstDocument] $Document,
 
         [Parameter()]
         [int[]] $EditIndex

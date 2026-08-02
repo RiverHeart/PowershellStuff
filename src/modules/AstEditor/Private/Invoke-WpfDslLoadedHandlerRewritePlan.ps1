@@ -11,8 +11,7 @@ function Invoke-WpfDslLoadedHandlerRewritePlan {
     [OutputType([bool])]
     param (
         [Parameter(Mandatory)]
-        [ValidateScript({ Test-AstDocumentInstance -InputObject $_ })]
-        [object] $Document,
+        [AstDocument] $Document,
 
         [Parameter(Mandatory)]
         [pscustomobject] $Plan

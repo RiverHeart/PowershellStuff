@@ -1,7 +1,8 @@
-using module ../AstEditor.psd1
 using namespace System.Management.Automation.Language
 
 $ErrorActionPreference = 'Stop'
+
+Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
 
 Describe 'New-AstDocument' {
     It 'parses string input via InputObject' {
@@ -22,7 +23,6 @@ Describe 'New-AstDocument' {
                 }, $true))
 
         $Overlay | Should -Not -BeNullOrEmpty
-        $Overlay | Should -BeOfType ([AstDocument])
         $Overlay.Ast.Extent.StartOffset | Should -Be 0
         $Functions.Name | Should -Be 'Get-Greeting'
     }

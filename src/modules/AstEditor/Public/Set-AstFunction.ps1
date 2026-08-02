@@ -7,8 +7,7 @@ function Set-AstFunction {
     [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]
-        [ValidateScript({ Test-AstDocumentInstance -InputObject $_ })]
-        [object] $Document,
+        [AstDocument] $Document,
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]

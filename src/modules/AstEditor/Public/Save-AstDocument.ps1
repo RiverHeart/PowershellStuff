@@ -24,8 +24,7 @@ function Save-AstDocument {
     [CmdletBinding(SupportsShouldProcess)]
     param (
         [Parameter(Mandatory)]
-        [ValidateScript({ Test-AstDocumentInstance -InputObject $_ })]
-        [object] $Document,
+        [AstDocument] $Document,
 
         [Parameter()]
         [string] $OutPath

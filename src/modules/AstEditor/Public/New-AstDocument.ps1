@@ -48,7 +48,7 @@ function New-AstDocument {
         $Tokens = $null
         $Errors = $null
 
-        if ($null -ne $InputObject -and (Test-AstDocumentInstance -InputObject $InputObject)) {
+        if ($null -ne $InputObject -and $InputObject -is [AstDocument]) {
             return $InputObject
         }
 
@@ -57,7 +57,7 @@ function New-AstDocument {
             $FileText = [File]::ReadAllText($ResolvedPath)
             $Ast = [Parser]::ParseInput($FileText, [ref] $Tokens, [ref] $Errors)
             $NewLineSequence = if ($FileText.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = New-AstDocumentInstance -Path $ResolvedPath -Text $FileText -Ast $Ast -Tokens $Tokens -ParseErrors $Errors
+            $Document = [AstDocument]::new($ResolvedPath, $FileText, $Ast, $Tokens, $Errors)
             $Document.NewLineSequence = $NewLineSequence
             return $Document
         }
@@ -66,7 +66,7 @@ function New-AstDocument {
             $Text = [string] $InputObject
             $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
             $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = New-AstDocumentInstance -Path '<memory>' -Text $Text -Ast $Ast -Tokens $Tokens -ParseErrors $Errors
+            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
             $Document.NewLineSequence = $NewLineSequence
             return $Document
         }
@@ -75,7 +75,7 @@ function New-AstDocument {
             $Text = $InputObject.Ast.Extent.Text
             $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
             $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = New-AstDocumentInstance -Path '<memory>' -Text $Text -Ast $Ast -Tokens $Tokens -ParseErrors $Errors
+            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
             $Document.NewLineSequence = $NewLineSequence
             return $Document
         }
@@ -84,7 +84,7 @@ function New-AstDocument {
             $Text = ([Ast] $InputObject).Extent.Text
             $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
             $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = New-AstDocumentInstance -Path '<memory>' -Text $Text -Ast $Ast -Tokens $Tokens -ParseErrors $Errors
+            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
             $Document.NewLineSequence = $NewLineSequence
             return $Document
         }

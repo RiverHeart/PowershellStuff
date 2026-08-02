@@ -25,8 +25,7 @@ function Resolve-AstDocument {
     [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]
-        [ValidateScript({ Test-AstDocumentInstance -InputObject $_ })]
-        [object] $Document,
+        [AstDocument] $Document,
 
         [switch] $PassThruText
     )

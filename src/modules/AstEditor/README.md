@@ -13,7 +13,8 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 ## Files
 
 - `AstEditor.psd1`: module manifest and public export list
-- `AstEditor.psm1`: core classes and module loader
+- `AstEditor.psm1`: module loader
+- `Classes/`: internal document and text-edit classes
 - `Private/`: internal rewrite planning and emission helpers
 - `Public/`: exported editing commands
 - `Run-SimpleExample.ps1`: minimal demo showing prepend/replace/append line edits
@@ -22,22 +23,22 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 
 ## Import
 
-Use `using module` at the beginning of scripts that reference the module's classes:
+Import the module and create documents through its public commands:
 
 ```powershell
-using module ./AstEditor.psd1
+Import-Module ./AstEditor.psd1
 
 $document = New-AstDocument -InputObject 'function Get-Greeting {}'
-$document -is [AstDocument]
+Resolve-AstDocument -Document $document
 ```
 
-`Import-Module ./AstEditor.psd1` is sufficient when callers use only the exported commands and do
-not include `[AstDocument]` type literals in their own script.
+`AstDocument` and `AstTextEdit` are internal implementation types. Consumers should instantiate
+documents through `New-AstDocument` and pass the returned objects to the other exported commands.
 
 ## Core Model
 
-- `AstTextEdit`: single replacement/insertion operation
-- `AstDocument`: immutable parse data plus a queued list of `AstTextEdit` edits
+- `AstTextEdit`: internal representation of a single replacement/insertion operation
+- `AstDocument`: internal immutable parse data plus a queued list of `AstTextEdit` edits
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits by index
