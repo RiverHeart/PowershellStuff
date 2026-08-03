@@ -1,3 +1,5 @@
+using namespace System.Collections.Generic
+
 <#
 .SYNOPSIS
     Runs a task and its dependencies from a TaskFile.
