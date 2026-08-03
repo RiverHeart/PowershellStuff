@@ -1,3 +1,5 @@
+using namespace System.IO
+
 <#
 .SYNOPSIS
     Parses script content into an AstDocument ready to receive edits.

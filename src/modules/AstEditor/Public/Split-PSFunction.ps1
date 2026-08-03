@@ -1,3 +1,5 @@
+using namespace System.IO
+
 <#
 .SYNOPSIS
     Previews or applies splitting top-level functions into individual files.
@@ -55,8 +57,7 @@ function Split-PSFunction {
                 return $true
             }, $true)
         )
-        $Name = @($DiscoveredFunctions |
-            ForEach-Object -MemberName Name -WhatIf:$false)
+        [string[]] $Name = $DiscoveredFunctions | Select-Object -ExpandProperty Name
     }
 
     if ($Name.Count -eq 0) {

@@ -1,3 +1,5 @@
+using namespace System.IO
+
 <#
 .SYNOPSIS
     Saves rendered document output to disk after parse validation succeeds.
