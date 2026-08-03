@@ -1,6 +1,6 @@
 Describe 'test-runner skill scripts' {
     BeforeAll {
-        $script:InvokeTestSource = Join-Path -Path $PSScriptRoot -ChildPath '../scripts/Invoke-Test.ps1'
+        $script:InvokeTestSource = Join-Path -Path $PSScriptRoot -ChildPath '../../../../tools/Invoke-Test.ps1'
         $script:InvokeTestCoverageSource = Join-Path -Path $PSScriptRoot -ChildPath '../scripts/Invoke-TestCoverage.ps1'
         $script:InvokeNewCodeGateSource = Join-Path -Path $PSScriptRoot -ChildPath '../scripts/Invoke-NewCodeGate.ps1'
 
@@ -91,7 +91,9 @@ Describe 'test-runner skill scripts' {
             )
 
             $scriptsPath = Join-Path -Path $RootPath -ChildPath 'scripts'
+            $toolsPath = Join-Path -Path $RootPath -ChildPath 'tools'
             New-Item -Path $scriptsPath -ItemType Directory -Force | Out-Null
+            New-Item -Path $toolsPath -ItemType Directory -Force | Out-Null
 
             Copy-Item -Path $script:InvokeTestCoverageSource -Destination (Join-Path -Path $scriptsPath -ChildPath 'Invoke-TestCoverage.ps1') -Force
 
@@ -145,7 +147,7 @@ param(
 
 `$data | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path -Path `$PSScriptRoot -ChildPath 'invoke-test.params.json') -NoNewline
 exit 0
-"@ | Set-Content -Path (Join-Path -Path $scriptsPath -ChildPath 'Invoke-Test.ps1') -NoNewline
+"@ | Set-Content -Path (Join-Path -Path $toolsPath -ChildPath 'Invoke-Test.ps1') -NoNewline
 
             @"
 param(
@@ -171,7 +173,7 @@ exit 0
             return [pscustomobject] @{
                 RootPath = $RootPath
                 EntryScriptPath = (Join-Path -Path $scriptsPath -ChildPath 'Invoke-TestCoverage.ps1')
-                InvokeTestParamsPath = (Join-Path -Path $scriptsPath -ChildPath 'invoke-test.params.json')
+                InvokeTestParamsPath = (Join-Path -Path $toolsPath -ChildPath 'invoke-test.params.json')
                 InvokeGateParamsPath = (Join-Path -Path $scriptsPath -ChildPath 'invoke-gate.params.json')
             }
         }
