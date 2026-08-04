@@ -14,6 +14,10 @@
       "ConfigPath": "src/modules/PleaseWork/pester.json"
     },
     {
+      "Name": "AstEditor",
+      "ConfigPath": "src/modules/AstEditor/pester.json"
+    },
+    {
       "Name": "TabCentral",
       "ConfigPath": "src/modules/TabCentral/pester.json"
     }

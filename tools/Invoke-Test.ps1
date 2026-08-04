@@ -53,22 +53,22 @@
     Returns the full Pester result object after printing the summary.
 
 .EXAMPLE
-    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example
+    ./tools/Invoke-Test.ps1 -TestSuite Example
 
 .EXAMPLE
-    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -DebugOutput
+    ./tools/Invoke-Test.ps1 -TestSuite Example -DebugOutput
 
 .EXAMPLE
-    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -Suite Example -Path Tests/Feature.tests.ps1 -DetailedOutput
+    ./tools/Invoke-Test.ps1 -Suite Example -Path Tests/Feature.tests.ps1 -DetailedOutput
 
 .EXAMPLE
-    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -Tag DataGrid -PassThru
+    ./tools/Invoke-Test.ps1 -TestSuite Example -Tag DataGrid -PassThru
 
 .EXAMPLE
-    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -ListSuites
+    ./tools/Invoke-Test.ps1 -ListSuites
 
 .EXAMPLE
-    ./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -TestSuite Example -ListTags
+    ./tools/Invoke-Test.ps1 -TestSuite Example -ListTags
 #>
 [CmdletBinding()]
 

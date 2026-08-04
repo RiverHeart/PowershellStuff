@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-. "$PSScriptRoot/AstOverlay.ps1"
+Import-Module "$PSScriptRoot/AstEditor.psd1" -Force
 
 # --- Source: any well-formed script text ---
 
@@ -32,7 +32,7 @@ if (-not $WriteHostCall) {
 
 $Overlay.PrependLine($WriteHostCall, 'Write-Output "....testing, mic check..."', 'Insert greeting before Write-Host')
 $Overlay.Replace($WriteHostCall, 'Write-Output "Hello, $Name!"', 'Replace Write-Host with Write-Output')
-$Overlay.AppendLine($WriteHostCall, 'Write-Output "Welcome to the AstOverlayLab!"', 'Insert additional greeting after Write-Host')
+$Overlay.AppendLine($WriteHostCall, 'Write-Output "Welcome to AstEditor!"', 'Insert additional greeting after Write-Host')
 
 # --- 4. Render and validate ---
 

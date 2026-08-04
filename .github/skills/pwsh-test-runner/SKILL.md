@@ -17,15 +17,15 @@ This is the preferred path for any project in the workspace unless the user expl
 - Running specific files or directories within a configured suite.
 - Summarizing results with compact output that is easy for agents to consume.
 
-## Bundled assets
+## Repository tools
 
-Use the bundled test runner script asset at:
+Use the repository test runner at:
 
 ```powershell
-"$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1"
+"$(git rev-parse --show-toplevel)/tools/Invoke-Test.ps1"
 ```
 
-Use the bundled coverage runner script asset at:
+The dedicated coverage runner remains a bundled skill asset at:
 
 ```powershell
 "$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-TestCoverage.ps1"
@@ -34,7 +34,7 @@ Use the bundled coverage runner script asset at:
 Instead of reading the entire script, discover capabilities and usage with:
 
 ```powershell
-Get-Help "$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1" -Detailed
+Get-Help "$(git rev-parse --show-toplevel)/tools/Invoke-Test.ps1" -Detailed
 ```
 
 Use compact output by default. Only enable detailed Pester console output when needed with `-DetailedOutput`.
@@ -45,13 +45,13 @@ Use `Invoke-TestCoverage.ps1` when you need a dedicated coverage command and opt
 Run a configured suite (`-Suite` is an alias for `-TestSuite`):
 
 ```powershell
-./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 -Suite TabCentral
+./tools/Invoke-Test.ps1 -Suite TabCentral
 ```
 
 Run one or more focused paths instead of all paths configured by the suite:
 
 ```powershell
-./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 `
+./tools/Invoke-Test.ps1 `
     -Suite TabCentral `
     -Path Tests/TabCentralState.tests.ps1
 ```
@@ -59,7 +59,7 @@ Run one or more focused paths instead of all paths configured by the suite:
 Relative `-Path` values are resolved from the directory containing the selected suite's configuration file. Absolute paths are also accepted. Use `-DetailedOutput` when full Pester discovery and test output is needed:
 
 ```powershell
-./.github/skills/pwsh-test-runner/scripts/Invoke-Test.ps1 `
+./tools/Invoke-Test.ps1 `
     -Suite TabCentral `
     -Path Tests/TabCentralState.tests.ps1 `
     -DetailedOutput
