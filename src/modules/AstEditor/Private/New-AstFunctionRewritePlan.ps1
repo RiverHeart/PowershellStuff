@@ -1,3 +1,5 @@
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Builds a validated rewrite plan for replacing one PowerShell function.

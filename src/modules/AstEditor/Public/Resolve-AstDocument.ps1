@@ -1,3 +1,5 @@
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Renders queued edits and re-parses the result, returning diagnostics.

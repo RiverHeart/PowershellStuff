@@ -1,4 +1,5 @@
 using namespace System.IO
+using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
