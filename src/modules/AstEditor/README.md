@@ -124,11 +124,11 @@ Pass `-Name Get-One, Get-Two` to select functions. Existing destination files ar
 
 ### Extraction TODOs
 
-- Guarantee that extracted function files end with a newline.
+- Add newline when saving extracted function.
+- Find all type declarations and attempt to determine any `using` statements that need included with the extraction.
 - Continue excluding constructors and methods beneath type definitions from top-level discovery.
 - Report class and other lexical type dependencies that may not resolve after extraction.
 - Support caller-provided destination classification, such as mapping functions to `Public` or `Private`.
-- Produce a migration report listing residual declarations and likely lexical dependencies.
 
 ## WPF DSL Transform (first pass)
 
