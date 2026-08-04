@@ -1,33 +1,17 @@
 # Please Work
 
-A small, sequential PowerShell task runner with makefile-like task declarations.
 
-```powershell
-Import-Module ./PleaseWork.psd1
-
-please              # Finds TaskFile.ps1 and runs its first declared task
-please start
-please build
-please -List        # Lists tasks without running them
-please build -WhatIf
-please build -PassThru
-please test -TaskFile ./AnotherTaskFile.ps1
 ```
-
-Task names support tab completion. Completion parses declaration metadata without invoking the
-TaskFile or any task bodies:
-
-```powershell
-please bu<Tab>                         # build
-please -TaskFile ./Release.ps1 de<Tab> # deploy
+"Life is not so short but that there is always time enough for courtesy."  
+     — Ralph Waldo Emerson
 ```
+\
+\
+Please Work is a small PowerShell task runner with makefile-like task declarations.
 
-When `-TaskFile` is already present on the command line, completion reads that file. Otherwise it
-uses normal upward `TaskFile.ps1` discovery. A `-TaskFile` argument written later on the command line
-is not yet bound during completion, so the discovered TaskFile is used for that case.
+Tasks are defined as `name: dependencies { body }`. Dependencies are optional:
 
-A TaskFile declares tasks as `name: dependencies { body }`. Dependencies are optional:
-
+**taskfile.ps1**
 ```powershell
 lint: {
     Invoke-ScriptAnalyzer -Path ./src
@@ -40,6 +24,25 @@ test: lint {
 build: test {
     dotnet build
 }
+```
+
+Invocation of the taskfile is about what you'd expect.
+
+```powershell
+Import-Module ./PleaseWork.psd1
+
+please              # Run the default task
+please build        # Run a specific task
+please -List        # Lists tasks without running them
+please test -TaskFile ./AnotherTaskFile.ps1  # Run tasks in a specific taskfile
+```
+
+Task names support tab completion. Completion parses declaration metadata without invoking the
+TaskFile or any task bodies:
+
+```powershell
+please bu<Tab>                         # build
+please -TaskFile ./Release.ps1 de<Tab> # deploy
 ```
 
 Task declarations must be top-level statements. Each task name and its dependencies must be bare
