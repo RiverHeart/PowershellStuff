@@ -86,9 +86,14 @@ function Invoke-PleaseWork {
         return
     }
 
+    # As much as I would like to populate PSScriptRoot in the context of the task scriptblock
+    # Powershell doesn't allow it.
     $TaskContext = @{
         TaskFilePath = $TaskFilePath
         TaskFileRoot = $TaskFileRoot
+    }
+    if (Get-Command 'git' -ErrorAction SilentlyContinue) {
+        $TaskContext.GitRoot = (git rev-parse --show-toplevel 2>$null)
     }
     $OriginalLocation = Get-Location
     try {
