@@ -57,20 +57,57 @@ function Get-TaskDeclaration {
             throw "Task '$TaskName' must end with a scriptblock body."
         }
 
-        if ($CommandElements.Count -gt 2) {
-            $Dependencies = [List[string]]::new()
-            foreach ($DependencyAst in $CommandElements[1..($CommandElements.Count - 2)]) {
-                if (
-                    -not ($DependencyAst -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
-                    $DependencyAst.StringConstantType -ne [System.Management.Automation.Language.StringConstantType]::BareWord
-                ) {
-                    throw "Dependencies for task '$TaskName' must be bare task names."
-                }
-
-                $Dependencies.Add($DependencyAst.Value)
+        $Dependencies = [List[string]]::new()
+        $PathSpecs = [List[string]]::new()
+        $ElementIndex = 1
+        while ($ElementIndex -lt ($CommandElements.Count - 1)) {
+            $DependencyAst = $CommandElements[$ElementIndex]
+            if (
+                -not ($DependencyAst -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
+                $DependencyAst.StringConstantType -ne [System.Management.Automation.Language.StringConstantType]::BareWord
+            ) {
+                throw "Dependencies for task '$TaskName' must be bare task names."
             }
-        } else {
-            $Dependencies = [List[string]]::new()
+
+            if ($DependencyAst.Value -ine 'changed') {
+                $Dependencies.Add($DependencyAst.Value)
+                $ElementIndex++
+                continue
+            }
+
+            $ElementIndex++
+            if ($ElementIndex -ge ($CommandElements.Count - 1) -or
+                -not ($CommandElements[$ElementIndex] -is [System.Management.Automation.Language.ParenExpressionAst])
+            ) {
+                throw "Changeset filter for task '$TaskName' must use changed('pathspec', ...)."
+            }
+
+            $FilterPipeline = $CommandElements[$ElementIndex].Pipeline
+            if ($FilterPipeline.PipelineElements.Count -ne 1 -or
+                -not ($FilterPipeline.PipelineElements[0] -is [System.Management.Automation.Language.CommandExpressionAst])
+            ) {
+                throw "Changeset filters for task '$TaskName' must contain only string pathspecs."
+            }
+
+            $FilterExpression = $FilterPipeline.PipelineElements[0].Expression
+            if ($FilterExpression -is [System.Management.Automation.Language.ArrayLiteralAst]) {
+                $FilterElements = @($FilterExpression.Elements)
+            } else {
+                $FilterElements = @($FilterExpression)
+            }
+
+            if ($FilterElements.Count -eq 0) {
+                throw "Changeset filter for task '$TaskName' must contain at least one pathspec."
+            }
+            foreach ($FilterElement in $FilterElements) {
+                if (-not ($FilterElement -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
+                    [string]::IsNullOrWhiteSpace($FilterElement.Value)
+                ) {
+                    throw "Changeset filters for task '$TaskName' must contain only string pathspecs."
+                }
+                $PathSpecs.Add($FilterElement.Value)
+            }
+            $ElementIndex++
         }
 
         $Comments = [List[string]]::new()
@@ -95,6 +132,7 @@ function Get-TaskDeclaration {
             Name = $TaskName
             CommandToken = $CommandToken
             Dependencies = $Dependencies.ToArray()
+            PathSpecs = $PathSpecs.ToArray()
             Comments = $Comments.ToArray()
             Help = $TaskHelp
         }

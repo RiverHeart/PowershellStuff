@@ -17,6 +17,27 @@ lint: { 'lint' }
             Get-Variable -Name PleaseWorkDeclarationExecuted -Scope Global -ErrorAction SilentlyContinue |
                 Should -BeNullOrEmpty
         }
+
+        It 'separates task dependencies from changed pathspecs' {
+            $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+            @'
+build: test changed('./Public', './Private') { 'build' }
+test: { 'test' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+            $Declaration = @(Get-TaskFileDeclaration -Path $TaskFile)[0]
+
+            $Declaration.Dependencies | Should -Be @('test')
+            $Declaration.PathSpecs | Should -Be @('./Public', './Private')
+        }
+
+        It 'rejects nonliteral changed pathspecs' {
+            $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+            "build: changed(`$Path) { 'build' }" | Set-Content -LiteralPath $TaskFile
+
+            { Get-TaskFileDeclaration -Path $TaskFile } |
+                Should -Throw "Changeset filters for task 'build' must contain only string pathspecs."
+        }
     }
 }
 

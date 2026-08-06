@@ -69,6 +69,7 @@ function Invoke-PleaseWork {
             [pscustomobject] @{
                 Name = $TaskName
                 Dependencies = [string[]] $TaskSet.Tasks[$TaskName].Dependencies
+                PathSpecs = [string[]] $TaskSet.Tasks[$TaskName].PathSpecs
                 Default = $TaskName -eq $TaskSet.DefaultTask
                 Description = $Description
             }
@@ -92,21 +93,63 @@ function Invoke-PleaseWork {
         TaskFilePath = $TaskFilePath
         TaskFileRoot = $TaskFileRoot
     }
-    if (Get-Command 'git' -ErrorAction SilentlyContinue) {
-        $TaskContext.GitRoot = (git rev-parse --show-toplevel 2>$null)
+    $Changeset = $null
+    if (@($TaskOrder | Where-Object { $TaskSet.Tasks[$_].PathSpecs.Count -gt 0 }).Count -gt 0) {
+        $BaseRef = if ($TaskSet.Config.Contains('BaseRef')) {
+            [string] $TaskSet.Config['BaseRef']
+        } else {
+            $null
+        }
+        $HeadRef = if ($TaskSet.Config.Contains('HeadRef')) {
+            [string] $TaskSet.Config['HeadRef']
+        } elseif (-not [string]::IsNullOrWhiteSpace($env:GIT_COMMIT)) {
+            $env:GIT_COMMIT
+        } else {
+            'HEAD'
+        }
+        $Changeset = Get-GitChangeset `
+            -WorkingDirectory $TaskFileRoot `
+            -BaseRef $BaseRef `
+            -HeadRef $HeadRef
+        $TaskContext.Changeset = $Changeset
+        $TaskContext.GitRoot = $Changeset.Root
+    } elseif (Get-Command 'git' -ErrorAction SilentlyContinue) {
+        $GitRoot = git -C $TaskFileRoot rev-parse --show-toplevel 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $TaskContext.GitRoot = [string] @($GitRoot)[0]
+        }
     }
+    $ExecutedTasks = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $OriginalLocation = Get-Location
     try {
         foreach ($TaskName in $TaskOrder) {
             Set-Location -LiteralPath $TaskFileRoot
+            $Task = $TaskSet.Tasks[$TaskName]
+            [string[]] $ChangedFiles = @()
+            if ($Task.PathSpecs.Count -gt 0) {
+                $DependencyRan = @($Task.Dependencies | Where-Object { $ExecutedTasks.Contains($_) }).Count -gt 0
+                $ChangedFiles = @(Get-GitChangedFile `
+                    -Changeset $Changeset `
+                    -PathSpec $Task.PathSpecs)
+                if ($Changeset.Available -and $ChangedFiles.Count -eq 0 -and -not $DependencyRan) {
+                    Write-Verbose "Skipped task '$TaskName' because its changeset filters did not match."
+                    continue
+                }
+            }
+
+            $CurrentTaskContext = @{}
+            foreach ($ContextName in $TaskContext.Keys) {
+                $CurrentTaskContext[$ContextName] = $TaskContext[$ContextName]
+            }
+            $CurrentTaskContext.ChangedFiles = $ChangedFiles
             $TaskResult = $null
             $TaskOutput = [List[object]]::new()
             try {
                 Invoke-PleaseWorkTask `
                     -Name $TaskName `
-                    -ScriptBlock $TaskSet.Tasks[$TaskName].ScriptBlock `
+                    -ScriptBlock $Task.ScriptBlock `
                     -Arguments $RemainingArguments `
-                    -Context $TaskContext `
+                    -Context $CurrentTaskContext `
                     -Result ([ref] $TaskResult) |
                     ForEach-Object { $TaskOutput.Add($_) }
             } catch {
@@ -140,6 +183,7 @@ function Invoke-PleaseWork {
             if (-not $TaskResult.Succeeded) {
                 throw "Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."
             }
+            $null = $ExecutedTasks.Add($TaskName)
         }
     } finally {
         Set-Location -LiteralPath $OriginalLocation.Path

@@ -61,6 +61,122 @@ build: lint test { $global:PleaseWorkLog.Add('build') }
         $global:PleaseWorkLog | Should -Be @('restore', 'lint', 'test', 'build')
     }
 
+    It 'skips a filtered task when no changed files match' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = 'base'
+                HeadRef = 'head'
+                CompareRef = 'base'
+                HeadCommit = 'head'
+                Files = @('README.md')
+                Available = $true
+            }
+        }
+        Mock Get-GitChangedFile { @() }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'exposes matching files and changeset metadata to a filtered task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$PleaseWorkConfig = @{ BaseRef = 'configured-base'; HeadRef = 'configured-head' }
+build: changed('./Public') {
+    $global:PleaseWorkLog.Add('build')
+    $global:PleaseWorkChangedFiles = $ChangedFiles
+    $global:PleaseWorkChangeset = $Changeset
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = $BaseRef
+                HeadRef = $HeadRef
+                CompareRef = 'base'
+                HeadCommit = 'head'
+                Files = @('Public/One.ps1', 'README.md')
+                Available = $true
+            }
+        }
+        Mock Get-GitChangedFile { @('Public/One.ps1') }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('build')
+        $global:PleaseWorkChangedFiles | Should -Be @('Public/One.ps1')
+        $global:PleaseWorkChangeset.Files | Should -Be @('Public/One.ps1', 'README.md')
+        $global:PleaseWorkChangeset.Provider | Should -Be 'Git'
+        Should -Invoke Get-GitChangeset -Times 1 -Exactly -ParameterFilter {
+            $BaseRef -eq 'configured-base' -and $HeadRef -eq 'configured-head'
+        }
+        Remove-Variable -Name PleaseWorkChangedFiles -Scope Global
+        Remove-Variable -Name PleaseWorkChangeset -Scope Global
+    }
+
+    It 'runs an unmatched filtered task when one of its task dependencies ran' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+test: changed('./Tests') { $global:PleaseWorkLog.Add('test') }
+build: test changed('./Public') { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = 'base'
+                HeadRef = 'head'
+                CompareRef = 'base'
+                HeadCommit = 'head'
+                Files = @('Tests/One.tests.ps1')
+                Available = $true
+            }
+        }
+        Mock Get-GitChangedFile {
+            if ($PathSpec -contains './Tests') {
+                return @('Tests/One.tests.ps1')
+            }
+            return @()
+        }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('test', 'build')
+    }
+
+    It 'runs filtered tasks when no reliable base ref is available' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = $null
+                HeadRef = 'HEAD'
+                CompareRef = $null
+                HeadCommit = $null
+                Files = @()
+                Available = $false
+            }
+        }
+        Mock Get-GitChangedFile { @('Public/Working.ps1') }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('build')
+        Should -Invoke Get-GitChangedFile -Times 1 -Exactly
+    }
+
     It 'rejects a missing dependency before running any task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'

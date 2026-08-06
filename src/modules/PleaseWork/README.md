@@ -97,6 +97,42 @@ By default, task output remains in the normal output pipeline. With `-PassThru`,
 returns one result object per executed task and stores each task's output in that result's `Output`
 property. The final native status remains available through `$LASTEXITCODE`.
 
+
+Tasks can use `changed()` filters containing literal Git pathspecs. A filtered task runs when a
+matching file changed or when one of its task dependencies ran:
+
+```powershell
+$PleaseWorkConfig = @{
+    BaseRef = $env:GIT_PREVIOUS_SUCCESSFUL_COMMIT
+    HeadRef = if ($env:GIT_COMMIT) { $env:GIT_COMMIT } else { 'HEAD' }
+}
+
+test: changed('./Tests') {
+    Invoke-Pester -Path $ChangedFiles
+}
+
+build: test changed('./Public', './Private') {
+    & "$GitRoot/tools/Build-PSResource.ps1" -ProjectPath ./project.psd1
+}
+```
+
+### Incremental Builds
+
+PleaseWork does not persist the last successful commit itself meaning it can't support
+incremental builds on its own. CI systems that track state can be used to set `$PleaseWorkConfig.BaseRef`
+and `$PleaseWorkConfig.HeadRef` from their own build variables. For example, Jenkins' Git
+plugin exposes `GIT_PREVIOUS_SUCCESSFUL_COMMIT` and `GIT_COMMIT`. PleaseWork recognizes those
+variables as built-in fallbacks, so Jenkins commonly needs no explicit TaskFile configuration.
+
+Explicit configuration takes precedence over recognized environment variables. On a first build,
+or when no previous successful commit is available, PleaseWork tries the remote default branch and
+otherwise runs filtered tasks conservatively.
+
+Filtered task bodies receive `$ChangedFiles`, containing repository-relative files matching that
+task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `BaseRef`, `HeadRef`, `CompareRef`,
+`Files`, and `Available`; `$Changeset.Files` contains the complete changeset. All task bodies receive
+`$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
+
 ## Future parallel execution
 
 Parallel execution will extend the same result model into each worker rather than relying on one

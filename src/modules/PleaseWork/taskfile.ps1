@@ -1,4 +1,4 @@
-build: {
+build: changed('./Public', './Private') {
     Write-Host "Building the project..."
 
     & "$GitRoot/tools/Build-PSResource.ps1" `
