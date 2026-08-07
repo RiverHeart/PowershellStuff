@@ -18,12 +18,14 @@ function Get-GitChangeset {
     )
 
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        throw 'Git is required when a task uses changed().'
+        Write-Error 'Git is required when a task uses changed().' -Category InvalidOperation
+        return
     }
 
     $Root = git -C $WorkingDirectory rev-parse --show-toplevel 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Root)) {
-        throw "TaskFile directory '$WorkingDirectory' is not inside a Git worktree."
+        Write-Error "TaskFile directory '$WorkingDirectory' is not inside a Git worktree." -Category InvalidOperation
+        return
     }
     $Root = [string] @($Root)[0]
 
@@ -41,7 +43,8 @@ function Get-GitChangeset {
 
     $HeadCommit = git -C $Root rev-parse --verify "$HeadRef`^{commit}" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        throw "Git head ref '$HeadRef' does not identify a commit."
+        Write-Error "Git head ref '$HeadRef' does not identify a commit." -Category InvalidOperation
+        return
     }
     $HeadCommit = [string] @($HeadCommit)[0]
 
@@ -61,12 +64,14 @@ function Get-GitChangeset {
 
     $BaseCommit = git -C $Root rev-parse --verify "$BaseRef`^{commit}" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        throw "Git base ref '$BaseRef' does not identify a commit."
+        Write-Error "Git base ref '$BaseRef' does not identify a commit." -Category InvalidOperation
+        return
     }
     $BaseCommit = [string] @($BaseCommit)[0]
     $CompareRef = git -C $Root merge-base $BaseCommit $HeadCommit 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CompareRef)) {
-        throw "Git could not find a merge base for '$BaseRef' and '$HeadRef'."
+        Write-Error "Git could not find a merge base for '$BaseRef' and '$HeadRef'." -Category InvalidOperation
+        return
     }
     $CompareRef = [string] @($CompareRef)[0]
 
