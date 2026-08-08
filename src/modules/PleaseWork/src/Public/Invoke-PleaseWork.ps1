@@ -36,12 +36,14 @@ function Invoke-PleaseWork {
                         )
                     }
                 }
-                [System.Management.Automation.CompletionResult]::new(
-                    'help',
-                    'help',
-                    [System.Management.Automation.CompletionResultType]::ParameterValue,
-                    'Display help information'
-                )
+                if ('help'.StartsWith($WordToComplete, [StringComparison]::OrdinalIgnoreCase)) {
+                    [System.Management.Automation.CompletionResult]::new(
+                        'help',
+                        'help',
+                        [System.Management.Automation.CompletionResultType]::ParameterValue,
+                        'Display help information'
+                    )
+                }
             } catch {
                 return @()
             }

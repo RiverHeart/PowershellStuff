@@ -653,6 +653,16 @@ test: { 'test' }
 
         $Completion.CompletionMatches.CompletionText | Should -Be @('deploy', 'destroy')
     }
+
+    It 'completes native help when its prefix matches' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        "build: { 'build' }" | Set-Content -LiteralPath $TaskFile
+        $InputScript = "please -TaskFile '$TaskFile' he"
+
+        $Completion = TabExpansion2 -InputScript $InputScript -CursorColumn $InputScript.Length
+
+        $Completion.CompletionMatches.CompletionText | Should -Be @('help')
+    }
 }
 }
 
