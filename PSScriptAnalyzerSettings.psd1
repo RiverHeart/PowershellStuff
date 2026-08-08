@@ -20,7 +20,7 @@
         }
         PSUseCompatibleSyntax = @{
             Enable = $true
-            TargetVersions = @('PowerShellCore', 'PowerShellDesktop')
+            TargetVersions = @('5.1')
         }
         PSUseCompatibleCmdlets = @{
             compatibility = 'desktop-5.1.14393.206-windows'

@@ -1,4 +1,5 @@
 using namespace System.Collections.Generic
+using namespace System.Management.Automation
 
 <#
 .SYNOPSIS
@@ -24,16 +25,16 @@ function Invoke-PleaseWorkTask {
         [ref] $Result
     )
 
-    $Variables = [List[System.Management.Automation.PSVariable]]::new()
+    $Variables = [List[PSVariable]]::new()
     $Variables.Add(
-        [System.Management.Automation.PSVariable]::new('ErrorActionPreference', 'Stop')
+        [PSVariable]::new('ErrorActionPreference', 'Stop')
     )
     foreach ($VariableName in $Context.Keys) {
         if ($VariableName -eq 'ErrorActionPreference') {
             continue
         }
         $Variables.Add(
-            [System.Management.Automation.PSVariable]::new(
+            [PSVariable]::new(
                 [string] $VariableName,
                 $Context[$VariableName]
             )

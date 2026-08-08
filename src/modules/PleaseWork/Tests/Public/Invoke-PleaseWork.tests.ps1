@@ -61,6 +61,112 @@ build: lint test { $global:PleaseWorkLog.Add('build') }
         $global:PleaseWorkLog | Should -Be @('restore', 'lint', 'test', 'build')
     }
 
+    It 'skips a filtered task when no changed files match' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+    $PleaseConfig = @{ BaseRef = 'base' }
+build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = 'base'
+                HeadRef = 'head'
+                CompareRef = 'base'
+                HeadCommit = 'head'
+                Files = @('README.md')
+                Available = $true
+            }
+        }
+        Mock Get-GitChangedPath { @() }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'exposes matching files and changeset metadata to a filtered task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+    $PleaseConfig = @{ BaseRef = 'configured-base'; HeadRef = 'configured-head' }
+build: changed('./Public') {
+    $global:PleaseWorkLog.Add('build')
+    $global:PleaseWorkChangedFiles = $ChangedFiles
+    $global:PleaseWorkChangeset = $Changeset
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = $BaseRef
+                HeadRef = $HeadRef
+                CompareRef = 'base'
+                HeadCommit = 'head'
+                Files = @('Public/One.ps1', 'README.md')
+                Available = $true
+            }
+        }
+        Mock Get-GitChangedPath { @('Public/One.ps1') }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('build')
+        $global:PleaseWorkChangedFiles | Should -Be @('Public/One.ps1')
+        $global:PleaseWorkChangeset.Files | Should -Be @('Public/One.ps1', 'README.md')
+        $global:PleaseWorkChangeset.Provider | Should -Be 'Git'
+        Should -Invoke Get-GitChangeset -Times 1 -Exactly -ParameterFilter {
+            $BaseRef -eq 'configured-base' -and $HeadRef -eq 'configured-head'
+        }
+        Remove-Variable -Name PleaseWorkChangedFiles -Scope Global
+        Remove-Variable -Name PleaseWorkChangeset -Scope Global
+    }
+
+    It 'runs an unmatched filtered task when one of its task dependencies ran' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+    $PleaseConfig = @{ BaseRef = 'base' }
+test: changed('./Tests') { $global:PleaseWorkLog.Add('test') }
+build: test changed('./Public') { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+        Mock Get-GitChangeset {
+            [pscustomobject] @{
+                Provider = 'Git'
+                Root = 'C:\repo'
+                BaseRef = 'base'
+                HeadRef = 'head'
+                CompareRef = 'base'
+                HeadCommit = 'head'
+                Files = @('Tests/One.tests.ps1')
+                Available = $true
+            }
+        }
+        Mock Get-GitChangedPath {
+            if ($PathSpec -contains './Tests') {
+                return @('Tests/One.tests.ps1')
+            }
+            return @()
+        }
+
+        please build -TaskFile $TaskFile
+
+        $global:PleaseWorkLog | Should -Be @('test', 'build')
+    }
+
+    It 'rejects a filtered task when no base ref is configured' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
+'@ | Set-Content -LiteralPath $TaskFile
+    Mock Get-GitChangeset { throw 'Get-GitChangeset should not be called.' }
+
+        { please build -TaskFile $TaskFile } |
+            Should -Throw 'Tasks using changed() require a non-empty $PleaseConfig.BaseRef.'
+        $global:PleaseWorkLog.Count | Should -Be 0
+        Should -Invoke Get-GitChangeset -Times 0 -Exactly
+    }
+
     It 'rejects a missing dependency before running any task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
@@ -191,6 +297,48 @@ build: { 'build' }
         $Tasks = @(please -List -TaskFile $TaskFile)
         $Tasks[0].Description | Should -Be 'Starts the build.'
         $Tasks[1].Description | Should -BeNullOrEmpty
+    }
+
+    It 'displays native help as task names and descriptions without executing tasks' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+<#
+.DESCRIPTION
+    Builds the project.
+#>
+build: { $global:PleaseWorkLog.Add('build') }
+test: { $global:PleaseWorkLog.Add('test') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please help -TaskFile $TaskFile)
+
+        $Output | Should -Be @(
+            'Available tasks:'
+            '  build  Builds the project.'
+            '  test'
+        )
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'rejects a user task named help by default' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        "help: { 'custom help' }" | Set-Content -LiteralPath $TaskFile
+
+        { please help -TaskFile $TaskFile } |
+            Should -Throw "Task 'help' is reserved. Set `$PleaseConfig.OverrideHelp = `$true to override it."
+    }
+
+    It 'runs a user help task when PleaseConfig overrides native help' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$PleaseConfig = @{ OverrideHelp = $true }
+help: { 'custom help' }
+build: { 'build' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please help -TaskFile $TaskFile)
+
+        $Output | Should -Be @('custom help')
     }
 
     It 'does not execute tasks under WhatIf' {

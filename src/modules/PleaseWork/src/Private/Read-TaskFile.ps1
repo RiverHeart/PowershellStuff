@@ -32,6 +32,8 @@ function Read-TaskFile {
             foreach ($Declaration in $TaskDeclarations) {
                 $TaskName = $Declaration.Name
                 $TaskHelp = $Declaration.Help
+                $TaskDependencies = $Declaration.Dependencies
+                $TaskPathSpecs = $Declaration.PathSpecs
                 $TaskCommand = {
                     [CmdletBinding()]
                     param (
@@ -43,7 +45,9 @@ function Read-TaskFile {
                         -Name $TaskName `
                         -Help $TaskHelp `
                         -Registry $script:RegisteredTasks `
-                        -Arguments $Arguments
+                        -Dependencies $TaskDependencies `
+                        -PathSpecs $TaskPathSpecs `
+                        -ScriptBlock $Arguments[-1]
                 }.GetNewClosure()
 
                 Set-Item -LiteralPath "Function:$($Declaration.CommandToken)" -Value $TaskCommand
@@ -54,7 +58,24 @@ function Read-TaskFile {
             $null = @(. $BoundScriptBlock)
         }
     $Tasks = @(& $TaskFileModule { $script:RegisteredTasks })
+    $TaskConfig = & $TaskFileModule {
+        $ConfigVariable = Get-Variable -Name PleaseConfig -Scope Script -ErrorAction SilentlyContinue
+        if ($null -eq $ConfigVariable) {
+            return @{}
+        }
+        if (-not ($ConfigVariable.Value -is [System.Collections.IDictionary])) {
+            throw '$PleaseConfig must be a dictionary.'
+        }
+        return $ConfigVariable.Value
+    }
     $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
+
+    $HelpTask = @($Tasks | Where-Object { $_.Name -ieq 'help' })
+    $OverrideHelp = $TaskConfig.Contains('OverrideHelp') -and
+        $TaskConfig['OverrideHelp'] -eq $true
+    if ($HelpTask.Count -gt 0 -and -not $OverrideHelp) {
+        throw "Task 'help' is reserved. Set `$PleaseConfig.OverrideHelp = `$true to override it."
+    }
 
     foreach ($TaskDefinition in $Tasks) {
         if ($TasksByName.ContainsKey($TaskDefinition.Name)) {
@@ -68,6 +89,7 @@ function Read-TaskFile {
         DefaultTask = if ($env:PLEASE_DEFAULT_TASK) { $env:PLEASE_DEFAULT_TASK } else { $Tasks[0].Name }
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
+        Config = $TaskConfig
         Module = $TaskFileModule
     }
 }

@@ -1,33 +1,17 @@
 # Please Work
 
-A small, sequential PowerShell task runner with makefile-like task declarations.
 
-```powershell
-Import-Module ./PleaseWork.psd1
-
-please              # Finds TaskFile.ps1 and runs its first declared task
-please start
-please build
-please -List        # Lists tasks without running them
-please build -WhatIf
-please build -PassThru
-please test -TaskFile ./AnotherTaskFile.ps1
 ```
-
-Task names support tab completion. Completion parses declaration metadata without invoking the
-TaskFile or any task bodies:
-
-```powershell
-please bu<Tab>                         # build
-please -TaskFile ./Release.ps1 de<Tab> # deploy
+"Life is not so short but that there is always time enough for courtesy."  
+     — Ralph Waldo Emerson
 ```
+\
+\
+Please Work is a small PowerShell task runner with makefile-like task declarations.
 
-When `-TaskFile` is already present on the command line, completion reads that file. Otherwise it
-uses normal upward `TaskFile.ps1` discovery. A `-TaskFile` argument written later on the command line
-is not yet bound during completion, so the discovered TaskFile is used for that case.
+Tasks are defined as `name: dependencies { body }`. Dependencies are optional:
 
-A TaskFile declares tasks as `name: dependencies { body }`. Dependencies are optional:
-
+**taskfile.ps1**
 ```powershell
 lint: {
     Invoke-ScriptAnalyzer -Path ./src
@@ -40,6 +24,37 @@ test: lint {
 build: test {
     dotnet build
 }
+```
+
+Invocation of the taskfile is about what you'd expect.
+
+```powershell
+Import-Module ./PleaseWork.psd1
+
+please              # Run the default task
+please build        # Run a specific task
+please -List        # Lists tasks without running them
+please help         # Displays task names and descriptions as text
+please test -TaskFile ./AnotherTaskFile.ps1  # Run tasks in a specific taskfile
+```
+
+`help` is reserved for the native task display. To replace it with a TaskFile task, opt in
+explicitly and declare the task:
+
+```powershell
+$PleaseConfig = @{ OverrideHelp = $true }
+
+help: {
+    Write-Output 'Project-specific help'
+}
+```
+
+Task names support tab completion. Completion parses declaration metadata without invoking the
+TaskFile or any task bodies:
+
+```powershell
+please bu<Tab>                         # build
+please -TaskFile ./Release.ps1 de<Tab> # deploy
 ```
 
 Task declarations must be top-level statements. Each task name and its dependencies must be bare
@@ -94,6 +109,47 @@ By default, task output remains in the normal output pipeline. With `-PassThru`,
 returns one result object per executed task and stores each task's output in that result's `Output`
 property. The final native status remains available through `$LASTEXITCODE`.
 
+
+Tasks can use `changed()` filters containing literal Git pathspecs. A filtered task runs when a
+matching file changed or when one of its task dependencies ran:
+
+```powershell
+$PleaseConfig = @{
+    BaseRef = if ($env:GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
+        $env:GIT_PREVIOUS_SUCCESSFUL_COMMIT
+    } else {
+        'origin/main'
+    }
+    HeadRef = if ($env:GIT_COMMIT) { $env:GIT_COMMIT } else { 'HEAD' }
+}
+
+test: changed('./Tests') {
+    Invoke-Pester -Path $ChangedFiles
+}
+
+build: test changed('./Public', './Private') {
+    & "$GitRoot/tools/Build-PSResource.ps1" -ProjectPath ./project.psd1
+}
+```
+
+### Incremental Builds
+
+PleaseWork does not persist the last successful commit itself, so CI systems that track state can
+set `$PleaseConfig.BaseRef` and `$PleaseConfig.HeadRef` from their own build variables.
+For example, Jenkins' Git plugin exposes `GIT_PREVIOUS_SUCCESSFUL_COMMIT` and `GIT_COMMIT`.
+PleaseWork does not read CI-specific variables automatically.
+
+`BaseRef` is required when a task uses `changed()`; set it to a branch such as `origin/main` or a
+commit supplied by the CI system. `HeadRef` defaults to `HEAD`. Pathspecs are evaluated relative to
+the TaskFile directory, while
+`$ChangedFiles` contains repository-relative paths. A filtered task with no matching files is
+skipped unless one of its task dependencies ran.
+
+Filtered task bodies receive `$ChangedFiles`, containing repository-relative files matching that
+task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `WorkingRoot`, `BaseRef`, `HeadRef`, `CompareRef`,
+`Files`, and `Available`; `$Changeset.Files` contains the complete changeset. All task bodies receive
+`$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
+
 ## Future parallel execution
 
 Parallel execution will extend the same result model into each worker rather than relying on one
@@ -109,3 +165,9 @@ The runner's overall outcome is therefore aggregate: it fails when any task fail
 pretend that one worker's native exit code is the canonical batch exit code. The exact task exit code
 remains available in that task's result and can be included in verbose output. A command-line wrapper
 can map aggregate success or failure to a conventional process exit code such as `0` or `1`.
+
+
+## Maintainer Notes
+
+* It's too bad Powershell help comments don't support a terse inline form like `.DESCRIPTION  Description text`.
+* Maybe `help` should use `.SYNOPSIS` instead of `.DESCRIPTION` and `.DESCRIPTION` should be shown for a new `please help foo` form or maybe that shows the entire help text. No doubt, a single inline comment is the nicest, terse syntax for regular `please help` usage. I'm unsure too many people would make full use of the help comment support.

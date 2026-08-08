@@ -1,9 +1,9 @@
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
 $Paths = @(
-    'Classes'
-    'Private'
-    'Public'
+    'src/Classes'
+    'src/Private'
+    'src/Public'
 )
 
 foreach ($Path in $Paths) {
