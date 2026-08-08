@@ -113,7 +113,9 @@ build: changed('./Public') {
         please build -TaskFile $TaskFile
 
         $global:PleaseWorkLog | Should -Be @('build')
-        $global:PleaseWorkChangedFiles | Should -Be @('Public/One.ps1')
+        $global:PleaseWorkChangedFiles | Should -Be @(
+            [System.IO.Path]::GetFullPath((Join-Path 'C:\repo' 'Public/One.ps1'))
+        )
         $global:PleaseWorkChangeset.Files | Should -Be @('Public/One.ps1', 'README.md')
         $global:PleaseWorkChangeset.Provider | Should -Be 'Git'
         Should -Invoke Get-GitChangeset -Times 1 -Exactly -ParameterFilter {

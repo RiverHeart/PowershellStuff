@@ -158,7 +158,10 @@ function Invoke-PleaseWork {
                 $DependencyRan = @($Task.Dependencies | Where-Object { $ExecutedTasks.Contains($_) }).Count -gt 0
                 $ChangedFiles = @(Get-GitChangedPath `
                     -Changeset $Changeset `
-                    -PathSpec $Task.PathSpecs)
+                    -PathSpec $Task.PathSpecs |
+                    ForEach-Object {
+                        [System.IO.Path]::GetFullPath((Join-Path $Changeset.Root $_))
+                    })
                 if ($ChangedFiles.Count -eq 0 -and -not $DependencyRan) {
                     Write-Verbose "Skipped task '$TaskName' because its changeset filters did not match."
                     continue

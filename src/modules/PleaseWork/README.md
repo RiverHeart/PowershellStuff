@@ -141,13 +141,13 @@ PleaseWork does not read CI-specific variables automatically.
 
 `BaseRef` is required when a task uses `changed()`; set it to a branch such as `origin/main` or a
 commit supplied by the CI system. `HeadRef` defaults to `HEAD`. Pathspecs are evaluated relative to
-the TaskFile directory, while
-`$ChangedFiles` contains repository-relative paths. A filtered task with no matching files is
+the TaskFile directory, while `$ChangedFiles` contains absolute paths. A filtered task with no matching files is
 skipped unless one of its task dependencies ran.
 
-Filtered task bodies receive `$ChangedFiles`, containing repository-relative files matching that
+Filtered task bodies receive `$ChangedFiles`, containing absolute files matching that
 task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `WorkingRoot`, `BaseRef`, `HeadRef`, `CompareRef`,
-`Files`, and `Available`; `$Changeset.Files` contains the complete changeset. All task bodies receive
+`Files`, and `Available`; `$Changeset.Files` contains the complete changeset as repository-relative
+paths. All task bodies receive
 `$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
 
 ## Future parallel execution

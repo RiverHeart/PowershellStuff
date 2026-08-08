@@ -13,7 +13,8 @@ build: changed('./src', './project.psd1') {
 #.DESCRIPTION
 #    Runs PSScriptAnalyzer
 lint: changed('./**/*.ps1') {
-    Invoke-ScriptAnalyzer -Path . -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
+    Write-Host "Found $($ChangedFiles.Count) changed files to analyze."
+    $ChangedFiles | Invoke-ScriptAnalyzer -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
 }
 
 #.DESCRIPTION
