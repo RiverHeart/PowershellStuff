@@ -23,6 +23,8 @@ test: changed('./src', './Tests') {
     & "$GitRoot/tools/Invoke-Test.ps1" -TestSuite PleaseWork
 }
 
+#.DESCRIPTION
+#     Installs the module dependencies for development
 install: {
     if ($null -ne $env:VSCODE_INJECTION) {
         Write-Warning "Skipping install in VSCode injection context."
@@ -30,10 +32,10 @@ install: {
     }
     $Project = Import-PowerShellDataFile -LiteralPath "$TaskFileRoot/project.psd1"
     $Project.DevDependencies.GetEnumerator() | ForEach-Object {
-        #Write-Host "Install-Module -Name $($_.Key) -RequiredVersion $($_.Value) -Scope CurrentUser"
         $InstallParams = @{
             Name = $_.Key
             Scope = 'CurrentUser'
+            Verbose = $true
         }
         if ($_.Value.StartsWith('^')) {
             $InstallParams.MinimumVersion = $_.Value.TrimStart('^')
