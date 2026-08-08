@@ -78,7 +78,7 @@ build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
                 Available = $true
             }
         }
-        Mock Get-GitChangedFile { @() }
+        Mock Get-GitChangedPath { @() }
 
         please build -TaskFile $TaskFile
 
@@ -107,7 +107,7 @@ build: changed('./Public') {
                 Available = $true
             }
         }
-        Mock Get-GitChangedFile { @('Public/One.ps1') }
+        Mock Get-GitChangedPath { @('Public/One.ps1') }
 
         please build -TaskFile $TaskFile
 
@@ -140,7 +140,7 @@ build: test changed('./Public') { $global:PleaseWorkLog.Add('build') }
                 Available = $true
             }
         }
-        Mock Get-GitChangedFile {
+        Mock Get-GitChangedPath {
             if ($PathSpec -contains './Tests') {
                 return @('Tests/One.tests.ps1')
             }
@@ -169,12 +169,12 @@ build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
                 Available = $false
             }
         }
-        Mock Get-GitChangedFile { @('Public/Working.ps1') }
+        Mock Get-GitChangedPath { @('Public/Working.ps1') }
 
         please build -TaskFile $TaskFile
 
         $global:PleaseWorkLog | Should -Be @('build')
-        Should -Invoke Get-GitChangedFile -Times 1 -Exactly
+        Should -Invoke Get-GitChangedPath -Times 1 -Exactly
     }
 
     It 'rejects a missing dependency before running any task' {

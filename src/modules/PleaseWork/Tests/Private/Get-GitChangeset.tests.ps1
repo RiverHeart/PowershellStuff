@@ -36,7 +36,7 @@ InModuleScope PleaseWork {
                 -WorkingDirectory $Public `
                 -BaseRef $BaseRef `
                 -HeadRef $HeadRef
-            $MatchingFiles = @(Get-GitChangedFile `
+            $MatchingFiles = @(Get-GitChangedPath `
                 -Changeset $Changeset `
                 -PathSpec './Public')
 

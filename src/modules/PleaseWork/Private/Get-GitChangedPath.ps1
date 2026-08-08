@@ -15,27 +15,42 @@ using namespace System.Collections.Generic
     repository at $GitRoot, comparing the 'origin/main' reference to the 'HEAD' commit.
 
     Get-GitChangedPath -Root $GitRoot -CompareRef 'origin/main' -HeadCommit 'HEAD' -PathSpec './src/*'
+
+.EXAMPLE
+    Returns changes matching a pathspec using the Git references in an existing changeset.
+
+    Get-GitChangedPath -Changeset $Changeset -PathSpec './src/*'
 #>
 function Get-GitChangedPath {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='Query')]
     [OutputType([string[]])]
     param (
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName='Query')]
         [ValidateNotNullOrEmpty()]
         [string] $Root,
 
-        [Parameter()]
+        [Parameter(ParameterSetName='Query')]
         [AllowNull()]
         [string] $CompareRef,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName='Query')]
         [ValidateNotNullOrEmpty()]
         [string] $HeadCommit,
+
+        [Parameter(Mandatory,ParameterSetName='Changeset')]
+        [ValidateNotNull()]
+        [psobject] $Changeset,
 
         [Parameter()]
         [AllowEmptyCollection()]
         [string[]] $PathSpec = @()
     )
+
+    if ($PSCmdlet.ParameterSetName -eq 'Changeset') {
+        $Root = $Changeset.Root
+        $CompareRef = $Changeset.CompareRef
+        $HeadCommit = $Changeset.HeadCommit
+    }
 
     $Files = [List[string]]::new()
     $Seen = [HashSet[string]]::new([StringComparer]::Ordinal)

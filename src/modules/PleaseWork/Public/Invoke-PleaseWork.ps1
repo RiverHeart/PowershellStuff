@@ -128,7 +128,7 @@ function Invoke-PleaseWork {
             [string[]] $ChangedFiles = @()
             if ($Task.PathSpecs.Count -gt 0) {
                 $DependencyRan = @($Task.Dependencies | Where-Object { $ExecutedTasks.Contains($_) }).Count -gt 0
-                $ChangedFiles = @(Get-GitChangedFile `
+                $ChangedFiles = @(Get-GitChangedPath `
                     -Changeset $Changeset `
                     -PathSpec $Task.PathSpecs)
                 if ($Changeset.Available -and $ChangedFiles.Count -eq 0 -and -not $DependencyRan) {
