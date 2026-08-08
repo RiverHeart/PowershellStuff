@@ -2,7 +2,7 @@ $PleaseConfig = @{
     BaseRef = 'origin/main'
 }
 
-build: changed('./Public', './Private') {
+build: changed('./src', './project.psd1') {
     Write-Host "Building the project..."
 
     & "$GitRoot/tools/Build-PSResource.ps1" `
@@ -10,8 +10,14 @@ build: changed('./Public', './Private') {
         -DestinationPath "$GitRoot/artifacts/packages"
 }
 
-lint: changed('./Public', './Private') {
+lint: changed('./**/*.ps1') {
     Write-Host "Linting the project..."
 
     Invoke-ScriptAnalyzer -Path . -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
+}
+
+test: changed('./src', './Tests') {
+    Write-Host "Running tests..."
+
+    & "$GitRoot/tools/Invoke-Test.ps1" -TestSuite PleaseWork
 }

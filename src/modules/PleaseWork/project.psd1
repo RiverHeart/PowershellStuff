@@ -9,8 +9,7 @@
         Include = @(
             'PleaseWork.psd1'
             'PleaseWork.psm1'
-            'Private'
-            'Public'
+            'src'
             'README.md'
         )
     }
