@@ -97,6 +97,47 @@ By default, task output remains in the normal output pipeline. With `-PassThru`,
 returns one result object per executed task and stores each task's output in that result's `Output`
 property. The final native status remains available through `$LASTEXITCODE`.
 
+
+Tasks can use `changed()` filters containing literal Git pathspecs. A filtered task runs when a
+matching file changed or when one of its task dependencies ran:
+
+```powershell
+$PleaseConfig = @{
+    BaseRef = if ($env:GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
+        $env:GIT_PREVIOUS_SUCCESSFUL_COMMIT
+    } else {
+        'origin/main'
+    }
+    HeadRef = if ($env:GIT_COMMIT) { $env:GIT_COMMIT } else { 'HEAD' }
+}
+
+test: changed('./Tests') {
+    Invoke-Pester -Path $ChangedFiles
+}
+
+build: test changed('./Public', './Private') {
+    & "$GitRoot/tools/Build-PSResource.ps1" -ProjectPath ./project.psd1
+}
+```
+
+### Incremental Builds
+
+PleaseWork does not persist the last successful commit itself, so CI systems that track state can
+set `$PleaseConfig.BaseRef` and `$PleaseConfig.HeadRef` from their own build variables.
+For example, Jenkins' Git plugin exposes `GIT_PREVIOUS_SUCCESSFUL_COMMIT` and `GIT_COMMIT`.
+PleaseWork does not read CI-specific variables automatically.
+
+`BaseRef` is required when a task uses `changed()`; set it to a branch such as `origin/main` or a
+commit supplied by the CI system. `HeadRef` defaults to `HEAD`. Pathspecs are evaluated relative to
+the TaskFile directory, while
+`$ChangedFiles` contains repository-relative paths. A filtered task with no matching files is
+skipped unless one of its task dependencies ran.
+
+Filtered task bodies receive `$ChangedFiles`, containing repository-relative files matching that
+task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `WorkingRoot`, `BaseRef`, `HeadRef`, `CompareRef`,
+`Files`, and `Available`; `$Changeset.Files` contains the complete changeset. All task bodies receive
+`$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
+
 ## Future parallel execution
 
 Parallel execution will extend the same result model into each worker rather than relying on one

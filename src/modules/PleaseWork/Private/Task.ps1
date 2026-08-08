@@ -19,29 +19,23 @@ function Task {
         [AllowEmptyCollection()]
         [List[hashtable]] $Registry,
 
-        [Parameter(ValueFromRemainingArguments)]
-        [object[]] $Arguments
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]] $Dependencies = @(),
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]] $PathSpecs = @(),
+
+        [Parameter(Mandatory)]
+        [scriptblock] $ScriptBlock
     )
-
-    if ($Arguments.Length -eq 0) {
-        throw 'At least one argument (the scriptblock) is required.'
-    }
-
-    $ScriptBlock = $Arguments[-1]
-    if (-not ($ScriptBlock -is [scriptblock])) {
-        throw [System.ArgumentException]::new('The last argument must be a scriptblock.')
-    }
-
-    if ($Arguments.Length -gt 1) {
-        [string[]] $Dependencies = $Arguments[0..($Arguments.Length - 2)]
-    } else {
-        [string[]] $Dependencies = @()
-    }
 
     $Registry.Add(@{
         Name = $Name
         Help = $Help
         Dependencies = $Dependencies
+        PathSpecs = $PathSpecs
         ScriptBlock = $ScriptBlock
     })
 }
