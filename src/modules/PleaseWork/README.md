@@ -34,7 +34,19 @@ Import-Module ./PleaseWork.psd1
 please              # Run the default task
 please build        # Run a specific task
 please -List        # Lists tasks without running them
+please help         # Displays task names and descriptions as text
 please test -TaskFile ./AnotherTaskFile.ps1  # Run tasks in a specific taskfile
+```
+
+`help` is reserved for the native task display. To replace it with a TaskFile task, opt in
+explicitly and declare the task:
+
+```powershell
+$PleaseConfig = @{ OverrideHelp = $true }
+
+help: {
+    Write-Output 'Project-specific help'
+}
 ```
 
 Task names support tab completion. Completion parses declaration metadata without invoking the

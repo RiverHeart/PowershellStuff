@@ -70,6 +70,13 @@ function Read-TaskFile {
     }
     $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
 
+    $HelpTask = @($Tasks | Where-Object { $_.Name -ieq 'help' })
+    $OverrideHelp = $TaskConfig.Contains('OverrideHelp') -and
+        $TaskConfig['OverrideHelp'] -eq $true
+    if ($HelpTask.Count -gt 0 -and -not $OverrideHelp) {
+        throw "Task 'help' is reserved. Set `$PleaseConfig.OverrideHelp = `$true to override it."
+    }
+
     foreach ($TaskDefinition in $Tasks) {
         if ($TasksByName.ContainsKey($TaskDefinition.Name)) {
             throw "Task '$($TaskDefinition.Name)' is declared more than once."

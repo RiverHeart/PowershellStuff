@@ -36,6 +36,12 @@ function Invoke-PleaseWork {
                         )
                     }
                 }
+                [System.Management.Automation.CompletionResult]::new(
+                    'help',
+                    'help',
+                    [System.Management.Automation.CompletionResultType]::ParameterValue,
+                    'Display help information'
+                )
             } catch {
                 return @()
             }
@@ -59,8 +65,13 @@ function Invoke-PleaseWork {
     $TaskFilePath = Resolve-TaskFilePath -Path $TaskFile
     $TaskFileRoot = Split-Path -Parent $TaskFilePath
     $TaskSet = Read-TaskFile -Path $TaskFilePath
-    if ($List) {
-        foreach ($TaskName in $TaskSet.TaskNames) {
+
+    # Support a native 'help' task that displays the available tasks and their descriptions.
+    $UseNativeHelp = $Name -ieq 'help' -and -not $TaskSet.Tasks.ContainsKey('help')
+
+    # If the user requested a task list or help, build a list of tasks and their descriptions.
+    if ($List -or $UseNativeHelp) {
+        $TaskList = foreach ($TaskName in $TaskSet.TaskNames) {
             $Description = $TaskSet.Tasks[$TaskName].Help.Description
             if (-not [string]::IsNullOrWhiteSpace($Description)) {
                 $Description = $Description.Trim()
@@ -73,6 +84,22 @@ function Invoke-PleaseWork {
                 Default = $TaskName -eq $TaskSet.DefaultTask
                 Description = $Description
             }
+        }
+    }
+
+    if ($List) { return $TaskList }
+
+    # If the user requested help, display the available tasks and their descriptions.
+    # NOTE: Might wanna pull in Expand-Tab from GrabBag instead of doing this manually.
+    if ($UseNativeHelp) {
+        $NameWidth = ($TaskList.Name | Measure-Object -Property Length -Maximum).Maximum
+        'Available tasks:'
+        foreach ($TaskInfo in $TaskList) {
+            $HelpLine = '  {0}' -f $TaskInfo.Name.PadRight($NameWidth)
+            if (-not [string]::IsNullOrWhiteSpace($TaskInfo.Description)) {
+                $HelpLine += '  {0}' -f ($TaskInfo.Description -replace '\s+', ' ')
+            }
+            $HelpLine.TrimEnd()
         }
         return
     }

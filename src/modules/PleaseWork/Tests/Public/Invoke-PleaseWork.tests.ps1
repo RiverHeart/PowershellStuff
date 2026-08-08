@@ -299,6 +299,48 @@ build: { 'build' }
         $Tasks[1].Description | Should -BeNullOrEmpty
     }
 
+    It 'displays native help as task names and descriptions without executing tasks' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+<#
+.DESCRIPTION
+    Builds the project.
+#>
+build: { $global:PleaseWorkLog.Add('build') }
+test: { $global:PleaseWorkLog.Add('test') }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please help -TaskFile $TaskFile)
+
+        $Output | Should -Be @(
+            'Available tasks:'
+            '  build  Builds the project.'
+            '  test'
+        )
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'rejects a user task named help by default' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        "help: { 'custom help' }" | Set-Content -LiteralPath $TaskFile
+
+        { please help -TaskFile $TaskFile } |
+            Should -Throw "Task 'help' is reserved. Set `$PleaseConfig.OverrideHelp = `$true to override it."
+    }
+
+    It 'runs a user help task when PleaseConfig overrides native help' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$PleaseConfig = @{ OverrideHelp = $true }
+help: { 'custom help' }
+build: { 'build' }
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please help -TaskFile $TaskFile)
+
+        $Output | Should -Be @('custom help')
+    }
+
     It 'does not execute tasks under WhatIf' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
