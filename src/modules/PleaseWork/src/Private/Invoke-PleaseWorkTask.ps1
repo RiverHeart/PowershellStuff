@@ -73,6 +73,7 @@ function Invoke-PleaseWorkTask {
     }
 
     $FinishedAt = [datetime]::UtcNow
+    # Task-local LASTEXITCODE assignments do not affect the native status tracked by the runspace.
     $ExitCode = [int] $global:LASTEXITCODE
     $Result.Value = [pscustomobject] @{
         TaskName = $Name

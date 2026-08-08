@@ -4,7 +4,7 @@ $PleaseConfig = @{
 
 #.DESCRIPTION
 #  Packages the module
-build: changed('./src', './project.psd1') {
+build: test changed('./src', './project.psd1') {
     & "$GitRoot/tools/Build-PSResource.ps1" `
         -ProjectPath ./project.psd1 `
         -DestinationPath "$GitRoot/artifacts/packages"
@@ -14,17 +14,24 @@ build: changed('./src', './project.psd1') {
 #    Runs PSScriptAnalyzer
 lint: changed('./**/*.ps1') {
     Write-Host "Found $($ChangedFiles.Count) changed files to analyze."
-    $ChangedFiles | Invoke-ScriptAnalyzer -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
+    $Results = $ChangedFiles | Invoke-ScriptAnalyzer -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
+    if ($Results.Count -gt 0) {
+        Write-Host "Found $($Results.Count) issues."
+        $Results | Out-Host  # Use Out-Host for immediate output instead of Write-Host to avoid throw discarding buffered output.
+        throw "PSScriptAnalyzer found issues."
+    } else {
+        Write-Host "No issues found."
+    }
 }
 
 #.DESCRIPTION
 #     Runs Pester tests
-test: changed('./src', './Tests') {
+test: lint changed('./src', './Tests') {
     & "$GitRoot/tools/Invoke-Test.ps1" -TestSuite PleaseWork
 }
 
 #.DESCRIPTION
-#     Installs the module dependencies for development
+#     Installs dev dependencies
 install: {
     if ($null -ne $env:VSCODE_INJECTION) {
         Write-Warning "Skipping install in VSCode injection context."

@@ -92,10 +92,12 @@ Each task produces an internal result containing:
 TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration, Output
 ```
 
-Before each task, PleaseWork resets `$LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to
-`Stop` for the task invocation. A PowerShell error therefore fails the task immediately. Otherwise,
-the last native command executed by the task determines its native exit status after the scriptblock
-finishes. A nonzero final status fails the task and prevents its dependents from running.
+Before each task, PleaseWork resets `$global:LASTEXITCODE` to `0` and sets `$ErrorActionPreference`
+to `Stop` for the task invocation. A PowerShell error therefore fails the task immediately.
+Otherwise, the last native command executed by the task determines its native exit status after the
+scriptblock finishes. PleaseWork reads `$global:LASTEXITCODE`; assigning to an unscoped
+`$LASTEXITCODE` inside a task creates or updates a task-local variable and does not affect the task
+result. A nonzero final status fails the task and prevents its dependents from running.
 Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle
 expected native failures using normal PowerShell control flow.
 
