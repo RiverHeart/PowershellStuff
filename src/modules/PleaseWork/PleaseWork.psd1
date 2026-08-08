@@ -9,7 +9,9 @@
     Description = 'A small PowerShell task runner with makefile-like task declarations.'
     PowerShellVersion = '5.1'
     FunctionsToExport = @(
+        'Get-TaskFileDeclaration'
         'Invoke-PleaseWork'
+        'Resolve-TaskFilePath'
     )
     CmdletsToExport = @()
     VariablesToExport = @()
