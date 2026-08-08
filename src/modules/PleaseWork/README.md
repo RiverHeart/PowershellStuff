@@ -165,3 +165,9 @@ The runner's overall outcome is therefore aggregate: it fails when any task fail
 pretend that one worker's native exit code is the canonical batch exit code. The exact task exit code
 remains available in that task's result and can be included in verbose output. A command-line wrapper
 can map aggregate success or failure to a conventional process exit code such as `0` or `1`.
+
+
+## Maintainer Notes
+
+* It's too bad Powershell help comments don't support a terse inline form like `.DESCRIPTION  Description text`.
+* Maybe `help` should use `.SYNOPSIS` instead of `.DESCRIPTION` and `.DESCRIPTION` should be shown for a new `please help foo` form or maybe that shows the entire help text. No doubt, a single inline comment is the nicest, terse syntax for regular `please help` usage. I'm unsure too many people would make full use of the help comment support.
