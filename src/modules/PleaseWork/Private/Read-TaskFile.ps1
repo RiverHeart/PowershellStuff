@@ -58,13 +58,13 @@ function Read-TaskFile {
             $null = @(. $BoundScriptBlock)
         }
     $Tasks = @(& $TaskFileModule { $script:RegisteredTasks })
-    $Config = & $TaskFileModule {
-        $ConfigVariable = Get-Variable -Name PleaseWorkConfig -ErrorAction SilentlyContinue
+    $TaskConfig = & $TaskFileModule {
+        $ConfigVariable = Get-Variable -Name PleaseConfig -Scope Script -ErrorAction SilentlyContinue
         if ($null -eq $ConfigVariable) {
             return @{}
         }
         if (-not ($ConfigVariable.Value -is [System.Collections.IDictionary])) {
-            throw '$PleaseWorkConfig must be a dictionary.'
+            throw '$PleaseConfig must be a dictionary.'
         }
         return $ConfigVariable.Value
     }
@@ -82,7 +82,7 @@ function Read-TaskFile {
         DefaultTask = if ($env:PLEASE_DEFAULT_TASK) { $env:PLEASE_DEFAULT_TASK } else { $Tasks[0].Name }
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
-        Config = $Config
+        Config = $TaskConfig
         Module = $TaskFileModule
     }
 }

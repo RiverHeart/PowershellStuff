@@ -9,7 +9,8 @@ function Get-GitChangeset {
         [ValidateNotNullOrEmpty()]
         [string] $WorkingDirectory,
 
-        [Parameter()]
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
         [string] $BaseRef,
 
         [Parameter()]
@@ -29,38 +30,12 @@ function Get-GitChangeset {
     }
     $Root = [string] @($Root)[0]
 
-    if ([string]::IsNullOrWhiteSpace($BaseRef)) {
-        $BaseRef = $env:GIT_PREVIOUS_SUCCESSFUL_COMMIT
-    }
-    if ([string]::IsNullOrWhiteSpace($BaseRef)) {
-        $BaseRef = git -C $Root symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            $BaseRef = $null
-        } else {
-            $BaseRef = [string] @($BaseRef)[0]
-        }
-    }
-
     $HeadCommit = git -C $Root rev-parse --verify "$HeadRef`^{commit}" 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Git head ref '$HeadRef' does not identify a commit." -Category InvalidOperation
         return
     }
     $HeadCommit = [string] @($HeadCommit)[0]
-
-    if ([string]::IsNullOrWhiteSpace($BaseRef)) {
-        [string[]] $Files = @(Get-GitChangedPath -Root $Root -HeadCommit $HeadCommit)
-        return [pscustomobject] @{
-            Provider = 'Git'
-            Root = $Root
-            BaseRef = $null
-            HeadRef = $HeadRef
-            CompareRef = $null
-            HeadCommit = $HeadCommit
-            Files = $Files
-            Available = $false
-        }
-    }
 
     $BaseCommit = git -C $Root rev-parse --verify "$BaseRef`^{commit}" 2>$null
     if ($LASTEXITCODE -ne 0) {
@@ -82,6 +57,7 @@ function Get-GitChangeset {
     return [pscustomobject] @{
         Provider = 'Git'
         Root = $Root
+        WorkingRoot = $WorkingDirectory
         BaseRef = $BaseRef
         HeadRef = $HeadRef
         CompareRef = $CompareRef

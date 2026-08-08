@@ -1,3 +1,7 @@
+$PleaseConfig = @{
+    BaseRef = 'origin/main'
+}
+
 build: changed('./Public', './Private') {
     Write-Host "Building the project..."
 

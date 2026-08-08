@@ -102,8 +102,12 @@ Tasks can use `changed()` filters containing literal Git pathspecs. A filtered t
 matching file changed or when one of its task dependencies ran:
 
 ```powershell
-$PleaseWorkConfig = @{
-    BaseRef = $env:GIT_PREVIOUS_SUCCESSFUL_COMMIT
+$PleaseConfig = @{
+    BaseRef = if ($env:GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
+        $env:GIT_PREVIOUS_SUCCESSFUL_COMMIT
+    } else {
+        'origin/main'
+    }
     HeadRef = if ($env:GIT_COMMIT) { $env:GIT_COMMIT } else { 'HEAD' }
 }
 
@@ -118,18 +122,19 @@ build: test changed('./Public', './Private') {
 
 ### Incremental Builds
 
-PleaseWork does not persist the last successful commit itself meaning it can't support
-incremental builds on its own. CI systems that track state can be used to set `$PleaseWorkConfig.BaseRef`
-and `$PleaseWorkConfig.HeadRef` from their own build variables. For example, Jenkins' Git
-plugin exposes `GIT_PREVIOUS_SUCCESSFUL_COMMIT` and `GIT_COMMIT`. PleaseWork recognizes those
-variables as built-in fallbacks, so Jenkins commonly needs no explicit TaskFile configuration.
+PleaseWork does not persist the last successful commit itself, so CI systems that track state can
+set `$PleaseConfig.BaseRef` and `$PleaseConfig.HeadRef` from their own build variables.
+For example, Jenkins' Git plugin exposes `GIT_PREVIOUS_SUCCESSFUL_COMMIT` and `GIT_COMMIT`.
+PleaseWork does not read CI-specific variables automatically.
 
-Explicit configuration takes precedence over recognized environment variables. On a first build,
-or when no previous successful commit is available, PleaseWork tries the remote default branch and
-otherwise runs filtered tasks conservatively.
+`BaseRef` is required when a task uses `changed()`; set it to a branch such as `origin/main` or a
+commit supplied by the CI system. `HeadRef` defaults to `HEAD`. Pathspecs are evaluated relative to
+the TaskFile directory, while
+`$ChangedFiles` contains repository-relative paths. A filtered task with no matching files is
+skipped unless one of its task dependencies ran.
 
 Filtered task bodies receive `$ChangedFiles`, containing repository-relative files matching that
-task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `BaseRef`, `HeadRef`, `CompareRef`,
+task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `WorkingRoot`, `BaseRef`, `HeadRef`, `CompareRef`,
 `Files`, and `Available`; `$Changeset.Files` contains the complete changeset. All task bodies receive
 `$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
 

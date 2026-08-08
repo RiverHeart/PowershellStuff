@@ -47,7 +47,7 @@ function Get-GitChangedPath {
     )
 
     if ($PSCmdlet.ParameterSetName -eq 'Changeset') {
-        $Root = $Changeset.Root
+        $Root = $Changeset.WorkingRoot
         $CompareRef = $Changeset.CompareRef
         $HeadCommit = $Changeset.HeadCommit
     }
@@ -83,7 +83,7 @@ function Get-GitChangedPath {
     & $AddFiles $TrackedFiles
 
     [string[]] $UntrackedFiles = @(
-        git -C $Root ls-files --others --exclude-standard -- @PathSpec
+        git -C $Root ls-files --full-name --others --exclude-standard -- @PathSpec
     )
     if ($LASTEXITCODE -ne 0) {
         Write-Error 'Git could not read untracked files.'

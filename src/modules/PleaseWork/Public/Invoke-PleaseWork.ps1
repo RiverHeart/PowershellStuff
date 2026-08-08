@@ -100,10 +100,11 @@ function Invoke-PleaseWork {
         } else {
             $null
         }
+        if ([string]::IsNullOrWhiteSpace($BaseRef)) {
+            throw "Tasks using changed() require a non-empty `$PleaseConfig.BaseRef."
+        }
         $HeadRef = if ($TaskSet.Config.Contains('HeadRef')) {
             [string] $TaskSet.Config['HeadRef']
-        } elseif (-not [string]::IsNullOrWhiteSpace($env:GIT_COMMIT)) {
-            $env:GIT_COMMIT
         } else {
             'HEAD'
         }
@@ -131,7 +132,7 @@ function Invoke-PleaseWork {
                 $ChangedFiles = @(Get-GitChangedPath `
                     -Changeset $Changeset `
                     -PathSpec $Task.PathSpecs)
-                if ($Changeset.Available -and $ChangedFiles.Count -eq 0 -and -not $DependencyRan) {
+                if ($ChangedFiles.Count -eq 0 -and -not $DependencyRan) {
                     Write-Verbose "Skipped task '$TaskName' because its changeset filters did not match."
                     continue
                 }
