@@ -9,3 +9,9 @@ build: changed('./Public', './Private') {
         -ProjectPath ./project.psd1 `
         -DestinationPath "$GitRoot/artifacts/packages"
 }
+
+lint: changed('./Public', './Private') {
+    Write-Host "Linting the project..."
+
+    Invoke-ScriptAnalyzer -Path . -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
+}
