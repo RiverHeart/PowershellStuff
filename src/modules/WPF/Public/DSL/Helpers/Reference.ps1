@@ -41,7 +41,21 @@ function Reference {
         $ScopeObject = $PSCmdlet.GetVariableValue('this')
 
         foreach($Item in $Name) {
-            $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $ScopeObject
+            if ($PSBoundParameters.ContainsKey('ContextId')) {
+                if (-not (Test-WPFControlContextId -ContextId $ContextId -ErrorIfMissing)) {
+                    return
+                }
+
+                $ResolvedContextId = $ContextId
+            } else {
+                $ResolveContextParams = @{}
+                if ($ScopeObject -and (Get-WPFControlContextId -InputObject $ScopeObject)) {
+                    $ResolveContextParams.InputObject = $ScopeObject
+                }
+
+                $ResolvedContextId = Resolve-WPFControlContextId @ResolveContextParams
+            }
+
             $TargetObject = $null
 
             if ($ResolvedContextId -and $State.Contexts.ContainsKey($ResolvedContextId)) {

@@ -36,6 +36,19 @@ Describe 'Get-WPFWindow' -Tag 'Get-WPFWindow' {
         $ResolvedWindow | Should -Not -Be -ExpectedValue $FirstWindow
     }
 
+    It 'Should resolve the only registered window when no active context is set' {
+        $Id = [guid]::NewGuid().ToString('N')
+
+        $Window = Window "Window_$Id" {}
+        InModuleScope WPF {
+            (Get-WPFControlRegistry).ActiveContextId = $null
+        }
+
+        $ResolvedWindow = Get-WPFWindow
+
+        $ResolvedWindow | Should -BeExactly -ExpectedValue $Window
+    }
+
     It 'Should resolve a window by explicit ContextId' {
         $Id = [guid]::NewGuid().ToString('N')
 
@@ -63,11 +76,15 @@ Describe 'Get-WPFWindow' -Tag 'Get-WPFWindow' {
         $ResolvedWindow | Should -BeExactly -ExpectedValue $AppWindow
     }
 
-    It 'Should throw when there is no resolvable window context' {
+    It 'Should return null when there is no discoverable window context' {
         InModuleScope WPF {
             Clear-WPFControlRegistry
         }
 
-        { Get-WPFWindow -ErrorAction Stop } | Should -Throw '*No current window is available*'
+        Get-WPFWindow | Should -Be $null
+    }
+
+    It 'Should throw when explicit ContextId cannot be resolved' {
+        { Get-WPFWindow -ContextId 'missing-context' -ErrorAction Stop } | Should -Throw '*No WPF control context exists*'
     }
 }

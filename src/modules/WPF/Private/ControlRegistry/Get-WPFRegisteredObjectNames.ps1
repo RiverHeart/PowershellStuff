@@ -8,7 +8,21 @@ function Get-WPFRegisteredObjectNames {
     )
 
     $State = Get-WPFControlRegistry
-    $Id = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $InputObject
+    if ($PSBoundParameters.ContainsKey('ContextId')) {
+        if (-not (Test-WPFControlContextId -ContextId $ContextId)) {
+            return @()
+        }
+
+        $Id = $ContextId
+    } else {
+        $ResolveContextParams = @{}
+
+        if ($PSBoundParameters.ContainsKey('InputObject')) {
+            $ResolveContextParams.InputObject = $InputObject
+        }
+
+        $Id = Resolve-WPFControlContextId @ResolveContextParams
+    }
 
     if ($Id -and $State.Contexts.ContainsKey($Id)) {
         return @($State.Contexts[$Id].Objects.Keys)

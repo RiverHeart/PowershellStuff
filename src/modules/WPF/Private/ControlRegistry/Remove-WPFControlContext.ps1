@@ -1,3 +1,15 @@
+<#
+.SYNOPSIS
+    Removes a WPF control context and disposes any registered objects within that context.
+
+.DESCRIPTION
+    This helper removes a WPF control context from the registry, optionally by
+    explicit ContextId or by resolving the context from an input object.
+
+    When a context is removed, all registered objects within that context are
+    disposed if they implement IDisposable, and any DispatcherTimer objects are
+    stopped to prevent them from firing against a removed context.
+#>
 function Remove-WPFControlContext {
     [CmdletBinding()]
     [OutputType([void])]
@@ -8,7 +20,22 @@ function Remove-WPFControlContext {
     )
 
     $State = Get-WPFControlRegistry
-    $Id = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $InputObject
+    if ($PSBoundParameters.ContainsKey('ContextId')) {
+        if (-not (Test-WPFControlContextId -ContextId $ContextId)) {
+            return
+        }
+
+        $Id = $ContextId
+    } else {
+        $ResolveContextParams = @{}
+
+        if ($PSBoundParameters.ContainsKey('InputObject')) {
+            $ResolveContextParams.InputObject = $InputObject
+        }
+
+        $Id = Resolve-WPFControlContextId @ResolveContextParams
+    }
+
     if (-not $Id) {
         return
     }

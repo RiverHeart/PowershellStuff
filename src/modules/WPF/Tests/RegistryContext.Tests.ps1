@@ -84,4 +84,50 @@ Describe 'Registry Context' -Tag 'RegistryContext' {
         { Reference 'FirstButton' -ContextId $FirstContextId -ErrorAction Stop } | Should -Throw
         (Reference 'SecondButton' -ContextId $SecondContextId) | Should -Not -BeNullOrEmpty
     }
+
+    It 'Should resolve using the fallback context rules when ContextId is omitted' {
+        InModuleScope WPF {
+            $Window = Window 'Window' {}
+            $ExpectedContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
+            (Get-WPFControlRegistry).ActiveContextId = $null
+            $ResolvedContextId = Resolve-WPFControlContextId
+
+            $ResolvedContextId | Should -BeExactly -ExpectedValue $ExpectedContextId
+        }
+    }
+
+    It 'Should reject an explicit null InputObject' {
+        { Resolve-WPFControlContextId -InputObject $null -ErrorAction Stop } | Should -Throw
+    }
+
+    It 'Should return true when a context exists' {
+        InModuleScope WPF {
+            $Window = Window 'Window' {}
+            $ContextId = [string] $Window.PSObject.Properties['_WPFContextId'].Value
+
+            (Test-WPFControlContextId -ContextId $ContextId) | Should -BeTrue
+        }
+    }
+
+    It 'Should return false when a context does not exist' {
+        InModuleScope WPF {
+            (Test-WPFControlContextId -ContextId 'missing-context') | Should -BeFalse
+        }
+    }
+
+    It 'Should error when ErrorIfMissing is used and context does not exist' {
+        InModuleScope WPF {
+            { Test-WPFControlContextId -ContextId 'missing-context' -ErrorIfMissing -ErrorAction Stop } | Should -Throw '*No WPF control context exists*'
+        }
+    }
+
+    It 'Should error when an explicit InputObject does not resolve' {
+        InModuleScope WPF {
+            $InputObject = [pscustomobject] @{
+                Name = 'MissingContextObject'
+            }
+
+            { Resolve-WPFControlContextId -InputObject $InputObject -ErrorAction Stop } | Should -Throw '*not associated with a WPF control context*'
+        }
+    }
 }
