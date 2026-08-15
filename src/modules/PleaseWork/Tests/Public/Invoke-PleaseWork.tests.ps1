@@ -527,7 +527,7 @@ test: {
         $Results[0].TaskName | Should -Be 'test'
         $Results[0].Succeeded | Should -BeFalse
         $Results[0].Error.Exception.Message | Should -Match 'test failed'
-        $Results[0].Output | Should -BeNullOrEmpty
+        $Results[0].Output | Should -Be @('before failure')
     }
 
     It 'discovers a TaskFile in a parent directory' {
@@ -617,6 +617,7 @@ fail: {
         (Get-Location).Path | Should -Be $OriginalLocation.Path
     }
 }
+}
 
 Describe 'Invoke-PleaseWork argument completion' {
     It 'completes task names from a discovered parent TaskFile' {
@@ -663,6 +664,5 @@ test: { 'test' }
 
         $Completion.CompletionMatches.CompletionText | Should -Be @('help')
     }
-}
 }
 

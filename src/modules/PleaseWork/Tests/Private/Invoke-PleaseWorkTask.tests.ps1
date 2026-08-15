@@ -28,6 +28,45 @@ InModuleScope PleaseWork {
             $Result.Duration | Should -BeOfType ([timespan])
         }
 
+        It 'binds named arguments and validates them in an isolated task module scope' {
+            $TaskModule = New-Module {
+                $script:Task = {
+                    param (
+                        [Parameter(Mandatory)]
+                        [ValidateSet('Debug', 'Release')]
+                        [string] $Configuration,
+
+                        [switch] $Force
+                    )
+
+                    "$GitRoot|$Configuration|$Force"
+                }
+            }
+            $TaskScriptBlock = & $TaskModule { $script:Task }
+            $Result = $null
+
+            $Output = Invoke-PleaseWorkTask `
+                -Name build `
+                -ScriptBlock $TaskScriptBlock `
+                -Arguments @{ Configuration = 'Release'; Force = $true } `
+                -Context @{ GitRoot = 'C:\repo' } `
+                -Result ([ref] $Result)
+
+            $Output | Should -Be 'C:\repo|Release|True'
+            $Result.Succeeded | Should -BeTrue
+            & $TaskModule {
+                Get-Variable -Name GitRoot -Scope Script -ErrorAction SilentlyContinue
+            } | Should -BeNullOrEmpty
+
+            { Invoke-PleaseWorkTask `
+                -Name build `
+                -ScriptBlock $TaskScriptBlock `
+                -Arguments @{ Configuration = 'Invalid' } `
+                -Context @{ GitRoot = 'C:\repo' } `
+                -Result ([ref] $Result) } |
+                Should -Throw '*Cannot validate argument on parameter*Configuration*'
+        }
+
         It 'resets stale native status before invoking a task with no native commands' {
             $global:LASTEXITCODE = 23
             $Result = $null

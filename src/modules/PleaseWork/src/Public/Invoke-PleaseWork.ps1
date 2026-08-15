@@ -15,39 +15,7 @@ function Invoke-PleaseWork {
     [Alias('pw', 'please')]
     param(
         [Parameter(Position=0,ParameterSetName='Run')]
-        [ArgumentCompleter({
-            param (
-                [string] $CommandName,
-                [string] $ParameterName,
-                [string] $WordToComplete,
-                [System.Management.Automation.Language.CommandAst] $CommandAst,
-                [System.Collections.IDictionary] $FakeBoundParameters
-            )
-
-            try {
-                $TaskFilePath = Resolve-TaskFilePath -Path $FakeBoundParameters['TaskFile']
-                foreach ($Declaration in (Get-TaskFileDeclaration -Path $TaskFilePath)) {
-                    if ($Declaration.Name.StartsWith($WordToComplete, [StringComparison]::OrdinalIgnoreCase)) {
-                        [System.Management.Automation.CompletionResult]::new(
-                            $Declaration.Name,
-                            $Declaration.Name,
-                            [System.Management.Automation.CompletionResultType]::ParameterValue,
-                            $Declaration.Name
-                        )
-                    }
-                }
-                if ('help'.StartsWith($WordToComplete, [StringComparison]::OrdinalIgnoreCase)) {
-                    [System.Management.Automation.CompletionResult]::new(
-                        'help',
-                        'help',
-                        [System.Management.Automation.CompletionResultType]::ParameterValue,
-                        'Display help information'
-                    )
-                }
-            } catch {
-                return @()
-            }
-        })]
+        [ArgumentCompleter({ Complete-PleaseWorkTask @args })]
         [string] $Name,
 
         [Parameter(Mandatory,ParameterSetName='List')]
