@@ -1,3 +1,8 @@
+using namespace System.Collections.Generic
+using namespace System.Collections.ObjectModel
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Resolves the ParamBlock in a given Scriptblock or a list
