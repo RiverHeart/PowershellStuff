@@ -485,6 +485,8 @@ prepare: {
 build: prepare {
     param ([string] $Configuration)
     "build:${Value}:$Configuration"
+    "context:$(Split-Path -Leaf $TaskFilePath)"
+    "module-bound:$($null -ne $MyInvocation.MyCommand.Module)"
 }
 '@ | Set-Content -LiteralPath $TaskFile
 
@@ -493,6 +495,8 @@ build: prepare {
         $Output | Should -Be @(
             'prepare:prepared'
             'build:prepared:Release'
+            'context:TaskFile.ps1'
+            'module-bound:False'
         )
     }
 

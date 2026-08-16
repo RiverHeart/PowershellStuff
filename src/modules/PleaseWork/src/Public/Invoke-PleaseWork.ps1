@@ -97,7 +97,11 @@ function Invoke-PleaseWork {
             return
         }
 
-        $TaskSet = Read-TaskFile -Path $TaskFilePath
+        $TaskSet = if ($null -ne $script:PreparedTaskSet) {
+            $script:PreparedTaskSet
+        } else {
+            Read-TaskFile -Path $TaskFilePath
+        }
 
         # Support a native 'help' task that displays the available tasks and their descriptions.
         $UseNativeHelp = $Name -ieq 'help' -and -not $TaskSet.Tasks.ContainsKey('help')
@@ -215,6 +219,7 @@ function Invoke-PleaseWork {
                         -ScriptBlock $Task.ScriptBlock `
                         -Arguments $(if ($TaskName -ieq $Name) { $TaskArguments } else { $null }) `
                         -Context $CurrentTaskContext `
+                        -Invoker $TaskSet.Invoker `
                         -Result ([ref] $TaskResult) |
                         ForEach-Object { $TaskOutput.Add($_) }
                 } catch {

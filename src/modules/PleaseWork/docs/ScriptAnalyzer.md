@@ -84,21 +84,21 @@ Get-Module PSScriptAnalyzer -ListAvailable |
 
 ## Dedicated runspace experiment
 
-PleaseWork has an opt-in `-Runspace` prototype that imports the module and invokes the complete
-task plan in a fresh runspace. It preserves dynamic task parameters, task output, and the durable
-TaskFile `$script:` scope.
+PleaseWork has an opt-in `-Runspace` prototype that imports the module, dot-sources the TaskFile,
+registers its tasks, and invokes the complete task plan in a fresh runspace. The runspace itself is
+the TaskFile's durable script scope, so task bodies are not bound to the dynamic module created by
+`Read-TaskFile`.
 
-This isolation does not fix the cold PSScriptAnalyzer auto-load failure. In a clean
-`pwsh -NoProfile` process, `please lint -Runspace` still reports that `Get-Command` is unavailable.
-The task body still runs through the TaskFile's dynamic module, so the nested module-bound
-auto-load path remains unchanged. A runspace-only wrapper is therefore useful as an isolation
-prototype, but it is not a fix for this defect.
+This direct-loading design preserves dynamic task parameters, task output and errors, injected task
+context, and persistent TaskFile `$script:` state. It also fixes the cold PSScriptAnalyzer auto-load
+failure. In a clean `pwsh -NoProfile` process, `please lint -Runspace` reaches normal script analysis
+without pre-importing PSScriptAnalyzer. The lint task may still throw `PSScriptAnalyzer found
+issues.` when findings exist; that is its intended behavior.
 
-Using the runspace itself as the TaskFile's durable scope would be a different design. Registration,
-planning, and task invocation would all need to execute in that scope instead of constructing a
-dynamic module in `Read-TaskFile`.
+Wrapping the old dynamic-module execution in a runspace did not fix the defect. The relevant change
+was making TaskFile registration and task invocation occur in the runspace's script scope.
 
-## Confirmed workaround
+## Workaround for standard execution
 
 Import PSScriptAnalyzer before PleaseWork enters the module-bound task invocation. For example, an
 entrypoint script can use:
@@ -110,8 +110,9 @@ Import-Module PleaseWork -Force
 please lint
 ```
 
-Pre-importing PSScriptAnalyzer in a clean process removes the `Get-Command` error. The lint task then
-runs and reports normal analyzer findings.
+Pre-importing PSScriptAnalyzer in a clean process removes the `Get-Command` error from the standard
+dynamic-module execution path. The lint task then runs and reports normal analyzer findings. The
+experimental `-Runspace` path does not require this workaround.
 
 If the dependency must be loaded from the task body, importing it into global session state also
 works:

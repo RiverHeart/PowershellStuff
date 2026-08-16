@@ -18,6 +18,9 @@ function Invoke-PleaseWorkTask {
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Context,
 
+        [AllowNull()]
+        [scriptblock] $Invoker,
+
         [Parameter(Mandatory)]
         [ref] $Result
     )
@@ -51,7 +54,9 @@ function Invoke-PleaseWorkTask {
     $StartedAt = [datetime]::UtcNow
     $global:LASTEXITCODE = 0
     try {
-        if ($null -ne $ScriptBlock.Module) {
+        if ($null -ne $Invoker) {
+            & $Invoker $ScriptBlock $Context $Arguments
+        } elseif ($null -ne $ScriptBlock.Module) {
             & $ScriptBlock.Module $TaskInvoker $ScriptBlock $Context $Arguments
         } else {
             & $TaskInvoker $ScriptBlock $Context $Arguments
