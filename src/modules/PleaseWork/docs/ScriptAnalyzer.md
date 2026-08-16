@@ -82,6 +82,22 @@ Get-Module PSScriptAnalyzer -ListAvailable |
     Select-Object Name, Version, Path
 ```
 
+## Dedicated runspace experiment
+
+PleaseWork has an opt-in `-Runspace` prototype that imports the module and invokes the complete
+task plan in a fresh runspace. It preserves dynamic task parameters, task output, and the durable
+TaskFile `$script:` scope.
+
+This isolation does not fix the cold PSScriptAnalyzer auto-load failure. In a clean
+`pwsh -NoProfile` process, `please lint -Runspace` still reports that `Get-Command` is unavailable.
+The task body still runs through the TaskFile's dynamic module, so the nested module-bound
+auto-load path remains unchanged. A runspace-only wrapper is therefore useful as an isolation
+prototype, but it is not a fix for this defect.
+
+Using the runspace itself as the TaskFile's durable scope would be a different design. Registration,
+planning, and task invocation would all need to execute in that scope instead of constructing a
+dynamic module in `Read-TaskFile`.
+
 ## Confirmed workaround
 
 Import PSScriptAnalyzer before PleaseWork enters the module-bound task invocation. For example, an
@@ -115,31 +131,18 @@ The entrypoint import is preferable when the entrypoint owns development-tool in
 
 ## Misleading error location
 
-`Invoke-PleaseWorkTask` preserves the original error record in the task result, but currently
-rethrows only its exception object:
+`Invoke-PleaseWorkTask` preserves the original error record in the task result and uses a bare
+rethrow:
 
 ```powershell
 $TaskError = $_
-$TaskException = $_.Exception
 # Build the result...
-throw $TaskException
+throw
 ```
 
-`throw $TaskException` creates a new throw site and loses useful `ErrorRecord` invocation metadata.
-Consequently, the displayed stack points at the wrapper's throw statement and omits the
-PSScriptAnalyzer import location.
-
-A bare rethrow preserves the active error record and its original diagnostic context:
-
-```powershell
-catch {
-    $TaskError = $_
-    # Build the result...
-    throw
-}
-```
-
-This change would improve diagnostics but would not fix the auto-loading failure itself.
+The bare rethrow preserves the active error record within the current runspace. The experimental
+runspace boundary cannot preserve the same live `ErrorRecord`; it forwards the nested invocation's
+failure reason to the caller instead.
 
 ## Reproduction
 

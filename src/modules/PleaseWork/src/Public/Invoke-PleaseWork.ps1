@@ -26,7 +26,10 @@ function Invoke-PleaseWork {
         [string] $TaskFile,
 
         [Parameter(ParameterSetName='Run')]
-        [switch] $PassThru
+        [switch] $PassThru,
+
+        [Parameter()]
+        [switch] $Runspace
     )
 
     dynamicparam {
@@ -68,7 +71,6 @@ function Invoke-PleaseWork {
     end {
         $TaskFilePath = Resolve-TaskFilePath -Path $TaskFile
         $TaskFileRoot = Split-Path -Parent $TaskFilePath
-        $TaskSet = Read-TaskFile -Path $TaskFilePath
 
         # PSBoundParameters also contains PleaseWork and common parameters; forward only parameters
         # generated from the selected task's declaration.
@@ -78,6 +80,24 @@ function Invoke-PleaseWork {
                 $TaskArguments[$ParameterName] = $PSBoundParameters[$ParameterName]
             }
         }
+
+        if ($Runspace) {
+            $InvocationParameters = @{}
+            foreach ($ParameterName in $PSBoundParameters.Keys) {
+                if ($ParameterName -ne 'Runspace') {
+                    $InvocationParameters[$ParameterName] = $PSBoundParameters[$ParameterName]
+                }
+            }
+            $InvocationParameters.TaskFile = $TaskFilePath
+
+            Invoke-PleaseWorkInRunspace `
+                -ModulePath $MyInvocation.MyCommand.Module.Path `
+                -InvocationParameters $InvocationParameters `
+                -WorkingDirectory $PWD.ProviderPath
+            return
+        }
+
+        $TaskSet = Read-TaskFile -Path $TaskFilePath
 
         # Support a native 'help' task that displays the available tasks and their descriptions.
         $UseNativeHelp = $Name -ieq 'help' -and -not $TaskSet.Tasks.ContainsKey('help')

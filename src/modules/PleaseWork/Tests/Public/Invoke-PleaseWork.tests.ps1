@@ -474,6 +474,46 @@ readAfterScript: changeScript { "after-script:$Value" }
         )
     }
 
+    It 'runs the complete task plan in a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$Value = 'initial'
+prepare: {
+    $script:Value = 'prepared'
+    "prepare:$Value"
+}
+build: prepare {
+    param ([string] $Configuration)
+    "build:${Value}:$Configuration"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please build -TaskFile $TaskFile -Configuration Release -Runspace)
+
+        $Output | Should -Be @(
+            'prepare:prepared'
+            'build:prepared:Release'
+        )
+    }
+
+    It 'returns task output before rethrowing an error from a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+fail: {
+    'before failure'
+    throw 'runspace task failed'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Output = [System.Collections.Generic.List[object]]::new()
+
+        {
+            please fail -TaskFile $TaskFile -Runspace |
+                ForEach-Object { $Output.Add($_) }
+        } | Should -Throw 'runspace task failed'
+
+        $Output | Should -Be @('before failure')
+    }
+
     It 'does not register hashtable output as a task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
