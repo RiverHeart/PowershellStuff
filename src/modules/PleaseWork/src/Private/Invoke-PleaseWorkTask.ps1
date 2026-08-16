@@ -58,7 +58,6 @@ function Invoke-PleaseWorkTask {
         }
     } catch {
         $TaskError = $_
-        $TaskException = $_.Exception
 
         $FinishedAt = [datetime]::UtcNow
         $Result.Value = [pscustomobject] @{
@@ -70,7 +69,7 @@ function Invoke-PleaseWorkTask {
             FinishedAt = $FinishedAt
             Duration = $FinishedAt - $StartedAt
         }
-        throw $TaskException
+        throw  # Re-throw the error to propagate it to the caller.
     }
 
     $FinishedAt = [datetime]::UtcNow
