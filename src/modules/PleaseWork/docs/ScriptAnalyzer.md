@@ -98,6 +98,20 @@ issues.` when findings exist; that is its intended behavior.
 Wrapping the old dynamic-module execution in a runspace did not fix the defect. The relevant change
 was making TaskFile registration and task invocation occur in the runspace's script scope.
 
+### Output across the runspace boundary
+
+Task output should remain on PowerShell's success stream rather than being consumed with
+`Out-Host`. PleaseWork returns that output normally, or stores it in each task result's `Output`
+property when `-PassThru` is used. The lint task converts PSScriptAnalyzer diagnostics to plain
+objects containing the rule, severity, script path, line, column, and message because the
+analyzer's custom formatting metadata does not render reliably outside its originating runspace.
+
+PleaseWork also replays information, warning, verbose, debug, and progress records through the
+caller's corresponding PowerShell streams. This keeps `Write-Host` status messages visible and
+allows normal redirection and stream variables to work. The current synchronous prototype replays
+these records after the child pipeline completes; live, cross-stream ordering would require an
+asynchronous stream pump.
+
 ## Workaround for standard execution
 
 Import PSScriptAnalyzer before PleaseWork enters the module-bound task invocation. For example, an

@@ -518,6 +518,34 @@ fail: {
         $Output | Should -Be @('before failure')
     }
 
+    It 'forwards auxiliary streams from a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+inspect: {
+    Write-Host 'host message'
+    Write-Warning 'warning message'
+    Write-Verbose 'verbose message'
+    'task output'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Information = @()
+        $Warnings = @()
+
+        $Output = @(please inspect `
+                -TaskFile $TaskFile `
+                -Runspace `
+                -Verbose `
+                -InformationVariable Information `
+                -WarningVariable Warnings `
+                6>$null `
+                3>$null `
+                4>$null)
+
+        $Output | Should -Be @('task output')
+        [string[]] $Information.MessageData | Should -Contain 'host message'
+        [string[]] $Warnings.Message | Should -Contain 'warning message'
+    }
+
     It 'does not register hashtable output as a task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'

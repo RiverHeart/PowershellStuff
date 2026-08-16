@@ -17,7 +17,11 @@ lint: changed('./**/*.ps1') {
     $Results = $ChangedFiles | Invoke-ScriptAnalyzer -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
     if ($Results.Count -gt 0) {
         Write-Host "Found $($Results.Count) issues."
-        $Results | Out-Host  # Use Out-Host for immediate output instead of Write-Host to avoid throw discarding buffered output.
+        $Results | Select-Object `
+            -Property RuleName, Severity, ScriptPath, `
+            @{ Name = 'Line'; Expression = { $_.Extent.StartLineNumber } }, `
+            @{ Name = 'Column'; Expression = { $_.Extent.StartColumnNumber } }, `
+            Message
         throw "PSScriptAnalyzer found issues."
     } else {
         Write-Host "No issues found."

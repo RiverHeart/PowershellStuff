@@ -159,6 +159,22 @@ function Invoke-PleaseWorkInRunspace {
                 $InvocationError = $_.Exception.InnerException
             }
         }
+
+        foreach ($InformationRecord in $PowerShell.Streams.Information) {
+            $PSCmdlet.WriteInformation($InformationRecord)
+        }
+        foreach ($WarningRecord in $PowerShell.Streams.Warning) {
+            $PSCmdlet.WriteWarning($WarningRecord.Message)
+        }
+        foreach ($VerboseRecord in $PowerShell.Streams.Verbose) {
+            $PSCmdlet.WriteVerbose($VerboseRecord.Message)
+        }
+        foreach ($DebugRecord in $PowerShell.Streams.Debug) {
+            $PSCmdlet.WriteDebug($DebugRecord.Message)
+        }
+        foreach ($ProgressRecord in $PowerShell.Streams.Progress) {
+            $PSCmdlet.WriteProgress($ProgressRecord)
+        }
         $Output
 
         if ($null -ne $InvocationError) {
