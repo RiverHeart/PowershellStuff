@@ -19,47 +19,68 @@ using namespace System.Management.Automation.Language
 #>
 function Resolve-ParamBlock {
     [CmdletBinding(DefaultParameterSetName='ByScriptblock')]
-    [OutputType([RuntimeDefinedParameterDictionary])]
+    [OutputType([System.Management.Automation.RuntimeDefinedParameterDictionary])]
     param(
         [Parameter(Mandatory,ParameterSetName='ByScriptblock',Position=0)]
         [scriptblock] $ParamBlock,
 
         [Parameter(Mandatory,ParameterSetName='ByParameterAst',Position=0)]
-        [ReadOnlyCollection[ParameterAst]] $ParameterAsts
+        [System.Collections.ObjectModel.ReadOnlyCollection[
+            System.Management.Automation.Language.ParameterAst
+        ]] $ParameterAsts,
+
+        [string] $DefaultParameterSetName
     )
 
     if (-not $ParameterAsts) {
         $ParameterAsts = $ParamBlock.Ast.ParamBlock.Parameters
     }
 
-    $Parameters = [RuntimeDefinedParameterDictionary]::new()
-    foreach($ParameterAst in $ParameterAsts) {
+    $Parameters = [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
+    foreach ($ParameterAst in $ParameterAsts) {
         $Attributes = [List`1[System.Attribute]]::new()
-        foreach($AttributeAst in $ParameterAst.Attributes) {
+        foreach ($AttributeAst in $ParameterAst.Attributes) {
             if ($AttributeAst.GetType().Name -eq 'TypeConstraintAst') {
                 # This is available already from ParameterAst
                 continue
             }
             $TypeName = $AttributeAst.TypeName
             $AttributeType = $TypeName.GetReflectionAttributeType()
-            $AttributeObj = $AttributeType::new()
-            foreach($NamedArg in $AttributeAst.NamedArguments) {
+            # Recreate each attribute from constant AST values so aliases and validation metadata
+            # participate in PowerShell's normal dynamic parameter binding.
+            [object[]] $PositionalArguments = @(
+                foreach ($PositionalArgument in $AttributeAst.PositionalArguments) {
+                    $PositionalArgument.SafeGetValue()
+                }
+            )
+            $AttributeObj = [Activator]::CreateInstance($AttributeType, $PositionalArguments)
+            foreach ($NamedArg in $AttributeAst.NamedArguments) {
                 $AttributeObj.psobject.properties |
                     Where-Object { $_.Name -eq $NamedArg.ArgumentName } |
                     ForEach-Object {
                         if ($NamedArg.ExpressionOmitted) {
                             $_.Value = $True
                         } else {
-                            $_.Value = $NamedArg.Argument
+                            $_.Value = $NamedArg.Argument.SafeGetValue()
                         }
                     }
             }
             $Attributes.Add($AttributeObj)
         }
-        $Parameter = [RuntimeDefinedParameter]::new($ParameterAst.Name.VariablePath, $ParameterAst.StaticType, $Attributes)
-        if ($ParameterAst.DefaultValue) {
-            $Parameter.Value = $Parameter.DefaultValue
+        # A dynamic parameter without ParameterAttribute is not available in a named parameter set.
+        if (-not [string]::IsNullOrEmpty($DefaultParameterSetName) -and
+            -not ($Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] })
+        ) {
+            $ParameterAttribute = [System.Management.Automation.ParameterAttribute]::new()
+            $ParameterAttribute.ParameterSetName = $DefaultParameterSetName
+            $Attributes.Add($ParameterAttribute)
         }
+        # Leave defaults unset here so the task evaluates its own defaults in its execution scope.
+        $Parameter = [System.Management.Automation.RuntimeDefinedParameter]::new(
+            $ParameterAst.Name.VariablePath,
+            $ParameterAst.StaticType,
+            $Attributes
+        )
         $Parameters.Add($Parameter.Name, $Parameter)
     }
 
