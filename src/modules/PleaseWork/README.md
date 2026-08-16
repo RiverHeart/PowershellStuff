@@ -38,6 +38,29 @@ please help         # Displays task names and descriptions as text
 please test -TaskFile ./AnotherTaskFile.ps1  # Run tasks in a specific taskfile
 ```
 
+Tasks can declare parameters using a normal PowerShell `param` block. PleaseWork exposes the
+selected task's parameters while binding the command, so aliases, switches, type conversion,
+mandatory parameters, and validation attributes behave normally:
+
+```powershell
+build: {
+    param (
+        [Parameter(Mandatory)]
+        [ValidateSet('Debug', 'Release')]
+        [string] $Configuration,
+
+        [switch] $Force
+    )
+
+    dotnet build --configuration $Configuration
+}
+
+please build -Configuration Release -Force
+```
+
+Task parameter names and aliases must not conflict with PleaseWork parameters, common parameters,
+or their abbreviations. Task arguments are passed only to the requested task, not its dependencies.
+
 `help` is reserved for the native task display. To replace it with a TaskFile task, opt in
 explicitly and declare the task:
 

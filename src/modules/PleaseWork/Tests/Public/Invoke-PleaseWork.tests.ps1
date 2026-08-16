@@ -22,6 +22,30 @@ second: { $global:PleaseWorkLog.Add('second') }
         $global:PleaseWorkLog | Should -Be @('first')
     }
 
+    It 'binds and validates named parameters declared by the requested task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: {
+    param (
+        [Parameter(Mandatory)]
+        [Alias('cfg')]
+        [ValidateSet('Debug', 'Release')]
+        [string] $Configuration,
+
+        [switch] $Force
+    )
+
+    "$Configuration|$Force"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+    please build -TaskFile $TaskFile -cfg Release -Force |
+            Should -Be 'Release|True'
+
+        { please build -TaskFile $TaskFile -Configuration Invalid } |
+            Should -Throw '*Cannot validate argument on parameter*Configuration*'
+    }
+
     It 'runs transitive dependencies before the requested task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'

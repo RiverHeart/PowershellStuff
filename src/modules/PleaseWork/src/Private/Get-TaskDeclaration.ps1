@@ -128,11 +128,18 @@ function Get-TaskDeclaration {
         }
 
         $TaskHelp = Get-TaskHelp -Comments $Comments.ToArray()
+        # Preserve parameter metadata for dynamic binding without loading or executing the TaskFile.
+        $TaskBodyAst = $CommandElements[-1].ScriptBlock
         [pscustomobject] @{
             Name = $TaskName
             CommandToken = $CommandToken
             Dependencies = $Dependencies.ToArray()
             PathSpecs = $PathSpecs.ToArray()
+            ParameterAsts = if ($null -ne $TaskBodyAst.ParamBlock) {
+                $TaskBodyAst.ParamBlock.Parameters
+            } else {
+                @()
+            }
             Comments = $Comments.ToArray()
             Help = $TaskHelp
         }
