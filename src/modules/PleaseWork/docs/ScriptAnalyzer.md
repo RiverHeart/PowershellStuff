@@ -102,7 +102,7 @@ was making TaskFile registration and task invocation occur in the runspace's scr
 
 Task output should remain on PowerShell's success stream rather than being consumed with
 `Out-Host`. PleaseWork returns that output normally, or stores it in each task result's `Output`
-property when `-PassThru` is used. The lint task converts PSScriptAnalyzer diagnostics to plain
+property when `-PassThru` is used. The lint task converts/normalizes PSScriptAnalyzer diagnostics to plain
 objects containing the rule, severity, script path, line, column, and message because the
 analyzer's custom formatting metadata does not render reliably outside its originating runspace.
 
