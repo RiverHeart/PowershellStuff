@@ -17,6 +17,8 @@ function Invoke-PleaseWorkInRunspace {
         [string] $WorkingDirectory
     )
 
+    # Use the runspace's default host and session state. Sharing the caller's host changes module
+    # auto-loading behavior and causes PSScriptAnalyzer initialization to fail.
     $Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
     $PowerShell = [powershell]::Create()
     try {
@@ -31,6 +33,9 @@ function Invoke-PleaseWorkInRunspace {
                 -Force `
                 -PassThru `
                 -ErrorAction Stop
+
+            # Parse declaration metadata before loading the TaskFile so the temporary DSL commands
+            # can register each body without duplicating dependency and help parsing at runtime.
             $TaskFilePath = $Parameters.TaskFile
             $Declarations = @(& $PleaseWorkModule {
                     param ($Path)
@@ -43,6 +48,9 @@ function Invoke-PleaseWorkInRunspace {
 
             $script:PleaseWorkRunspaceDeclarations = @{}
             $script:PleaseWorkRunspaceTasks = [System.Collections.Generic.List[hashtable]]::new()
+
+            # Create the invocation wrapper in the same script scope as the TaskFile. Context
+            # variables injected here are therefore visible to its unbound task scriptblocks.
             $RunspaceTaskInvoker = {
                 param ($TaskScriptBlock, $TaskContext, $TaskArguments)
 
@@ -66,6 +74,9 @@ function Invoke-PleaseWorkInRunspace {
                     & $TaskScriptBlock
                 }
             }
+
+            # Every declaration token (for example, build:) points to this registrar. Looking up
+            # metadata by command name avoids creating one closure per task declaration.
             $TaskCommand = {
                 [CmdletBinding()]
                 param (
@@ -89,6 +100,8 @@ function Invoke-PleaseWorkInRunspace {
                     -Value $TaskCommand
             }
 
+            # Dot-sourcing makes the runspace script scope the durable TaskFile scope. Top-level
+            # variables and functions remain available, and $script: state persists across tasks.
             $OriginalErrorActionPreference = $ErrorActionPreference
             try {
                 $ErrorActionPreference = 'Stop'
@@ -125,6 +138,9 @@ function Invoke-PleaseWorkInRunspace {
                 }
                 $TasksByName.Add($TaskDefinition.Name, $TaskDefinition)
             }
+
+            # Hand the registered tasks to the imported module so its existing planner can run
+            # unchanged while task bodies and their invoker remain owned by this runspace scope.
             $PreparedTaskSet = [pscustomobject] @{
                 DefaultTask = if ($env:PLEASE_DEFAULT_TASK) {
                     $env:PLEASE_DEFAULT_TASK
@@ -149,6 +165,8 @@ function Invoke-PleaseWorkInRunspace {
         $null = $PowerShell.AddArgument($InvocationParameters)
         $null = $PowerShell.AddArgument($WorkingDirectory)
 
+        # Collect success output separately so it can be emitted even when the child pipeline
+        # terminates and the original failure must be rethrown in the caller.
         $Output = [System.Collections.Generic.List[psobject]]::new()
         $InvocationError = $null
         try {
@@ -160,6 +178,8 @@ function Invoke-PleaseWorkInRunspace {
             }
         }
 
+        # Auxiliary streams are buffered by synchronous invocation. Replay them through this
+        # cmdlet so caller-side redirection and stream variables continue to work.
         foreach ($InformationRecord in $PowerShell.Streams.Information) {
             $PSCmdlet.WriteInformation($InformationRecord)
         }

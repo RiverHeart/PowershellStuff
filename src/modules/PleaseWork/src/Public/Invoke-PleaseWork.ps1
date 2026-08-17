@@ -97,6 +97,8 @@ function Invoke-PleaseWork {
             return
         }
 
+        # The runspace bootstrap registers tasks directly and places its prepared set in this
+        # module's private state. Standard invocation retains the dynamic-module loader.
         $TaskSet = if ($null -ne $script:PreparedTaskSet) {
             $script:PreparedTaskSet
         } else {

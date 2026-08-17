@@ -25,7 +25,7 @@ function Invoke-PleaseWorkTask {
         [ref] $Result
     )
 
-    # Task bodies are bound to the TaskFile module. This wrapper runs in that module so context
+    # Standard TaskFiles bind task bodies to a dynamic module. This wrapper runs there so context
     # variables remain invocation-local while the call operator preserves normal parameter binding.
     $TaskInvoker = {
         param ($TaskScriptBlock, $TaskContext, $TaskArguments)
@@ -54,6 +54,8 @@ function Invoke-PleaseWorkTask {
     $StartedAt = [datetime]::UtcNow
     $global:LASTEXITCODE = 0
     try {
+        # Direct-runspace TaskFiles supply an invoker created in their own script scope. Standard
+        # TaskFiles instead enter the dynamic module associated with the task scriptblock.
         if ($null -ne $Invoker) {
             & $Invoker $ScriptBlock $Context $Arguments
         } elseif ($null -ne $ScriptBlock.Module) {
