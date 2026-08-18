@@ -261,6 +261,31 @@ build: native { $global:PleaseWorkLog.Add('build') }
         Remove-Variable -Name PleaseWorkPowerShellPath -Scope Global
     }
 
+    It 'captures a native exit code in a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    & $PowerShellPath -NoProfile -Command 'exit 7'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Results = [System.Collections.Generic.List[object]]::new()
+
+        {
+            please native `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -Runspace `
+                -PassThru |
+                ForEach-Object { $Results.Add($_) }
+        } | Should -Throw "Task 'native' failed with exit code 7."
+
+        $Results.Count | Should -Be 1
+        $Results[0].Succeeded | Should -BeFalse
+        $Results[0].ExitCode | Should -Be 7
+    }
+
     It 'uses the last native exit code rather than failing on an intermediate code' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName

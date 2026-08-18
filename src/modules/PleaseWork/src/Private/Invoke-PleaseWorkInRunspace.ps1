@@ -17,17 +17,12 @@ function Invoke-PleaseWorkInRunspace {
         [string] $WorkingDirectory
     )
 
-    # Use the runspace's default host and session state. Sharing the caller's host changes module
-    # auto-loading behavior and causes PSScriptAnalyzer initialization to fail.
-    $Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
-    $PowerShell = [powershell]::Create()
+    $Runspace = $null
+    $PowerShell = $null
     try {
-        $Runspace.Open()
-        $PowerShell.Runspace = $Runspace
         $InvocationScript = {
-            param ($ImportedModulePath, $Parameters, $InitialWorkingDirectory)
+            param ($ImportedModulePath, $Parameters)
 
-            Set-Location -LiteralPath $InitialWorkingDirectory
             $PleaseWorkModule = Import-Module `
                 -Name $ImportedModulePath `
                 -Force `
@@ -160,10 +155,14 @@ function Invoke-PleaseWorkInRunspace {
             } $PreparedTaskSet
             Invoke-PleaseWork @Parameters
         }
-        $null = $PowerShell.AddScript($InvocationScript.ToString())
-        $null = $PowerShell.AddArgument($ModulePath)
-        $null = $PowerShell.AddArgument($InvocationParameters)
-        $null = $PowerShell.AddArgument($WorkingDirectory)
+        $PowerShell = New-PleaseWorkTaskExecutor `
+            -ScriptBlock $InvocationScript `
+            -Parameters @{
+                ImportedModulePath = $ModulePath
+                Parameters = $InvocationParameters
+            } `
+            -WorkingDirectory $WorkingDirectory
+        $Runspace = $PowerShell.Runspace
 
         # Collect success output separately so it can be emitted even when the child pipeline
         # terminates and the original failure must be rethrown in the caller.
@@ -204,7 +203,7 @@ function Invoke-PleaseWorkInRunspace {
             throw $PowerShell.InvocationStateInfo.Reason
         }
     } finally {
-        $PowerShell.Dispose()
-        $Runspace.Dispose()
+        if ($null -ne $PowerShell) { $PowerShell.Dispose() }
+        if ($null -ne $Runspace) { $Runspace.Dispose() }
     }
 }

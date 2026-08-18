@@ -1,60 +1,48 @@
 <#
 .SYNOPSIS
-    Creates a new PleaseWork runspace and powershell instance.
-
-.NOTES
-    TODO: Find a way to integrate with Invoke-PleaseWorkInRunspace
+    Creates a PowerShell pipeline in a new PleaseWork runspace.
 #>
 function New-PleaseWorkTaskExecutor {
     [CmdletBinding()]
     [OutputType([powershell])]
-    param(
+    param (
+        [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock,
-        [object] $Parameters,
-        [hashtable] $Variables = @{},
+
+        [Parameter()]
+        [System.Collections.IDictionary] $Parameters = @{},
+
+        [Parameter()]
+        [System.Collections.IDictionary] $Variables = @{},
+
+        [Parameter()]
         [string] $WorkingDirectory
     )
 
-    if ($null -ne $Parameters -and (
-        $Parameters -isnot [System.Collections.IList] -or
-        $Parameters -isnot [System.Collections.IDictionary]
-    )) {
-        Write-Error "`$Parameters must implement IList or IDictionary."
-        return
-    }
-
+    $Runspace = $null
+    $PowerShell = $null
     try {
-        $InitialSessionState = [initialsessionstate]::CreateDefault()
-
-        # Add variables not already present in the session
-        foreach ($VariableName in $Variables.GetEnumerator()) {
-            $InitialSessionState.Variables.Add(
-                [System.Management.Automation.Runspaces.SessionStateVariableEntry]::new($_.Key, $_.Value, '')
-            )
-        }
-
-        $Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace($InitialSessionState)
-
-        # The SessionStateProxy allows us to set existing variables such as ErrorActionPreference
-        # and modify the working directory without resorting to `InitialSessionState.StartupScripts`.
+        # The parameterless factory provides the session state in which module auto-loading works
+        # consistently for both Windows PowerShell 5.1 and PowerShell 7.
+        $Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
         $Runspace.Open()
-        $Runspace.SessionStateProxy.SetVariable('ErrorActionPreference', 'Stop')
-        if ($WorkingDirectory) {
-            $Runspace.SessionStateProxy.Path.SetLocation($WorkingDirectory)
+
+        foreach ($Variable in $Variables.GetEnumerator()) {
+            $Runspace.SessionStateProxy.SetVariable([string] $Variable.Key, $Variable.Value)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $null = $Runspace.SessionStateProxy.Path.SetLocation($WorkingDirectory)
         }
 
-        # Create a Powershell instance
-        $Powershell = [powershell]::new($Runspace)
-        $Powershell.AddScript($Scriptblock)
-        if ($Parameters) {
-            $Powershell.AddParameters($Parameters)
-        }
+        $PowerShell = [powershell]::Create()
+        $PowerShell.Runspace = $Runspace
+        $null = $PowerShell.AddScript($ScriptBlock.ToString())
+        $null = $PowerShell.AddParameters($Parameters)
     } catch {
-        # Cleanup in the event that something fails
-        if ($Powershell) { $Powershell.Dispose() }
-        if ($Runspace) { $Runspace.Dispose() }
+        if ($null -ne $PowerShell) { $PowerShell.Dispose() }
+        if ($null -ne $Runspace) { $Runspace.Dispose() }
         throw
     }
 
-    return $Powershell
+    return $PowerShell
 }
