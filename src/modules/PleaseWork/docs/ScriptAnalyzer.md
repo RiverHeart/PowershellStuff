@@ -82,6 +82,48 @@ Get-Module PSScriptAnalyzer -ListAvailable |
     Select-Object Name, Version, Path
 ```
 
+## ScriptAnalyzer Assembly Load Fix
+
+No point in trying to merge this code but I was curious if the problem was fixable and Copilot suggested the following which appears to work from loose testing.
+
+**PSScriptAnalyzer.psm1**
+```powershell
+...code above...
+
+$binaryModulePath = Join-Path -Path $binaryModuleRoot -ChildPath 'Microsoft.Windows.PowerShell.ScriptAnalyzer.dll'
+$expectedAssemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($binaryModulePath)
+
+$loadedAssembly = [AppDomain]::CurrentDomain.GetAssemblies() |
+    Where-Object {
+        $_.GetName().Name -eq $expectedAssemblyName.Name
+    } |
+    Select-Object -First 1
+
+if ($null -eq $loadedAssembly) {
+    $binaryModule = Import-Module -Name $binaryModulePath -PassThru
+} else {
+    $loadedAssemblyName = $loadedAssembly.GetName()
+
+    if ($loadedAssemblyName.Version -ne $expectedAssemblyName.Version) {
+        throw "PSScriptAnalyzer $($loadedAssemblyName.Version) is already loaded, but this module requires $($expectedAssemblyName.Version)."
+    }
+
+    Write-Verbose "Detected preloaded assembly '$loadedAssemblyName' in process."
+    Write-Verbose "Attempting to import existing assembly into runspace."
+    
+    $binaryModule = Import-Module -Assembly $loadedAssembly -PassThru
+}
+
+# When the module is unloaded, remove the nested binary module that was loaded with it.
+# Removing the binary module does not unload the ScriptAnalyzer assembly from the process
+# so other consumers should be unaffected.
+$PSModule.OnRemove = {
+    Remove-Module -ModuleInfo $binaryModule
+}
+
+...code below...
+```
+
 ## Dedicated runspace experiment
 
 PleaseWork has an opt-in `-Runspace` prototype that imports the module, dot-sources the TaskFile,
