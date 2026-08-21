@@ -1,5 +1,13 @@
+# Ignore artifacts and binaries
 artifacts/
 bin/
 
+# Kicker files are used to invoke other scripts for tests/debugging.
+# For example, foo.ps1 may have a corresponding foo.kicker.ps1 file that is used to invoke it.
 kicker.ps1
 *.kicker.ps1
+
+# A dedicated folder for misc content to ignore.
+# Useful if you need to clone a repo to use as a workspace reference,
+# but don't want to include its contents in your own repo.
+gitignore
