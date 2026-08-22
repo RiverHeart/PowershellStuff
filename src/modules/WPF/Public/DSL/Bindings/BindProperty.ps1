@@ -43,6 +43,9 @@
     Optional scriptblock to configure the binding object (e.g., set Converter, Mode, etc.).
     The scriptblock receives the internally created Binding instance as $this.
 
+    Use FallbackValue when the binding path cannot be resolved. Use TargetNullValue
+    when the path resolves successfully but its value is null.
+
 .EXAMPLE
     # Bind TextBlock.Text to DataGrid.ItemsSource.Count
     TextBlock 'ProcessCount' {
@@ -56,6 +59,29 @@
 
         TextBlock 'Counter' {
             BindProperty Text Count
+        }
+    }
+
+.EXAMPLE
+    # Initialize a nested binding source before its child controls are created.
+    Window 'MyApp' {
+        State @{ Detail = [pscustomobject] @{ Name = '' } }
+
+        Border {
+            BindProperty DataContext Detail
+
+            TextBlock {
+                BindProperty Text Name
+            }
+        }
+    }
+
+.EXAMPLE
+    # Supply display values for unresolved bindings and resolved null values.
+    Image {
+        BindProperty Source ImageUri -ScriptBlock {
+            $this.FallbackValue = $PlaceholderImage
+            $this.TargetNullValue = $PlaceholderImage
         }
     }
 
@@ -158,7 +184,7 @@ function BindProperty {
             if ($null -eq $dataContextProperty) {
                 Write-Warning "BindProperty: Target type '$($TargetType.FullName)' does not expose DataContext. Specify -Self, -TemplatedParent, -ElementName, or -Source for path '$Path'."
             } elseif ($null -eq $Target.DataContext) {
-                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. The binding will remain unresolved until DataContext is assigned or inherited."
+                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. Initialize or inherit a non-null DataContext before calling BindProperty, or specify -Source. If deferred resolution is intentional, the binding will become active when DataContext is later assigned; configure FallbackValue in -ScriptBlock for a temporary display value."
             } else {
                 Write-Verbose "BindProperty: No source selector specified; using inherited DataContext for path '$Path'."
             }

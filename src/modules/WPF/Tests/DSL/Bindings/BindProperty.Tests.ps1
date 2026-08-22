@@ -80,6 +80,9 @@ Describe 'BindProperty' -Tag 'BindProperty' {
 
         $Warnings.Count | Should -Be 1
         $Warnings[0].ToString() | Should -Match 'DataContext is null'
+        $Warnings[0].ToString() | Should -Match 'Initialize or inherit a non-null DataContext'
+        $Warnings[0].ToString() | Should -Match 'specify -Source'
+        $Warnings[0].ToString() | Should -Match 'FallbackValue'
     }
 
     It 'Should allow configuring the binding via ScriptBlock' {

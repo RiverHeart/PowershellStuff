@@ -917,6 +917,46 @@ Rectangle 'Loading' {
 }
 ```
 
+When no source selector is specified, `BindProperty` uses the target's inherited
+`DataContext`. Initialize that context before creating child bindings. This is
+especially important when a panel changes its `DataContext` to a nested object:
+
+```powershell
+Window 'MyApp' {
+    State @{
+        Detail = [pscustomobject] @{ Name = '' }
+    }
+
+    Border {
+        BindProperty DataContext Detail
+
+        TextBlock {
+            BindProperty Text Name
+        }
+    }
+}
+```
+
+If `Detail` starts as `$null`, the child `Name` binding is temporarily unresolved
+and `BindProperty` warns. Prefer a neutral initial object when it represents valid
+application state. Alternatively, specify `-Source` when the source is known and
+should not come from `DataContext`.
+
+There are two different null cases when configuring a binding through
+`-ScriptBlock`:
+
+- `FallbackValue` is displayed when the source or binding path cannot be resolved.
+- `TargetNullValue` is displayed when the path resolves but its value is `$null`.
+
+```powershell
+Image 'Preview' {
+    BindProperty Source ImageUri -ScriptBlock {
+        $this.FallbackValue = $PlaceholderImage
+        $this.TargetNullValue = $PlaceholderImage
+    }
+}
+```
+
 With a value converter:
 
 ```powershell
