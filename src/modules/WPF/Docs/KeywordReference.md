@@ -24,6 +24,7 @@ Scope of this page:
     * [Label](#label)
     * [TextBlock](#textblock)
     * [TextBox](#textbox)
+    * [ComboBox](#combobox)
     * [Image](#image)
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
@@ -364,6 +365,18 @@ Creates a TextBox.
 ```powershell
 TextBox 'SearchText' {
     $this.Width = 250
+}
+```
+
+### ComboBox
+
+Creates a ComboBox. Set `ItemsSource` directly or bind it to a collection, then use `SelectedItem` for the current selection.
+
+```powershell
+ComboBox 'PokemonPicker' {
+    $this.DisplayMemberPath = 'Name'
+    BindProperty ItemsSource PokemonList
+    BindProperty SelectedItem SelectedPokemon
 }
 ```
 

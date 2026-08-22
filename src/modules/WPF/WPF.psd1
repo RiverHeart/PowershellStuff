@@ -102,6 +102,7 @@ FunctionsToExport = @(
     'Border'
     'ContentPresenter'
     'Button'
+    'ComboBox'
     'DataGrid'
     'DataGridTextColumn'
     'ListView'
