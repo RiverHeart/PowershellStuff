@@ -25,6 +25,7 @@ Scope of this page:
     * [TextBlock](#textblock)
     * [TextBox](#textbox)
     * [ComboBox](#combobox)
+    * [ProgressBar](#progressbar)
     * [Image](#image)
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
@@ -379,6 +380,21 @@ ComboBox 'PokemonPicker' {
     BindProperty SelectedItem SelectedPokemon
 }
 ```
+
+### ProgressBar
+
+Creates a ProgressBar. Configure determinate progress with `Minimum`, `Maximum`, and `Value`, or set `IsIndeterminate` for ongoing activity.
+
+```powershell
+ProgressBar 'LoadingIndicator' {
+    $this.Minimum = 0
+    $this.Maximum = 100
+    $this.Value = 40
+    $this.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+}
+```
+
+Custom control templates can provide the standard `PART_Track`, `PART_Indicator`, and `PART_GlowRect` template parts.
 
 ### Image
 

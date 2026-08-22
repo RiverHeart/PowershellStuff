@@ -119,6 +119,7 @@ FunctionsToExport = @(
     'Row'
     'Menu'
     'MenuItem'
+    'ProgressBar'
     'StatusBar'
     'StatusBarItem'
     'ScrollViewer'
