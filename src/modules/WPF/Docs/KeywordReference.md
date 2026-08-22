@@ -374,10 +374,10 @@ TextBox 'SearchText' {
 Creates a ComboBox. Set `ItemsSource` directly or bind it to a collection, then use `SelectedItem` for the current selection.
 
 ```powershell
-ComboBox 'PokemonPicker' {
+ComboBox 'Options' {
     $this.DisplayMemberPath = 'Name'
-    BindProperty ItemsSource PokemonList
-    BindProperty SelectedItem SelectedPokemon
+    BindProperty ItemsSource OptionsList
+    BindProperty SelectedItem SelectedOption
 }
 ```
 
