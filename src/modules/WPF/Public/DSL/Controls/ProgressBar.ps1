@@ -9,6 +9,7 @@
 
 .LINK
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.controls.progressbar
+    https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/progressbar
 #>
 function ProgressBar {
     [CmdletBinding(DefaultParameterSetName = 'ScriptBlock')]
