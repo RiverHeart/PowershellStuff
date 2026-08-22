@@ -4,7 +4,7 @@ A DSL re-implementation of [Jakub Jareš'](https://github.com/nohwnd) [PokeBrows
 
 ## Credit
 
-All credit and thanks for the idea and overall implementation of the [PokeBrowser](https://github.com/nohwnd/WpfToolkit/tree/master/demo/PokeBrowser.Ps) goes to [Jakub Jareš](https://github.com/nohwnd), perhaps best known as the creator of [Pester](https://github.com/pester/Pester). It featured in his 2019 presentation for PSConferenceEU called [Jakub Jareš - A better way to do WPF in PowerShell 5+](https://www.youtube.com/watch?v=KW5Wf72Zvug) in which he demonstrated how Powershell classes could be bound to WPF XAML definitions. Jakub was kind enough to release the code as MIT for public benefit.
+All credit and thanks for the idea and overall implementation of the [PokeBrowser](https://github.com/nohwnd/WpfToolkit/tree/master/demo/PokeBrowser.Ps) goes to [Jakub Jareš](https://github.com/nohwnd), perhaps best known as the creator of [Pester](https://github.com/pester/Pester). It featured in his 2019 presentation for PSConferenceEU called [Jakub Jareš - A better way to do WPF in PowerShell 5+](https://youtu.be/KW5Wf72Zvug?si=uFk7z0es_iV2pRrP&t=483) in which he demonstrated how Powershell classes could be bound to WPF XAML definitions. Jakub was kind enough to release the code as MIT for public benefit.
 
 Additionally, I should also thank the creators of [PokeApi](https://github.com/pokeapi/pokeapi) for hosting the service that powers this application.
 
