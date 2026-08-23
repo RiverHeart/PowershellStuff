@@ -88,6 +88,11 @@ Scope of this page:
     * [Show-WPFWindow](#show-wpfwindow)
     * [New-WPFProject](#new-wpfproject)
     * [Get-WPFTextInput](#get-wpftextinput)
+* [Application Storage](#application-storage)
+    * [New-WPFAppStorage](#new-wpfappstorage)
+    * [Get-WPFStoredItem](#get-wpfstoreditem)
+    * [Set-WPFStoredItem](#set-wpfstoreditem)
+    * [Remove-WPFStoredItem](#remove-wpfstoreditem)
 * [Completers](#completers)
     * [Complete-WPFColor](#complete-wpfcolor)
 * [Compatibility Note](#compatibility-note)
@@ -1642,6 +1647,52 @@ $Interval = Get-WPFTextInput -Prompt 'Enter slideshow interval in seconds:' -Tit
 
 ```powershell
 $Interval = Get-WPFTextInput -Prompt 'Seconds:' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
+```
+
+## Application Storage
+
+These supporting commands provide durable, per-user storage for application data.
+They are regular module commands rather than control keywords, so they can be used
+before creating a WPF window. Stored values use JSON by default; specify
+`-Format CliXml` when PowerShell-specific type fidelity is useful. Both formats
+store data snapshots and do not restore custom class instances. Cache expiry,
+schema versions, class reconstruction, and invalidation remain the application's
+responsibility.
+
+### New-WPFAppStorage
+
+Creates an explicit storage context. By default, data is stored beneath
+`%LOCALAPPDATA%\WPF\<Application>`. Specify `-Publisher` to use a different
+application namespace.
+
+```powershell
+$Storage = New-WPFAppStorage -Application 'PokeBrowser'
+```
+
+### Get-WPFStoredItem
+
+Reads and deserializes an item. A missing item returns no output; corrupt data
+produces an error.
+
+```powershell
+$UserPreferences = Get-WPFStoredItem -Storage $Storage -Name 'UserPreferences'
+```
+
+### Set-WPFStoredItem
+
+Serializes a value in the selected format and atomically replaces any item with
+the same name and format. Concurrent writes to the same item are rejected.
+
+```powershell
+Set-WPFStoredItem -Storage $Storage -Name 'UserPreferences' -Value $UserPreferences
+```
+
+### Remove-WPFStoredItem
+
+Removes an item when it exists. The command supports `-WhatIf` and `-Confirm`.
+
+```powershell
+Remove-WPFStoredItem -Storage $Storage -Name 'UserPreferences'
 ```
 
 ## Completers

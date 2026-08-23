@@ -83,6 +83,12 @@ FunctionsToExport = @(
     'New-WPFRelayCommand'
     'New-WPFValueConverter'
 
+    # Application Storage
+    'New-WPFAppStorage'
+    'Get-WPFStoredItem'
+    'Set-WPFStoredItem'
+    'Remove-WPFStoredItem'
+
     # Completers
     'Complete-WPFApplicationCommand'
     'Complete-WPFColor'

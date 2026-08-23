@@ -11,3 +11,6 @@ kicker.ps1
 # Useful if you need to clone a repo to use as a workspace reference,
 # but don't want to include its contents in your own repo.
 gitignore
+
+# Ignore lock files
+*.lock
