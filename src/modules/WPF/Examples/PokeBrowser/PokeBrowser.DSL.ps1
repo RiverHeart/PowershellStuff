@@ -62,14 +62,16 @@ App 'Window' {
     State @{
         PokemonList = $PokemonList
         SelectedPokemon = $null
-        Detail = [PokemonDetail]::new('', 0, 0, '', $null)
+        Detail = [PokemonDetail]::new()
         IsLoading = $false
         StatusText = 'Loading Pokemon catalog...'
+        Storage = New-WPFAppStorage -Application 'PokeBrowser' -ErrorAction Stop
     }
 
     On Loaded {
         Write-Debug 'PokeBrowser loaded.'
-        (Reference 'RefreshCatalogButton').Command.Execute($null)
+        $WindowContext = Get-WPFContextId -InputObject (Reference 'Window')
+        Update-PokeBrowserCatalog -ContextId $WindowContext
     }
 
     MenuItem '(F)ile/(E)xit' {
@@ -179,23 +181,8 @@ App 'Window' {
                                         $State = (Reference 'Window').DataContext
                                         $State.IsLoading = $true
 
-                                        try {
-                                            $Catalog = @(Get-PokeBrowserCatalog)
-                                            $State.PokemonList.Clear()
-                                            foreach ($Pokemon in $Catalog) {
-                                                $State.PokemonList.Add($Pokemon)
-                                            }
-
-                                            $State.SelectedPokemon = $Catalog | Select-Object -First 1
-                                            $State.Detail = [PokemonDetail]::new('', 0, 0, '', $null)
-                                            $State.StatusText = "Loaded $($Catalog.Count) Pokemon from PokeAPI"
-                                        } catch {
-                                            $State.StatusText = "Unable to load Pokemon catalog: $($_.Exception.Message)"
-                                        } finally {
-                                            $State.IsLoading = $false
-                                            (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
-                                            (Reference 'RefreshCatalogButton').Command.NotifyCanExecuteChanged()
-                                        }
+                                        $WindowContext = Get-WPFContextId -InputObject (Reference 'Window')
+                                        Update-PokeBrowserCatalog -ContextId $WindowContext -Refresh
                                     }
 
                                     CanExecute {

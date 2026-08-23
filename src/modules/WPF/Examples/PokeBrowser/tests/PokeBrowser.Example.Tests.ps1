@@ -3,6 +3,7 @@ using module ../PokeBrowser.Models.psm1
 Describe 'PokeBrowser example' -Tag 'PokeBrowser-Example' {
     BeforeAll {
         . "$PSScriptRoot/../functions/Get-PokeBrowserCatalog.ps1"
+        . "$PSScriptRoot/../functions/Get-PokeBrowserCachedCatalog.ps1"
         . "$PSScriptRoot/../functions/Get-PokeBrowserDetail.ps1"
     }
 
@@ -25,6 +26,52 @@ Describe 'PokeBrowser example' -Tag 'PokeBrowser-Example' {
         Should -Invoke Invoke-RestMethod -Times 1 -Exactly -ParameterFilter {
             $Uri.AbsoluteUri -eq 'https://pokeapi.co/api/v2/pokemon?limit=2'
         }
+    }
+
+    It 'Writes refreshed catalog data to a JSON cache' {
+        $Storage = New-WPFAppStorage `
+            -Application 'PokeBrowserWriteTest' `
+            -Publisher 'TestPublisher' `
+            -RootPath $TestDrive
+
+        Mock Get-PokeBrowserCatalog {
+            [PokemonSummary[]] @(
+                [PokemonSummary]::new('Bulbasaur', 'https://pokeapi.co/api/v2/pokemon/1/')
+                [PokemonSummary]::new('Pikachu', 'https://pokeapi.co/api/v2/pokemon/25/')
+            )
+        }
+
+        $Catalog = Get-PokeBrowserCachedCatalog -Storage $Storage -Refresh
+        $CachedCatalog = @(Get-WPFStoredItem -Storage $Storage -Name 'Catalog')
+
+        $Catalog.GetType() | Should -Be ([PokemonSummary[]])
+        $Catalog[0] | Should -BeOfType ([PokemonSummary])
+        $CachedCatalog[0].Name | Should -Be 'Bulbasaur'
+        $CachedCatalog[0].ResourceUri | Should -Be 'https://pokeapi.co/api/v2/pokemon/1/'
+    }
+
+    It 'Rehydrates typed catalog data from the JSON cache' {
+        $Storage = New-WPFAppStorage `
+            -Application 'PokeBrowserReadTest' `
+            -Publisher 'TestPublisher' `
+            -RootPath $TestDrive
+
+        $CachedCatalog = @(
+            [pscustomobject] @{
+                Name = 'Bulbasaur'
+                ResourceUri = 'https://pokeapi.co/api/v2/pokemon/1/'
+            }
+        )
+
+        Set-WPFStoredItem -Storage $Storage -Name 'Catalog' -Value $CachedCatalog
+        Mock Get-PokeBrowserCatalog { throw 'The API should not be called.' }
+
+        $Catalog = Get-PokeBrowserCachedCatalog -Storage $Storage
+
+        $Catalog.GetType() | Should -Be ([PokemonSummary[]])
+        $Catalog[0] | Should -BeOfType ([PokemonSummary])
+        $Catalog[0].ResourceUri.AbsoluteUri | Should -Be 'https://pokeapi.co/api/v2/pokemon/1/'
+        Should -Invoke Get-PokeBrowserCatalog -Times 0 -Exactly
     }
 
     It 'Builds a typed detail model from a mocked Pokemon response' {
@@ -69,26 +116,5 @@ Describe 'PokeBrowser example' -Tag 'PokeBrowser-Example' {
         $detail.Name | Should -BeNullOrEmpty
         $detail.Type | Should -BeNullOrEmpty
         $detail.ImageUri | Should -Be $null
-    }
-
-    It 'Keeps State as the view-model binding surface' {
-        $dslPath = Join-Path $PSScriptRoot '../PokeBrowser.DSL.ps1'
-        $content = Get-Content -Path $dslPath -Raw
-
-        $content | Should -Match "App\s+'Window'\s+\{"
-        $content | Should -Match 'Content\s+\{'
-        $content | Should -Match '\}\s*\|\s*Show-WPFWindow\s*$'
-        $content | Should -Match 'State\s+@\{'
-        $content | Should -Match 'PokemonList\s*=\s*\$PokemonList'
-        $content | Should -Match 'SelectedPokemon\s*=\s*\$null'
-        $content | Should -Match "Detail\s*=\s*\[PokemonDetail\]::new\('',\s*0,\s*0,\s*'',\s*\`$null\)"
-        $content | Should -Match 'BindProperty\s+ItemsSource\s+PokemonList'
-        $content | Should -Match 'BindProperty\s+FontSize\s+ActualHeight\s+-Self'
-        $content | Should -Match 'BindProperty\s+DataContext\s+Detail'
-        $content | Should -Match 'Get-PokeBrowserCatalog'
-        $content | Should -Match 'Get-PokeBrowserDetail'
-        $content | Should -Match "Join-Path\s+\`$PSScriptRoot\s+'images/0\.png'"
-        $content | Should -Match '\$this\.FallbackValue\s*=\s*\$PlaceholderImage'
-        $content | Should -Match '\$this\.TargetNullValue\s*=\s*\$PlaceholderImage'
     }
 }

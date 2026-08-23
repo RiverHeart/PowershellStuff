@@ -39,6 +39,8 @@ class PokemonDetail {
     [string] $Type
     [uri] $ImageUri
 
+    PokemonDetail() {}
+
     PokemonDetail(
         [string] $Name,
         [int] $Height,

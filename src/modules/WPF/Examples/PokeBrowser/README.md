@@ -37,8 +37,4 @@ Tests mock `Invoke-RestMethod`, so running the PokeBrowser test file does not ma
 
 ## Todo
 
-* Should support a local (optional?) cache to avoid future network calls.
-* Should probably ignore disable the "Show Details" button after a successful call is made
-    * "Show Details" would enable after a new Pokemon is selected.
-* Should support smaller window sizes
-    * Currently, users have to full size for everything to display properly.
+* Remove "Show Details" button. Just load the pokemon automatically when the user makes a selection.
