@@ -34,7 +34,7 @@ using namespace System.Windows.Controls
 
 Set-Location $PSScriptRoot
 
-    Import-Module WPF -ErrorAction Stop -Force
+Import-Module WPF -ErrorAction Stop -Force
 
 Import "$PSScriptRoot/PokeBrowser.Styles.ps1"
 Import "$PSScriptRoot/functions"
