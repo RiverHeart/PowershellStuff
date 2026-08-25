@@ -102,6 +102,34 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $binding.Converter | Should -Not -BeNullOrEmpty
     }
 
+    It 'Should convert source values with -Converter' {
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        $Source = [pscustomobject] @{ Value = 4 }
+
+        BindProperty -InputObject $TextBlock -Property Text -Path Value -Source $Source -Converter {
+            param($Value)
+            "Value: $Value"
+        }
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBlock, [System.Windows.Controls.TextBlock]::TextProperty)
+        $binding.Converter | Should -Not -BeNullOrEmpty
+        $TextBlock.Text | Should -Be 'Value: 4'
+    }
+
+    It 'Should update the source with -TwoWay' {
+        $TextBox = [System.Windows.Controls.TextBox]::new()
+        $State = New-WPFObservableState @{ Value = 'Initial' }
+
+        BindProperty -InputObject $TextBox -Property Text -Path Value -Source $State -TwoWay
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBox, [System.Windows.Controls.TextBox]::TextProperty)
+        $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::TwoWay)
+
+        $TextBox.Text = 'Updated'
+        $TextBox.GetBindingExpression([System.Windows.Controls.TextBox]::TextProperty).UpdateSource()
+        $State.Value | Should -Be 'Updated'
+    }
+
     It 'Should work inside a DSL control body with $this' {
         $DummySource = [pscustomobject]@{ Value = 42 }
 

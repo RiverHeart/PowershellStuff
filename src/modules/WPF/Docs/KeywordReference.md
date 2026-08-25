@@ -966,14 +966,25 @@ With a value converter:
 
 ```powershell
 Label 'Status' {
-    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
-        $this.Converter = New-WPFValueConverter {
-            param($File)
-            if ($File) { "File: $($File.Name)" } else { 'No file' }
-        }
+    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -Converter {
+        param($File)
+        if ($File) { "File: $($File.Name)" } else { 'No file' }
     }
 }
 ```
+
+For properties that should update their source:
+
+```powershell
+ComboBox 'Picker' {
+    BindProperty SelectedItem UserSelection -TwoWay
+}
+```
+
+`-Converter` is shorthand for assigning a `New-WPFValueConverter` to the WPF
+binding. `-TwoWay` sets the WPF binding mode to `TwoWay`. Use `-ScriptBlock` for
+other binding properties such as `UpdateSourceTrigger`, `FallbackValue`, or
+`TargetNullValue`, or to override the shorthand configuration.
 
 ### Binding
 

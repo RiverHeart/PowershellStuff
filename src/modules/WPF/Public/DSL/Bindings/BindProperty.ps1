@@ -39,6 +39,13 @@
 .PARAMETER InputObject
     The target control. Accepts pipeline input. Defaults to $this in DSL context.
 
+.PARAMETER TwoWay
+    Configures the binding to update both the target and source properties.
+
+.PARAMETER Converter
+    Optional scriptblock used to convert source values before assigning them to
+    the target property.
+
 .PARAMETER ScriptBlock
     Optional scriptblock to configure the binding object (e.g., set Converter, Mode, etc.).
     The scriptblock receives the internally created Binding instance as $this.
@@ -94,11 +101,9 @@
 .EXAMPLE
     # Configure the binding with a converter
     Label 'Status' {
-        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
-            $this.Converter = New-WPFValueConverter {
-                param($File)
-                if ($File) { "File: $($File.Name)" } else { 'No file' }
-            }
+        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -Converter {
+            param($File)
+            if ($File) { "File: $($File.Name)" } else { 'No file' }
         }
     }
 
@@ -133,6 +138,12 @@ function BindProperty {
 
         [Parameter(ValueFromPipeline)]
         [object] $InputObject,
+
+        [Parameter()]
+        [switch] $TwoWay,
+
+        [Parameter()]
+        [scriptblock] $Converter,
 
         [Parameter()]
         [scriptblock] $ScriptBlock
@@ -188,6 +199,14 @@ function BindProperty {
             } else {
                 Write-Verbose "BindProperty: No source selector specified; using inherited DataContext for path '$Path'."
             }
+        }
+
+        if ($TwoWay) {
+            $binding.Mode = [System.Windows.Data.BindingMode]::TwoWay
+        }
+
+        if ($Converter) {
+            $binding.Converter = New-WPFValueConverter $Converter
         }
 
         # Allow custom configuration via scriptblock
