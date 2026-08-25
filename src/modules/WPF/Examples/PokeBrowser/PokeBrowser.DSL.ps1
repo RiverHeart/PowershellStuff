@@ -34,11 +34,7 @@ using namespace System.Windows.Controls
 
 Set-Location $PSScriptRoot
 
-if (-not (Get-Module -Name WPF) -and
-    (Get-Module -ListAvailable -Name WPF)
-) {
     Import-Module WPF -ErrorAction Stop -Force
-}
 
 Import "$PSScriptRoot/PokeBrowser.Styles.ps1"
 Import "$PSScriptRoot/functions"
@@ -49,15 +45,12 @@ $PlaceholderImage = [System.Windows.Media.Imaging.BitmapImage]::new(
 )
 
 App 'Window' {
+    UseStyle 'PokeBrowser.Window'
+
     $this.Title = 'PokeBrowser'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.WindowState = [WindowState]::Maximized
     $this.ResizeMode = [ResizeMode]::CanResize
-    $this.Width = 960
-    $this.Height = 640
-    $this.MinWidth = 760
-    $this.MinHeight = 520
-    $this.Background = '#F3F4F6'
 
     State @{
         PokemonList = $PokemonList
@@ -106,9 +99,7 @@ App 'Window' {
             Row 'Expand' {
                 Column {
                     Border 'CatalogPanel' {
-                        UseStyle 'PokeBrowser.Panel'
-                        $this.Width = 300
-                        $this.Margin = 0, 0, 20, 0
+                        UseStyle 'PokeBrowser.CatalogPanel'
 
                         StackPanel 'CatalogContent' {
                             TextBlock 'CatalogHeading' {
@@ -123,19 +114,11 @@ App 'Window' {
 
                                 # Compute FontSize as 40% of the rendered height with a 12-point floor.
                                 # A 40 pixel minimum height yields a 16-point font size, which is a reasonable minimum for legibility.
-                                #
-                                # TODO: That said, it would be nice to find a nicer abstraction for this, e.g. a "ScaleFontSize"
-                                # binding converter that could be reused in other scenarios.
-                                BindProperty FontSize ActualHeight -Self -ScriptBlock {
-                                    $this.Converter = New-WPFValueConverter {
-                                        param($Height)
-                                        [Math]::Max(12, [double] $Height * 0.4)
-                                    }
+                                BindProperty FontSize ActualHeight -Self -Converter {
+                                    param($Height); [Math]::Max(12, [double] $Height * 0.4)
                                 }
                                 BindProperty ItemsSource PokemonList
-                                BindProperty SelectedItem SelectedPokemon -ScriptBlock {
-                                    $this.Mode = [System.Windows.Data.BindingMode]::TwoWay
-                                }
+                                BindProperty SelectedItem SelectedPokemon -TwoWay
 
                                 On SelectionChanged {
                                     $State = (Reference 'Window').DataContext
@@ -221,9 +204,6 @@ App 'Window' {
                                     VStackPanel 'ImageContainer' {
                                         Border 'ImageFrame' {
                                             UseStyle 'PokeBrowser.ImageFrame'
-                                            $this.Width = 240
-                                            $this.Height = 240
-                                            $this.Margin = 0, 20, 28, 0
 
                                             Image 'PokemonImage' {
                                                 $this.Stretch = [System.Windows.Media.Stretch]::Uniform

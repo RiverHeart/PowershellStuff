@@ -10,8 +10,6 @@ Additionally, I should also thank the creators of [PokeApi](https://github.com/p
 
 ## Interface
 
-Jigglypuff, objectively the best pokemon.
-
 ![PokeBrowser](./images/PokeBrowser.png)
 
 ## Architecture

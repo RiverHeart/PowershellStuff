@@ -23,12 +23,27 @@ Style 'GhostButton' Button {
     Foreground: '#4A4F57'
 }
 
+Style 'PokeBrowser.Window' Window {
+    Width: 960
+    Height: 640
+    MinWidth: 760
+    MinHeight: 520
+    Background: '#F3F4F6'
+}
+
 Style 'PokeBrowser.Panel' Border {
     Background: '#FFFFFF'
     BorderBrush: '#D9DCE2'
     BorderThickness: 1
     CornerRadius: 8
     Padding: 24
+    Width: 600
+}
+
+Style 'PokeBrowser.CatalogPanel' Border {
+    ExtendStyle 'PokeBrowser.Panel'
+    Width: 300
+    Margin: 0, 0, 20, 0
 }
 
 Style 'PokeBrowser.ImageFrame' Border {
@@ -36,7 +51,9 @@ Style 'PokeBrowser.ImageFrame' Border {
     BorderBrush: '#E4C85A'
     BorderThickness: 1
     CornerRadius: 8
-
+    Width: 240
+    Height: 240
+    Margin: 0, 20, 28, 0
 }
 
 Style 'PokeBrowser.Title' TextBlock {
