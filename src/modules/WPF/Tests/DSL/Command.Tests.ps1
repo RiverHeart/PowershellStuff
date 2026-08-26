@@ -43,6 +43,37 @@ Describe 'Command' -Tag 'Command' {
         $Parent.Command.CanExecute($null) | Should -BeTrue
     }
 
+    It 'Should return a reusable command definition outside a control scriptblock' {
+        $Definition = Command 'DoThing' {
+            Execute { $null = $true }
+            CanExecute { $true }
+        }
+
+        $Definition.PSObject.TypeNames | Should -Contain 'WPF.CommandDefinition'
+        $Definition.Name | Should -Be 'DoThing'
+        $Definition.Command | Should -Be $null
+    }
+
+    It 'Should attach the same command instance to multiple controls' {
+        $Definition = Command 'DoThing' {
+            Execute { $null = $true }
+            CanExecute { $true }
+        }
+        $FirstParent = [System.Windows.Controls.Button]::new()
+        $SecondParent = [System.Windows.Controls.Button]::new()
+
+        {
+            Command $Definition
+        }.InvokeWithContext($null, (New-WPFVariableList -InputObject $FirstParent))
+        {
+            Command $Definition
+        }.InvokeWithContext($null, (New-WPFVariableList -InputObject $SecondParent))
+
+        $FirstParent.Command | Should -BeOfType [RelayCommand]
+        [object]::ReferenceEquals($FirstParent.Command, $SecondParent.Command) | Should -BeTrue
+        [object]::ReferenceEquals($Definition.Command, $FirstParent.Command) | Should -BeTrue
+    }
+
     It 'Should add a CommandBinding and assign routed command when BoundTo is supplied' {
         InModuleScope WPF {
             Clear-WPFControlRegistry

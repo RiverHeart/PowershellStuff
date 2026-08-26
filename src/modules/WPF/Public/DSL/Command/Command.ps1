@@ -4,11 +4,13 @@ using namespace System.Windows.Input
 
 <#
 .SYNOPSIS
-    Keyword for defining a command on a WPF control.
+    Keyword for defining or attaching a command.
 
 .DESCRIPTION
     Creates a RelayCommand or RoutedUICommand and assigns it to the current
-    control's Command property.
+    control's Command property. When called outside a control scriptblock,
+    returns a reusable command definition that can be attached later by
+    passing it back to Command.
 
     By default, the scriptblock is processed for child keyword specs:
 
@@ -47,6 +49,18 @@ using namespace System.Windows.Input
     }
 
 .EXAMPLE
+    Reusable command definition:
+
+    $SaveCommand = Command 'Save' {
+        Execute { Save-File }
+        CanExecute { $global:FileIsLoaded }
+    }
+
+    Button 'SaveButton' {
+        Command $SaveCommand
+    }
+
+.EXAMPLE
     Relay command with keyboard gesture bound to the Window:
 
     MenuItem '(F)ile/(S)ave As' {
@@ -81,13 +95,11 @@ using namespace System.Windows.Input
 function Command {
     [CmdletBinding()]
     [Alias('-Command')]
-    [OutputType([void])]
+    [OutputType([void], [pscustomobject])]
     param(
         [Parameter(Mandatory, Position=0)]
-        [ValidateNotNullOrEmpty()]
-        [ValidatePattern('^\w+$')]
         [ArgumentCompleter({ Complete-WPFApplicationCommand @args })]
-        [string] $Name,
+        [object] $NameOrDefinition,
 
         [Parameter(Position=1)]
         [object] $GesturesOrScriptBlock,
@@ -103,7 +115,22 @@ function Command {
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $NameOrDefinition
+        return
+    }
+
+    $Definition = if ('WPF.CommandDefinition' -in $NameOrDefinition.PSObject.TypeNames) {
+        $NameOrDefinition
+    } else {
+        $null
+    }
+
+    if ($Definition) {
+        $Name = $Definition.Name
+    } elseif ($NameOrDefinition -is [string] -and $NameOrDefinition -match '^\w+$') {
+        $Name = $NameOrDefinition
+    } else {
+        Write-Error 'Command requires a valid command name or WPF.CommandDefinition object.'
         return
     }
 
@@ -114,9 +141,16 @@ function Command {
         $GesturesOrScriptBlock = $null
     }
 
-    if (-not $ScriptBlock) {
-        Write-Error "Command '$Name' requires a scriptblock."
-        return
+    if ($Definition) {
+        if ($ScriptBlock) {
+            Write-Error "Command definition '$Name' cannot be supplied with another scriptblock."
+            return
+        }
+
+        $ScriptBlock = $Definition.ScriptBlock
+        if (-not $PSBoundParameters.ContainsKey('BoundTo')) {
+            $BoundTo = $Definition.BoundTo
+        }
     }
 
     if (-not $Parent) {
@@ -124,7 +158,52 @@ function Command {
     }
 
     if (-not $Parent) {
-        Write-Error "Command '$Name' must be called within a control's scriptblock."
+        if ($Definition) {
+            Write-Error "Command definition '$Name' must be attached within a control's scriptblock."
+            return
+        }
+
+        if (-not $ScriptBlock) {
+            Write-Error "Command '$Name' requires a scriptblock."
+            return
+        }
+
+        if ($GesturesOrScriptBlock) {
+            Write-Error "Command definition '$Name' cannot declare gestures. Supply gestures when attaching it to a control."
+            return
+        }
+
+        return [pscustomobject] @{
+            PSTypeName  = 'WPF.CommandDefinition'
+            Name        = $Name
+            ScriptBlock = $ScriptBlock
+            BoundTo     = $BoundTo
+            Command     = $null
+        }
+    }
+
+    if (-not $ScriptBlock) {
+        Write-Error "Command '$Name' requires a scriptblock."
+        return
+    }
+
+    if ($Definition.Command) {
+        if ($GesturesOrScriptBlock) {
+            $GestureStrings = @($GesturesOrScriptBlock)
+            $Window = Get-WPFRegisteredObject 'Window'
+            foreach ($Gesture in @(ConvertTo-KeyGesture -InputObject $GestureStrings)) {
+                $Window.InputBindings.Add(
+                    [KeyBinding]::new($Definition.Command, $Gesture)
+                ) | Out-Null
+            }
+
+            if ($Parent -is [MenuItem] -and $GestureStrings.Count -gt 0) {
+                $Parent.InputGestureText = [string] $GestureStrings[0]
+            }
+        }
+
+        Set-WPFObjectSpec -InputObject $Parent -Name 'Command' -Value $Definition.Command | Out-Null
+        Update-WPFObjectSpec -InputObject $Parent
         return
     }
 
@@ -253,6 +332,10 @@ function Command {
             } else {
                 [RelayCommand]::new($ExecuteSpec.ScriptBlock)
             }
+        }
+
+        if ($Definition) {
+            $Definition.Command = $Command
         }
 
         Set-WPFObjectSpec -InputObject $Parent -Name 'Command' -Value $Command | Out-Null

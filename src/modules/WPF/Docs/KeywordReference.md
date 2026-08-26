@@ -622,28 +622,44 @@ Border 'Banner' {
 
 ### Command
 
-Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
+Creates or attaches a command and optionally binds shortcut gestures.
 
 `Execute` and `CanExecute` are contextual child keywords of `Command`.
 They are intended to be used inside a `Command { ... }` specification block.
 
+Outside a control scriptblock, `Command 'Name' { ... }` returns a reusable
+`WPF.CommandDefinition`. Pass that object to `Command` inside each control that
+should use it. The command is materialized on first attachment, then the same
+`ICommand` instance is reused by later attachments. Gestures belong to the
+attachment site rather than the definition.
+
 ```powershell
-Command 'Open' {
-    # Uses built-in ApplicationCommand if available
-}
-
-Command 'MyCommand' 'Ctrl+M' {
-    Write-Host 'Run custom command'
-}
-
-Command 'SaveAs' 'Ctrl+Shift+S' {
+$SaveCommand = Command 'Save' {
     Execute { Write-Host 'Saving...' }
     CanExecute { $IsFileLoaded }
-    # RelayCommand does not rely on CommandManager in this module,
-    # so we refresh availability explicitly when file state changes.
-    (Reference 'Window').Tag.SaveAsCommand = $this.Command
+}
+
+Button 'SaveButton' {
+    Command $SaveCommand
+}
+
+MenuItem '(F)ile/(S)ave' {
+    Command $SaveCommand 'Ctrl+S'
 }
 ```
+
+Inline definitions remain supported:
+
+```powershell
+Button 'RunButton' {
+    Command 'Run' {
+        Write-Host 'Run command'
+    }
+}
+```
+
+Root definitions cannot declare gestures because they are not associated with
+a window. Supply a gesture when attaching the definition to a control.
 
 ### Key
 

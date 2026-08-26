@@ -25,6 +25,43 @@ $PlaceholderImage = [System.Windows.Media.Imaging.BitmapImage]::new(
     [uri] (Join-Path $PSScriptRoot 'images/0.png')
 )
 
+$ShowPokemonCommand = Command 'ShowPokemonCommand' {
+    Execute {
+        $State = (Reference 'Window').DataContext
+        $State.IsLoading = $true
+
+        try {
+            $State.Detail = Get-PokeBrowserDetail -Pokemon $State.SelectedPokemon
+            $State.StatusText = "Showing $($State.Detail.Name) from PokeAPI"
+        } catch {
+            $State.StatusText = "Unable to load Pokemon details: $($_.Exception.Message)"
+        } finally {
+            $State.IsLoading = $false
+            (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
+            (Reference 'RefreshCatalogButton').Command.NotifyCanExecuteChanged()
+        }
+    }
+
+    CanExecute {
+        $State = (Reference 'Window').DataContext
+        $null -ne $State.SelectedPokemon -and -not $State.IsLoading
+    }
+}
+
+$RefreshCatalogCommand = Command 'RefreshCatalogCommand' {
+    Execute {
+        $State = (Reference 'Window').DataContext
+        $State.IsLoading = $true
+
+        $WindowContext = Get-WPFContextId -InputObject (Reference 'Window')
+        Update-PokeBrowserCatalog -ContextId $WindowContext -Refresh
+    }
+
+    CanExecute {
+        -not (Reference 'Window').DataContext.IsLoading
+    }
+}
+
 App 'Window' {
     UseStyle 'PokeBrowser.Window'
 
@@ -112,47 +149,14 @@ App 'Window' {
                                 UseStyle 'PrimaryButton'
                                 $this.Content = 'Show details'
 
-                                Command 'ShowPokemonCommand' {
-                                    Execute {
-                                        $State = (Reference 'Window').DataContext
-                                        $State.IsLoading = $true
-
-                                        try {
-                                            $State.Detail = Get-PokeBrowserDetail -Pokemon $State.SelectedPokemon
-                                            $State.StatusText = "Showing $($State.Detail.Name) from PokeAPI"
-                                        } catch {
-                                            $State.StatusText = "Unable to load Pokemon details: $($_.Exception.Message)"
-                                        } finally {
-                                            $State.IsLoading = $false
-                                            (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
-                                            (Reference 'RefreshCatalogButton').Command.NotifyCanExecuteChanged()
-                                        }
-                                    }
-
-                                    CanExecute {
-                                        $State = (Reference 'Window').DataContext
-                                        $null -ne $State.SelectedPokemon -and -not $State.IsLoading
-                                    }
-                                }
+                                Command $ShowPokemonCommand
                             }
 
                             Button 'RefreshCatalogButton' {
                                 UseStyle 'GhostButton'
                                 $this.Content = 'Refresh catalog'
 
-                                Command 'RefreshCatalogCommand' {
-                                    Execute {
-                                        $State = (Reference 'Window').DataContext
-                                        $State.IsLoading = $true
-
-                                        $WindowContext = Get-WPFContextId -InputObject (Reference 'Window')
-                                        Update-PokeBrowserCatalog -ContextId $WindowContext -Refresh
-                                    }
-
-                                    CanExecute {
-                                        -not (Reference 'Window').DataContext.IsLoading
-                                    }
-                                }
+                                Command $RefreshCatalogCommand
                             }
 
                             ProgressBar 'LoadingIndicator' {
