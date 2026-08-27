@@ -74,6 +74,28 @@ Describe 'Command' -Tag 'Command' {
         [object]::ReferenceEquals($Definition.Command, $FirstParent.Command) | Should -BeTrue
     }
 
+    It 'Should attach a reusable command with a gesture' {
+        InModuleScope WPF {
+            Clear-WPFControlRegistry
+        }
+
+        $Window = [System.Windows.Window]::new()
+        Register-WPFObject -Name 'Window' -InputObject $Window -Overwrite
+        $Definition = Command 'DoThing' {
+            Execute { $null = $true }
+        }
+        $Parent = [System.Windows.Controls.MenuItem]::new()
+
+        {
+            Command $Definition 'Ctrl+P'
+        }.InvokeWithContext($null, (New-WPFVariableList -InputObject $Parent))
+
+        $Parent.Command | Should -BeOfType [RelayCommand]
+        $Parent.InputGestureText | Should -Be 'Ctrl+P'
+        $Window.InputBindings.Count | Should -Be 1
+        $Window.InputBindings[0].Command | Should -BeExactly $Parent.Command
+    }
+
     It 'Should add a CommandBinding and assign routed command when BoundTo is supplied' {
         InModuleScope WPF {
             Clear-WPFControlRegistry

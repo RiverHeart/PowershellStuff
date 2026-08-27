@@ -93,20 +93,34 @@ using namespace System.Windows.Input
     https://learn.microsoft.com/en-us/dotnet/api/system.windows.input.icommand
 #>
 function Command {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'CreateWithGesture')]
     [Alias('-Command')]
     [OutputType([void], [pscustomobject])]
     param(
-        [Parameter(Mandatory, Position=0)]
+        [Parameter(Mandatory, Position=0, ParameterSetName = 'Reference')]
+        [ValidateScript({ 'WPF.CommandDefinition' -in $_.PSTypeNames })]
+        [PSTypeName('WPF.CommandDefinition')]
+        [pscustomobject] $Definition,
+
+        [Parameter(Mandatory, Position=0, ParameterSetName = 'Create')]
+        [Parameter(Mandatory, Position=0, ParameterSetName = 'CreateWithGesture')]
         [ArgumentCompleter({ Complete-WPFApplicationCommand @args })]
-        [object] $NameOrDefinition,
+        [ValidateScript({ $_ -isnot [scriptblock] })]
+        [ValidatePattern('^\w+$')]
+        [string] $Name,
 
-        [Parameter(Position=1)]
-        [object] $GesturesOrScriptBlock,
+        [Parameter(Position=1, ParameterSetName = 'CreateWithGesture')]
+        [Parameter(Position=1, ParameterSetName = 'Reference')]
+        [ValidateScript({ $_ -isnot [scriptblock] })]
+        [string[]] $Gestures,
 
-        [Parameter(Position=2)]
+        [Parameter(Position=1, ParameterSetName = 'Create')]
+        [Parameter(Position=2, ParameterSetName = 'CreateWithGesture')]
         [scriptblock] $ScriptBlock,
 
+        [Parameter(ParameterSetName = 'Create')]
+        [Parameter(ParameterSetName = 'CreateWithGesture')]
+        [Parameter(ParameterSetName = 'Reference')]
         [string] $BoundTo,
 
         # Explicit parent; supplied by wrapper keywords so that the correct
@@ -114,39 +128,16 @@ function Command {
         [object] $Parent
     )
 
-    if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $NameOrDefinition
-        return
-    }
-
-    $Definition = if ('WPF.CommandDefinition' -in $NameOrDefinition.PSObject.TypeNames) {
-        $NameOrDefinition
-    } else {
-        $null
-    }
-
-    if ($Definition) {
+    if ($PSCmdlet.ParameterSetName -eq 'Reference') {
         $Name = $Definition.Name
-    } elseif ($NameOrDefinition -is [string] -and $NameOrDefinition -match '^\w+$') {
-        $Name = $NameOrDefinition
-    } else {
-        Write-Error 'Command requires a valid command name or WPF.CommandDefinition object.'
+    }
+
+    if ($MyInvocation.InvocationName.StartsWith('-')) {
+        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
         return
     }
 
-    # Normalize: if position 1 is a scriptblock and no explicit ScriptBlock supplied,
-    # treat it as the scriptblock.
-    if ($GesturesOrScriptBlock -is [scriptblock] -and -not $PSBoundParameters.ContainsKey('ScriptBlock')) {
-        $ScriptBlock = $GesturesOrScriptBlock
-        $GesturesOrScriptBlock = $null
-    }
-
     if ($Definition) {
-        if ($ScriptBlock) {
-            Write-Error "Command definition '$Name' cannot be supplied with another scriptblock."
-            return
-        }
-
         $ScriptBlock = $Definition.ScriptBlock
         if (-not $PSBoundParameters.ContainsKey('BoundTo')) {
             $BoundTo = $Definition.BoundTo
@@ -168,7 +159,7 @@ function Command {
             return
         }
 
-        if ($GesturesOrScriptBlock) {
+        if ($Gestures) {
             Write-Error "Command definition '$Name' cannot declare gestures. Supply gestures when attaching it to a control."
             return
         }
@@ -188,8 +179,8 @@ function Command {
     }
 
     if ($Definition.Command) {
-        if ($GesturesOrScriptBlock) {
-            $GestureStrings = @($GesturesOrScriptBlock)
+        if ($Gestures) {
+            $GestureStrings = @($Gestures)
             $Window = Get-WPFRegisteredObject 'Window'
             foreach ($Gesture in @(ConvertTo-KeyGesture -InputObject $GestureStrings)) {
                 $Window.InputBindings.Add(
@@ -248,7 +239,7 @@ function Command {
                   "Call NotifyCanExecuteChanged on the command object when state changes."
         }
 
-        if ($GesturesOrScriptBlock -and -not $BoundToTarget) {
+        if ($Gestures -and -not $BoundToTarget) {
             # --- Relay command + Window KeyBinding path ---
             $Command = if ($CanExecuteSpec) {
                 [RelayCommand]::new($ExecuteSpec.ScriptBlock, $CanExecuteSpec.ScriptBlock)
@@ -256,10 +247,10 @@ function Command {
                 [RelayCommand]::new($ExecuteSpec.ScriptBlock)
             }
 
-            $GestureStrings = @($GesturesOrScriptBlock)
-            $Gestures = @(ConvertTo-KeyGesture -InputObject $GestureStrings)
+            $GestureStrings = @($Gestures)
+            $ConvertedGestures = @(ConvertTo-KeyGesture -InputObject $GestureStrings)
             $Window = Get-WPFRegisteredObject 'Window'
-            foreach ($Gesture in $Gestures) {
+            foreach ($Gesture in $ConvertedGestures) {
                 $Window.InputBindings.Add(
                     [KeyBinding]::new($Command, $Gesture)
                 ) | Out-Null
@@ -272,11 +263,11 @@ function Command {
         } elseif ($BoundToTarget) {
             # --- Routed / Application command path ---
             $AppProperty = [ApplicationCommands].GetProperty($Name)
-            $GestureStrings = @($GesturesOrScriptBlock)
+            $GestureStrings = @($Gestures)
             $InputGestures = [InputGestureCollection]::new()
-            if ($GesturesOrScriptBlock) {
-                $Gestures = @(ConvertTo-KeyGesture -InputObject $GestureStrings)
-                foreach ($Item in $Gestures) {
+            if ($Gestures) {
+                $ConvertedGestures = @(ConvertTo-KeyGesture -InputObject $GestureStrings)
+                foreach ($Item in $ConvertedGestures) {
                     [void] $InputGestures.Add(
                         [InputGesture] $Item
                     )
