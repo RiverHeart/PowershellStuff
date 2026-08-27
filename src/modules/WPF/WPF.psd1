@@ -146,6 +146,7 @@ FunctionsToExport = @(
     'ExtendStyle'
     'Execute'
     'CanExecute'
+    'NotifyCanExecuteChanged'
     'Import'
     'Key'
     'Link'

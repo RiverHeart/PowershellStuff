@@ -37,7 +37,6 @@ function Update-PokeBrowserCatalog {
         $State.StatusText = "Unable to load Pokemon catalog: $($_.Exception.Message)"
     } finally {
         $State.IsLoading = $false
-        (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
-        (Reference 'RefreshCatalogButton').Command.NotifyCanExecuteChanged()
+        NotifyCanExecuteChanged 'ShowPokemonButton', 'RefreshCatalogButton'
     }
 }

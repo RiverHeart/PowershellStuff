@@ -37,8 +37,7 @@ $ShowPokemonCommand = Command 'ShowPokemonCommand' {
             $State.StatusText = "Unable to load Pokemon details: $($_.Exception.Message)"
         } finally {
             $State.IsLoading = $false
-            (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
-            (Reference 'RefreshCatalogButton').Command.NotifyCanExecuteChanged()
+            NotifyCanExecuteChanged 'ShowPokemonButton', 'RefreshCatalogButton'
         }
     }
 
@@ -141,7 +140,7 @@ App 'Window' {
                                 On SelectionChanged {
                                     $State = (Get-WPFWindow).DataContext
                                     $State.SelectedPokemon = $this.SelectedItem
-                                    (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
+                                    NotifyCanExecuteChanged 'ShowPokemonButton'
                                 }
                             }
 

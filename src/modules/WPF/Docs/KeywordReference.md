@@ -661,6 +661,26 @@ Button 'RunButton' {
 Root definitions cannot declare gestures because they are not associated with
 a window. Supply a gesture when attaching the definition to a control.
 
+### NotifyCanExecuteChanged
+
+Explicitly notifies relay commands that their `CanExecute` result may have
+changed. Pass registered control names directly, or pipe controls, reusable
+command definitions, or relay commands to the keyword.
+
+When multiple targets expose the same command instance, that command is
+notified once per invocation.
+
+```powershell
+NotifyCanExecuteChanged 'SaveButton', 'RefreshButton'
+```
+
+```powershell
+Reference 'SaveButton', 'RefreshButton' | NotifyCanExecuteChanged
+```
+
+This keyword does not observe state or trigger automatically. Call it explicitly
+after changing values used by a command's `CanExecute` block.
+
 ### Key
 
 `Key` registers a handler for `PreviewKeyDown` on the current object. It is syntax sugar that wraps your action in gesture-matching logic and only invokes the action when the key and modifier combination matches. Internally, `Key` registers this wrapper through `On PreviewKeyDown`.
