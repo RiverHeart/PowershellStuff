@@ -27,7 +27,7 @@ $PlaceholderImage = [System.Windows.Media.Imaging.BitmapImage]::new(
 
 $ShowPokemonCommand = Command 'ShowPokemonCommand' {
     Execute {
-        $State = (Reference 'Window').DataContext
+        $State = (Get-WPFWindow).DataContext
         $State.IsLoading = $true
 
         try {
@@ -43,22 +43,22 @@ $ShowPokemonCommand = Command 'ShowPokemonCommand' {
     }
 
     CanExecute {
-        $State = (Reference 'Window').DataContext
+        $State = (Get-WPFWindow).DataContext
         $null -ne $State.SelectedPokemon -and -not $State.IsLoading
     }
 }
 
 $RefreshCatalogCommand = Command 'RefreshCatalogCommand' {
     Execute {
-        $State = (Reference 'Window').DataContext
+        $State = (Get-WPFWindow).DataContext
         $State.IsLoading = $true
 
-        $WindowContext = Get-WPFContextId -InputObject (Reference 'Window')
+        $WindowContext = Get-WPFContextId
         Update-PokeBrowserCatalog -ContextId $WindowContext -Refresh
     }
 
     CanExecute {
-        -not (Reference 'Window').DataContext.IsLoading
+        -not (Get-WPFWindow).DataContext.IsLoading
     }
 }
 
@@ -81,14 +81,14 @@ App 'Window' {
 
     On Loaded {
         Write-Debug 'PokeBrowser loaded.'
-        $WindowContext = Get-WPFContextId -InputObject (Reference 'Window')
+        $WindowContext = Get-WPFContextId -InputObject (Get-WPFWindow)
         Update-PokeBrowserCatalog -ContextId $WindowContext
     }
 
     MenuItem '(F)ile/(E)xit' {
         Command 'CloseCommand' 'Ctrl+q' {
             Write-Debug 'Close command triggered. Closing window.'
-            (Reference 'Window').Close()
+            (Get-WPFWindow).Close()
         }
     }
 
@@ -108,7 +108,7 @@ App 'Window' {
 
                         TextBlock 'StatusText' {
                             UseStyle 'PokeBrowser.Status'
-                            BindProperty Text StatusText
+                            Link StatusText -To Text
                         }
                     }
                 }
@@ -135,11 +135,11 @@ App 'Window' {
                                 BindProperty FontSize ActualHeight -Self -Converter {
                                     param($Height); [Math]::Max(12, [double] $Height * 0.4)
                                 }
-                                BindProperty ItemsSource PokemonList
-                                BindProperty SelectedItem SelectedPokemon -TwoWay
+                                Link PokemonList -To ItemsSource
+                                Link SelectedItem -To SelectedPokemon -Sync
 
                                 On SelectionChanged {
-                                    $State = (Reference 'Window').DataContext
+                                    $State = (Get-WPFWindow).DataContext
                                     $State.SelectedPokemon = $this.SelectedItem
                                     (Reference 'ShowPokemonButton').Command.NotifyCanExecuteChanged()
                                 }
@@ -172,7 +172,7 @@ App 'Window' {
                 Column {
                     Border 'DetailPanel' {
                         UseStyle 'PokeBrowser.Panel'
-                        BindProperty DataContext Detail
+                        Link Detail -To DataContext
 
                         Grid 'DetailContent' {
                             Row {
