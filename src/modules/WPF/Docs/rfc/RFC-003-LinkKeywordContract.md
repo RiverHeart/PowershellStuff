@@ -1,7 +1,7 @@
 # Feature Proposal: Link Keyword Contract (v1)
 
 ## Summary
-Introduce `Link` as a single entrypoint keyword for directional binding scenarios. `Link` is syntax sugar only and delegates to existing binding primitives (`Bind` and `BindProperty`). The canonical user-facing shape is source-to-target directional syntax.
+Introduce `Link` as a single entrypoint keyword for directional binding scenarios. `Link` is syntax sugar only and dispatches to existing binding primitives or observable-state callbacks. The canonical user-facing shape is source-to-target directional syntax.
 
 ## Problem
 The current surface area exposes multiple concepts (`State`, `Bind`, `BindProperty`, `Binding`) that are each valid but increase cognitive load for common scenarios. New users are expected to struggle deciding which keyword to use.
@@ -18,7 +18,7 @@ The current surface area exposes multiple concepts (`State`, `Bind`, `BindProper
 * No forced migration of existing scripts.
 
 ## Core Principle
-`Link` should be sugar, not a new binding engine.
+`Link` should be sugar over existing binding mechanisms, not a new general-purpose binding engine.
 
 ## Proposed Contract (v1)
 
@@ -32,6 +32,48 @@ appropriate primitive.
 Link <Source> -To <Target> [-FromKind Property|State] [-ToKind Property|State]
 ```
 
+### Endpoint scope and rationale
+
+Canonical `Link` endpoints are exact top-level member names in two namespaces:
+
+* `Property`: a property on the current control (or `-InputObject`)
+* `State`: a property on the root window State (`Window.Tag`)
+
+Resolution is eager. `Link` must classify both endpoint kinds before selecting
+a connector, and it reports missing or ambiguous endpoints before wiring any
+callbacks or WPF bindings.
+
+This exact-member rule is a deliberate v1 contract boundary, not a WPF
+limitation. The target-first `Link` API that preceded canonical directional
+syntax forwarded WPF paths and `-Source`, `-ElementName`, `-Self`, and
+`-TemplatedParent` selectors to `BindProperty`. Those forms were removed when
+`Link <Source> -To <Target>` introduced symmetric endpoint inference.
+
+The boundary keeps inference deterministic across connector routes that do not
+share one underlying engine:
+
+| Route | Underlying mechanism |
+| --- | --- |
+| State -> Property | `Bind` callback rooted at `Window.Tag` |
+| Property -> Property | self-relative `BindProperty` |
+| Property -> State | `BindProperty` with State as the explicit source |
+| State -> State | observable State `AddBinding()` callback |
+
+WPF paths and inherited `DataContext` are late-bound: an intermediate object
+may be null or replaced after the UI is built, and a `DataContext` member may
+not exist when `Link` performs eager inference. The State-to-State callback
+route also has no WPF `Binding.Path` or source-selector concept to delegate to.
+Supporting those features uniformly would therefore require a larger endpoint
+model and nested subscription semantics, not only forwarding another parameter.
+
+This does not mean every richer case is technically difficult. Property-only
+paths and selectors could be forwarded to `BindProperty`, as the earlier API
+demonstrated. Doing so only for some routes would make identical endpoint syntax
+mean different things depending on inferred kinds and would reintroduce much of
+the `BindProperty` surface into `Link`. Canonical `Link` instead uses the common,
+eagerly validated subset; callers use `BindProperty` when they need WPF binding
+semantics.
+
 ### Binding object construction
 
 `Link` does not construct or return binding objects. Advanced APIs such as
@@ -43,8 +85,9 @@ Binding 'IsEnabled' -TemplatedParent
 ```
 
 **Dispatch Rules (Deterministic)**
-1. Use directional endpoint resolution and dispatch to `Bind` or `BindProperty`.
-2. Error on ambiguous endpoint resolution without explicit kinds.
+1. Resolve exact endpoint names against current-control Property and root-window State namespaces.
+2. Dispatch to the connector for the resolved Property/State pairing.
+3. Error on ambiguous endpoint resolution without explicit kinds.
 
 **Examples**
 
@@ -59,7 +102,7 @@ Link Text -To SearchQuery
 ### Error Contract
 * Preserve existing underlying error behavior where possible.
 * Add Link-specific validation messages for invalid mode combinations.
-* Forward warnings from delegated commands (for example unresolved DataContext warning behavior).
+* Fail endpoint inference before connector dispatch when a member is missing or ambiguous.
 
 ### Backward Compatibility
 * Existing scripts using `Bind`, `BindProperty`, and `Binding` continue unchanged.

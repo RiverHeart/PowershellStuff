@@ -835,7 +835,8 @@ Unified binding sugar that delegates to existing binding keywords.
 resolution, value conversion, and route-specific connectors are internal and
 are not exported as DSL keywords.
 
-Directionality contract: Link applies values in one direction only (source -> target) to reduce ambiguity.
+By default, `Link` applies values in one direction only (source -> target).
+Use `-Sync` for supported two-way Property and State links.
 
 Canonical directional form:
 
@@ -911,7 +912,73 @@ Link FigureDrawingPreset -To Content -Map @{
 } -Default 'Custom'
 ```
 
-For regular WPF binding paths and custom source selectors, use `BindProperty` directly.
+#### Link resolution boundary
+
+`Link` endpoints are exact member names, not WPF `Binding.Path` expressions.
+Each endpoint is resolved against only:
+
+- properties on the current control (or `-InputObject`)
+- top-level properties in the root window State
+
+This is a deliberate contract boundary, not a WPF limitation. `Link` eagerly
+classifies both endpoint kinds before choosing a connector, while WPF paths and
+inherited `DataContext` are late-bound and may not be resolvable when the UI is
+built. Link routes also use different underlying mechanisms, including WPF
+bindings and observable State callbacks, so paths and source selectors cannot
+be forwarded consistently across every Property/State pairing.
+
+An earlier target-first `Link` API did forward paths and source selectors to
+`BindProperty`; canonical source-to-target syntax removed that route-specific
+surface in favor of one predictable endpoint model. Supporting richer endpoints
+again is possible, but would be a contract expansion rather than exposing a
+capability that WPF lacks.
+
+`Link` does not inspect the control's inherited or locally assigned
+`DataContext`. It also does not accept WPF source selectors such as `-Source`,
+`-ElementName`, `-Self`, or `-TemplatedParent`. Property-to-Property links use
+the same current control for both endpoints, so a simple self-source binding
+can still be written explicitly:
+
+```powershell
+Link ActualWidth -To Width -FromKind Property -ToKind Property
+```
+
+For example, a dotted WPF binding path is not a valid `Link` endpoint:
+
+```powershell
+# Link 'SelectedPokemon.Name' -To Text
+# Fails because no exact member named 'SelectedPokemon.Name' exists.
+BindProperty Text 'SelectedPokemon.Name'
+```
+
+A nested `DataContext` is another important distinction:
+
+```powershell
+Border {
+    BindProperty DataContext Detail
+
+    TextBlock {
+        BindProperty Text Name
+    }
+}
+```
+
+Here, `Name` is read from the `TextBlock`'s inherited `DataContext`. Replacing
+the last line with `Link Name -To Text` would not express that binding. Because
+`TextBlock` itself has a `Name` property, `Link` can resolve it as a
+Property-to-Property link on the control instead of reading `DataContext.Name`.
+
+Use `BindProperty` when the source is:
+
+- an inherited or local `DataContext`
+- a dotted WPF binding path
+- another element or explicit source object
+- a relative source other than the current control, such as `TemplatedParent`
+- a binding that needs `FallbackValue`, `TargetNullValue`, or other custom WPF binding configuration
+
+Use `Link` when both endpoints are top-level members of the current control or
+root window State and directional intent is the clearest way to describe the
+relationship.
 
 Use `Binding` directly when an advanced API requires a binding object, such as
 a trigger, template, or data-grid column:

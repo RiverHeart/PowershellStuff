@@ -7,11 +7,28 @@
 	to the appropriate Link connector. Directional links flow from source to
 	target; use -Sync for two-way Property and State synchronization.
 
+	Endpoints are exact top-level member names in one of two namespaces: a
+	property on the current control, or a property in the root window State.
+	They are resolved eagerly so ambiguous or missing endpoints fail before a
+	connector is selected.
+
+	Link intentionally does not interpret endpoints as WPF Binding.Path values
+	or inspect inherited DataContext. Use BindProperty for dotted paths, source
+	selectors, deferred DataContext resolution, or custom WPF binding settings.
+	This is a contract boundary for consistent directional inference across all
+	Property/State pairings, not a limitation of WPF binding.
+
 .EXAMPLE
 	Link IsFullScreen -To Visibility -Invert
 
 .EXAMPLE
 	Link Text -To SearchQuery -Sync
+
+.NOTES
+	Link connectors use different underlying mechanisms depending on endpoint
+	kinds. The exact-member contract is the common behavior that can be validated
+	consistently before dispatch; richer WPF binding semantics remain available
+	through BindProperty and Binding.
 #>
 function Link {
 	[CmdletBinding()]
