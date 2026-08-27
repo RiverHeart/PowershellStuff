@@ -980,6 +980,14 @@ Use `Link` when both endpoints are top-level members of the current control or
 root window State and directional intent is the clearest way to describe the
 relationship.
 
+State-to-Property links preserve collection object identity. For example,
+linking an `ObservableCollection` to `ItemsSource` keeps later collection
+changes visible to the control:
+
+```powershell
+Link SourceItems -To ItemsSource
+```
+
 Use `Binding` directly when an advanced API requires a binding object, such as
 a trigger, template, or data-grid column:
 

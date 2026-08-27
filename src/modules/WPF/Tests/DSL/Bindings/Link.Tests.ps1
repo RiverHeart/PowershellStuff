@@ -52,6 +52,29 @@ Describe 'Link' -Tag 'Link' {
         $label.Content | Should -Be 'Ready'
     }
 
+    It 'Should preserve collection identity for state to property binding' {
+        $id = [guid]::NewGuid().ToString('N')
+        $windowName = "Window_$id"
+        $comboBoxName = "ComboBox_$id"
+        $sourceItems = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
+
+        $null = Window $windowName {
+            $this.Tag = New-WPFObservableState @{
+                SourceItems = $sourceItems
+            }
+
+            ComboBox $comboBoxName {
+                Link SourceItems -To ItemsSource
+            }
+        }
+
+        $comboBox = Reference $comboBoxName
+        [object]::ReferenceEquals($comboBox.ItemsSource, $sourceItems) | Should -BeTrue
+
+        $sourceItems.Add('Item 1')
+        @($comboBox.ItemsSource).Count | Should -Be 1
+    }
+
     It 'Should throw when directional source endpoint is ambiguous without explicit kind' {
         $errors = & {
             $id = [guid]::NewGuid().ToString('N')
