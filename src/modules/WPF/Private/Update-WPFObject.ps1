@@ -38,119 +38,115 @@ function Update-WPFObject {
     $thisName = if ($InputObject.Name) { $InputObject.Name } else { '__Nameless__' }
     $thisType = $InputObject.GetType().Name
     $PSVars = New-WPFVariableList -InputObject $InputObject
-    $templateTargetType = $PSCmdlet.GetVariableValue('WPFTemplateTargetType')
-    if ($templateTargetType -is [Type]) {
-        $PSVars.Add([psvariable]::new('WPFTemplateTargetType', $templateTargetType))
+    $TemplateTargetType = $PSCmdlet.GetVariableValue('WPFTemplateTargetType')
+    if ($TemplateTargetType -is [Type]) {
+        $PSVars.Add([psvariable]::new('WPFTemplateTargetType', $TemplateTargetType))
     }
-    $strictUnexpectedChild = Test-WPFStrictUnexpectedChildMode
+    $StrictUnexpectedChild = Test-WPFStrictUnexpectedChildMode
 
     Write-Debug "Updating WPF object '$thisName' ($thisType)"
 
-    try {
-        if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
-            if ($InputObject -is [System.Windows.FrameworkElementFactory]) {
-                $factoryType = $InputObject.Type
+    if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
+        if ($InputObject -is [System.Windows.FrameworkElementFactory]) {
+            $ImplicitSetterFunctions = New-WPFStylePropertyHandler `
+                -ScriptBlock $ScriptBlock `
+                -ContextName 'Factory'
 
-                $implicitSetterFunctions = New-WPFStylePropertyHandler `
-                    -ScriptBlock $ScriptBlock `
-                    -ContextName 'Factory'
-
-                $ChildObjects = $ScriptBlock.InvokeWithContext($implicitSetterFunctions, $PSVars, @())
-            } else {
-                $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
-            }
+            $ChildObjects = $ScriptBlock.InvokeWithContext($ImplicitSetterFunctions, $PSVars, @())
+        } else {
+            $ChildObjects = $ScriptBlock.InvokeWithContext($null, $PSVars)
         }
-
-        foreach ($Child in $ChildObjects) {
-            if ($null -eq $Child) {
-                continue
-            }
-
-            # SetBinding() returns BindingExpression objects; these are side-effect
-            # results, not visual children, and should not be auto-attached.
-            if ($Child -is [System.Windows.Data.BindingExpressionBase]) {
-                Write-Debug "Ignoring binding result output '$($Child.GetType().Name)'"
-                continue
-            }
-
-            $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
-            $ChildType = $Child.GetType().Name
-
-            # Returning objects early so I don't need to worry about breaking out
-            # of a nested if statement later. Calling `continue` is much simpler.
-            if ($PassThru) {
-                Write-Output $Child
-            }
-
-            # Command
-            if (Test-WPFType $Child 'Command') {
-                Write-Debug "Adding Command to object '$thisName' ($thisType)"
-                Set-WPFObjectSpec -InputObject $InputObject -Name 'Command' -Value $Child | Out-Null
-            }
-            # Control
-            elseif (Test-WPFType $Child @('Control', 'GridDefinition', 'DataGridColumn', 'ListViewView', 'GridViewColumn')) {
-                # NOTE: Most controls are auto-attaching to their parents during
-                # creation so their parent is available to their children before
-                # recursing through their scriptblock but for objects being created
-                # on the fly or re-parented I think it still makes sense to use Update-WPFObject.
-
-                $AppRootProperty = $InputObject.PSObject.Properties['_WPFAppRoot']
-                $AppContentProperty = $InputObject.PSObject.Properties['_WPFAppContent']
-                if ($InputObject -is [System.Windows.Window] -and $AppRootProperty -and $AppRootProperty.Value -and $AppContentProperty -and $AppContentProperty.Value) {
-
-                    if ($Child -is [System.Windows.Controls.MenuItem]) {
-                        $Menu = Get-WPFMenu -Window $InputObject
-                        $AppRootProperty = $InputObject.PSObject.Properties['_WPFAppRoot']
-                        if (-not $Menu -and $AppRootProperty.Value) {
-                            $Menu = New-WPFMenu -Window $InputObject
-                        }
-                        if ($Menu) {
-                            Add-WPFObject $Menu $Child
-                        }
-                    } elseif ($Child -is [System.Windows.Controls.Menu]) {
-                        Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'Menu'
-                    } elseif ($Child -is [System.Windows.Controls.Primitives.StatusBar]) {
-                        Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'StatusBar'
-                    } else {
-                        Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'Content'
-                    }
-                } else {
-                    Add-WPFObject $InputObject $Child
-                }
-            }
-            # Shape
-            elseif (Test-WPFType $Child 'Shape') {
-                # My thinking here is that while a user can assign a Path to a button's content
-                # property other objects are probably assigned differently so it's just be easier
-                # to add them based on the object type so you don't need to remember.
-                if ($InputObject -is [System.Windows.Controls.Button]) {
-                    $InputObject.Content = $Child
-                } elseif ($InputObject -is [System.Windows.Controls.Border]) {
-                    $InputObject.Child = $Child
-                }
-            }
-            else {
-                $message = "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
-                if ($strictUnexpectedChild) {
-                    throw $message
-                }
-
-                # Maybe instead of erroring we just pass unhandled items further up the chain?
-                Write-Warning $message
-            }
-        }
-
-        Update-WPFObjectSpec -InputObject $InputObject
-
-        Write-Debug "Finished updating '$thisName' ($thisType)"
-    } catch {
-        if ($strictUnexpectedChild) {
-            throw
-        }
-
-        # Get base exception and surface here?
-        Write-Error "Failed to update '$thisName' ($thisType) with error: $($_.Exception.Message)"
-        return
     }
+
+    foreach ($Child in $ChildObjects) {
+        if ($null -eq $Child) {
+            continue
+        }
+
+        # SetBinding() returns BindingExpression objects; these are side-effect
+        # results, not visual children, and should not be auto-attached.
+        if ($Child -is [System.Windows.Data.BindingExpressionBase]) {
+            Write-Debug "Ignoring binding result output '$($Child.GetType().Name)'"
+            continue
+        }
+
+        $ChildName = if ($Child.Name) { $Child.Name } else { '__Nameless__' }
+        $ChildType = $Child.GetType().Name
+
+        # Returning objects early so I don't need to worry about breaking out
+        # of a nested if statement later. Calling `continue` is much simpler.
+        if ($PassThru) {
+            Write-Output $Child
+        }
+
+        # Command
+        if (Test-WPFType $Child 'Command') {
+            Write-Debug "Adding Command to object '$thisName' ($thisType)"
+            Set-WPFObjectSpec -InputObject $InputObject -Name 'Command' -Value $Child | Out-Null
+        }
+        # Control
+        elseif (Test-WPFType $Child @('Control', 'GridDefinition', 'DataGridColumn', 'ListViewView', 'GridViewColumn')) {
+            # NOTE: Most controls are auto-attaching to their parents during
+            # creation so their parent is available to their children before
+            # recursing through their scriptblock but for objects being created
+            # on the fly or re-parented I think it still makes sense to use Update-WPFObject.
+
+            $AppRootProperty = $InputObject.PSObject.Properties['_WPFAppRoot']
+            $AppContentProperty = $InputObject.PSObject.Properties['_WPFAppContent']
+            if ($InputObject -is [System.Windows.Window] -and $AppRootProperty -and $AppRootProperty.Value -and $AppContentProperty -and $AppContentProperty.Value) {
+
+                if ($Child -is [System.Windows.Controls.MenuItem]) {
+                    $Menu = Get-WPFMenu -Window $InputObject
+                    $AppRootProperty = $InputObject.PSObject.Properties['_WPFAppRoot']
+                    if (-not $Menu -and $AppRootProperty.Value) {
+                        $Menu = New-WPFMenu -Window $InputObject
+                    }
+                    if ($Menu) {
+                        Add-WPFObject $Menu $Child
+                    }
+                } elseif ($Child -is [System.Windows.Controls.Menu]) {
+                    Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'Menu'
+                } elseif ($Child -is [System.Windows.Controls.Primitives.StatusBar]) {
+                    Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'StatusBar'
+                } else {
+                    Add-WPFAppRootChild -Window $InputObject -Child $Child -Placement 'Content'
+                }
+            } else {
+                Add-WPFObject $InputObject $Child
+            }
+        }
+        # Shape
+        elseif (Test-WPFType $Child 'Shape') {
+            # My thinking here is that while a user can assign a Path to a button's content
+            # property other objects are probably assigned differently so it's just be easier
+            # to add them based on the object type so you don't need to remember.
+            if ($InputObject -is [System.Windows.Controls.Button]) {
+                $InputObject.Content = $Child
+            } elseif ($InputObject -is [System.Windows.Controls.Border]) {
+                $InputObject.Child = $Child
+            }
+        }
+        else {
+            $Message = "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
+
+            if ($StrictUnexpectedChild) {
+                $Exception = [System.InvalidOperationException]::new($Message)
+                $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
+                    $Exception,
+                    'WPF.UnexpectedChild',
+                    [System.Management.Automation.ErrorCategory]::InvalidData,
+                    $Child
+                )
+
+                $PSCmdlet.ThrowTerminatingError($ErrorRecord)
+            }
+
+            Write-Warning $Message
+        }
+    }
+
+    Update-WPFObjectSpec -InputObject $InputObject
+
+    Write-Debug "Finished updating '$thisName' ($thisType)"
 }
 

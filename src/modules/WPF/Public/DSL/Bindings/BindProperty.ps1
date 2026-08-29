@@ -39,9 +39,19 @@
 .PARAMETER InputObject
     The target control. Accepts pipeline input. Defaults to $this in DSL context.
 
+.PARAMETER TwoWay
+    Configures the binding to update both the target and source properties.
+
+.PARAMETER Converter
+    Optional scriptblock used to convert source values before assigning them to
+    the target property.
+
 .PARAMETER ScriptBlock
     Optional scriptblock to configure the binding object (e.g., set Converter, Mode, etc.).
     The scriptblock receives the internally created Binding instance as $this.
+
+    Use FallbackValue when the binding path cannot be resolved. Use TargetNullValue
+    when the path resolves successfully but its value is null.
 
 .EXAMPLE
     # Bind TextBlock.Text to DataGrid.ItemsSource.Count
@@ -60,6 +70,29 @@
     }
 
 .EXAMPLE
+    # Initialize a nested binding source before its child controls are created.
+    Window 'MyApp' {
+        State @{ Detail = [pscustomobject] @{ Name = '' } }
+
+        Border {
+            BindProperty DataContext Detail
+
+            TextBlock {
+                BindProperty Text Name
+            }
+        }
+    }
+
+.EXAMPLE
+    # Supply display values for unresolved bindings and resolved null values.
+    Image {
+        BindProperty Source ImageUri -ScriptBlock {
+            $this.FallbackValue = $PlaceholderImage
+            $this.TargetNullValue = $PlaceholderImage
+        }
+    }
+
+.EXAMPLE
     # Bind visibility relative to the target control itself
     Rectangle 'Loading' {
         BindProperty Visibility IsLoading -Self
@@ -68,11 +101,9 @@
 .EXAMPLE
     # Configure the binding with a converter
     Label 'Status' {
-        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
-            $this.Converter = New-WPFValueConverter {
-                param($File)
-                if ($File) { "File: $($File.Name)" } else { 'No file' }
-            }
+        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -Converter {
+            param($File)
+            if ($File) { "File: $($File.Name)" } else { 'No file' }
         }
     }
 
@@ -107,6 +138,12 @@ function BindProperty {
 
         [Parameter(ValueFromPipeline)]
         [object] $InputObject,
+
+        [Parameter()]
+        [switch] $TwoWay,
+
+        [Parameter()]
+        [scriptblock] $Converter,
 
         [Parameter()]
         [scriptblock] $ScriptBlock
@@ -158,10 +195,18 @@ function BindProperty {
             if ($null -eq $dataContextProperty) {
                 Write-Warning "BindProperty: Target type '$($TargetType.FullName)' does not expose DataContext. Specify -Self, -TemplatedParent, -ElementName, or -Source for path '$Path'."
             } elseif ($null -eq $Target.DataContext) {
-                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. The binding will remain unresolved until DataContext is assigned or inherited."
+                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. Initialize or inherit a non-null DataContext before calling BindProperty, or specify -Source. If deferred resolution is intentional, the binding will become active when DataContext is later assigned; configure FallbackValue in -ScriptBlock for a temporary display value."
             } else {
                 Write-Verbose "BindProperty: No source selector specified; using inherited DataContext for path '$Path'."
             }
+        }
+
+        if ($TwoWay) {
+            $binding.Mode = [System.Windows.Data.BindingMode]::TwoWay
+        }
+
+        if ($Converter) {
+            $binding.Converter = New-WPFValueConverter $Converter
         }
 
         # Allow custom configuration via scriptblock

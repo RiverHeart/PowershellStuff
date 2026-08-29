@@ -90,7 +90,7 @@ function Grid {
         }
 
         if ('WPF.Grid.RowSpec' -notin $Row.PSTypeNames) {
-            throw "Grid rows must be declared with Row { ... }"
+            throw "Expected RowSpec but received '$($Row.GetType().Name)'. Grid rows must be declared with Row { ... }"
         }
 
         if ($Grid.RowDefinitions.Count -le $RowIndex) {
@@ -109,7 +109,7 @@ function Grid {
             }
 
             if ('WPF.Grid.ColumnSpec' -notin $Column.PSTypeNames) {
-                throw "Grid columns must be declared with Column { ... }"
+                throw "Expected ColumnSpec but received '$($Column.GetType().Name)'. Grid columns must be declared with Column { ... }"
             }
 
             if ($Grid.ColumnDefinitions.Count -le $ColumnIndex) {

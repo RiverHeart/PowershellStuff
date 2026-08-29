@@ -132,7 +132,10 @@ function Bind {
 
         $callback = {
             param($SourceValue)
-            $FinalValue = if ($Invert) { -not $SourceValue } else { $SourceValue }
+            $FinalValue = $SourceValue
+            if ($Invert) {
+                $FinalValue = -not $SourceValue
+            }
             if ($Converter) {
                 $HasParams = $Converter.Ast.ParamBlock -and $Converter.Ast.ParamBlock.Parameters.Count -gt 0
                 if ($HasParams) {

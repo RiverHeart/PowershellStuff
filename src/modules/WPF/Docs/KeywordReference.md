@@ -24,6 +24,8 @@ Scope of this page:
     * [Label](#label)
     * [TextBlock](#textblock)
     * [TextBox](#textbox)
+    * [ComboBox](#combobox)
+    * [ProgressBar](#progressbar)
     * [Image](#image)
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
@@ -86,6 +88,11 @@ Scope of this page:
     * [Show-WPFWindow](#show-wpfwindow)
     * [New-WPFProject](#new-wpfproject)
     * [Get-WPFTextInput](#get-wpftextinput)
+* [Application Storage](#application-storage)
+    * [New-WPFAppStorage](#new-wpfappstorage)
+    * [Get-WPFStoredItem](#get-wpfstoreditem)
+    * [Set-WPFStoredItem](#set-wpfstoreditem)
+    * [Remove-WPFStoredItem](#remove-wpfstoreditem)
 * [Completers](#completers)
     * [Complete-WPFColor](#complete-wpfcolor)
 * [Compatibility Note](#compatibility-note)
@@ -367,6 +374,33 @@ TextBox 'SearchText' {
 }
 ```
 
+### ComboBox
+
+Creates a ComboBox. Set `ItemsSource` directly or bind it to a collection, then use `SelectedItem` for the current selection.
+
+```powershell
+ComboBox 'Options' {
+    $this.DisplayMemberPath = 'Name'
+    BindProperty ItemsSource OptionsList
+    BindProperty SelectedItem SelectedOption
+}
+```
+
+### ProgressBar
+
+Creates a ProgressBar. Configure determinate progress with `Minimum`, `Maximum`, and `Value`, or set `IsIndeterminate` for ongoing activity.
+
+```powershell
+ProgressBar 'LoadingIndicator' {
+    $this.Minimum = 0
+    $this.Maximum = 100
+    $this.Value = 40
+    $this.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+}
+```
+
+Custom control templates can provide the standard `PART_Track`, `PART_Indicator`, and `PART_GlowRect` template parts.
+
 ### Image
 
 Creates an Image control.
@@ -588,28 +622,64 @@ Border 'Banner' {
 
 ### Command
 
-Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
+Creates or attaches a command and optionally binds shortcut gestures.
 
 `Execute` and `CanExecute` are contextual child keywords of `Command`.
 They are intended to be used inside a `Command { ... }` specification block.
 
+Outside a control scriptblock, `Command 'Name' { ... }` returns a reusable
+`WPF.CommandDefinition`. Pass that object to `Command` inside each control that
+should use it. The command is materialized on first attachment, then the same
+`ICommand` instance is reused by later attachments. Gestures belong to the
+attachment site rather than the definition.
+
 ```powershell
-Command 'Open' {
-    # Uses built-in ApplicationCommand if available
-}
-
-Command 'MyCommand' 'Ctrl+M' {
-    Write-Host 'Run custom command'
-}
-
-Command 'SaveAs' 'Ctrl+Shift+S' {
+$SaveCommand = Command 'Save' {
     Execute { Write-Host 'Saving...' }
     CanExecute { $IsFileLoaded }
-    # RelayCommand does not rely on CommandManager in this module,
-    # so we refresh availability explicitly when file state changes.
-    (Reference 'Window').Tag.SaveAsCommand = $this.Command
+}
+
+Button 'SaveButton' {
+    Command $SaveCommand
+}
+
+MenuItem '(F)ile/(S)ave' {
+    Command $SaveCommand 'Ctrl+S'
 }
 ```
+
+Inline definitions remain supported:
+
+```powershell
+Button 'RunButton' {
+    Command 'Run' {
+        Write-Host 'Run command'
+    }
+}
+```
+
+Root definitions cannot declare gestures because they are not associated with
+a window. Supply a gesture when attaching the definition to a control.
+
+### NotifyCanExecuteChanged
+
+Explicitly notifies relay commands that their `CanExecute` result may have
+changed. Pass registered control names directly, or pipe controls, reusable
+command definitions, or relay commands to the keyword.
+
+When multiple targets expose the same command instance, that command is
+notified once per invocation.
+
+```powershell
+NotifyCanExecuteChanged 'SaveButton', 'RefreshButton'
+```
+
+```powershell
+Reference 'SaveButton', 'RefreshButton' | NotifyCanExecuteChanged
+```
+
+This keyword does not observe state or trigger automatically. Call it explicitly
+after changing values used by a command's `CanExecute` block.
 
 ### Key
 
@@ -785,7 +855,8 @@ Unified binding sugar that delegates to existing binding keywords.
 resolution, value conversion, and route-specific connectors are internal and
 are not exported as DSL keywords.
 
-Directionality contract: Link applies values in one direction only (source -> target) to reduce ambiguity.
+By default, `Link` applies values in one direction only (source -> target).
+Use `-Sync` for supported two-way Property and State links.
 
 Canonical directional form:
 
@@ -861,7 +932,81 @@ Link FigureDrawingPreset -To Content -Map @{
 } -Default 'Custom'
 ```
 
-For regular WPF binding paths and custom source selectors, use `BindProperty` directly.
+#### Link resolution boundary
+
+`Link` endpoints are exact member names, not WPF `Binding.Path` expressions.
+Each endpoint is resolved against only:
+
+- properties on the current control (or `-InputObject`)
+- top-level properties in the root window State
+
+This is a deliberate contract boundary, not a WPF limitation. `Link` eagerly
+classifies both endpoint kinds before choosing a connector, while WPF paths and
+inherited `DataContext` are late-bound and may not be resolvable when the UI is
+built. Link routes also use different underlying mechanisms, including WPF
+bindings and observable State callbacks, so paths and source selectors cannot
+be forwarded consistently across every Property/State pairing.
+
+An earlier target-first `Link` API did forward paths and source selectors to
+`BindProperty`; canonical source-to-target syntax removed that route-specific
+surface in favor of one predictable endpoint model. Supporting richer endpoints
+again is possible, but would be a contract expansion rather than exposing a
+capability that WPF lacks.
+
+`Link` does not inspect the control's inherited or locally assigned
+`DataContext`. It also does not accept WPF source selectors such as `-Source`,
+`-ElementName`, `-Self`, or `-TemplatedParent`. Property-to-Property links use
+the same current control for both endpoints, so a simple self-source binding
+can still be written explicitly:
+
+```powershell
+Link ActualWidth -To Width -FromKind Property -ToKind Property
+```
+
+For example, a dotted WPF binding path is not a valid `Link` endpoint:
+
+```powershell
+# Link 'SelectedPokemon.Name' -To Text
+# Fails because no exact member named 'SelectedPokemon.Name' exists.
+BindProperty Text 'SelectedPokemon.Name'
+```
+
+A nested `DataContext` is another important distinction:
+
+```powershell
+Border {
+    BindProperty DataContext Detail
+
+    TextBlock {
+        BindProperty Text Name
+    }
+}
+```
+
+Here, `Name` is read from the `TextBlock`'s inherited `DataContext`. Replacing
+the last line with `Link Name -To Text` would not express that binding. Because
+`TextBlock` itself has a `Name` property, `Link` can resolve it as a
+Property-to-Property link on the control instead of reading `DataContext.Name`.
+
+Use `BindProperty` when the source is:
+
+- an inherited or local `DataContext`
+- a dotted WPF binding path
+- another element or explicit source object
+- a relative source other than the current control, such as `TemplatedParent`
+- a binding that needs `FallbackValue`, `TargetNullValue`, or other custom WPF binding configuration
+
+Use `Link` when both endpoints are top-level members of the current control or
+root window State and directional intent is the clearest way to describe the
+relationship.
+
+State-to-Property links preserve collection object identity. For example,
+linking an `ObservableCollection` to `ItemsSource` keeps later collection
+changes visible to the control:
+
+```powershell
+Link SourceItems -To ItemsSource
+```
 
 Use `Binding` directly when an advanced API requires a binding object, such as
 a trigger, template, or data-grid column:
@@ -888,18 +1033,69 @@ Rectangle 'Loading' {
 }
 ```
 
-With a value converter:
+When no source selector is specified, `BindProperty` uses the target's inherited
+`DataContext`. Initialize that context before creating child bindings. This is
+especially important when a panel changes its `DataContext` to a nested object:
 
 ```powershell
-Label 'Status' {
-    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
-        $this.Converter = New-WPFValueConverter {
-            param($File)
-            if ($File) { "File: $($File.Name)" } else { 'No file' }
+Window 'MyApp' {
+    State @{
+        Detail = [pscustomobject] @{ Name = '' }
+    }
+
+    Border {
+        BindProperty DataContext Detail
+
+        TextBlock {
+            BindProperty Text Name
         }
     }
 }
 ```
+
+If `Detail` starts as `$null`, the child `Name` binding is temporarily unresolved
+and `BindProperty` warns. Prefer a neutral initial object when it represents valid
+application state. Alternatively, specify `-Source` when the source is known and
+should not come from `DataContext`.
+
+There are two different null cases when configuring a binding through
+`-ScriptBlock`:
+
+- `FallbackValue` is displayed when the source or binding path cannot be resolved.
+- `TargetNullValue` is displayed when the path resolves but its value is `$null`.
+
+```powershell
+Image 'Preview' {
+    BindProperty Source ImageUri -ScriptBlock {
+        $this.FallbackValue = $PlaceholderImage
+        $this.TargetNullValue = $PlaceholderImage
+    }
+}
+```
+
+With a value converter:
+
+```powershell
+Label 'Status' {
+    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -Converter {
+        param($File)
+        if ($File) { "File: $($File.Name)" } else { 'No file' }
+    }
+}
+```
+
+For properties that should update their source:
+
+```powershell
+ComboBox 'Picker' {
+    BindProperty SelectedItem UserSelection -TwoWay
+}
+```
+
+`-Converter` is shorthand for assigning a `New-WPFValueConverter` to the WPF
+binding. `-TwoWay` sets the WPF binding mode to `TwoWay`. Use `-ScriptBlock` for
+other binding properties such as `UpdateSourceTrigger`, `FallbackValue`, or
+`TargetNullValue`, or to override the shorthand configuration.
 
 ### Binding
 
@@ -1573,6 +1769,52 @@ $Interval = Get-WPFTextInput -Prompt 'Enter slideshow interval in seconds:' -Tit
 
 ```powershell
 $Interval = Get-WPFTextInput -Prompt 'Seconds:' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
+```
+
+## Application Storage
+
+These supporting commands provide durable, per-user storage for application data.
+They are regular module commands rather than control keywords, so they can be used
+before creating a WPF window. Stored values use JSON by default; specify
+`-Format CliXml` when PowerShell-specific type fidelity is useful. Both formats
+store data snapshots and do not restore custom class instances. Cache expiry,
+schema versions, class reconstruction, and invalidation remain the application's
+responsibility.
+
+### New-WPFAppStorage
+
+Creates an explicit storage context. By default, data is stored beneath
+`%LOCALAPPDATA%\WPF\<Application>`. Specify `-Publisher` to use a different
+application namespace.
+
+```powershell
+$Storage = New-WPFAppStorage -Application 'PokeBrowser'
+```
+
+### Get-WPFStoredItem
+
+Reads and deserializes an item. A missing item returns no output; corrupt data
+produces an error.
+
+```powershell
+$UserPreferences = Get-WPFStoredItem -Storage $Storage -Name 'UserPreferences'
+```
+
+### Set-WPFStoredItem
+
+Serializes a value in the selected format and atomically replaces any item with
+the same name and format. Concurrent writes to the same item are rejected.
+
+```powershell
+Set-WPFStoredItem -Storage $Storage -Name 'UserPreferences' -Value $UserPreferences
+```
+
+### Remove-WPFStoredItem
+
+Removes an item when it exists. The command supports `-WhatIf` and `-Confirm`.
+
+```powershell
+Remove-WPFStoredItem -Storage $Storage -Name 'UserPreferences'
 ```
 
 ## Completers

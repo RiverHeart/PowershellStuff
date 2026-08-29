@@ -83,6 +83,12 @@ FunctionsToExport = @(
     'New-WPFRelayCommand'
     'New-WPFValueConverter'
 
+    # Application Storage
+    'New-WPFAppStorage'
+    'Get-WPFStoredItem'
+    'Set-WPFStoredItem'
+    'Remove-WPFStoredItem'
+
     # Completers
     'Complete-WPFApplicationCommand'
     'Complete-WPFColor'
@@ -102,6 +108,7 @@ FunctionsToExport = @(
     'Border'
     'ContentPresenter'
     'Button'
+    'ComboBox'
     'DataGrid'
     'DataGridTextColumn'
     'ListView'
@@ -118,6 +125,7 @@ FunctionsToExport = @(
     'Row'
     'Menu'
     'MenuItem'
+    'ProgressBar'
     'StatusBar'
     'StatusBarItem'
     'ScrollViewer'
@@ -138,6 +146,7 @@ FunctionsToExport = @(
     'ExtendStyle'
     'Execute'
     'CanExecute'
+    'NotifyCanExecuteChanged'
     'Import'
     'Key'
     'Link'
