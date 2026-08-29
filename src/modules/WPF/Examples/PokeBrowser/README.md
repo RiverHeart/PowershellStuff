@@ -18,7 +18,7 @@ Additionally, I should also thank the creators of [PokeApi](https://github.com/p
 - `State` remains the observable view-model and inherited `DataContext`.
 - `PokemonList`, `SelectedPokemon`, `Detail`, loading state, and status text live in `State`.
 - `PokemonSummary` and `PokemonDetail` instances live beneath `State` as domain data.
-- Controls use `BindProperty`; no XAML markup extensions or third-party assemblies are required.
+- Controls use `BindProperty` or `Link`; no XAML markup extensions or third-party assemblies are required.
 - Network access is isolated in `Get-PokeBrowserCatalog` and `Get-PokeBrowserDetail`.
 
 ## Network Access
@@ -32,7 +32,3 @@ Tests mock `Invoke-RestMethod`, so running the PokeBrowser test file does not ma
 ```powershell
 ./PokeBrowser.DSL.ps1
 ```
-
-## Todo
-
-* Remove "Show Details" button. Just load the pokemon automatically when the user makes a selection.
