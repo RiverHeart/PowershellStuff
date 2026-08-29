@@ -1,6 +1,23 @@
 <#
 .SYNOPSIS
     Invokes a native command and fails when its exit code is not accepted.
+
+.DESCRIPTION
+    Invokes a native command and fails when its exit code is not accepted.
+
+    Includes a workaround for the issue where the PSModulePath is incorrect
+    when calling an edition different than the current one (e.g. calling pwsh
+    from Windows PowerShell).
+
+.EXAMPLE
+    Basic usage:
+
+    Invoke-PleaseWorkNativeCommand cmd '/c', 'echo Hello World'
+
+.EXAMPLE
+    Basic usage with a custom success exit code:
+
+    Invoke-PleaseWorkNativeCommand cmd '/c', 'echo Hello World' -SuccessExitCode @(0, 1)
 #>
 function Invoke-PleaseWorkNativeCommand {
     [CmdletBinding()]
@@ -64,5 +81,8 @@ function Invoke-PleaseWorkNativeCommand {
         $PSCmdlet.ThrowTerminatingError($ErrorRecord)
     }
 
+    # The task runner reads the runspace's global LASTEXITCODE after the task
+    # completes. Normalize an accepted nonzero code so it does not subsequently
+    # mark an otherwise successful task failed.
     $global:LASTEXITCODE = 0
 }
