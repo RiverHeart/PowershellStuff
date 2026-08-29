@@ -36,7 +36,9 @@ function NotifyCanExecuteChanged {
 
     process {
         $Targets = if ($PSCmdlet.ParameterSetName -eq 'Name') {
-            @(Reference -Name $Name -ContextId $ContextId -ErrorAction Stop)
+            foreach ($TargetName in $Name) {
+                Reference -Name $TargetName -ContextId $ContextId
+            }
         } else {
             @($InputObject)
         }
