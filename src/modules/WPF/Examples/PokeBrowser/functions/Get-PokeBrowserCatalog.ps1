@@ -29,7 +29,7 @@ function Get-PokeBrowserCatalog {
 
     $UriBuilder = [System.UriBuilder]::new('https://pokeapi.co/api/v2/pokemon')
     $UriBuilder.Query = "limit=$Limit"
-    $Response = Invoke-RestMethod -Uri $UriBuilder.Uri -Method Get -ErrorAction Stop
+    $Response = Invoke-RestMethod -Uri $UriBuilder.Uri -Method Get -ErrorAction Stop -Debug:$false
     $TextInfo = [System.Globalization.CultureInfo]::InvariantCulture.TextInfo
 
     return [PokemonSummary[]] @(

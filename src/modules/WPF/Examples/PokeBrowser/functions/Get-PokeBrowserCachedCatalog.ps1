@@ -19,25 +19,21 @@ function Get-PokeBrowserCachedCatalog {
     [OutputType([PokemonSummary[]])]
     param (
         [Parameter(Mandatory)]
-        [psobject] $Storage,
+        [PSTypeName('WPF.ApplicationStorage')]
+        $Storage,
 
         [switch] $Refresh
     )
-
-    if ($Storage.PSObject.TypeNames -notcontains 'WPF.ApplicationStorage') {
-        Write-Error 'Storage must be created by New-WPFAppStorage.' -Category InvalidArgument
-        return
-    }
 
     if ($Refresh) {
         Write-Verbose 'Refresh switch specified. Retrieving catalog from PokeAPI.'
     } else {
         $CachedCatalog = Get-WPFStoredItem -Storage $Storage -Name 'Catalog'
         if ($CachedCatalog) {
-            Write-Verbose 'Cached catalog found. Using cached data.'
+            Write-Verbose 'Cache hit for catalog. Returning cached catalog.'
             $Catalog = [PokemonSummary[]] @(
                 $CachedCatalog | ForEach-Object {
-                    [PokemonSummary]::new([string] $_.Name, [uri] $_.ResourceUri)
+                    [PokemonSummary]::FromObject($_)
                 }
             )
             return ,$Catalog

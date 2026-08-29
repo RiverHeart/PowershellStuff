@@ -4,6 +4,8 @@ using namespace System.Collections.ObjectModel
 using namespace System.Windows
 using namespace System.Windows.Controls
 
+$DebugPreference = 'Continue'
+
 <#
 .SYNOPSIS
     Displays Pokemon retrieved from PokeAPI.
@@ -24,28 +26,6 @@ $PokemonList = [ObservableCollection[PokemonSummary]]::new()
 $PlaceholderImage = [System.Windows.Media.Imaging.BitmapImage]::new(
     [uri] (Join-Path $PSScriptRoot 'images/0.png')
 )
-
-$ShowPokemonCommand = Command 'ShowPokemonCommand' {
-    Execute {
-        $State = (Get-WPFWindow).DataContext
-        $State.IsLoading = $true
-
-        try {
-            $State.Detail = Get-PokeBrowserDetail -Pokemon $State.SelectedPokemon
-            $State.StatusText = "Showing $($State.Detail.Name) from PokeAPI"
-        } catch {
-            $State.StatusText = "Unable to load Pokemon details: $($_.Exception.Message)"
-        } finally {
-            $State.IsLoading = $false
-            NotifyCanExecuteChanged 'ShowPokemonButton', 'RefreshCatalogButton'
-        }
-    }
-
-    CanExecute {
-        $State = (Get-WPFWindow).DataContext
-        $null -ne $State.SelectedPokemon -and -not $State.IsLoading
-    }
-}
 
 $RefreshCatalogCommand = Command 'RefreshCatalogCommand' {
     Execute {
@@ -80,7 +60,7 @@ App 'Window' {
 
     On Loaded {
         Write-Debug 'PokeBrowser loaded.'
-        $WindowContext = Get-WPFContextId -InputObject (Get-WPFWindow)
+        $WindowContext = Get-WPFContextId -InputObject $this
         Update-PokeBrowserCatalog -ContextId $WindowContext
     }
 
@@ -138,21 +118,16 @@ App 'Window' {
                                 Link SelectedItem -To SelectedPokemon -Sync
 
                                 On SelectionChanged {
-                                    $State = (Get-WPFWindow).DataContext
-                                    $State.SelectedPokemon = $this.SelectedItem
-                                    NotifyCanExecuteChanged 'ShowPokemonButton'
+                                    $SelectedPokemon = $this.SelectedItem
+                                    if ($null -ne $SelectedPokemon) {
+                                        $State = (Get-WPFWindow).DataContext
+                                        $State.Detail = Get-PokeBrowserCachedDetail -Storage $State.Storage -Pokemon $SelectedPokemon
+                                    }
                                 }
                             }
 
-                            Button 'ShowPokemonButton' {
-                                UseStyle 'PrimaryButton'
-                                $this.Content = 'Show details'
-
-                                Command $ShowPokemonCommand
-                            }
-
                             Button 'RefreshCatalogButton' {
-                                UseStyle 'GhostButton'
+                                UseStyle 'PrimaryButton'
                                 $this.Content = 'Refresh catalog'
 
                                 Command $RefreshCatalogCommand

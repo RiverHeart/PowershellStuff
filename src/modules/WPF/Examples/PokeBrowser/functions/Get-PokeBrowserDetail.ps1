@@ -16,7 +16,11 @@ function Get-PokeBrowserDetail {
         [PokemonSummary] $Pokemon
     )
 
-    $Response = Invoke-RestMethod -Uri $Pokemon.ResourceUri -Method Get -ErrorAction Stop
+    $Response = Invoke-RestMethod -Uri $Pokemon.ResourceUri -Method Get -Debug:$false
+    if (-not $Response) {
+        Write-Error "Unable to retrieve details for Pokemon '$($Pokemon.Name)' from PokeAPI."
+        return
+    }
     $TextInfo = [System.Globalization.CultureInfo]::InvariantCulture.TextInfo
     $Types = @(
         $Response.types |

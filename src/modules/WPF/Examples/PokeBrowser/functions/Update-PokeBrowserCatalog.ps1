@@ -30,13 +30,11 @@ function Update-PokeBrowserCatalog {
             $State.PokemonList.Add($Pokemon)
         }
 
-        $State.SelectedPokemon = $Catalog | Select-Object -First 1
-        $State.Detail = [PokemonDetail]::new()
         $State.StatusText = "Loaded $($Catalog.Count) Pokemon from PokeAPI"
     } catch {
         $State.StatusText = "Unable to load Pokemon catalog: $($_.Exception.Message)"
     } finally {
         $State.IsLoading = $false
-        NotifyCanExecuteChanged 'ShowPokemonButton', 'RefreshCatalogButton'
+        NotifyCanExecuteChanged 'RefreshCatalogButton'
     }
 }

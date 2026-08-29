@@ -30,6 +30,13 @@ class PokemonSummary {
         $this.Name = $Name
         $this.ResourceUri = $ResourceUri
     }
+
+    static [PokemonSummary] FromObject([psobject] $Value) {
+        return [PokemonSummary]::new(
+            [string] $Value.Name,
+            [uri] $Value.ResourceUri
+        )
+    }
 }
 
 class PokemonDetail {
@@ -53,5 +60,15 @@ class PokemonDetail {
         $this.Weight = $Weight
         $this.Type = $Type
         $this.ImageUri = $ImageUri
+    }
+
+    static [PokemonDetail] FromObject([psobject] $Value) {
+        return [PokemonDetail]::new(
+            [string] $Value.Name,
+            [int] $Value.Height,
+            [int] $Value.Weight,
+            [string] $Value.Type,
+            [uri] $Value.ImageUri
+        )
     }
 }
