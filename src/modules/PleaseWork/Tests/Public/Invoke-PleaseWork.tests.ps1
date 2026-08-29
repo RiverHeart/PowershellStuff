@@ -242,6 +242,107 @@ build: test { $global:PleaseWorkLog.Add('build') }
         $global:PleaseWorkLog | Should -Be @('test')
     }
 
+    It 'stops a non-runspace task when exec receives an unexpected native exit code' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec $PowerShellPath -NoProfile -Command 'exit 7'
+    'after native command'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        {
+            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath
+        } | Should -Throw "Native command '$PowerShellPath' exited with code 7."
+
+        $LASTEXITCODE | Should -Be 7
+    }
+
+    It 'allows configured native success exit codes in a non-runspace task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec $PowerShellPath @('-NoProfile', '-Command', 'exit 7') -SuccessExitCode 7
+    'continued'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath |
+            Should -Be 'continued'
+
+        $LASTEXITCODE | Should -Be 0
+    }
+
+    It 'normalizes the user module path for a child PowerShell edition' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command powershell.exe).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            'WindowsPowerShell\Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeTrue
+
+            $env:PSModulePath | Should -Be (@(
+                $OriginalPSModulePath -split [IO.Path]::PathSeparator |
+                    Where-Object { $_ -ne $UserModulePath }
+            ) -join [IO.Path]::PathSeparator)
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
+    It 'allows PowerShell module path normalization to be disabled' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command powershell.exe).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            'WindowsPowerShell\Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+$PleaseConfig = @{ NormalizePowerShellModulePath = $false }
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeFalse
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
     It 'fails a task when its final native process exits nonzero' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -284,6 +385,54 @@ native: {
         $Results.Count | Should -Be 1
         $Results[0].Succeeded | Should -BeFalse
         $Results[0].ExitCode | Should -Be 7
+    }
+
+    It 'stops a runspace task when exec receives an unexpected native exit code' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec $PowerShellPath -NoProfile -Command 'exit 7'
+    'after native command'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        {
+            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath -Runspace
+        } | Should -Throw "Native command '$PowerShellPath' exited with code 7."
+    }
+
+    It 'passes PleaseConfig options to exec in a runspace task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command powershell.exe).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            'WindowsPowerShell\Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+$PleaseConfig = @{ NormalizePowerShellModulePath = $false }
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath `
+                -Runspace
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeFalse
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
     }
 
     It 'uses the last native exit code rather than failing on an intermediate code' {

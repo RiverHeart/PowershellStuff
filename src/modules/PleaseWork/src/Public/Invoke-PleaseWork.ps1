@@ -188,7 +188,10 @@ function Invoke-PleaseWork {
         }
         $ExecutedTasks = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         $OriginalLocation = Get-Location
+        $OriginalPleaseWorkConfig = $script:PleaseWorkConfig
         try {
+            # Expose this TaskFile's config to module helpers, then restore prior module state.
+            $script:PleaseWorkConfig = $TaskSet.Config
             foreach ($TaskName in $TaskOrder) {
                 Set-Location -LiteralPath $TaskFileRoot
                 $Task = $TaskSet.Tasks[$TaskName]
@@ -258,6 +261,7 @@ function Invoke-PleaseWork {
                 $null = $ExecutedTasks.Add($TaskName)
             }
         } finally {
+            $script:PleaseWorkConfig = $OriginalPleaseWorkConfig
             Set-Location -LiteralPath $OriginalLocation.Path
         }
     }

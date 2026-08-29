@@ -11,11 +11,13 @@
     FunctionsToExport = @(
         'Complete-PleaseWorkTask'
         'Invoke-PleaseWork'
+        'Invoke-PleaseWorkNativeCommand'
         'Resolve-TaskFilePath'
     )
     CmdletsToExport = @()
     VariablesToExport = @()
     AliasesToExport = @(
+        'exec'
         'pw'
         'please'
     )

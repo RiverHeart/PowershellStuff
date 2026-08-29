@@ -124,6 +124,33 @@ result. A nonzero final status fails the task and prevents its dependents from r
 Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle
 expected native failures using normal PowerShell control flow.
 
+Use `exec` when an unexpected native exit should stop the task immediately on both Windows
+PowerShell 5.1 and PowerShell Core:
+
+```powershell
+build: {
+    exec dotnet build --configuration Release
+}
+```
+
+By default, only exit code `0` succeeds. Supply `-SuccessExitCode` when a command defines other
+successful outcomes:
+
+```powershell
+compare: {
+    exec git diff --quiet -SuccessExitCode @(0, 1)
+}
+```
+
+`exec` streams the native command's output normally and throws a terminating error containing the
+unexpected exit code. After an accepted exit, it normalizes `$global:LASTEXITCODE` to `0` so the
+task's final native-status check uses the same success policy.
+
+When `exec` launches `powershell.exe` or `pwsh.exe`, it temporarily adds that edition's conventional
+user module directory to `PSModulePath`. This corrects inherited cross-edition paths before the
+child process starts. Set `$PleaseConfig.NormalizePowerShellModulePath = $false` to disable this
+behavior. The caller's original `PSModulePath` is restored after execution.
+
 On PowerShell 7, callers can set `$PSNativeCommandUseErrorActionPreference` to `$true` to make a
 nonzero native exit code participate in PowerShell error handling. In that mode, the injected
 `$ErrorActionPreference = 'Stop'` causes the task to stop at the first failing native command.
