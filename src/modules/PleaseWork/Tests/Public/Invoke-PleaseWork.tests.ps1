@@ -697,11 +697,13 @@ fail: {
         @'
 inspect: {
     Write-Host 'host message'
+    Write-Error 'error message' -ErrorAction Continue
     Write-Warning 'warning message'
     Write-Verbose 'verbose message'
     'task output'
 }
 '@ | Set-Content -LiteralPath $TaskFile
+        $Errors = @()
         $Information = @()
         $Warnings = @()
 
@@ -709,13 +711,17 @@ inspect: {
                 -TaskFile $TaskFile `
                 -Runspace `
                 -Verbose `
+                -ErrorAction Continue `
+                -ErrorVariable Errors `
                 -InformationVariable Information `
                 -WarningVariable Warnings `
-                6>$null `
+                2>$null `
                 3>$null `
-                4>$null)
+                4>$null `
+                6>$null)
 
         $Output | Should -Be @('task output')
+        [string[]] $Errors.Exception.Message | Should -Contain 'error message'
         [string[]] $Information.MessageData | Should -Contain 'host message'
         [string[]] $Warnings.Message | Should -Contain 'warning message'
     }
