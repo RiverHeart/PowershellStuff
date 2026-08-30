@@ -22,6 +22,36 @@ second: { $global:PleaseWorkLog.Add('second') }
         $global:PleaseWorkLog | Should -Be @('first')
     }
 
+    It 'binds parameters from the environment-provided default task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+first: {
+    param (
+        [Parameter(Mandatory)]
+        [string] $FirstValue
+    )
+    "first:$FirstValue"
+}
+second: {
+    param (
+        [Parameter(Mandatory)]
+        [string] $SecondValue
+    )
+    "second:$SecondValue"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $OriginalDefaultTask = $env:PLEASE_DEFAULT_TASK
+
+        try {
+            $env:PLEASE_DEFAULT_TASK = 'second'
+
+            please -TaskFile $TaskFile -SecondValue selected |
+                Should -Be 'second:selected'
+        } finally {
+            $env:PLEASE_DEFAULT_TASK = $OriginalDefaultTask
+        }
+    }
+
     It 'binds and validates named parameters declared by the requested task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'

@@ -52,7 +52,11 @@ function Invoke-PleaseWork {
             $TaskFilePath = Resolve-TaskFilePath -Path $BoundTaskFile
             $TaskDeclarations = @(Get-TaskFileDeclaration -Path $TaskFilePath)
             $SelectedTaskName = if ([string]::IsNullOrEmpty($BoundTaskName)) {
-                $TaskDeclarations[0].Name
+                if ($env:PLEASE_DEFAULT_TASK) {
+                    $env:PLEASE_DEFAULT_TASK
+                } else {
+                    $TaskDeclarations[0].Name
+                }
             } else {
                 $BoundTaskName
             }
