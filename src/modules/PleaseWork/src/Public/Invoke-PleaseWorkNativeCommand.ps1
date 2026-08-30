@@ -46,14 +46,18 @@ function Invoke-PleaseWorkNativeCommand {
         )
 
         if ($NormalizePowerShellModulePath -and $CommandName -in @('powershell', 'pwsh')) {
-            $UserModuleDirectoryName = if ($CommandName -eq 'powershell') {
-                'WindowsPowerShell'
+            $UserModulePath = if ($CommandName -eq 'pwsh' -and ($IsLinux -or $IsMacOS)) {
+                Join-Path $HOME '.local/share/powershell/Modules'
             } else {
-                'PowerShell'
+                $UserModuleDirectoryName = if ($CommandName -eq 'powershell') {
+                    'WindowsPowerShell'
+                } else {
+                    'PowerShell'
+                }
+                Join-Path `
+                    ([Environment]::GetFolderPath('MyDocuments')) `
+                    "$UserModuleDirectoryName\Modules"
             }
-            $UserModulePath = Join-Path `
-                ([Environment]::GetFolderPath('MyDocuments')) `
-                "$UserModuleDirectoryName\Modules"
             $ModulePaths = @($env:PSModulePath -split [IO.Path]::PathSeparator)
 
             if ((Test-Path -LiteralPath $UserModulePath) -and $UserModulePath -notin $ModulePaths) {

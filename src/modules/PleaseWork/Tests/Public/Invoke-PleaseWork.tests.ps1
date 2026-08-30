@@ -342,6 +342,38 @@ inspect: {
         }
     }
 
+    It 'normalizes the CurrentUser module path for pwsh on Unix' -Skip:(-not ($IsLinux -or $IsMacOS)) {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command pwsh).Source
+        $UserModulePath = Join-Path $HOME '.local/share/powershell/Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeTrue
+            $env:PSModulePath | Should -Be (@(
+                $OriginalPSModulePath -split [IO.Path]::PathSeparator |
+                    Where-Object { $_ -ne $UserModulePath }
+            ) -join [IO.Path]::PathSeparator)
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
     It 'allows PowerShell module path normalization to be disabled' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = (Get-Command powershell.exe).Source
