@@ -260,17 +260,35 @@ exit /b 0
 
         It 'restores the edition-specific user module path before Pester discovery' {
             $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'module-path-run')
-            $userModulePath = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Modules'
+            $userModulePath = if (-not ($IsLinux -or $IsMacOS)) {
+                Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Modules'
+            } else {
+                Join-Path $HOME '.local/share/powershell/Modules'
+            }
+            @'
+Describe 'Restored module path' {
+    It 'contains the expected CurrentUser module path' {
+        @($env:PSModulePath -split [IO.Path]::PathSeparator) |
+            Should -Contain $env:EXPECTED_USER_MODULE_PATH
+    }
+}
+'@ | Set-Content -Path (Join-Path $sandbox.RootPath 'suite/Tests/Selected.tests.ps1') -NoNewline
             $modulePathWithoutUserRoot = @(
                 $env:PSModulePath -split [IO.Path]::PathSeparator |
                     Where-Object { $_ -ne $userModulePath }
             ) -join [IO.Path]::PathSeparator
 
-            $run = Invoke-ExternalPwshScript `
-                -WorkingDirectory $sandbox.RootPath `
-                -ScriptPath $sandbox.EntryScriptPath `
-                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1') `
-                -ModulePath $modulePathWithoutUserRoot
+            $originalExpectedUserModulePath = $env:EXPECTED_USER_MODULE_PATH
+            try {
+                $env:EXPECTED_USER_MODULE_PATH = $userModulePath
+                $run = Invoke-ExternalPwshScript `
+                    -WorkingDirectory $sandbox.RootPath `
+                    -ScriptPath $sandbox.EntryScriptPath `
+                    -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1') `
+                    -ModulePath $modulePathWithoutUserRoot
+            } finally {
+                $env:EXPECTED_USER_MODULE_PATH = $originalExpectedUserModulePath
+            }
 
             $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
         }

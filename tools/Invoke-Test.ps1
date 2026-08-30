@@ -108,13 +108,17 @@ function Initialize-UserModulePath {
     [CmdletBinding()]
     param()
 
-    $UserModuleDirectoryName = if ($PSEdition -eq 'Desktop') {
-        'WindowsPowerShell'
+    $UserModulePath = if ($IsLinux -or $IsMacOS) {
+        Join-Path $HOME '.local/share/powershell/Modules'
     } else {
-        'PowerShell'
+        $UserModuleDirectoryName = if ($PSEdition -eq 'Desktop') {
+            'WindowsPowerShell'
+        } else {
+            'PowerShell'
+        }
+        $DocumentsPath = [Environment]::GetFolderPath('MyDocuments')
+        Join-Path $DocumentsPath "$UserModuleDirectoryName\Modules"
     }
-    $DocumentsPath = [Environment]::GetFolderPath('MyDocuments')
-    $UserModulePath = Join-Path $DocumentsPath "$UserModuleDirectoryName\Modules"
     $ModulePaths = @($env:PSModulePath -split [IO.Path]::PathSeparator)
 
     if ((Test-Path -LiteralPath $UserModulePath) -and $UserModulePath -notin $ModulePaths) {
