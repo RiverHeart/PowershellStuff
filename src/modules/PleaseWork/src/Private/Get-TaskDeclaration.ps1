@@ -112,19 +112,29 @@ function Get-TaskDeclaration {
 
         $Comments = [List[string]]::new()
         $CommentBoundary = $CommandAst.Extent.StartOffset
-        foreach ($CommentToken in ($CommentTokens |
-                Where-Object { $_.Extent.EndOffset -le $CommentBoundary } |
-                Sort-Object { $_.Extent.StartOffset } -Descending)) {
+        $CommentBoundaryLine = $CommandAst.Extent.StartLineNumber
+        foreach ($CommentToken in (
+            $CommentTokens |
+            Where-Object { $_.Extent.EndOffset -le $CommentBoundary } |
+            Sort-Object { $_.Extent.StartOffset } -Descending
+        )) {
+
+            if ($CommentToken.Extent.EndLineNumber -ne ($CommentBoundaryLine - 1)) {
+                break
+            }
+
             $Gap = $SourceText.Substring(
                 $CommentToken.Extent.EndOffset,
                 $CommentBoundary - $CommentToken.Extent.EndOffset
             )
+
             if (-not [string]::IsNullOrWhiteSpace($Gap)) {
                 break
             }
 
             $Comments.Insert(0, $CommentToken.Text)
             $CommentBoundary = $CommentToken.Extent.StartOffset
+            $CommentBoundaryLine = $CommentToken.Extent.StartLineNumber
         }
 
         $TaskHelp = Get-TaskHelp -Comments $Comments.ToArray()
@@ -141,6 +151,7 @@ function Get-TaskDeclaration {
                 @()
             }
             Comments = $Comments.ToArray()
+            Description = Get-TaskDescription -Comments $Comments.ToArray()
             Help = $TaskHelp
         }
     }
