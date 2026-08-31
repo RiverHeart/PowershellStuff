@@ -143,18 +143,8 @@ function Invoke-PleaseWork {
             return $TaskSet.Tasks[$HelpTaskName].Help
         }
 
-        # If the user requested help, display the available tasks and their descriptions.
-        # NOTE: Might wanna pull in Expand-Tab from GrabBag instead of doing this manually.
         if ($UseNativeHelp) {
-            $NameWidth = ($TaskList.Name | Measure-Object -Property Length -Maximum).Maximum
-            'Available tasks:'
-            foreach ($TaskInfo in $TaskList) {
-                $HelpLine = '  {0}' -f $TaskInfo.Name.PadRight($NameWidth)
-                if (-not [string]::IsNullOrWhiteSpace($TaskInfo.Description)) {
-                    $HelpLine += '  {0}' -f ($TaskInfo.Description -replace '\s+', ' ')
-                }
-                $HelpLine.TrimEnd()
-            }
+            $TaskList | Format-PleaseWorkTaskHelp
             return
         }
 
