@@ -137,7 +137,6 @@ function Get-TaskDeclaration {
             $CommentBoundaryLine = $CommentToken.Extent.StartLineNumber
         }
 
-        $TaskHelp = Get-TaskHelp -Comments $Comments.ToArray()
         # Preserve parameter metadata for dynamic binding without loading or executing the TaskFile.
         $TaskBodyAst = $CommandElements[-1].ScriptBlock
         [pscustomobject] @{
@@ -152,7 +151,7 @@ function Get-TaskDeclaration {
             }
             Comments = $Comments.ToArray()
             Description = Get-TaskDescription -Comments $Comments.ToArray()
-            Help = $TaskHelp
+            Help = $TaskBodyAst.GetHelpContent()
         }
     }
 }

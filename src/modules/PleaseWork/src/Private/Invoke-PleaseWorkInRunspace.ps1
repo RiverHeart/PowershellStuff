@@ -85,6 +85,7 @@ function Invoke-PleaseWorkInRunspace {
                 $Declaration = $script:PleaseWorkRunspaceDeclarations[$MyInvocation.MyCommand.Name]
                 $script:PleaseWorkRunspaceTasks.Add(@{
                     Name = $Declaration.Name
+                    Description = $Declaration.Description
                     Help = $Declaration.Help
                     Dependencies = $Declaration.Dependencies
                     PathSpecs = $Declaration.PathSpecs

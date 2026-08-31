@@ -18,6 +18,10 @@ function Invoke-PleaseWork {
         [ArgumentCompleter({ Complete-PleaseWorkTask @args })]
         [string] $Name,
 
+        [Parameter(Position=1,ParameterSetName='Run')]
+        [ArgumentCompleter({ Complete-PleaseWorkTask @args })]
+        [string] $HelpTaskName,
+
         [Parameter(Mandatory,ParameterSetName='List')]
         [switch] $List,
 
@@ -115,7 +119,7 @@ function Invoke-PleaseWork {
         # If the user requested a task list or help, build a list of tasks and their descriptions.
         if ($List -or $UseNativeHelp) {
             $TaskList = foreach ($TaskName in $TaskSet.TaskNames) {
-                $Description = $TaskSet.Tasks[$TaskName].Help.Description
+                $Description = $TaskSet.Tasks[$TaskName].Description
                 if (-not [string]::IsNullOrWhiteSpace($Description)) {
                     $Description = $Description.Trim()
                 }
@@ -131,6 +135,13 @@ function Invoke-PleaseWork {
         }
 
         if ($List) { return $TaskList }
+
+        if ($UseNativeHelp -and -not [string]::IsNullOrWhiteSpace($HelpTaskName)) {
+            if (-not $TaskSet.Tasks.ContainsKey($HelpTaskName)) {
+                throw "Task '$HelpTaskName' is not defined."
+            }
+            return $TaskSet.Tasks[$HelpTaskName].Help
+        }
 
         # If the user requested help, display the available tasks and their descriptions.
         # NOTE: Might wanna pull in Expand-Tab from GrabBag instead of doing this manually.

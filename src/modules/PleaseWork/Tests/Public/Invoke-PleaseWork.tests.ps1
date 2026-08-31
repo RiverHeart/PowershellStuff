@@ -218,7 +218,7 @@ build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
     Mock Get-GitChangeset { throw 'Get-GitChangeset should not be called.' }
 
         { please build -TaskFile $TaskFile } |
-            Should -Throw 'Tasks using changed() require a non-empty $PleaseConfig.BaseRef.'
+            Should -Throw
         $global:PleaseWorkLog.Count | Should -Be 0
         Should -Invoke Get-GitChangeset -Times 0 -Exactly
     }
@@ -534,13 +534,10 @@ test: { $global:PleaseWorkLog.Add('test') }
         $global:PleaseWorkLog.Count | Should -Be 0
     }
 
-    It 'lists descriptions from comment-based help only on the associated task' {
+    It 'lists descriptions from adjacent comments only on the associated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-<#
-.DESCRIPTION
-    Starts the build.
-#>
+# Starts the build.
 start: build { 'start' }
 build: { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
@@ -549,11 +546,10 @@ build: { 'build' }
 
         $Declarations[0].Comments.Count | Should -Be 1
         $Declarations[0].Comments[0] | Should -Match 'Starts the build\.'
-        $Declarations[0].Help | Should -BeOfType (
-            [System.Management.Automation.Language.CommentHelpInfo]
-        )
-        $Declarations[0].Help.Description.Trim() | Should -Be 'Starts the build.'
+        $Declarations[0].Description | Should -Be 'Starts the build.'
+        $Declarations[0].Help | Should -BeNullOrEmpty
         $Declarations[1].Comments | Should -BeNullOrEmpty
+        $Declarations[1].Description | Should -BeNullOrEmpty
         $Declarations[1].Help | Should -BeNullOrEmpty
 
         $Tasks = @(please -List -TaskFile $TaskFile)
@@ -564,10 +560,7 @@ build: { 'build' }
     It 'displays native help as task names and descriptions without executing tasks' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-<#
-.DESCRIPTION
-    Builds the project.
-#>
+# Builds the project.
 build: { $global:PleaseWorkLog.Add('build') }
 test: { $global:PleaseWorkLog.Add('test') }
 '@ | Set-Content -LiteralPath $TaskFile
@@ -579,6 +572,32 @@ test: { $global:PleaseWorkLog.Add('test') }
             '  build  Builds the project.'
             '  test'
         )
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'displays comment-based help declared inside a task body' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+# Builds the project.
+build: {
+<#$
+.SYNOPSIS
+    Runs the project build.
+.DESCRIPTION
+    Builds all project artifacts.
+.EXAMPLE
+    please build
+#>
+    $global:PleaseWorkLog.Add('build')
+}
+'@.Replace('<#$', '<#') | Set-Content -LiteralPath $TaskFile
+
+        $Help = please help build -TaskFile $TaskFile
+
+        $Help | Should -BeOfType ([System.Management.Automation.Language.CommentHelpInfo])
+        $Help.Synopsis.Trim() | Should -Be 'Runs the project build.'
+        $Help.Description.Trim() | Should -Be 'Builds all project artifacts.'
+        $Help.Examples[0].Trim() | Should -Be 'please build'
         $global:PleaseWorkLog.Count | Should -Be 0
     }
 

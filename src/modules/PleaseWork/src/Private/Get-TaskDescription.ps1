@@ -18,5 +18,10 @@ function Get-TaskDescription {
         }
     }
 
-    return ($DescriptionParts -join [Environment]::NewLine).Trim()
+    $Description = ($DescriptionParts -join [Environment]::NewLine).Trim()
+    if ([string]::IsNullOrWhiteSpace($Description)) {
+        return
+    }
+
+    return $Description
 }

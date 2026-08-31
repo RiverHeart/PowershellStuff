@@ -31,6 +31,7 @@ function Read-TaskFile {
             $script:RegisteredTasks = [List[hashtable]]::new()
             foreach ($Declaration in $TaskDeclarations) {
                 $TaskName = $Declaration.Name
+                $TaskDescription = $Declaration.Description
                 $TaskHelp = $Declaration.Help
                 $TaskDependencies = $Declaration.Dependencies
                 $TaskPathSpecs = $Declaration.PathSpecs
@@ -43,6 +44,7 @@ function Read-TaskFile {
 
                     & $TaskRegistrar `
                         -Name $TaskName `
+                        -Description $TaskDescription `
                         -Help $TaskHelp `
                         -Registry $script:RegisteredTasks `
                         -Dependencies $TaskDependencies `
