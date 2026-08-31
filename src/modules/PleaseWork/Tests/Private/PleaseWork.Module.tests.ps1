@@ -2,10 +2,30 @@ Import-Module "$PSScriptRoot/../../PleaseWork.psd1" -Force
 
 Describe 'PleaseWork module exports' {
     It 'exports the runner and its aliases from the module' {
-        $Commands = Get-Command Invoke-PleaseWork, pw, please
+        $Commands = Get-Command `
+            Complete-PleaseWorkTask, `
+            Invoke-PleaseWork, `
+            Invoke-PleaseWorkNativeCommand, `
+            exec, `
+            pw, `
+            please
 
-        $Commands.Name | Should -Be @('Invoke-PleaseWork', 'pw', 'please')
-        $Commands.ModuleName | Should -Be @('PleaseWork', 'PleaseWork', 'PleaseWork')
+        $Commands.Name | Should -Be @(
+            'Complete-PleaseWorkTask'
+            'Invoke-PleaseWork'
+            'Invoke-PleaseWorkNativeCommand'
+            'exec'
+            'pw'
+            'please'
+        )
+        $Commands.ModuleName | Should -Be @(
+            'PleaseWork'
+            'PleaseWork'
+            'PleaseWork'
+            'PleaseWork'
+            'PleaseWork'
+            'PleaseWork'
+        )
     }
 
     It 'does not export implementation helpers' {

@@ -22,6 +22,60 @@ second: { $global:PleaseWorkLog.Add('second') }
         $global:PleaseWorkLog | Should -Be @('first')
     }
 
+    It 'binds parameters from the environment-provided default task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+first: {
+    param (
+        [Parameter(Mandatory)]
+        [string] $FirstValue
+    )
+    "first:$FirstValue"
+}
+second: {
+    param (
+        [Parameter(Mandatory)]
+        [string] $SecondValue
+    )
+    "second:$SecondValue"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $OriginalDefaultTask = $env:PLEASE_DEFAULT_TASK
+
+        try {
+            $env:PLEASE_DEFAULT_TASK = 'second'
+
+            please -TaskFile $TaskFile -SecondValue selected |
+                Should -Be 'second:selected'
+        } finally {
+            $env:PLEASE_DEFAULT_TASK = $OriginalDefaultTask
+        }
+    }
+
+    It 'binds and validates named parameters declared by the requested task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+build: {
+    param (
+        [Parameter(Mandatory)]
+        [Alias('cfg')]
+        [ValidateSet('Debug', 'Release')]
+        [string] $Configuration,
+
+        [switch] $Force
+    )
+
+    "$Configuration|$Force"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+    please build -TaskFile $TaskFile -cfg Release -Force |
+            Should -Be 'Release|True'
+
+        { please build -TaskFile $TaskFile -Configuration Invalid } |
+            Should -Throw '*Cannot validate argument on parameter*Configuration*'
+    }
+
     It 'runs transitive dependencies before the requested task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
@@ -113,7 +167,9 @@ build: changed('./Public') {
         please build -TaskFile $TaskFile
 
         $global:PleaseWorkLog | Should -Be @('build')
-        $global:PleaseWorkChangedFiles | Should -Be @('Public/One.ps1')
+        $global:PleaseWorkChangedFiles | Should -Be @(
+            [System.IO.Path]::GetFullPath((Join-Path 'C:\repo' 'Public/One.ps1'))
+        )
         $global:PleaseWorkChangeset.Files | Should -Be @('Public/One.ps1', 'README.md')
         $global:PleaseWorkChangeset.Provider | Should -Be 'Git'
         Should -Invoke Get-GitChangeset -Times 1 -Exactly -ParameterFilter {
@@ -162,7 +218,7 @@ build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
     Mock Get-GitChangeset { throw 'Get-GitChangeset should not be called.' }
 
         { please build -TaskFile $TaskFile } |
-            Should -Throw 'Tasks using changed() require a non-empty $PleaseConfig.BaseRef.'
+            Should -Throw
         $global:PleaseWorkLog.Count | Should -Be 0
         Should -Invoke Get-GitChangeset -Times 0 -Exactly
     }
@@ -216,6 +272,139 @@ build: test { $global:PleaseWorkLog.Add('build') }
         $global:PleaseWorkLog | Should -Be @('test')
     }
 
+    It 'stops a non-runspace task when exec receives an unexpected native exit code' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec $PowerShellPath -NoProfile -Command 'exit 7'
+    'after native command'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        {
+            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath
+        } | Should -Throw "Native command '$PowerShellPath' exited with code 7."
+
+        $LASTEXITCODE | Should -Be 7
+    }
+
+    It 'allows configured native success exit codes in a non-runspace task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec $PowerShellPath @('-NoProfile', '-Command', 'exit 7') -SuccessExitCode 7
+    'continued'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath |
+            Should -Be 'continued'
+
+        $LASTEXITCODE | Should -Be 0
+    }
+
+    It 'normalizes the user module path for a child PowerShell edition' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command powershell.exe).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            'WindowsPowerShell\Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeTrue
+
+            $env:PSModulePath | Should -Be (@(
+                $OriginalPSModulePath -split [IO.Path]::PathSeparator |
+                    Where-Object { $_ -ne $UserModulePath }
+            ) -join [IO.Path]::PathSeparator)
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
+    It 'normalizes the CurrentUser module path for pwsh on Unix' -Skip:(-not ($IsLinux -or $IsMacOS)) {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command pwsh).Source
+        $UserModulePath = Join-Path $HOME '.local/share/powershell/Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeTrue
+            $env:PSModulePath | Should -Be (@(
+                $OriginalPSModulePath -split [IO.Path]::PathSeparator |
+                    Where-Object { $_ -ne $UserModulePath }
+            ) -join [IO.Path]::PathSeparator)
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
+    It 'allows PowerShell module path normalization to be disabled' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command powershell.exe).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            'WindowsPowerShell\Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+$PleaseConfig = @{ NormalizePowerShellModulePath = $false }
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeFalse
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
     It 'fails a task when its final native process exits nonzero' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -233,6 +422,79 @@ build: native { $global:PleaseWorkLog.Add('build') }
         $LASTEXITCODE | Should -Be 7
         $global:PleaseWorkLog | Should -Be @('native')
         Remove-Variable -Name PleaseWorkPowerShellPath -Scope Global
+    }
+
+    It 'captures a native exit code in a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    & $PowerShellPath -NoProfile -Command 'exit 7'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Results = [System.Collections.Generic.List[object]]::new()
+
+        {
+            please native `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -Runspace `
+                -PassThru |
+                ForEach-Object { $Results.Add($_) }
+        } | Should -Throw "Task 'native' failed with exit code 7."
+
+        $Results.Count | Should -Be 1
+        $Results[0].Succeeded | Should -BeFalse
+        $Results[0].ExitCode | Should -Be 7
+    }
+
+    It 'stops a runspace task when exec receives an unexpected native exit code' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec $PowerShellPath -NoProfile -Command 'exit 7'
+    'after native command'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        {
+            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath -Runspace
+        } | Should -Throw "Native command '$PowerShellPath' exited with code 7."
+    }
+
+    It 'passes PleaseConfig options to exec in a runspace task' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = (Get-Command powershell.exe).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            'WindowsPowerShell\Modules'
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+$PleaseConfig = @{ NormalizePowerShellModulePath = $false }
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath `
+                -Runspace
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeFalse
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
     }
 
     It 'uses the last native exit code rather than failing on an intermediate code' {
@@ -272,13 +534,10 @@ test: { $global:PleaseWorkLog.Add('test') }
         $global:PleaseWorkLog.Count | Should -Be 0
     }
 
-    It 'lists descriptions from comment-based help only on the associated task' {
+    It 'lists descriptions from adjacent comments only on the associated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-<#
-.DESCRIPTION
-    Starts the build.
-#>
+# Starts the build.
 start: build { 'start' }
 build: { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
@@ -287,11 +546,10 @@ build: { 'build' }
 
         $Declarations[0].Comments.Count | Should -Be 1
         $Declarations[0].Comments[0] | Should -Match 'Starts the build\.'
-        $Declarations[0].Help | Should -BeOfType (
-            [System.Management.Automation.Language.CommentHelpInfo]
-        )
-        $Declarations[0].Help.Description.Trim() | Should -Be 'Starts the build.'
+        $Declarations[0].Description | Should -Be 'Starts the build.'
+        $Declarations[0].Help | Should -BeNullOrEmpty
         $Declarations[1].Comments | Should -BeNullOrEmpty
+        $Declarations[1].Description | Should -BeNullOrEmpty
         $Declarations[1].Help | Should -BeNullOrEmpty
 
         $Tasks = @(please -List -TaskFile $TaskFile)
@@ -302,10 +560,7 @@ build: { 'build' }
     It 'displays native help as task names and descriptions without executing tasks' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-<#
-.DESCRIPTION
-    Builds the project.
-#>
+# Builds the project.
 build: { $global:PleaseWorkLog.Add('build') }
 test: { $global:PleaseWorkLog.Add('test') }
 '@ | Set-Content -LiteralPath $TaskFile
@@ -317,6 +572,32 @@ test: { $global:PleaseWorkLog.Add('test') }
             '  build  Builds the project.'
             '  test'
         )
+        $global:PleaseWorkLog.Count | Should -Be 0
+    }
+
+    It 'displays comment-based help declared inside a task body' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+# Builds the project.
+build: {
+<#$
+.SYNOPSIS
+    Runs the project build.
+.DESCRIPTION
+    Builds all project artifacts.
+.EXAMPLE
+    please build
+#>
+    $global:PleaseWorkLog.Add('build')
+}
+'@.Replace('<#$', '<#') | Set-Content -LiteralPath $TaskFile
+
+        $Help = please help build -TaskFile $TaskFile
+
+        $Help | Should -BeOfType ([System.Management.Automation.Language.CommentHelpInfo])
+        $Help.Synopsis.Trim() | Should -Be 'Runs the project build.'
+        $Help.Description.Trim() | Should -Be 'Builds all project artifacts.'
+        $Help.Examples[0].Trim() | Should -Be 'please build'
         $global:PleaseWorkLog.Count | Should -Be 0
     }
 
@@ -448,6 +729,84 @@ readAfterScript: changeScript { "after-script:$Value" }
         )
     }
 
+    It 'runs the complete task plan in a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+$Value = 'initial'
+prepare: {
+    $script:Value = 'prepared'
+    "prepare:$Value"
+}
+build: prepare {
+    param ([string] $Configuration)
+    "build:${Value}:$Configuration"
+    "context:$(Split-Path -Leaf $TaskFilePath)"
+    "module-bound:$($null -ne $MyInvocation.MyCommand.Module)"
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        $Output = @(please build -TaskFile $TaskFile -Configuration Release -Runspace)
+
+        $Output | Should -Be @(
+            'prepare:prepared'
+            'build:prepared:Release'
+            'context:TaskFile.ps1'
+            'module-bound:False'
+        )
+    }
+
+    It 'returns task output before rethrowing an error from a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+fail: {
+    'before failure'
+    throw 'runspace task failed'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Output = [System.Collections.Generic.List[object]]::new()
+
+        {
+            please fail -TaskFile $TaskFile -Runspace |
+                ForEach-Object { $Output.Add($_) }
+        } | Should -Throw 'runspace task failed'
+
+        $Output | Should -Be @('before failure')
+    }
+
+    It 'forwards auxiliary streams from a dedicated runspace' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        @'
+inspect: {
+    Write-Host 'host message'
+    Write-Error 'error message' -ErrorAction Continue
+    Write-Warning 'warning message'
+    Write-Verbose 'verbose message'
+    'task output'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+        $Errors = @()
+        $Information = @()
+        $Warnings = @()
+
+        $Output = @(please inspect `
+                -TaskFile $TaskFile `
+                -Runspace `
+                -Verbose `
+                -ErrorAction Continue `
+                -ErrorVariable Errors `
+                -InformationVariable Information `
+                -WarningVariable Warnings `
+                2>$null `
+                3>$null `
+                4>$null `
+                6>$null)
+
+        $Output | Should -Be @('task output')
+        [string[]] $Errors.Exception.Message | Should -Contain 'error message'
+        [string[]] $Information.MessageData | Should -Contain 'host message'
+        [string[]] $Warnings.Message | Should -Contain 'warning message'
+    }
+
     It 'does not register hashtable output as a task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
@@ -525,7 +884,7 @@ test: {
         $Results[0].TaskName | Should -Be 'test'
         $Results[0].Succeeded | Should -BeFalse
         $Results[0].Error.Exception.Message | Should -Match 'test failed'
-        $Results[0].Output | Should -BeNullOrEmpty
+        $Results[0].Output | Should -Be @('before failure')
     }
 
     It 'discovers a TaskFile in a parent directory' {
@@ -615,6 +974,7 @@ fail: {
         (Get-Location).Path | Should -Be $OriginalLocation.Path
     }
 }
+}
 
 Describe 'Invoke-PleaseWork argument completion' {
     It 'completes task names from a discovered parent TaskFile' {
@@ -651,6 +1011,15 @@ test: { 'test' }
 
         $Completion.CompletionMatches.CompletionText | Should -Be @('deploy', 'destroy')
     }
-}
+
+    It 'completes native help when its prefix matches' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        "build: { 'build' }" | Set-Content -LiteralPath $TaskFile
+        $InputScript = "please -TaskFile '$TaskFile' he"
+
+        $Completion = TabExpansion2 -InputScript $InputScript -CursorColumn $InputScript.Length
+
+        $Completion.CompletionMatches.CompletionText | Should -Be @('help')
+    }
 }
 

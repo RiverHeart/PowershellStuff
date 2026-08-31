@@ -12,6 +12,10 @@ function Task {
         [string] $Name,
 
         [Parameter()]
+        [AllowEmptyString()]
+        [string] $Description,
+
+        [Parameter()]
         [AllowNull()]
         [System.Management.Automation.Language.CommentHelpInfo] $Help,
 
@@ -33,6 +37,7 @@ function Task {
 
     $Registry.Add(@{
         Name = $Name
+        Description = if ([string]::IsNullOrWhiteSpace($Description)) { $null } else { $Description }
         Help = $Help
         Dependencies = $Dependencies
         PathSpecs = $PathSpecs

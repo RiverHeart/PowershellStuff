@@ -1,6 +1,5 @@
 # Please Work
 
-
 ```
 "Life is not so short but that there is always time enough for courtesy."  
      — Ralph Waldo Emerson
@@ -14,7 +13,7 @@ Tasks are defined as `name: dependencies { body }`. Dependencies are optional:
 **taskfile.ps1**
 ```powershell
 lint: {
-    Invoke-ScriptAnalyzer -Path ./src
+    exec Invoke-ScriptAnalyzer -Path ./src -EnableExit
 }
 
 test: lint {
@@ -26,20 +25,40 @@ build: test {
 }
 ```
 
-Invocation of the taskfile is about what you'd expect.
+Invocation of the taskfile is about what you'd expect plus some conveniences.
 
 ```powershell
 Import-Module ./PleaseWork.psd1
 
 please              # Run the default task
 please build        # Run a specific task
-please -List        # Lists tasks without running them
-please help         # Displays task names and descriptions as text
+please help         # Built-in task that displays task names and descriptions
 please test -TaskFile ./AnotherTaskFile.ps1  # Run tasks in a specific taskfile
 ```
 
-`help` is reserved for the native task display. To replace it with a TaskFile task, opt in
-explicitly and declare the task:
+Tasks can declare parameters using a normal PowerShell `param` block. PleaseWork exposes the
+selected task's parameters while binding the command, so aliases, switches, type conversion,
+mandatory parameters, and validation attributes behave normally:
+
+```powershell
+build: {
+    param (
+        [Parameter(Mandatory)]
+        [ValidateSet('Debug', 'Release')]
+        [string] $Configuration,
+
+        [switch] $Force
+    )
+
+    dotnet build --configuration $Configuration
+}
+
+please build -Configuration Release -Force
+```
+
+Task parameter names and aliases must not conflict with PleaseWork parameters, common parameters, or their abbreviations. Task arguments are passed only to the requested task, not its dependencies.
+
+`help` is reserved as a predictable task name to get taskfile help. However, if you really, really, really want to define `help` yourself there is an override.
 
 ```powershell
 $PleaseConfig = @{ OverrideHelp = $true }
@@ -57,18 +76,12 @@ please bu<Tab>                         # build
 please -TaskFile ./Release.ps1 de<Tab> # deploy
 ```
 
-Task declarations must be top-level statements. Each task name and its dependencies must be bare
-words, and each declaration must end with a scriptblock body. Commands that resemble declarations
-inside a task body are not treated as additional tasks. Task names are case-insensitive and must be
-unique, so declarations such as `FOO:` and `foo:` cannot appear in the same TaskFile.
+Task declarations must be top-level statements. Each task name and its dependencies must be bare words, and each declaration must end with a scriptblock body. Commands that resemble declarations inside a task body are not treated as additional tasks. Task names are case-insensitive and must be unique, so declarations such as `FOO:` and `foo:` cannot appear in the same TaskFile.
 
 When `-TaskFile` is omitted, PleaseWork searches the current directory and then each parent
-directory for `TaskFile.ps1`. Each task starts from the directory containing that file, so relative
-paths remain stable even if an earlier task changes location. The caller's original location is
-restored after execution, including when a task fails.
+directory for `TaskFile.ps1`. Each task starts from the directory containing that file, so relative paths remain stable even if an earlier task changes location. The caller's original location is restored after execution, including when a task fails.
 
-PleaseWork explicitly injects `$TaskFilePath` and `$TaskFileRoot` into each task invocation. Task
-bodies can use them for the resolved file path and its directory:
+PleaseWork explicitly injects `$TaskFilePath` and `$TaskFileRoot` into each task invocation. Task bodies can use them for the resolved file path and its directory:
 
 ```powershell
 inspect: {
@@ -78,8 +91,7 @@ inspect: {
 
 Only the requested task and its transitive dependencies run. Dependencies execute sequentially,
 before their dependents, and shared dependencies run once. Task declarations register through
-private TaskFile state, so other output produced while loading a TaskFile is never interpreted as a
-task. PowerShell errors in top-level TaskFile setup code stop loading immediately.
+private TaskFile state, so other output produced while loading a TaskFile is never interpreted as a task. PowerShell errors in top-level TaskFile setup code stop loading immediately.
 
 `-WhatIf` previews the complete resolved task plan without running it. Explicitly using `-Confirm`
 asks once for that complete plan, so a dependent cannot run after its dependency was declined.
@@ -92,23 +104,37 @@ Each task produces an internal result containing:
 TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration, Output
 ```
 
-Before each task, PleaseWork resets `$LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to
-`Stop` for the task invocation. A PowerShell error therefore fails the task immediately. Otherwise,
-the last native command executed by the task determines its native exit status after the scriptblock
-finishes. A nonzero final status fails the task and prevents its dependents from running.
-Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle
-expected native failures using normal PowerShell control flow.
+Before each task, PleaseWork resets `$global:LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to `Stop` for the task invocation. A PowerShell error therefore fails the task immediately. Otherwise, the last native command executed by the task determines its native exit status after the scriptblock finishes. PleaseWork reads `$global:LASTEXITCODE`; assigning to an unscoped `$LASTEXITCODE` inside a task creates or updates a task-local variable and does not affect the task result. A nonzero final status fails the task and prevents its dependents from running.
 
-On PowerShell 7, callers can set `$PSNativeCommandUseErrorActionPreference` to `$true` to make a
-nonzero native exit code participate in PowerShell error handling. In that mode, the injected
+Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle expected native failures using normal PowerShell control flow.
+
+Use `exec` when an unexpected native exit should stop the task immediately on both Windows
+PowerShell 5.1 and PowerShell Core:
+
+```powershell
+build: {
+    exec dotnet build --configuration Release
+}
+```
+
+By default, only exit code `0` succeeds. Supply `-SuccessExitCode` when a command defines other
+successful outcomes:
+
+```powershell
+compare: {
+    exec git diff --quiet -SuccessExitCode @(0, 1)
+}
+```
+
+`exec` streams the native command's output normally and throws a terminating error containing the unexpected exit code. After an accepted exit, it normalizes `$global:LASTEXITCODE` to `0` so the task's final native-status check uses the same success policy.
+
+When `exec` launches `powershell.exe` or `pwsh.exe`, it temporarily adds that edition's conventional user module directory to `PSModulePath`. This corrects inherited cross-edition paths before the child process starts. Set `$PleaseConfig.NormalizePowerShellModulePath = $false` to disable this behavior. The caller's original `PSModulePath` is restored after execution.
+
+On PowerShell 7, callers can set `$PSNativeCommandUseErrorActionPreference` to `$true` to make a nonzero native exit code participate in PowerShell error handling. In that mode, the injected
 `$ErrorActionPreference = 'Stop'` causes the task to stop at the first failing native command.
-PleaseWork does not set this PowerShell 7-only preference so its default behavior remains compatible
-with Windows PowerShell 5.1.
+PleaseWork does not set this PowerShell 7-only preference so its default behavior remains compatible with Windows PowerShell 5.1.
 
-By default, task output remains in the normal output pipeline. With `-PassThru`, PleaseWork instead
-returns one result object per executed task and stores each task's output in that result's `Output`
-property. The final native status remains available through `$LASTEXITCODE`.
-
+By default, task output remains in the normal output pipeline. With `-PassThru`, PleaseWork instead returns one result object per executed task and stores each task's output in that result's `Output` property. The final native status remains available through `$LASTEXITCODE`.
 
 Tasks can use `changed()` filters containing literal Git pathspecs. A filtered task runs when a
 matching file changed or when one of its task dependencies ran:
@@ -134,40 +160,19 @@ build: test changed('./Public', './Private') {
 
 ### Incremental Builds
 
-PleaseWork does not persist the last successful commit itself, so CI systems that track state can
-set `$PleaseConfig.BaseRef` and `$PleaseConfig.HeadRef` from their own build variables.
+PleaseWork does not persist the last successful commit itself, so CI systems that track state can set `$PleaseConfig.BaseRef` and `$PleaseConfig.HeadRef` from their own build variables.
 For example, Jenkins' Git plugin exposes `GIT_PREVIOUS_SUCCESSFUL_COMMIT` and `GIT_COMMIT`.
 PleaseWork does not read CI-specific variables automatically.
 
-`BaseRef` is required when a task uses `changed()`; set it to a branch such as `origin/main` or a
-commit supplied by the CI system. `HeadRef` defaults to `HEAD`. Pathspecs are evaluated relative to
-the TaskFile directory, while
-`$ChangedFiles` contains repository-relative paths. A filtered task with no matching files is
-skipped unless one of its task dependencies ran.
+`BaseRef` is required when a task uses `changed()`; set it to a branch such as `origin/main` or a commit supplied by the CI system. `HeadRef` defaults to `HEAD`. Pathspecs are evaluated relative to the TaskFile directory, while `$ChangedFiles` contains absolute paths. A filtered task with no matching files is skipped unless one of its task dependencies ran.
 
-Filtered task bodies receive `$ChangedFiles`, containing repository-relative files matching that
-task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `WorkingRoot`, `BaseRef`, `HeadRef`, `CompareRef`,
-`Files`, and `Available`; `$Changeset.Files` contains the complete changeset. All task bodies receive
-`$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
+Filtered task bodies receive `$ChangedFiles`, containing absolute files matching that
+task's pathspecs. `$Changeset` exposes `Provider`, `Root`, `WorkingRoot`, `BaseRef`, `HeadRef`, `CompareRef`, `Files`, and `Available`; `$Changeset.Files` contains the complete changeset as repository-relative paths. All task bodies receive `$ChangedFiles`, which is empty for an unfiltered task or a task run only because its dependency ran.
 
 ## Future parallel execution
 
-Parallel execution will extend the same result model into each worker rather than relying on one
-shared `$LASTEXITCODE`. Each worker runspace has its own `$LASTEXITCODE`, and completion order does
-not provide a meaningful single "last" task when several tasks run concurrently.
+Parallel execution will extend the same result model into each worker rather than relying on one shared `$LASTEXITCODE`. Each worker runspace has its own `$LASTEXITCODE`, and completion order does not provide a meaningful single "last" task when several tasks run concurrently.
 
-The last native command executed by that task determines its native exit status. A nonzero status or
-a terminating PowerShell error fails that task. On failure, the scheduler should stop admitting new
-work, never schedule the failed task's dependents, and request cancellation of tasks already running.
-Already-running tasks may still produce their own results before cancellation completes.
+The last native command executed by that task determines its native exit status. A nonzero status or a terminating PowerShell error fails that task. On failure, the scheduler should stop admitting new work, never schedule the failed task's dependents, and request cancellation of tasks already running. Already-running tasks may still produce their own results before cancellation completes.
 
-The runner's overall outcome is therefore aggregate: it fails when any task fails, but it does not
-pretend that one worker's native exit code is the canonical batch exit code. The exact task exit code
-remains available in that task's result and can be included in verbose output. A command-line wrapper
-can map aggregate success or failure to a conventional process exit code such as `0` or `1`.
-
-
-## Maintainer Notes
-
-* It's too bad Powershell help comments don't support a terse inline form like `.DESCRIPTION  Description text`.
-* Maybe `help` should use `.SYNOPSIS` instead of `.DESCRIPTION` and `.DESCRIPTION` should be shown for a new `please help foo` form or maybe that shows the entire help text. No doubt, a single inline comment is the nicest, terse syntax for regular `please help` usage. I'm unsure too many people would make full use of the help comment support.
+The runner's overall outcome is therefore aggregate: it fails when any task fails, but it does not pretend that one worker's native exit code is the canonical batch exit code. The exact task exit code remains available in that task's result and can be included in verbose output. A command-line wrapper can map aggregate success or failure to a conventional process exit code such as `0` or `1`.

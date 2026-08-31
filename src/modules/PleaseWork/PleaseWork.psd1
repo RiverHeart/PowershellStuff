@@ -9,13 +9,15 @@
     Description = 'A small PowerShell task runner with makefile-like task declarations.'
     PowerShellVersion = '5.1'
     FunctionsToExport = @(
-        'Get-TaskFileDeclaration'
+        'Complete-PleaseWorkTask'
         'Invoke-PleaseWork'
+        'Invoke-PleaseWorkNativeCommand'
         'Resolve-TaskFilePath'
     )
     CmdletsToExport = @()
     VariablesToExport = @()
     AliasesToExport = @(
+        'exec'
         'pw'
         'please'
     )

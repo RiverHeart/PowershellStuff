@@ -12,14 +12,21 @@ Describe 'test-runner skill scripts' {
                 [Parameter(Mandatory)]
                 [string] $ScriptPath,
 
-                [string[]] $Arguments = @()
+                [string[]] $Arguments = @(),
+
+                [string] $ModulePath
             )
 
             Push-Location -Path $WorkingDirectory
+            $originalModulePath = $env:PSModulePath
             try {
+                if ($PSBoundParameters.ContainsKey('ModulePath')) {
+                    $env:PSModulePath = $ModulePath
+                }
                 $output = @(& pwsh -NoProfile -NonInteractive -File $ScriptPath @Arguments 2>&1)
                 $exitCode = $LASTEXITCODE
             } finally {
+                $env:PSModulePath = $originalModulePath
                 Pop-Location
             }
 
@@ -248,6 +255,41 @@ exit /b 0
                 -Arguments @('-TestSuite', 'Fake', '-Path', 'Tests/Selected.tests.ps1', '-DetailedOutput')
 
             $run.Text | Should -Match 'Starting discovery in'
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
+        }
+
+        It 'restores the edition-specific user module path before Pester discovery' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'module-path-run')
+            $userModulePath = if (-not ($IsLinux -or $IsMacOS)) {
+                Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Modules'
+            } else {
+                Join-Path $HOME '.local/share/powershell/Modules'
+            }
+            @'
+Describe 'Restored module path' {
+    It 'contains the expected CurrentUser module path' {
+        @($env:PSModulePath -split [IO.Path]::PathSeparator) |
+            Should -Contain $env:EXPECTED_USER_MODULE_PATH
+    }
+}
+'@ | Set-Content -Path (Join-Path $sandbox.RootPath 'suite/Tests/Selected.tests.ps1') -NoNewline
+            $modulePathWithoutUserRoot = @(
+                $env:PSModulePath -split [IO.Path]::PathSeparator |
+                    Where-Object { $_ -ne $userModulePath }
+            ) -join [IO.Path]::PathSeparator
+
+            $originalExpectedUserModulePath = $env:EXPECTED_USER_MODULE_PATH
+            try {
+                $env:EXPECTED_USER_MODULE_PATH = $userModulePath
+                $run = Invoke-ExternalPwshScript `
+                    -WorkingDirectory $sandbox.RootPath `
+                    -ScriptPath $sandbox.EntryScriptPath `
+                    -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1') `
+                    -ModulePath $modulePathWithoutUserRoot
+            } finally {
+                $env:EXPECTED_USER_MODULE_PATH = $originalExpectedUserModulePath
+            }
+
             $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
         }
     }

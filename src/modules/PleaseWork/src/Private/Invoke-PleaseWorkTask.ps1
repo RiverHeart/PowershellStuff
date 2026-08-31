@@ -1,6 +1,3 @@
-using namespace System.Collections.Generic
-using namespace System.Management.Automation
-
 <#
 .SYNOPSIS
     Invokes one task with explicit context and records its result.
@@ -16,48 +13,58 @@ function Invoke-PleaseWorkTask {
         [scriptblock] $ScriptBlock,
 
         [AllowNull()]
-        [object[]] $Arguments,
+        [object] $Arguments,
 
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Context,
+
+        [AllowNull()]
+        [scriptblock] $Invoker,
 
         [Parameter(Mandatory)]
         [ref] $Result
     )
 
-    $Variables = [List[PSVariable]]::new()
-    $Variables.Add(
-        [PSVariable]::new('ErrorActionPreference', 'Stop')
-    )
-    foreach ($VariableName in $Context.Keys) {
-        if ($VariableName -eq 'ErrorActionPreference') {
-            continue
+    # Standard TaskFiles bind task bodies to a dynamic module. This wrapper runs there so context
+    # variables remain invocation-local while the call operator preserves normal parameter binding.
+    $TaskInvoker = {
+        param ($TaskScriptBlock, $TaskContext, $TaskArguments)
+
+        $ErrorActionPreference = 'Stop'
+        foreach ($VariableName in $TaskContext.Keys) {
+            if ($VariableName -eq 'ErrorActionPreference') {
+                continue
+            }
+            Set-Variable `
+                -Name ([string] $VariableName) `
+                -Value $TaskContext[$VariableName] `
+                -Scope Local
         }
-        $Variables.Add(
-            [PSVariable]::new(
-                [string] $VariableName,
-                $Context[$VariableName]
-            )
-        )
+
+        if ($TaskArguments -is [System.Collections.IDictionary]) {
+            & $TaskScriptBlock @TaskArguments
+        } elseif ($null -ne $TaskArguments) {
+            [object[]] $PositionalArguments = @($TaskArguments)
+            & $TaskScriptBlock @PositionalArguments
+        } else {
+            & $TaskScriptBlock
+        }
     }
 
     $StartedAt = [datetime]::UtcNow
     $global:LASTEXITCODE = 0
     try {
-        # InvokeWithContext returns collected output only after successful completion. If the
-        # scriptblock terminates, output written before the error is not available to the caller.
-        $ScriptBlock.InvokeWithContext($null, $Variables, $Arguments)
+        # Direct-runspace TaskFiles supply an invoker created in their own script scope. Standard
+        # TaskFiles instead enter the dynamic module associated with the task scriptblock.
+        if ($null -ne $Invoker) {
+            & $Invoker $ScriptBlock $Context $Arguments
+        } elseif ($null -ne $ScriptBlock.Module) {
+            & $ScriptBlock.Module $TaskInvoker $ScriptBlock $Context $Arguments
+        } else {
+            & $TaskInvoker $ScriptBlock $Context $Arguments
+        }
     } catch {
         $TaskError = $_
-        $TaskException = $_.Exception
-        if ($null -ne $TaskException.InnerException) {
-            $TaskException = $TaskException.InnerException
-            if ($TaskException -is [System.Management.Automation.RuntimeException] -and
-                $null -ne $TaskException.ErrorRecord
-            ) {
-                $TaskError = $TaskException.ErrorRecord
-            }
-        }
 
         $FinishedAt = [datetime]::UtcNow
         $Result.Value = [pscustomobject] @{
@@ -69,10 +76,11 @@ function Invoke-PleaseWorkTask {
             FinishedAt = $FinishedAt
             Duration = $FinishedAt - $StartedAt
         }
-        throw $TaskException
+        throw  # Re-throw the error to propagate it to the caller.
     }
 
     $FinishedAt = [datetime]::UtcNow
+    # Task-local LASTEXITCODE assignments do not affect the native status tracked by the runspace.
     $ExitCode = [int] $global:LASTEXITCODE
     $Result.Value = [pscustomobject] @{
         TaskName = $Name
