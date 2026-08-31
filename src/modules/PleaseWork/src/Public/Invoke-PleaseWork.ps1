@@ -170,42 +170,13 @@ function Invoke-PleaseWork {
 
         # As much as I would like to populate PSScriptRoot in the context of the task scriptblock
         # Powershell doesn't allow it.
-        $TaskContext = @{
-            TaskFilePath = $TaskFilePath
-            TaskFileRoot = $TaskFileRoot
-        }
-        $Changeset = $null
-        if (@($TaskOrder | Where-Object { $TaskSet.Tasks[$_].PathSpecs.Count -gt 0 }).Count -gt 0) {
-            $BaseRef = if ($TaskSet.Config.Contains('BaseRef')) {
-                [string] $TaskSet.Config['BaseRef']
-            } else {
-                $null
-            }
-            if ([string]::IsNullOrWhiteSpace($BaseRef)) {
-                throw @"
-Tasks using changed() require a non-empty `$PleaseConfig.BaseRef.
-For example, to run tasks based on changes in the current branch relative to the main branch, set:
-
-    `$PleaseConfig = @{ BaseRef = 'origin/main' }
-"@
-            }
-            $HeadRef = if ($TaskSet.Config.Contains('HeadRef')) {
-                [string] $TaskSet.Config['HeadRef']
-            } else {
-                'HEAD'
-            }
-            $Changeset = Get-GitChangeset `
-                -WorkingDirectory $TaskFileRoot `
-                -BaseRef $BaseRef `
-                -HeadRef $HeadRef
-            $TaskContext.Changeset = $Changeset
-            $TaskContext.GitRoot = $Changeset.Root
-        } elseif (Get-Command 'git' -ErrorAction SilentlyContinue) {
-            $GitRoot = git -C $TaskFileRoot rev-parse --show-toplevel 2>$null
-            if ($LASTEXITCODE -eq 0) {
-                $TaskContext.GitRoot = [string] @($GitRoot)[0]
-            }
-        }
+        $TaskContext = New-PleaseWorkTaskContext `
+            -TaskFilePath $TaskFilePath `
+            -TaskFileRoot $TaskFileRoot `
+            -TaskOrder $TaskOrder `
+            -Tasks $TaskSet.Tasks `
+            -Config $TaskSet.Config
+        $Changeset = $TaskContext.Changeset
         $ExecutedTasks = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         $OriginalLocation = Get-Location
         $OriginalPleaseWorkConfig = $script:PleaseWorkConfig
