@@ -171,7 +171,12 @@ function Invoke-PleaseWork {
                 $null
             }
             if ([string]::IsNullOrWhiteSpace($BaseRef)) {
-                throw "Tasks using changed() require a non-empty `$PleaseConfig.BaseRef."
+                throw @"
+Tasks using changed() require a non-empty `$PleaseConfig.BaseRef.
+For example, to run tasks based on changes in the current branch relative to the main branch, set:
+
+    `$PleaseConfig = @{ BaseRef = 'origin/main' }
+"@
             }
             $HeadRef = if ($TaskSet.Config.Contains('HeadRef')) {
                 [string] $TaskSet.Config['HeadRef']
