@@ -85,6 +85,8 @@ Scope of this page:
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
     * [CanvasPosition](#canvasposition)
+    * [BringToFront](#bringtofront)
+    * [SendToBack](#sendtoback)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -1694,6 +1696,38 @@ Canvas 'Board' {
 
 ```powershell
 CanvasPosition -Left 5 -ZIndex 2 -InputObject $SomeControl
+```
+
+### BringToFront
+
+Sets `Panel.ZIndex` on the current object to one greater than the highest
+`ZIndex` among its sibling elements, so it renders above the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Back' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Front' {
+        CanvasPosition -Left 0 -Top 0
+        BringToFront
+    }
+}
+```
+
+### SendToBack
+
+Sets `Panel.ZIndex` on the current object to one less than the lowest
+`ZIndex` among its sibling elements, so it renders behind the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Front' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Back' {
+        CanvasPosition -Left 0 -Top 0
+        SendToBack
+    }
+}
 ```
 
 ### Get-WPFWindow

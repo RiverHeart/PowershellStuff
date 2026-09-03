@@ -141,6 +141,8 @@ FunctionsToExport = @(
     'BindProperty'
     'BoundTo'
     'Brush'
+    'BringToFront'
+    'SendToBack'
     'CanvasPosition'
     'Chrome'
     'DataTrigger'
