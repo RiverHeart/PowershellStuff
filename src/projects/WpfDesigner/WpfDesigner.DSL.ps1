@@ -20,10 +20,67 @@ App 'Window' {
     $this.Height = 700
 
     Content {
-        # Placeholder until the toolbar/viewport/property panel are built out.
-        TextBlock 'PlaceholderText' {
-            $this.Margin = 16
-            $this.Text = 'WPF Designer scaffold. Toolbar, viewport, and property panel coming in later phases.'
+        Grid 'DesignerGrid' {
+            Row 'Expand' {
+                Column '180' {
+                    Border 'ToolbarPane' {
+                        $this.BorderBrush = '#CCCCCC'
+                        $this.BorderThickness = 0, 0, 1, 0
+
+                        StackPanel 'ToolbarContent' {
+                            $this.Margin = 8
+
+                            TextBlock 'ToolbarHeader' {
+                                $this.Text = 'Toolbar'
+                                $this.FontWeight = 'Bold'
+                                $this.Margin = 0, 0, 0, 8
+                            }
+
+                            TextBlock 'ToolbarPlaceholder' {
+                                $this.Text = 'Draggable controls go here.'
+                                $this.TextWrapping = 'Wrap'
+                                $this.Foreground = '#808080'
+                            }
+                        }
+                    }
+                }
+
+                Column 'Expand' {
+                    Border 'ViewportPane' {
+                        $this.Background = '#F5F5F5'
+
+                        TextBlock 'ViewportPlaceholder' {
+                            $this.Text = 'Design surface goes here.'
+                            $this.HorizontalAlignment = 'Center'
+                            $this.VerticalAlignment = 'Center'
+                            $this.Foreground = '#808080'
+                        }
+                    }
+                }
+
+                Column '220' {
+                    Border 'PropertyPanelPane' {
+                        $this.BorderBrush = '#CCCCCC'
+                        $this.BorderThickness = 1, 0, 0, 0
+
+                        StackPanel 'PropertyPanelContent' {
+                            $this.Margin = 8
+
+                            TextBlock 'PropertyPanelHeader' {
+                                $this.Text = 'Properties'
+                                $this.FontWeight = 'Bold'
+                                $this.Margin = 0, 0, 0, 8
+                            }
+
+                            TextBlock 'PropertyPanelPlaceholder' {
+                                $this.Text = 'Selected control properties go here.'
+                                $this.TextWrapping = 'Wrap'
+                                $this.Foreground = '#808080'
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 } | Show-WPFWindow

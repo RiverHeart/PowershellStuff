@@ -1,8 +1,8 @@
 # WPF Designer
 
 > [!WARNING]
-> Experimental scaffold. Only a launchable shell window exists so far — no toolbar,
-> viewport, or property panel yet.
+> Experimental scaffold. Only the static toolbar/viewport/property-panel shell exists so
+> far — nothing is interactive yet (no drag-drop, selection, or property binding).
 
 A visual designer for the [WPF DSL](../../modules/WPF), built as a consumer of its public
 API rather than as part of the module itself. Scope for v1 is intentionally narrow:
@@ -24,6 +24,7 @@ depends on the WPF module's public commands and DSL keywords.
 ## Status
 
 - [x] Scaffold: entry script launches a bare window.
+- [x] Shell layout: toolbar / viewport / property panel panes.
 - [ ] Toolbar of draggable controls.
 - [ ] Design surface (drop, select, move, resize).
 - [ ] Property panel bound to the selected control.
