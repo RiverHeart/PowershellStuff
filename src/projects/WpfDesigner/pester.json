@@ -1,0 +1,18 @@
+{
+  "TestSuite": "WpfDesigner",
+  "Run": {
+    "Path": [
+      "Tests"
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  },
+  "Filter": {
+    "Tag": [],
+    "ExcludeTag": []
+  },
+  "Coverage": {
+    "Enabled": false
+  }
+}
