@@ -87,6 +87,7 @@ Scope of this page:
     * [CanvasPosition](#canvasposition)
     * [BringToFront](#bringtofront)
     * [SendToBack](#sendtoback)
+    * [Draggable](#draggable)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -1727,6 +1728,35 @@ Canvas 'Board' {
         CanvasPosition -Left 0 -Top 0
         SendToBack
     }
+}
+```
+
+### Draggable
+
+Wires up `MouseLeftButtonDown`/`MouseMove`/`MouseLeftButtonUp` handlers so the
+current object can be dragged around its parent Canvas with the mouse.
+Position updates go through `CanvasPosition`. The parent is resolved when a
+drag starts, so `Draggable` can be called before the object is attached to its
+final Canvas; if the parent isn't a Canvas at that point, a warning is written
+and the drag is ignored.
+
+Use `-BringToFrontOnDrag` to raise the object's `ZIndex` when a drag begins,
+and `-OnDragEnd` to run custom logic (for example, persisting the final
+position) after the mouse is released.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 10
+        Draggable -BringToFrontOnDrag
+    }
+}
+```
+
+```powershell
+Draggable -InputObject $SomeControl -OnDragEnd {
+    param($Target)
+    Write-Host "Dropped at $([System.Windows.Controls.Canvas]::GetLeft($Target)), $([System.Windows.Controls.Canvas]::GetTop($Target))"
 }
 ```
 

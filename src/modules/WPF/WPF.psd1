@@ -147,6 +147,7 @@ FunctionsToExport = @(
     'Chrome'
     'DataTrigger'
     'Dock'
+    'Draggable'
     'ExtendStyle'
     'Execute'
     'CanExecute'
