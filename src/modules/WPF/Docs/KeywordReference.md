@@ -30,6 +30,7 @@ Scope of this page:
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
     * [DockPanel](#dockpanel)
+    * [Canvas](#canvas)
     * [DataGrid](#datagrid)
     * [DataGridTextColumn](#datagridtextcolumn)
     * [ListView](#listview)
@@ -83,6 +84,7 @@ Scope of this page:
     * [Unregister-WPFCompletionType](#unregister-wpfcompletiontype)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
+    * [CanvasPosition](#canvasposition)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -440,6 +442,19 @@ Creates a DockPanel.
 DockPanel 'Layout' {
     Label 'Left' {}
     Label 'Right' {}
+}
+```
+
+### Canvas
+
+Creates a Canvas. Use `CanvasPosition` to place children with the
+`Canvas.Left`/`Top`/`Right`/`Bottom` attached properties.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
 }
 ```
 
@@ -1656,6 +1671,29 @@ StatusBarItem 'StatusZoomItem' {
 
 ```powershell
 Dock Top -InputObject $SomeControl
+```
+
+### CanvasPosition
+
+Sets the `Canvas.Left`, `Canvas.Top`, `Canvas.Right`, `Canvas.Bottom`, and
+`Panel.ZIndex` attached properties on the current object. Only the parameters
+you supply are applied.
+
+`-Left`/`-Right` and `-Top`/`-Bottom` are mutually exclusive pairs; supplying
+both sides of an axis raises an error.
+
+Use inside a DSL block to target `$this`, or pass `-InputObject` explicitly.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
+}
+```
+
+```powershell
+CanvasPosition -Left 5 -ZIndex 2 -InputObject $SomeControl
 ```
 
 ### Get-WPFWindow
