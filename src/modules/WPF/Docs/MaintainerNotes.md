@@ -8,6 +8,7 @@ Use the development log for dated progress entries and in-flight investigation n
 
 - Improve error handling so child object failures bubble up cleanly and produce a useful call stack.
 - Evaluate global resource support so keyed LinearGradientBrush definitions can be referenced outside Theme contexts (for example, style-only workflows). Current keyed behavior is Theme-only because there is no Application.Resources or module-level global resource registry path yet.
+- Replace the `$this`-based auto-attach parent check with a dedicated marker variable (for example, `$__WPFParentContext`) set by `Update-WPFObject` alongside `$this`. This would let keyword functions distinguish "we are inside DSL-managed child processing" from "`$this` happens to be bound because PowerShell auto-populates it for WPF event handler delegates" (see the Design Notes gotcha below). Touches every control keyword's auto-attach check (~25 files) plus `Tests/AttachReturnSemantics.Tests.ps1`, so scope as its own change rather than folding it into unrelated work.
 
 ## Design Notes
 
@@ -58,6 +59,27 @@ startup/render issue coverage for very small values and allows
 
 For runs that should not modify app script parameters, set
 `WPF_AUTO_CLOSE_SECONDS` to a numeric value in the environment.
+
+### Auto-Attach vs. Event Handler `$this`
+
+Control keywords (`Label`, `Button`, etc.) decide whether to auto-attach to a parent by checking `$PSCmdlet.GetVariableValue('this')`. This collides with a separate PowerShell behavior: when a scriptblock is invoked as a WPF event handler delegate (for example, via `On Click { ... }`), PowerShell automatically binds `$this` to the sender in that scriptblock's scope. From inside a nested scope there is no way to tell these two cases apart — both are just "`$this` is set in an ancestor scope."
+
+This matters when a keyword like `Label` is called from inside an event handler to build a control programmatically (as opposed to declaratively inside another control's block). The ambient `$this` (the sender) gets mistaken for a DSL parent, and the new control gets auto-attached to the wrong object.
+
+Until the auto-attach check moves to a dedicated marker variable (see Backlog Candidates), the workaround is to explicitly shadow `$this` immediately before calling the keyword:
+
+```powershell
+On Click {
+    # Label() auto-attaches to $this when set, so clear it first to guarantee
+    # the new Label stays unparented until we place it on the canvas.
+    $this = $null
+    $NewLabel = Label 'SomeLabel' {
+        $this.Content = 'Label'
+    }
+}
+```
+
+A `-NoAutoAttach` switch was considered for this generally and rejected as unintuitive for callers; it still exists narrowly on `MenuItem` for its own recursive nested-path construction, which is an unrelated use case.
 
 ### RelayCommand
 

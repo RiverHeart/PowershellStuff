@@ -13,11 +13,27 @@ if (-not (Get-Module -Name WPF)) {
     Import-Module "$PSScriptRoot/../../modules/WPF" -ErrorAction Stop -Force
 }
 
+Import "$PSScriptRoot/functions"
+
 App 'Window' {
     $this.Title = 'WPF Designer'
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.Width = 1000
     $this.Height = 700
+
+    Resources {
+        # Scoped to this Window so it only affects Labels placed on the design surface.
+        Style Label {
+            BorderBrush: '#999999'
+            BorderThickness: 1
+            Padding: 4
+
+            Trigger IsMouseOver $true {
+                BorderBrush: '#2563EB'
+                Background: '#EFF6FF'
+            }
+        }
+    }
 
     Content {
         Grid 'DesignerGrid' {
@@ -36,10 +52,12 @@ App 'Window' {
                                 $this.Margin = 0, 0, 0, 8
                             }
 
-                            TextBlock 'ToolbarPlaceholder' {
-                                $this.Text = 'Draggable controls go here.'
-                                $this.TextWrapping = 'Wrap'
-                                $this.Foreground = '#808080'
+                            Button 'AddLabelButton' {
+                                $this.Content = '+ Label'
+
+                                On Click {
+                                    Add-WpfDesignerLabel -Canvas (Reference 'DesignSurface')
+                                }
                             }
                         }
                     }
@@ -49,11 +67,8 @@ App 'Window' {
                     Border 'ViewportPane' {
                         $this.Background = '#F5F5F5'
 
-                        TextBlock 'ViewportPlaceholder' {
-                            $this.Text = 'Design surface goes here.'
-                            $this.HorizontalAlignment = 'Center'
-                            $this.VerticalAlignment = 'Center'
-                            $this.Foreground = '#808080'
+                        Canvas 'DesignSurface' {
+                            $this.Background = 'Transparent'
                         }
                     }
                 }
