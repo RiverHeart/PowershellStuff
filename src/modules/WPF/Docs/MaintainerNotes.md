@@ -83,6 +83,24 @@ On Click {
 
 A `-NoAutoAttach` switch was considered for this generally and rejected as unintuitive for callers; it still exists narrowly on `MenuItem` for its own recursive nested-path construction, which is an unrelated use case.
 
+### GetNewClosure() and Bare Function Calls
+
+Event handler scriptblocks that need to keep a snapshot of outer variables (for example, per-control drag state) typically call `.GetNewClosure()` before assigning them to `Add_<Event>`. This detaches the scriptblock into its own scope for variable lookups, but it also breaks bare-name calls to other functions defined in the same script/module from inside that scriptblock — they fail to resolve at invoke time with "term not recognized," even though the function is clearly defined and in scope everywhere else.
+
+The existing `Draggable` implementation already works around this by capturing the function as a scriptblock reference before closing over it, then invoking it indirectly:
+
+```powershell
+$ComputeDraggedPosition = ${function:Get-WPFDraggedPosition}
+
+$MouseMoveHandler = {
+    param($sender, $e)
+    # ...
+    & $ComputeDraggedPosition -AnchorLeft $DragState.AnchorLeft -AnchorTop $DragState.AnchorTop ...
+}.GetNewClosure()
+```
+
+Capturing the reference via `${function:Name}` works regardless of which file defined the function, as long as it has already been loaded into the session (dot-sourced or imported) before the capturing line executes — this is a session-wide function-table lookup, not a file-scoped one. Any new keyword or consumer code that builds `GetNewClosure()`'d event handlers and needs to call another function from inside them should follow this same capture-and-invoke pattern rather than calling the function by bare name.
+
 ### RelayCommand
 
 While working on menu support, the initial expectation was that `ICommand` could be attached directly to a `MenuItem` with a simple command object. In practice, usable command wiring in WPF revolved around a `RelayCommand` implementation and, initially, `CommandBinding`.

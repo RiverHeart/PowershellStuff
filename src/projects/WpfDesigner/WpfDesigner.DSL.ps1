@@ -20,6 +20,9 @@ App 'Window' {
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.Width = 1000
     $this.Height = 700
+    State @{
+        SelectedElement = $null
+    }
 
     Resources {
         # Scoped to this Window so it only affects Labels placed on the design surface.
@@ -56,7 +59,7 @@ App 'Window' {
                                 $this.Content = '+ Label'
 
                                 On Click {
-                                    Add-WpfDesignerLabel -Canvas (Reference 'DesignSurface')
+                                    Add-WpfDesignerLabel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag
                                 }
                             }
                         }
@@ -69,6 +72,12 @@ App 'Window' {
 
                         Canvas 'DesignSurface' {
                             $this.Background = 'Transparent'
+
+                            # Deselect when clicking empty canvas. Suppressed for clicks on a
+                            # control because Draggable marks that event Handled first.
+                            On MouseLeftButtonDown {
+                                Clear-WpfDesignerSelection -Canvas $this -State (Reference 'Window').Tag
+                            }
                         }
                     }
                 }

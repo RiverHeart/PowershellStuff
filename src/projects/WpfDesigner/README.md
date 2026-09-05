@@ -1,8 +1,8 @@
 # WPF Designer
 
 > [!WARNING]
-> Experimental scaffold. Labels can be added and dragged around the design surface, but
-> there's no selection, resizing, or property panel binding yet.
+> Experimental scaffold. Labels can be added, dragged, selected, and resized, but there's
+> no property panel binding yet.
 
 A visual designer for the [WPF DSL](../../modules/WPF), built as a consumer of its public
 API rather than as part of the module itself. Scope for v1 is intentionally narrow:
@@ -28,6 +28,6 @@ depends on the WPF module's public commands and DSL keywords.
 - [x] Toolbar action to add Labels onto the design surface (click-to-place).
 - [x] Move placed Labels by dragging (`Canvas` + `Draggable`).
 - [x] Placed Labels have a visible border and a hover highlight (`Style Label`).
-- [ ] Selection of a placed Label.
-- [ ] Resize handles for the selected Label.
+- [x] Selection of a placed Label (click to select, click empty canvas to deselect).
+- [x] Resize handle for the selected Label (bottom-right corner, 20px minimum).
 - [ ] Property panel bound to the selected Label.
