@@ -176,3 +176,8 @@ Parallel execution will extend the same result model into each worker rather tha
 The last native command executed by that task determines its native exit status. A nonzero status or a terminating PowerShell error fails that task. On failure, the scheduler should stop admitting new work, never schedule the failed task's dependents, and request cancellation of tasks already running. Already-running tasks may still produce their own results before cancellation completes.
 
 The runner's overall outcome is therefore aggregate: it fails when any task fails, but it does not pretend that one worker's native exit code is the canonical batch exit code. The exact task exit code remains available in that task's result and can be included in verbose output. A command-line wrapper can map aggregate success or failure to a conventional process exit code such as `0` or `1`.
+
+# TODO
+
+* Tasks beginning with an underscore should be considered hidden/internal.
+* Ensure that the base PleaseWork cmdlet does not take positional parameters other than the task name so users can effectively forward remaining arguments to the task itself. This would be in service of calling CLI utilities from those tasks that depend on positional params themselves. 
