@@ -5,10 +5,12 @@ using namespace System.Windows.Controls
     Commits a bound TextBox's value on Enter instead of requiring focus loss.
 
 .DESCRIPTION
-    Clears keyboard focus when Enter is pressed. Text bindings default to
-    UpdateSourceTrigger=LostFocus, so this triggers the existing commit path
-    (including any LostFocus handlers, such as numeric clamping) without
-    moving focus to another control.
+    Clears focus when Enter is pressed. Text bindings default to
+    UpdateSourceTrigger=LostFocus, which commits on the UIElement.LostFocus
+    (logical focus) event rather than keyboard focus, so both the logical
+    focus (FocusManager) and keyboard focus (Keyboard) must be cleared for
+    the existing commit path (including any LostFocus handlers, such as
+    numeric clamping) to fire.
 #>
 function Add-WpfDesignerEnterCommit {
     [CmdletBinding()]
@@ -22,6 +24,8 @@ function Add-WpfDesignerEnterCommit {
         param($sender, $e)
 
         if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
+            $scope = [System.Windows.Input.FocusManager]::GetFocusScope($sender)
+            [System.Windows.Input.FocusManager]::SetFocusedElement($scope, $null)
             [System.Windows.Input.Keyboard]::ClearFocus()
             $e.Handled = $true
         }
