@@ -50,6 +50,23 @@ App 'Window' {
                                     Add-WpfDesignerLabel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag
                                 }
                             }
+
+                            Button 'ExportButton' {
+                                $this.Content = 'Export'
+                                $this.Margin = 0, 8, 0, 0
+
+                                On Click {
+                                    $Script = ConvertTo-WpfDesignerScript -Canvas (Reference 'DesignSurface')
+                                    [System.Windows.Clipboard]::SetText($Script)
+                                    (Reference 'ExportStatusText').Text = 'Copied DSL script to clipboard.'
+                                }
+                            }
+
+                            TextBlock 'ExportStatusText' {
+                                $this.Margin = 0, 4, 0, 0
+                                $this.TextWrapping = 'Wrap'
+                                $this.Foreground = '#808080'
+                            }
                         }
                     }
                 }

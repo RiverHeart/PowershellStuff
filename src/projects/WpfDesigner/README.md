@@ -2,7 +2,8 @@
 
 > [!WARNING]
 > Experimental scaffold. Labels can be added, dragged, selected, resized, and edited via
-> the property panel, with committed edits validated. See Status for full detail.
+> the property panel, with committed edits validated. The design can be exported as
+> runnable DSL script text. See Status for full detail.
 
 A visual designer for the [WPF DSL](../../modules/WPF), built as a consumer of its public
 API rather than as part of the module itself. Scope for v1 is intentionally narrow:
@@ -33,6 +34,8 @@ depends on the WPF module's public commands and DSL keywords.
 - [x] Property panel bound to the selected Label (`Content`/`Width`/`Height`, two-way).
 - [x] Panel Width/Height edits clamp to the resize handle's 20px minimum on commit.
 - [x] Panel fields commit on Enter without requiring focus loss.
+- [x] Export the design as runnable DSL script text, copied to the clipboard
+  (`ConvertTo-WpfDesignerScript`).
 
 ## Todo
 
