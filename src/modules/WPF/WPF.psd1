@@ -133,6 +133,7 @@ FunctionsToExport = @(
     'StackPanel'
     'TextBlock'
     'TextBox'
+    'Thumb'
     'Window'
 
     # DSL/Helpers

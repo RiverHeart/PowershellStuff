@@ -41,6 +41,7 @@ Scope of this page:
     * [Menu](#menu)
     * [MenuItem](#menuitem)
     * [StatusBar](#statusbar)
+    * [Thumb](#thumb)
 * [Shapes](#shapes)
     * [Path](#path)
     * [Rectangle](#rectangle)
@@ -598,6 +599,24 @@ App 'Example' {
         TextBlock 'ReadyText' {
             $this.Text = 'Ready'
         }
+    }
+}
+```
+
+### Thumb
+
+Creates a WPF `Thumb`. `Thumb` has no content and is typically used inside a
+custom template or control composition to provide drag behavior, handling
+`DragStarted`, `DragDelta`, and `DragCompleted` events.
+
+```powershell
+Thumb 'Handle' {
+    $this.Width = 12
+    $this.Height = 12
+
+    On DragDelta {
+        param($sender, $e)
+        Write-Host "$($e.HorizontalChange), $($e.VerticalChange)"
     }
 }
 ```
