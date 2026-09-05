@@ -4,7 +4,7 @@ Use this checklist before splitting WPF into its own repository or announcing br
 
 ## 1. Product Readiness
 
-- [ ] At least one flagship example is stable and runnable end to end.
+- [x] At least one flagship example is stable and runnable end to end.
 - [ ] At least two additional examples cover common UI patterns.
 - [ ] Known breaking behavior is documented in README or Docs.
 - [ ] Expected PowerShell 5 behavior is verified on Windows.
@@ -12,17 +12,17 @@ Use this checklist before splitting WPF into its own repository or announcing br
 ## 2. Documentation Readiness
 
 - [ ] README gives a clear first-run path and realistic scope.
-- [ ] Keyword and style docs match current behavior.
-- [ ] The "When This Is Not a Fit" section reflects current limits.
-- [ ] Maintainer docs are separated from user-facing docs.
+- [x] Keyword and style docs match current behavior.
+- [x] The "When This Is Not a Fit" section reflects current limits.
+- [x] Maintainer docs are separated from user-facing docs.
 
 ## 3. Quality Readiness
 
-- [ ] Module imports cleanly from a fresh session.
-- [ ] At least one smoke test path is documented and repeatable.
+- [x] Module imports cleanly from a fresh session.
+- [x] At least one smoke test path is documented and repeatable.
 - [ ] Error messages are actionable for common failures.
 - [ ] No known blocker bugs remain for primary examples.
-- [ ] Test runs in Windows PowerShell 5.1 and PowerShell 7 explicitly use Pester 5.7.1 or newer.
+- [x] Test runs in Windows PowerShell 5.1 and PowerShell 7 explicitly use Pester 5.7.1 or newer.
 
 For PS5 compatibility and Pester policy details, use the maintainer skill at `.github/skills/wpf-ps5-test-compatibility/SKILL.md`.
 
@@ -34,8 +34,8 @@ For PS5 compatibility and Pester policy details, use the maintainer skill at `.g
 
 ## 5. Repository Split Readiness
 
-- [ ] Extraction method is chosen and documented.
-- [ ] Required repo-root files for the new repo are identified.
+- [x] Extraction method is chosen and documented.
+- [x] Required repo-root files for the new repo are identified.
 - [ ] Post-split links and traceability notes are prepared.
 - [ ] Migration dry run was completed at least once.
 
