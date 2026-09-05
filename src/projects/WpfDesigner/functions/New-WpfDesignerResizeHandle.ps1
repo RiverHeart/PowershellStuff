@@ -8,7 +8,8 @@ using namespace System.Windows.Controls
     Adds a small square Thumb to the canvas, pinned to the target's
     bottom-right corner. Dragging the handle adjusts the target's Width and
     Height (clamped to a 20px minimum) and keeps the handle pinned as the
-    target's size changes.
+    target's size changes, from a drag or any other source (e.g. the
+    property panel).
 #>
 function New-WpfDesignerResizeHandle {
     [CmdletBinding()]
@@ -51,6 +52,16 @@ function New-WpfDesignerResizeHandle {
         $Target.Height = [System.Math]::Max(20, $Target.Height + $e.VerticalChange)
         & $UpdatePosition -Handle $sender -Target $Target
     }.GetNewClosure()
+
+    # SizeChanged catches Width/Height changes from any source (e.g. the
+    # property panel), not just handle drags. Stashed on Target so
+    # Clear-WpfDesignerSelection can unsubscribe it when the handle goes away.
+    $SizeChangedHandler = {
+        param($sender, $e)
+        & $UpdatePosition -Handle $Handle -Target $sender
+    }.GetNewClosure()
+    $Target.add_SizeChanged($SizeChangedHandler)
+    $Target | Add-Member -NotePropertyName '_WPFDesignerResizeHandleSizeChangedHandler' -NotePropertyValue $SizeChangedHandler -Force
 
     return $Handle
 }

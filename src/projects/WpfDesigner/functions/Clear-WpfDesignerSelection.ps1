@@ -27,6 +27,11 @@ function Clear-WpfDesignerSelection {
     $Previous.ClearValue([System.Windows.Controls.Control]::BorderBrushProperty)
     $Previous.ClearValue([System.Windows.Controls.Control]::BorderThicknessProperty)
 
+    $SizeChangedHandlerProperty = $Previous.PSObject.Properties['_WPFDesignerResizeHandleSizeChangedHandler']
+    if ($SizeChangedHandlerProperty -and $SizeChangedHandlerProperty.Value) {
+        $Previous.remove_SizeChanged($SizeChangedHandlerProperty.Value)
+    }
+
     $HandleProperty = $Previous.PSObject.Properties['_WPFDesignerResizeHandle']
     if ($HandleProperty -and $HandleProperty.Value) {
         $Canvas.Children.Remove($HandleProperty.Value)

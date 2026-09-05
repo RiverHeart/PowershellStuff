@@ -139,4 +139,34 @@ Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
         $Target.Width | Should -Be -ExpectedValue 20
         $Target.Height | Should -Be -ExpectedValue 20
     }
+
+    It 'Should reposition the handle when the target size changes without a drag' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Target = [System.Windows.Controls.Label]::new()
+        $Target.Width = 100
+        $Target.Height = 26
+        $Canvas.Children.Add($Target) | Out-Null
+
+        $Handle = New-WpfDesignerResizeHandle -Canvas $Canvas -Target $Target
+
+        # SizeChanged requires a real PresentationSource to fire, so host the
+        # canvas in an invisible native window instead of a full app Show().
+        $HwndSourceParams = [System.Windows.Interop.HwndSourceParameters]::new('WpfDesignerTest')
+        $HwndSourceParams.Width = 300
+        $HwndSourceParams.Height = 300
+        $HwndSource = [System.Windows.Interop.HwndSource]::new($HwndSourceParams)
+        try {
+            $HwndSource.RootVisual = $Canvas
+            $Canvas.UpdateLayout()
+
+            $Target.Width = 160
+            $Target.Height = 40
+            $Canvas.UpdateLayout()
+        } finally {
+            $HwndSource.Dispose()
+        }
+
+        [System.Windows.Controls.Canvas]::GetLeft($Handle) | Should -Be -ExpectedValue (160 - ($Handle.Width / 2))
+        [System.Windows.Controls.Canvas]::GetTop($Handle) | Should -Be -ExpectedValue (40 - ($Handle.Height / 2))
+    }
 }
