@@ -98,6 +98,7 @@ App 'Window' {
                             TextBox 'PropertyContentInput' {
                                 $this.Margin = 0, 0, 0, 8
                                 BindProperty Text Content -TwoWay
+                                Add-WpfDesignerEnterCommit -InputObject $this
                             }
 
                             TextBlock 'PropertyWidthLabel' {
@@ -108,6 +109,8 @@ App 'Window' {
                             TextBox 'PropertyWidthInput' {
                                 $this.Margin = 0, 0, 0, 8
                                 BindProperty Text Width -TwoWay
+                                Add-WpfDesignerEnterCommit -InputObject $this
+                                Add-WpfDesignerPropertyMinimum -InputObject $this -PropertyName Width -Minimum 20 -State (Reference 'Window').Tag
                             }
 
                             TextBlock 'PropertyHeightLabel' {
@@ -118,6 +121,8 @@ App 'Window' {
                             TextBox 'PropertyHeightInput' {
                                 $this.Margin = 0, 0, 0, 8
                                 BindProperty Text Height -TwoWay
+                                Add-WpfDesignerEnterCommit -InputObject $this
+                                Add-WpfDesignerPropertyMinimum -InputObject $this -PropertyName Height -Minimum 20 -State (Reference 'Window').Tag
                             }
                         }
                     }
