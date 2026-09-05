@@ -1,8 +1,9 @@
 # WPF Designer
 
 > [!WARNING]
-> Experimental scaffold. Labels can be added, dragged, selected, and resized, but there's
-> no property panel binding yet.
+> Experimental scaffold. Labels can be added, dragged, selected, resized, and edited via
+> the property panel. All v1 scope items are implemented; polish and validation are still
+> minimal (see Status).
 
 A visual designer for the [WPF DSL](../../modules/WPF), built as a consumer of its public
 API rather than as part of the module itself. Scope for v1 is intentionally narrow:
@@ -30,4 +31,11 @@ depends on the WPF module's public commands and DSL keywords.
 - [x] Placed Labels have a visible border and a hover highlight (`Style Label`).
 - [x] Selection of a placed Label (click to select, click empty canvas to deselect).
 - [x] Resize handle for the selected Label (bottom-right corner, 20px minimum).
-- [ ] Property panel bound to the selected Label.
+- [x] Property panel bound to the selected Label (`Content`/`Width`/`Height`, two-way).
+  Panel edits are not clamped to the resize handle's 20px minimum.
+
+## Todo
+
+- Clamp panel edits to the resize handle's 20px minimum. 
+- See if input boxes can accept enter instead of needing to change focus.
+- Consider a way to avoid DataContext null warning when intentional. 

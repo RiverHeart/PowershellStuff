@@ -78,16 +78,46 @@ App 'Window' {
                         StackPanel 'PropertyPanelContent' {
                             $this.Margin = 8
 
+                            # Re-scopes DataContext for this panel to whatever is
+                            # currently selected, so the fields below can bind to it
+                            # with plain inherited-DataContext paths.
+                            BindProperty DataContext SelectedElement
+                            Bind IsEnabled -To Window.Tag.SelectedElement -Converter { [bool] $_ }
+
                             TextBlock 'PropertyPanelHeader' {
                                 $this.Text = 'Properties'
                                 $this.FontWeight = 'Bold'
                                 $this.Margin = 0, 0, 0, 8
                             }
 
-                            TextBlock 'PropertyPanelPlaceholder' {
-                                $this.Text = 'Selected control properties go here.'
-                                $this.TextWrapping = 'Wrap'
-                                $this.Foreground = '#808080'
+                            TextBlock 'PropertyContentLabel' {
+                                $this.Text = 'Content'
+                                $this.Margin = 0, 0, 0, 2
+                            }
+
+                            TextBox 'PropertyContentInput' {
+                                $this.Margin = 0, 0, 0, 8
+                                BindProperty Text Content -TwoWay
+                            }
+
+                            TextBlock 'PropertyWidthLabel' {
+                                $this.Text = 'Width'
+                                $this.Margin = 0, 0, 0, 2
+                            }
+
+                            TextBox 'PropertyWidthInput' {
+                                $this.Margin = 0, 0, 0, 8
+                                BindProperty Text Width -TwoWay
+                            }
+
+                            TextBlock 'PropertyHeightLabel' {
+                                $this.Text = 'Height'
+                                $this.Margin = 0, 0, 0, 2
+                            }
+
+                            TextBox 'PropertyHeightInput' {
+                                $this.Margin = 0, 0, 0, 8
+                                BindProperty Text Height -TwoWay
                             }
                         }
                     }
