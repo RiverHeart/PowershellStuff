@@ -88,4 +88,29 @@ Describe 'Draggable' -Tag 'Draggable' {
         $Warnings = @(Invoke-Command -ScriptBlock { $Item.RaiseEvent($DownArgs) } -WarningVariable +Warnings 3>&1)
         ($Warnings | Out-String) | Should -Match 'must be attached to a Canvas'
     }
+
+    It 'Should clamp the position to the parent Canvas when -BoundToParent is set' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Item = [System.Windows.Controls.Label]::new()
+        $Canvas.Children.Add($Item) | Out-Null
+        [System.Windows.Controls.Canvas]::SetLeft($Item, 0)
+        [System.Windows.Controls.Canvas]::SetTop($Item, 0)
+
+        Draggable -InputObject $Item -BoundToParent
+
+        $MouseDevice = [System.Windows.Input.Mouse]::PrimaryDevice
+
+        $DownArgs = [System.Windows.Input.MouseButtonEventArgs]::new($MouseDevice, [Environment]::TickCount, [System.Windows.Input.MouseButton]::Left)
+        $DownArgs.RoutedEvent = [System.Windows.UIElement]::MouseLeftButtonDownEvent
+        $Item.RaiseEvent($DownArgs)
+
+        $MoveArgs = [System.Windows.Input.MouseEventArgs]::new($MouseDevice, [Environment]::TickCount)
+        $MoveArgs.RoutedEvent = [System.Windows.UIElement]::MouseMoveEvent
+        $Item.RaiseEvent($MoveArgs)
+
+        # Unrendered elements report zero ActualWidth/ActualHeight, so the
+        # parent-bound clamp collapses to [0, 0] regardless of mouse delta.
+        [System.Windows.Controls.Canvas]::GetLeft($Item) | Should -Be 0
+        [System.Windows.Controls.Canvas]::GetTop($Item) | Should -Be 0
+    }
 }

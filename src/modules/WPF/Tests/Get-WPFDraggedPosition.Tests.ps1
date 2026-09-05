@@ -41,4 +41,34 @@ Describe 'Get-WPFDraggedPosition' -Tag 'Get-WPFDraggedPosition' {
             $Result.Top | Should -Be -35
         }
     }
+
+    It 'Should clamp the result to -MaxLeft/-MaxTop when provided' {
+        InModuleScope WPF {
+            $Result = Get-WPFDraggedPosition `
+                -AnchorLeft 90 `
+                -AnchorTop 90 `
+                -AnchorMouse ([System.Windows.Point]::new(0, 0)) `
+                -CurrentMouse ([System.Windows.Point]::new(50, 50)) `
+                -MaxLeft 100 `
+                -MaxTop 100
+
+            $Result.Left | Should -Be 100
+            $Result.Top | Should -Be 100
+        }
+    }
+
+    It 'Should clamp the result to 0 when a delta would go negative' {
+        InModuleScope WPF {
+            $Result = Get-WPFDraggedPosition `
+                -AnchorLeft 10 `
+                -AnchorTop 10 `
+                -AnchorMouse ([System.Windows.Point]::new(50, 50)) `
+                -CurrentMouse ([System.Windows.Point]::new(0, 0)) `
+                -MaxLeft 100 `
+                -MaxTop 100
+
+            $Result.Left | Should -Be 0
+            $Result.Top | Should -Be 0
+        }
+    }
 }

@@ -1760,8 +1760,10 @@ final Canvas; if the parent isn't a Canvas at that point, a warning is written
 and the drag is ignored.
 
 Use `-BringToFrontOnDrag` to raise the object's `ZIndex` when a drag begins,
-and `-OnDragEnd` to run custom logic (for example, persisting the final
-position) after the mouse is released.
+`-BoundToParent` to keep the object fully within its parent Canvas (clamped
+using the Canvas's and object's actual size), and `-OnDragEnd` to run custom
+logic (for example, persisting the final position) after the mouse is
+released.
 
 ```powershell
 Canvas 'Board' {
@@ -1770,6 +1772,10 @@ Canvas 'Board' {
         Draggable -BringToFrontOnDrag
     }
 }
+```
+
+```powershell
+Draggable -InputObject $SomeControl -BoundToParent
 ```
 
 ```powershell

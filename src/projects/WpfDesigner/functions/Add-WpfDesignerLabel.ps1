@@ -44,7 +44,7 @@ function Add-WpfDesignerLabel {
         & $SelectHandler -Canvas $Canvas -Target $sender -State $State
     }.GetNewClosure()
 
-    Draggable -InputObject $NewLabel -BringToFrontOnDrag
+    Draggable -InputObject $NewLabel -BringToFrontOnDrag -BoundToParent
 
     # Draggable's -BringToFrontOnDrag can raise this Label's ZIndex above an
     # existing resize handle's on every mousedown, so re-assert the handle on

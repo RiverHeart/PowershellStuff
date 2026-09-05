@@ -34,6 +34,11 @@
     Draggable -BringToFrontOnDrag -InputObject $SomeControl
 
 .EXAMPLE
+    Constrain dragging so the target never leaves its parent Canvas.
+
+    Draggable -BoundToParent
+
+.EXAMPLE
     Run custom logic (for example, persisting the final position) after a drag ends.
 
     Draggable -OnDragEnd { param($Target) Write-Host "Dropped at $(
@@ -46,6 +51,8 @@ function Draggable {
     [OutputType([void])]
     param(
         [switch] $BringToFrontOnDrag,
+
+        [switch] $BoundToParent,
 
         [scriptblock] $OnDragEnd,
 
@@ -106,12 +113,22 @@ function Draggable {
 
         if (-not $DragState.IsDragging) { return }
 
-        $CurrentMouse = $e.GetPosition($sender.Parent)
-        $NewPosition = & $ComputeDraggedPosition `
-            -AnchorLeft $DragState.AnchorLeft `
-            -AnchorTop $DragState.AnchorTop `
-            -AnchorMouse $DragState.AnchorMouse `
-            -CurrentMouse $CurrentMouse
+        $Parent = $sender.Parent
+        $CurrentMouse = $e.GetPosition($Parent)
+
+        $PositionArgs = @{
+            AnchorLeft   = $DragState.AnchorLeft
+            AnchorTop    = $DragState.AnchorTop
+            AnchorMouse  = $DragState.AnchorMouse
+            CurrentMouse = $CurrentMouse
+        }
+
+        if ($BoundToParent) {
+            $PositionArgs.MaxLeft = [Math]::Max(0, $Parent.ActualWidth - $sender.ActualWidth)
+            $PositionArgs.MaxTop = [Math]::Max(0, $Parent.ActualHeight - $sender.ActualHeight)
+        }
+
+        $NewPosition = & $ComputeDraggedPosition @PositionArgs
 
         CanvasPosition -Left $NewPosition.Left -Top $NewPosition.Top -InputObject $sender
     }.GetNewClosure()
