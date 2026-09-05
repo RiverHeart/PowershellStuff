@@ -10,6 +10,7 @@ Describe 'Attach Return Semantics' -Tag 'AttachReturnSemantics' {
             @{ Keyword = 'ScrollViewer'; NamePrefix = 'ScrollViewer'; Type = [System.Windows.Controls.ScrollViewer] }
             @{ Keyword = 'StackPanel';   NamePrefix = 'StackPanel';   Type = [System.Windows.Controls.StackPanel] }
             @{ Keyword = 'DockPanel';    NamePrefix = 'DockPanel';    Type = [System.Windows.Controls.DockPanel] }
+            @{ Keyword = 'Canvas';       NamePrefix = 'Canvas';       Type = [System.Windows.Controls.Canvas] }
             @{ Keyword = 'DatePicker';   NamePrefix = 'DatePicker';   Type = [System.Windows.Controls.DatePicker] }
             @{ Keyword = 'DataGrid';     NamePrefix = 'DataGrid';     Type = [System.Windows.Controls.DataGrid] }
         )

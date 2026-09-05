@@ -30,6 +30,7 @@ Scope of this page:
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
     * [DockPanel](#dockpanel)
+    * [Canvas](#canvas)
     * [DataGrid](#datagrid)
     * [DataGridTextColumn](#datagridtextcolumn)
     * [ListView](#listview)
@@ -40,6 +41,7 @@ Scope of this page:
     * [Menu](#menu)
     * [MenuItem](#menuitem)
     * [StatusBar](#statusbar)
+    * [Thumb](#thumb)
 * [Shapes](#shapes)
     * [Path](#path)
     * [Rectangle](#rectangle)
@@ -83,6 +85,10 @@ Scope of this page:
     * [Unregister-WPFCompletionType](#unregister-wpfcompletiontype)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
+    * [CanvasPosition](#canvasposition)
+    * [BringToFront](#bringtofront)
+    * [SendToBack](#sendtoback)
+    * [Draggable](#draggable)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
@@ -443,6 +449,19 @@ DockPanel 'Layout' {
 }
 ```
 
+### Canvas
+
+Creates a Canvas. Use `CanvasPosition` to place children with the
+`Canvas.Left`/`Top`/`Right`/`Bottom` attached properties.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
+}
+```
+
 ### DataGrid
 
 Creates a DataGrid. Use `$this.ItemsSource` to bind data and `$this.AutoGenerateColumns` to control column generation.
@@ -580,6 +599,24 @@ App 'Example' {
         TextBlock 'ReadyText' {
             $this.Text = 'Ready'
         }
+    }
+}
+```
+
+### Thumb
+
+Creates a WPF `Thumb`. `Thumb` has no content and is typically used inside a
+custom template or control composition to provide drag behavior, handling
+`DragStarted`, `DragDelta`, and `DragCompleted` events.
+
+```powershell
+Thumb 'Handle' {
+    $this.Width = 12
+    $this.Height = 12
+
+    On DragDelta {
+        param($sender, $e)
+        Write-Host "$($e.HorizontalChange), $($e.VerticalChange)"
     }
 }
 ```
@@ -1656,6 +1693,96 @@ StatusBarItem 'StatusZoomItem' {
 
 ```powershell
 Dock Top -InputObject $SomeControl
+```
+
+### CanvasPosition
+
+Sets the `Canvas.Left`, `Canvas.Top`, `Canvas.Right`, `Canvas.Bottom`, and
+`Panel.ZIndex` attached properties on the current object. Only the parameters
+you supply are applied.
+
+`-Left`/`-Right` and `-Top`/`-Bottom` are mutually exclusive pairs; supplying
+both sides of an axis raises an error.
+
+Use inside a DSL block to target `$this`, or pass `-InputObject` explicitly.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
+}
+```
+
+```powershell
+CanvasPosition -Left 5 -ZIndex 2 -InputObject $SomeControl
+```
+
+### BringToFront
+
+Sets `Panel.ZIndex` on the current object to one greater than the highest
+`ZIndex` among its sibling elements, so it renders above the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Back' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Front' {
+        CanvasPosition -Left 0 -Top 0
+        BringToFront
+    }
+}
+```
+
+### SendToBack
+
+Sets `Panel.ZIndex` on the current object to one less than the lowest
+`ZIndex` among its sibling elements, so it renders behind the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Front' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Back' {
+        CanvasPosition -Left 0 -Top 0
+        SendToBack
+    }
+}
+```
+
+### Draggable
+
+Wires up `MouseLeftButtonDown`/`MouseMove`/`MouseLeftButtonUp` handlers so the
+current object can be dragged around its parent Canvas with the mouse.
+Position updates go through `CanvasPosition`. The parent is resolved when a
+drag starts, so `Draggable` can be called before the object is attached to its
+final Canvas; if the parent isn't a Canvas at that point, a warning is written
+and the drag is ignored.
+
+Use `-BringToFrontOnDrag` to raise the object's `ZIndex` when a drag begins,
+`-BoundToParent` to keep the object fully within its parent Canvas (clamped
+using the Canvas's and object's actual size), and `-OnDragEnd` to run custom
+logic (for example, persisting the final position) after the mouse is
+released.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 10
+        Draggable -BringToFrontOnDrag
+    }
+}
+```
+
+```powershell
+Draggable -InputObject $SomeControl -BoundToParent
+```
+
+```powershell
+Draggable -InputObject $SomeControl -OnDragEnd {
+    param($Target)
+    Write-Host "Dropped at $([System.Windows.Controls.Canvas]::GetLeft($Target)), $([System.Windows.Controls.Canvas]::GetTop($Target))"
+}
 ```
 
 ### Get-WPFWindow

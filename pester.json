@@ -20,6 +20,10 @@
     {
       "Name": "TabCentral",
       "ConfigPath": "src/modules/TabCentral/pester.json"
+    },
+    {
+      "Name": "WpfDesigner",
+      "ConfigPath": "src/projects/WpfDesigner/pester.json"
     }
   ]
 }
