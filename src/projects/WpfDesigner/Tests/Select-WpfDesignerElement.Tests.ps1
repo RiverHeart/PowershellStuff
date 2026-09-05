@@ -115,11 +115,12 @@ Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
 
         $Handle = New-WpfDesignerResizeHandle -Canvas $Canvas -Target $Target
 
-        $MouseDevice = [System.Windows.Input.Mouse]::PrimaryDevice
-        $DownArgs = [System.Windows.Input.MouseButtonEventArgs]::new($MouseDevice, [Environment]::TickCount, [System.Windows.Input.MouseButton]::Left)
-        $DownArgs.RoutedEvent = [System.Windows.UIElement]::MouseLeftButtonDownEvent
+        $DeltaArgs = [System.Windows.Controls.Primitives.DragDeltaEventArgs]::new(15, 10)
+        $DeltaArgs.RoutedEvent = [System.Windows.Controls.Primitives.Thumb]::DragDeltaEvent
 
-        { $Handle.RaiseEvent($DownArgs) } | Should -Not -Throw
+        { $Handle.RaiseEvent($DeltaArgs) } | Should -Not -Throw
+        $Target.Width | Should -Be -ExpectedValue 115
+        $Target.Height | Should -Be -ExpectedValue 36
     }
 
     It 'Should clamp target size to a 20px minimum' {
@@ -129,10 +130,13 @@ Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
         $Target.Height = 26
         $Canvas.Children.Add($Target) | Out-Null
 
-        New-WpfDesignerResizeHandle -Canvas $Canvas -Target $Target | Out-Null
+        $Handle = New-WpfDesignerResizeHandle -Canvas $Canvas -Target $Target
 
-        # Directly exercise the clamp math used by the handle's MouseMove handler.
-        $Clamped = [System.Math]::Max(20, 5 - 500)
-        $Clamped | Should -Be -ExpectedValue 20
+        $DeltaArgs = [System.Windows.Controls.Primitives.DragDeltaEventArgs]::new(-500, -500)
+        $DeltaArgs.RoutedEvent = [System.Windows.Controls.Primitives.Thumb]::DragDeltaEvent
+        $Handle.RaiseEvent($DeltaArgs)
+
+        $Target.Width | Should -Be -ExpectedValue 20
+        $Target.Height | Should -Be -ExpectedValue 20
     }
 }

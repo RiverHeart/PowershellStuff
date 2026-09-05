@@ -9,7 +9,7 @@ function Update-WpfDesignerResizeHandlePosition {
     [OutputType([void])]
     param(
         [Parameter(Mandatory)]
-        [System.Windows.Controls.Border] $Handle,
+        [System.Windows.Controls.Primitives.Thumb] $Handle,
 
         [Parameter(Mandatory)]
         [System.Windows.FrameworkElement] $Target

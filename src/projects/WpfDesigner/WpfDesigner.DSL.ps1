@@ -9,9 +9,7 @@ if ($PWD -ne $PSScriptRoot) {
     Set-Location -Path $PSScriptRoot
 }
 
-if (-not (Get-Module -Name WPF)) {
-    Import-Module "$PSScriptRoot/../../modules/WPF" -ErrorAction Stop -Force
-}
+Import-Module "$PSScriptRoot/../../modules/WPF" -ErrorAction Stop -Force
 
 Import "$PSScriptRoot/functions"
 
@@ -24,19 +22,9 @@ App 'Window' {
         SelectedElement = $null
     }
 
-    Resources {
-        # Scoped to this Window so it only affects Labels placed on the design surface.
-        Style Label {
-            BorderBrush: '#999999'
-            BorderThickness: 1
-            Padding: 4
-
-            Trigger IsMouseOver $true {
-                BorderBrush: '#2563EB'
-                Background: '#EFF6FF'
-            }
-        }
-    }
+    # Called here (rather than at top-level script scope) so its Resources
+    # block picks up $this = Window and scopes styles to Window.Resources.
+    Import "$PSScriptRoot/WpfDesigner.Styles.ps1"
 
     Content {
         Grid 'DesignerGrid' {
