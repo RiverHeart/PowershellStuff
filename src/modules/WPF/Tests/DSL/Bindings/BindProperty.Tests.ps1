@@ -146,6 +146,36 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $BindingApplied.Path.Path | Should -Be 'Value'
     }
 
+    It 'Should bind inside a FrameworkElementFactory template context' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "ButtonTextBindingTemplate_$Id"
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    TextBlock 'TemplateText' {
+                        BindProperty Text Content -TemplatedParent
+                    }
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Button.Content = 'ClickMe'
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateText = $Button.Template.FindName('TemplateText', $Button)
+
+        $TemplateText | Should -Not -BeNullOrEmpty
+        $TemplateText.Text | Should -Be 'ClickMe'
+
+        $BindingApplied = [System.Windows.Data.BindingOperations]::GetBinding($TemplateText, [System.Windows.Controls.TextBlock]::TextProperty)
+        $BindingApplied.Path.Path | Should -Be 'Content'
+        $BindingApplied.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::TemplatedParent)
+    }
+
     It 'Should bind owner-qualified attached-property targets' {
         $Button = [System.Windows.Controls.Button]::new()
         $State = New-WPFObservableState @{

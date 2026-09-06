@@ -30,6 +30,28 @@ function TextBlock {
         return
     }
 
+    # Factory mode: inside a Template/HierarchicalItemTemplate block, produce a
+    # FrameworkElementFactory instead of a live TextBlock instance.
+    if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
+        if ($Name -ne '__Nameless__') {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.TextBlock], $Name)
+        } else {
+            $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.TextBlock])
+        }
+
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        if ($Parent) {
+            Write-Debug "Factory auto-attach: $Name (TextBlock) -> $($Parent.GetType().Name)"
+            Add-WPFObject $Parent $Factory
+        }
+
+        Write-Debug "Processing factory children for $Name (TextBlock)"
+        Update-WPFObject $Factory $ScriptBlock
+
+        if (-not $Parent) { return $Factory }
+        return
+    }
+
     try {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
         if ($Name -ne '__Nameless__') {

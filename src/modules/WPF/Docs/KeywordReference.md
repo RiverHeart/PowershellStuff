@@ -39,6 +39,7 @@ Scope of this page:
     * [GridViewColumnHeader](#gridviewcolumnheader)
     * [TreeView](#treeview)
     * [TreeViewItem](#treeviewitem)
+    * [HierarchicalItemTemplate](#hierarchicalitemtemplate)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
     * [MenuItem](#menuitem)
@@ -561,41 +562,25 @@ blocks are added to the `Items` collection.
 
 ```powershell
 TreeView 'FileTree' {
-    TreeViewItem 'Root' {
-        $this.Header = 'Root'
-    }
-}
-```
+    TreeViewItem 'src' {
+        $this.Header = 'src'
 
-TreeView has no built-in `HierarchicalDataTemplate` support, so wiring an
-object graph means recursively creating `TreeViewItem` blocks and binding each
-one's `DataContext` to a node. `BindProperty` then reads `Header` (and any
-other property) from that node:
+        TreeViewItem 'Public' {
+            $this.Header = 'Public'
+        }
 
-```powershell
-$Root = [pscustomobject] @{
-    Header   = 'src'
-    Children = @(
-        [pscustomobject] @{ Header = 'Public'; Children = @() }
-        [pscustomobject] @{ Header = 'Private'; Children = @() }
-    )
-}
-
-function New-FileTreeItem($Node) {
-    TreeViewItem {
-        $this.DataContext = $Node
-        BindProperty Header Header
-
-        foreach ($Child in $Node.Children) {
-            New-FileTreeItem $Child
+        TreeViewItem 'Private' {
+            $this.Header = 'Private'
         }
     }
 }
-
-TreeView 'FileTree' {
-    New-FileTreeItem $Root
-}
 ```
+
+This manual, nested-`TreeViewItem` form is a good fit for a small or fixed
+tree shape known ahead of time. For a tree built from an arbitrary object
+graph (for example, a recursive `Children` property of unknown depth), use
+[HierarchicalItemTemplate](#hierarchicalitemtemplate) instead of hand-writing
+recursive `TreeViewItem` code.
 
 ### TreeViewItem
 
@@ -612,9 +597,50 @@ TreeViewItem 'Documents' {
 }
 ```
 
-See the [TreeView](#treeview) example above for wiring a `TreeViewItem` to a
-data object via `DataContext` and `BindProperty` instead of setting `Header`
-directly.
+### HierarchicalItemTemplate
+
+Creates a `HierarchicalDataTemplate` for a `TreeView` or `TreeViewItem` and
+auto-attaches it to the parent's `ItemTemplate`. Rather than manually creating
+a `TreeViewItem` per node, set `ItemsSource` on the `TreeView` and describe how
+to render *one* node; WPF applies that description recursively, generating
+`TreeViewItem` containers lazily as branches are expanded:
+
+```powershell
+$Root = [pscustomobject] @{
+    Header   = 'src'
+    Children = @(
+        [pscustomobject] @{ Header = 'Public'; Children = @() }
+        [pscustomobject] @{ Header = 'Private'; Children = @() }
+    )
+}
+
+TreeView 'FileTree' {
+    $this.ItemsSource = @($Root)
+
+    HierarchicalItemTemplate 'Children' {
+        TextBlock {
+            BindProperty Text Header
+        }
+    }
+}
+```
+
+The first argument is the property on each data item that holds its child
+collection. The nested block builds the per-node visual using factory-mode
+controls (currently `TextBlock`) — the same mechanism `Template` uses to build
+a `ControlTemplate`'s visual tree — so `BindProperty` and the colon shorthand
+(`Text: 'value'`) work as usual, but `$this.Property = value` does not, since
+the block is building a reusable template recipe rather than a live control.
+
+Compared to hand-written recursion (building `TreeViewItem` objects yourself
+and iterating child collections in PowerShell), `HierarchicalItemTemplate`:
+
+- generates containers lazily, only for expanded nodes, instead of eagerly
+  materializing every `TreeViewItem` up front
+- reflects later additions/removals automatically when the child collection is
+  an `ObservableCollection`
+- is defined once per `TreeView`/`TreeViewItem`, instead of being re-derived by
+  every caller that needs a tree
 
 ### DatePicker
 

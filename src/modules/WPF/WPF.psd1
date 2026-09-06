@@ -136,6 +136,7 @@ FunctionsToExport = @(
     'Thumb'
     'TreeView'
     'TreeViewItem'
+    'HierarchicalItemTemplate'
     'Window'
 
     # DSL/Helpers

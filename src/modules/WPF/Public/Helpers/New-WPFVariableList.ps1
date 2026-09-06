@@ -40,7 +40,8 @@ function New-WPFVariableList {
     # Propagate factory context so nested DSL keywords (Border, ContentPresenter,
     # etc.) produce FrameworkElementFactory nodes instead of live instances.
     if ($InputObject -is [System.Windows.FrameworkElementFactory] -or
-        $InputObject -is [System.Windows.Controls.ControlTemplate]
+        $InputObject -is [System.Windows.Controls.ControlTemplate] -or
+        $InputObject -is [System.Windows.DataTemplate]
     ) {
         $PSVars.Add([psvariable]::new('WPFFactoryContext', $true))
     }
