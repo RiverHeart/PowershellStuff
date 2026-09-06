@@ -134,6 +134,8 @@ FunctionsToExport = @(
     'TextBlock'
     'TextBox'
     'Thumb'
+    'TreeView'
+    'TreeViewItem'
     'Window'
 
     # DSL/Helpers

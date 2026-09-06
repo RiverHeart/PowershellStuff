@@ -37,6 +37,8 @@ Scope of this page:
     * [GridView](#gridview)
     * [GridViewColumn](#gridviewcolumn)
     * [GridViewColumnHeader](#gridviewcolumnheader)
+    * [TreeView](#treeview)
+    * [TreeViewItem](#treeviewitem)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
     * [MenuItem](#menuitem)
@@ -551,6 +553,68 @@ GridViewColumn {
     }
 }
 ```
+
+### TreeView
+
+Creates a TreeView. Supports named and nameless forms. Nested `TreeViewItem`
+blocks are added to the `Items` collection.
+
+```powershell
+TreeView 'FileTree' {
+    TreeViewItem 'Root' {
+        $this.Header = 'Root'
+    }
+}
+```
+
+TreeView has no built-in `HierarchicalDataTemplate` support, so wiring an
+object graph means recursively creating `TreeViewItem` blocks and binding each
+one's `DataContext` to a node. `BindProperty` then reads `Header` (and any
+other property) from that node:
+
+```powershell
+$Root = [pscustomobject] @{
+    Header   = 'src'
+    Children = @(
+        [pscustomobject] @{ Header = 'Public'; Children = @() }
+        [pscustomobject] @{ Header = 'Private'; Children = @() }
+    )
+}
+
+function New-FileTreeItem($Node) {
+    TreeViewItem {
+        $this.DataContext = $Node
+        BindProperty Header Header
+
+        foreach ($Child in $Node.Children) {
+            New-FileTreeItem $Child
+        }
+    }
+}
+
+TreeView 'FileTree' {
+    New-FileTreeItem $Root
+}
+```
+
+### TreeViewItem
+
+Creates a TreeViewItem. Set `$this.Header` to control the displayed text and
+nest further `TreeViewItem` blocks to build hierarchy.
+
+```powershell
+TreeViewItem 'Documents' {
+    $this.Header = 'Documents'
+
+    TreeViewItem 'ReadmeFile' {
+        $this.Header = 'README.md'
+    }
+}
+```
+
+See the [TreeView](#treeview) example above for wiring a `TreeViewItem` to a
+data object via `DataContext` and `BindProperty` instead of setting `Header`
+directly.
 
 ### DatePicker
 
