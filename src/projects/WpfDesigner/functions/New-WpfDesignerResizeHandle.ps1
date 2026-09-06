@@ -23,9 +23,10 @@ function New-WpfDesignerResizeHandle {
         [System.Windows.FrameworkElement] $Target
     )
 
-    # Thumb() auto-attaches to $this when set, so clear it first to guarantee
-    # the handle stays unparented until we explicitly place it below.
-    $this = $null
+    # Thumb() auto-attaches to the ambient WPFAutoAttachContext when set, so
+    # clear it first to guarantee the handle stays unparented until we
+    # explicitly place it below.
+    $WPFAutoAttachContext = $null
     $Handle = Thumb {
         $this.Width = 8
         $this.Height = 8
@@ -36,6 +37,7 @@ function New-WpfDesignerResizeHandle {
     }
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Handle
+    Add-WpfDesignerOverlayMarker -InputObject $Handle
     BringToFront -InputObject $Handle
     Update-WpfDesignerResizeHandlePosition -Handle $Handle -Target $Target -Canvas $Canvas
 

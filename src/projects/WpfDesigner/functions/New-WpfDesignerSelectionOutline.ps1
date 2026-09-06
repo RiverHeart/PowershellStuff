@@ -24,9 +24,10 @@ function New-WpfDesignerSelectionOutline {
         [System.Windows.FrameworkElement] $Target
     )
 
-    # Border() auto-attaches to $this when set, so clear it first to guarantee
-    # the outline stays unparented until we explicitly place it below.
-    $this = $null
+    # Border() auto-attaches to the ambient WPFAutoAttachContext when set, so
+    # clear it first to guarantee the outline stays unparented until we
+    # explicitly place it below.
+    $WPFAutoAttachContext = $null
     $Outline = Border {
         $this.BorderBrush = '#F59E0B'
         $this.BorderThickness = 2
@@ -34,6 +35,7 @@ function New-WpfDesignerSelectionOutline {
     }
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Outline
+    Add-WpfDesignerOverlayMarker -InputObject $Outline
     BringToFront -InputObject $Outline
     Update-WpfDesignerSelectionOutlinePosition -Outline $Outline -Target $Target -Canvas $Canvas
 

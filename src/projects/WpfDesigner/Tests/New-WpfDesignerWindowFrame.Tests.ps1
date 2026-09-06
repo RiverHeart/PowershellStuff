@@ -7,6 +7,7 @@ Describe 'New-WpfDesignerWindowFrame' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/New-WpfDesignerWindowFrame.ps1"
         . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"

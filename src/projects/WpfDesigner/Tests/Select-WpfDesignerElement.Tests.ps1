@@ -6,6 +6,7 @@ Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
     BeforeAll {
         . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
@@ -90,6 +91,7 @@ Describe 'Clear-WpfDesignerSelection' -Tag 'WpfDesigner' {
     BeforeAll {
         . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
@@ -147,6 +149,7 @@ Describe 'New-WpfDesignerSelectionOutline' -Tag 'WpfDesigner' {
     }
 
     BeforeAll {
+        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
         . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
@@ -200,6 +203,7 @@ Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
     }
 
     BeforeAll {
+        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"

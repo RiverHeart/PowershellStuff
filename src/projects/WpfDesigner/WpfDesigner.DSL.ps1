@@ -5,6 +5,8 @@ using namespace System.Windows
     Entry point for the WPF Designer project.
 #>
 
+$DebugPreference = 'Continue'
+
 if ($PWD -ne $PSScriptRoot) {
     Set-Location -Path $PSScriptRoot
 }

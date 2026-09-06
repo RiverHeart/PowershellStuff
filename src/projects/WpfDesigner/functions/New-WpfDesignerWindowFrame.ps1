@@ -22,14 +22,16 @@ function New-WpfDesignerWindowFrame {
         [object] $State
     )
 
-    # Border() auto-attaches to $this when set, so clear it first to guarantee
-    # the frame stays unparented until we place it on the canvas below. Left
-    # nameless (like the resize handle Thumb) since there's only ever one and
-    # it's tracked via State.WindowFrame instead of by-name lookup.
+    # Left nameless (like the resize handle Thumb) since there's only ever one
+    # and it's tracked via State.WindowFrame instead of by-name lookup.
     #
     # Sized to comfortably fit inside the default window's viewport pane so it
     # doesn't overflow into neighboring panes before the user resizes anything.
-    $this = $null
+    #
+    # Shadow the ambient WPFAutoAttachContext (the Canvas, injected via this
+    # function's own caller frame) so Border returns unparented instead of
+    # auto-attaching to it - Add-WPFObject below is what actually places it.
+    $WPFAutoAttachContext = $null
     $Frame = Border {
         $this.Width = 480
         $this.Height = 360

@@ -11,6 +11,7 @@ Describe 'Add-WpfDesignerStackPanel' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/Add-WpfDesignerStackPanel.ps1"
         . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"

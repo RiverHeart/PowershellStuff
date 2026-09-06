@@ -36,10 +36,10 @@ function Add-WpfDesignerControl {
         [switch] $Container
     )
 
-    # The DSL keyword function (Label, StackPanel, ...) auto-attaches to $this
-    # when set, so clear it first to guarantee the new element stays
-    # unparented until we place it on the canvas below.
-    $this = $null
+    # The DSL keyword function (Label, StackPanel, ...) auto-attaches to the
+    # ambient WPFAutoAttachContext when set, so clear it first to guarantee
+    # the new element stays unparented until we place it on the canvas below.
+    $WPFAutoAttachContext = $null
     $NewElement = & $Type $Configure
 
     if ($Container) {
