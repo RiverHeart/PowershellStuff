@@ -9,6 +9,8 @@ Describe 'New-WpfDesignerWindowFrame' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
+        . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
+        . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
     }
 
     It 'Should add a Border frame to the canvas and position it' {
@@ -44,7 +46,7 @@ Describe 'New-WpfDesignerWindowFrame' -Tag 'WpfDesigner' {
         $Frame.RaiseEvent($DownArgs)
 
         $State.SelectedElement | Should -Be -ExpectedValue $Frame
-        $Canvas.Children.Count | Should -Be -ExpectedValue 2
+        $Canvas.Children.Count | Should -Be -ExpectedValue 3
         $DownArgs.Handled | Should -Be -ExpectedValue $true
     }
 

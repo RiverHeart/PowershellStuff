@@ -4,11 +4,14 @@ Describe 'Add-WpfDesignerLabel' -Tag 'WpfDesigner' {
     }
 
     BeforeAll {
+        . "$PSScriptRoot/../functions/Add-WpfDesignerControl.ps1"
         . "$PSScriptRoot/../functions/Add-WpfDesignerLabel.ps1"
         . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
+        . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
+        . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
     }
 
     It 'Should add a Label to the canvas and position it' {

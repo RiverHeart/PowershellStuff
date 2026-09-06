@@ -60,6 +60,15 @@ App 'Window' {
                                 }
                             }
 
+                            Button 'AddStackPanelButton' {
+                                $this.Content = '+ StackPanel'
+                                $this.Margin = 0, 4, 0, 0
+
+                                On Click {
+                                    Add-WpfDesignerStackPanel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag
+                                }
+                            }
+
                             Button 'ExportButton' {
                                 $this.Content = 'Export'
                                 $this.Margin = 0, 8, 0, 0

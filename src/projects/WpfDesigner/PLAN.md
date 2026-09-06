@@ -80,12 +80,22 @@ among other things." The frame is a resizable `Border` (reuse the existing resiz
 mechanics) that represents the exported `Window`'s bounds. Nothing can be placed "outside"
 it conceptually, but loose elements can still sit elsewhere on the canvas.
 
-### Slice B — Generalize control creation
+### Slice B — Generalize control creation (done)
 
 Turn `Add-WpfDesignerLabel` into a general "add control of type `X`" path so `StackPanel`
 isn't a one-off copy-pasted function. Toolbar gains a second button. No placement-target
 logic yet — new controls still land in a fixed default spot (this slice is just about not
 duplicating creation code per control type).
+
+Landed as `Add-WpfDesignerControl` (shared placement/selection/drag/resize wiring, taking a
+`-Type` name and a `-Configure` scriptblock for type-specific defaults), with
+`Add-WpfDesignerLabel` and `Add-WpfDesignerStackPanel` as thin per-type wrappers. Along the
+way, selection highlighting was reworked from mutating the target's own
+BorderBrush/BorderThickness (which `StackPanel`, a bare `Panel`, doesn't have) to a separate
+non-hit-testable `Border` overlay (`New-WpfDesignerSelectionOutline`) positioned over the
+target — the same sibling-overlay approach already used for the resize handle. This makes
+selection work uniformly for any future control/container type regardless of what DPs it
+exposes.
 
 ### Slice C — Container-aware placement
 

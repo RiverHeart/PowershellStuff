@@ -25,10 +25,15 @@ function Limit-WPFNumber {
 
         [double] $Minimum = [double]::NegativeInfinity,
 
-        [double] $Maximum = [double]::PositiveInfinity
+        [double] $Maximum = [double]::PositiveInfinity,
+
+        [int] $Precision = 0
     )
 
     process {
-        [System.Math]::Min($Maximum, [System.Math]::Max($Minimum, $Value))
+        [System.Math]::Round(
+            [System.Math]::Min($Maximum, [System.Math]::Max($Minimum, $Value)),
+            $Precision
+        )
     }
 }

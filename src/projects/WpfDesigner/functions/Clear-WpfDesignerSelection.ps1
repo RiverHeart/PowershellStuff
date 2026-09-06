@@ -24,26 +24,14 @@ function Clear-WpfDesignerSelection {
         return
     }
 
-    # Border (used by the Window frame) defines its own BorderBrush/BorderThickness
-    # dependency properties rather than sharing Control's, so restore whichever local
-    # value (if any) Select-WpfDesignerElement stashed instead of assuming Control's.
-    $BorderBrushProperty = if ($Previous -is [System.Windows.Controls.Border]) { [System.Windows.Controls.Border]::BorderBrushProperty } else { [System.Windows.Controls.Control]::BorderBrushProperty }
-    $BorderThicknessProperty = if ($Previous -is [System.Windows.Controls.Border]) { [System.Windows.Controls.Border]::BorderThicknessProperty } else { [System.Windows.Controls.Control]::BorderThicknessProperty }
-
-    $PreviousBorderBrushProperty = $Previous.PSObject.Properties['_WPFDesignerPreviousBorderBrush']
-    $PreviousBorderBrush = if ($PreviousBorderBrushProperty) { $PreviousBorderBrushProperty.Value } else { [System.Windows.DependencyProperty]::UnsetValue }
-    if ($PreviousBorderBrush -eq [System.Windows.DependencyProperty]::UnsetValue) {
-        $Previous.ClearValue($BorderBrushProperty)
-    } else {
-        $Previous.SetValue($BorderBrushProperty, $PreviousBorderBrush)
+    $OutlineSizeChangedHandlerProperty = $Previous.PSObject.Properties['_WPFDesignerSelectionOutlineSizeChangedHandler']
+    if ($OutlineSizeChangedHandlerProperty -and $OutlineSizeChangedHandlerProperty.Value) {
+        $Previous.remove_SizeChanged($OutlineSizeChangedHandlerProperty.Value)
     }
 
-    $PreviousBorderThicknessProperty = $Previous.PSObject.Properties['_WPFDesignerPreviousBorderThickness']
-    $PreviousBorderThickness = if ($PreviousBorderThicknessProperty) { $PreviousBorderThicknessProperty.Value } else { [System.Windows.DependencyProperty]::UnsetValue }
-    if ($PreviousBorderThickness -eq [System.Windows.DependencyProperty]::UnsetValue) {
-        $Previous.ClearValue($BorderThicknessProperty)
-    } else {
-        $Previous.SetValue($BorderThicknessProperty, $PreviousBorderThickness)
+    $OutlineProperty = $Previous.PSObject.Properties['_WPFDesignerSelectionOutline']
+    if ($OutlineProperty -and $OutlineProperty.Value) {
+        $Canvas.Children.Remove($OutlineProperty.Value)
     }
 
     $SizeChangedHandlerProperty = $Previous.PSObject.Properties['_WPFDesignerResizeHandleSizeChangedHandler']
