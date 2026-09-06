@@ -43,6 +43,7 @@ function New-WpfDesignerResizeHandle {
     # Update-WpfDesignerResizeHandlePosition must be captured as a scriptblock
     # reference here rather than called by name below.
     $UpdatePosition = ${function:Update-WpfDesignerResizeHandlePosition}
+    $ClampValue = ${function:Limit-WPFNumber}
 
     # Thumb.DragDelta gives incremental change since the last event, so no
     # anchor/mouse-capture bookkeeping is needed here.
@@ -60,8 +61,8 @@ function New-WpfDesignerResizeHandle {
         $MaxWidth = if ($Canvas.ActualWidth -gt 0) { [System.Math]::Max(20, $Canvas.ActualWidth - $Left) } else { [double]::PositiveInfinity }
         $MaxHeight = if ($Canvas.ActualHeight -gt 0) { [System.Math]::Max(20, $Canvas.ActualHeight - $Top) } else { [double]::PositiveInfinity }
 
-        $Target.Width = [System.Math]::Min($MaxWidth, [System.Math]::Max(20, $Target.Width + $e.HorizontalChange))
-        $Target.Height = [System.Math]::Min($MaxHeight, [System.Math]::Max(20, $Target.Height + $e.VerticalChange))
+        $Target.Width = & $ClampValue -Value ($Target.Width + $e.HorizontalChange) -Minimum 20 -Maximum $MaxWidth
+        $Target.Height = & $ClampValue -Value ($Target.Height + $e.VerticalChange) -Minimum 20 -Maximum $MaxHeight
         & $UpdatePosition -Handle $sender -Target $Target
     }.GetNewClosure()
 

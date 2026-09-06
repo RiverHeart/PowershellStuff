@@ -200,6 +200,7 @@ FunctionsToExport = @(
     'Get-WPFFileSelection'
     'Get-WPFTextInput'
     'Get-WPFCompletionType'
+    'Limit-WPFNumber'
     'New-WPFObservableState'
     'New-WPFPoint'
     'New-WPFProject'

@@ -28,6 +28,11 @@ function Add-WpfDesignerPropertyMinimum {
         [object] $State
     )
 
+    # GetNewClosure() detaches the handler from module scope, so
+    # Get-WpfDesignerClampedValue must be captured as a scriptblock reference
+    # here rather than called by name below.
+    $ClampValue = ${function:Limit-WPFNumber}
+
     On -Event LostFocus -InputObject $InputObject -ScriptBlock {
         param($sender, $e)
 
@@ -38,7 +43,7 @@ function Add-WpfDesignerPropertyMinimum {
 
         $Value = 0.0
         if ([double]::TryParse($sender.Text, [ref] $Value)) {
-            $Target.$PropertyName = [System.Math]::Max($Minimum, $Value)
+            $Target.$PropertyName = & $ClampValue -Value $Value -Minimum $Minimum
         }
     }.GetNewClosure()
 }
