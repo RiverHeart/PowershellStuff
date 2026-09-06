@@ -7,9 +7,10 @@ using namespace System.Windows.Controls
 .DESCRIPTION
     Adds a small square Thumb to the canvas, pinned to the target's
     bottom-right corner. Dragging the handle adjusts the target's Width and
-    Height (clamped to a 20px minimum) and keeps the handle pinned as the
-    target's size changes, from a drag or any other source (e.g. the
-    property panel).
+    Height (clamped to a 20px minimum, and to whatever fits within the
+    Canvas's actual bounds once it's been laid out) and keeps the handle
+    pinned as the target's size changes, from a drag or any other source
+    (e.g. the property panel).
 #>
 function New-WpfDesignerResizeHandle {
     [CmdletBinding()]
@@ -48,8 +49,19 @@ function New-WpfDesignerResizeHandle {
     On -Event DragDelta -InputObject $Handle -ScriptBlock {
         param($sender, $e)
 
-        $Target.Width = [System.Math]::Max(20, $Target.Width + $e.HorizontalChange)
-        $Target.Height = [System.Math]::Max(20, $Target.Height + $e.VerticalChange)
+        $Left = [System.Windows.Controls.Canvas]::GetLeft($Target)
+        if ([double]::IsNaN($Left)) { $Left = 0.0 }
+        $Top = [System.Windows.Controls.Canvas]::GetTop($Target)
+        if ([double]::IsNaN($Top)) { $Top = 0.0 }
+
+        # ActualWidth/Height are 0 until the Canvas has been laid out (e.g. in
+        # tests without a real PresentationSource), which would otherwise
+        # clamp every resize to 20px. Treat that as "no bound yet" instead.
+        $MaxWidth = if ($Canvas.ActualWidth -gt 0) { [System.Math]::Max(20, $Canvas.ActualWidth - $Left) } else { [double]::PositiveInfinity }
+        $MaxHeight = if ($Canvas.ActualHeight -gt 0) { [System.Math]::Max(20, $Canvas.ActualHeight - $Top) } else { [double]::PositiveInfinity }
+
+        $Target.Width = [System.Math]::Min($MaxWidth, [System.Math]::Max(20, $Target.Width + $e.HorizontalChange))
+        $Target.Height = [System.Math]::Min($MaxHeight, [System.Math]::Max(20, $Target.Height + $e.VerticalChange))
         & $UpdatePosition -Handle $sender -Target $Target
     }.GetNewClosure()
 

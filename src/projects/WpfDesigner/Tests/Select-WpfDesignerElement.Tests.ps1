@@ -94,6 +94,26 @@ Describe 'Clear-WpfDesignerSelection' -Tag 'WpfDesigner' {
 
         { Clear-WpfDesignerSelection -Canvas $Canvas -State $State } | Should -Not -Throw
     }
+
+    It 'Should restore a Border target''s own local BorderBrush/BorderThickness instead of Control''s' {
+        # Border defines its own BorderBrush/BorderThickness dependency properties
+        # rather than sharing Control's, so ClearValue(Control's DP) would silently
+        # leave the selection color in place instead of restoring the local value.
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Target = [System.Windows.Controls.Border]::new()
+        $Target.Width = 100
+        $Target.Height = 26
+        $Target.BorderBrush = 'Black'
+        $Target.BorderThickness = 3
+        $Canvas.Children.Add($Target) | Out-Null
+        $State = @{ SelectedElement = $null }
+        Select-WpfDesignerElement -Canvas $Canvas -Target $Target -State $State
+
+        Clear-WpfDesignerSelection -Canvas $Canvas -State $State
+
+        $Target.BorderBrush.ToString() | Should -Be -ExpectedValue '#FF000000'
+        $Target.BorderThickness.Left | Should -Be -ExpectedValue 3
+    }
 }
 
 Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
@@ -168,5 +188,39 @@ Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
 
         [System.Windows.Controls.Canvas]::GetLeft($Handle) | Should -Be -ExpectedValue (160 - ($Handle.Width / 2))
         [System.Windows.Controls.Canvas]::GetTop($Handle) | Should -Be -ExpectedValue (40 - ($Handle.Height / 2))
+    }
+
+    It 'Should clamp resize to the canvas''s actual bounds once laid out' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Target = [System.Windows.Controls.Label]::new()
+        $Target.Width = 100
+        $Target.Height = 26
+        [System.Windows.Controls.Canvas]::SetLeft($Target, 250)
+        [System.Windows.Controls.Canvas]::SetTop($Target, 260)
+        $Canvas.Children.Add($Target) | Out-Null
+
+        $Handle = New-WpfDesignerResizeHandle -Canvas $Canvas -Target $Target
+
+        $HwndSourceParams = [System.Windows.Interop.HwndSourceParameters]::new('WpfDesignerResizeClampTest')
+        $HwndSourceParams.Width = 300
+        $HwndSourceParams.Height = 300
+        $HwndSource = [System.Windows.Interop.HwndSource]::new($HwndSourceParams)
+        try {
+            $HwndSource.RootVisual = $Canvas
+            $Canvas.Width = 300
+            $Canvas.Height = 300
+            $Canvas.UpdateLayout()
+
+            # Target sits at (250, 260) in a 300x300 canvas, so only 50x40 of
+            # room remains before hitting the canvas edge.
+            $DeltaArgs = [System.Windows.Controls.Primitives.DragDeltaEventArgs]::new(500, 500)
+            $DeltaArgs.RoutedEvent = [System.Windows.Controls.Primitives.Thumb]::DragDeltaEvent
+            $Handle.RaiseEvent($DeltaArgs)
+        } finally {
+            $HwndSource.Dispose()
+        }
+
+        $Target.Width | Should -Be -ExpectedValue 50
+        $Target.Height | Should -Be -ExpectedValue 40
     }
 }

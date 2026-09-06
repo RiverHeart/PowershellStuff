@@ -15,11 +15,13 @@ Import "$PSScriptRoot/functions"
 
 App 'Window' {
     $this.Title = 'WPF Designer'
+    $this.WindowState = [WindowState]::Maximized
     $this.WindowStartupLocation = [WindowStartupLocation]::CenterScreen
     $this.Width = 1000
     $this.Height = 700
     State @{
         SelectedElement = $null
+        WindowFrame     = $null
     }
 
     # Called here (rather than at top-level script scope) so its Resources
@@ -77,6 +79,12 @@ App 'Window' {
 
                         Canvas 'DesignSurface' {
                             $this.Background = 'Transparent'
+
+                            # Canvas doesn't clip its children by default, so without this an
+                            # oversized/dragged-to-the-edge element would bleed into neighboring panes.
+                            $this.ClipToBounds = $true
+
+                            New-WpfDesignerWindowFrame -Canvas $this -State (Reference 'Window').Tag
 
                             # Deselect when clicking empty canvas. Suppressed for clicks on a
                             # control because Draggable marks that event Handled first.

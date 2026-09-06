@@ -73,7 +73,7 @@ need real rework, not just extension:
 
 Rough dependency order; each should land with its own tests before the next starts.
 
-### Slice A — Abstract Window frame on the canvas
+### Slice A — Abstract Window frame on the canvas (done)
 
 Replace "the `Canvas` is the whole design surface" with "the `Canvas` hosts a Window frame,
 among other things." The frame is a resizable `Border` (reuse the existing resize `Thumb`

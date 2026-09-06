@@ -36,6 +36,8 @@ depends on the WPF module's public commands and DSL keywords.
 - [x] Panel fields commit on Enter without requiring focus loss.
 - [x] Export the design as runnable DSL script text, copied to the clipboard
   (`ConvertTo-WpfDesignerScript`).
+- [x] Abstract Window frame on the canvas: a resizable/selectable `Border` standing in for
+  the exported `Window`'s bounds (`New-WpfDesignerWindowFrame`, PLAN.md Slice A).
 
 ## Todo
 

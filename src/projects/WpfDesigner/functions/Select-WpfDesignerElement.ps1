@@ -31,6 +31,15 @@ function Select-WpfDesignerElement {
         Clear-WpfDesignerSelection -Canvas $Canvas -State $State
     }
 
+    # Border (used by the Window frame) defines its own BorderBrush/BorderThickness
+    # dependency properties rather than sharing Control's, so the correct pair must be
+    # read here and stashed for Clear-WpfDesignerSelection to restore on deselect.
+    $BorderBrushProperty = if ($Target -is [System.Windows.Controls.Border]) { [System.Windows.Controls.Border]::BorderBrushProperty } else { [System.Windows.Controls.Control]::BorderBrushProperty }
+    $BorderThicknessProperty = if ($Target -is [System.Windows.Controls.Border]) { [System.Windows.Controls.Border]::BorderThicknessProperty } else { [System.Windows.Controls.Control]::BorderThicknessProperty }
+
+    $Target | Add-Member -NotePropertyName '_WPFDesignerPreviousBorderBrush' -NotePropertyValue $Target.ReadLocalValue($BorderBrushProperty) -Force
+    $Target | Add-Member -NotePropertyName '_WPFDesignerPreviousBorderThickness' -NotePropertyValue $Target.ReadLocalValue($BorderThicknessProperty) -Force
+
     $Target.BorderBrush = '#F59E0B'
     $Target.BorderThickness = 2
 
