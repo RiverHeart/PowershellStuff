@@ -12,13 +12,13 @@ function Update-WpfDesignerResizeHandlePosition {
         [System.Windows.Controls.Primitives.Thumb] $Handle,
 
         [Parameter(Mandatory)]
-        [System.Windows.FrameworkElement] $Target
+        [System.Windows.FrameworkElement] $Target,
+
+        [Parameter(Mandatory)]
+        [System.Windows.Controls.Canvas] $Canvas
     )
 
-    $Left = [System.Windows.Controls.Canvas]::GetLeft($Target)
-    $Top = [System.Windows.Controls.Canvas]::GetTop($Target)
-    if ([double]::IsNaN($Left)) { $Left = 0.0 }
-    if ([double]::IsNaN($Top)) { $Top = 0.0 }
+    $Position = Get-WpfDesignerCanvasRelativePosition -Canvas $Canvas -Target $Target
 
-    CanvasPosition -Left ($Left + $Target.Width - ($Handle.Width / 2)) -Top ($Top + $Target.Height - ($Handle.Height / 2)) -InputObject $Handle
+    CanvasPosition -Left ($Position.X + $Target.Width - ($Handle.Width / 2)) -Top ($Position.Y + $Target.Height - ($Handle.Height / 2)) -InputObject $Handle
 }

@@ -10,6 +10,7 @@ Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
     }
 
     It 'Should mark the target as selected and add a selection outline and resize handle' {
@@ -93,6 +94,7 @@ Describe 'Clear-WpfDesignerSelection' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
     }
 
     It 'Should remove the outline and resize handle and clear selection state' {
@@ -147,6 +149,7 @@ Describe 'New-WpfDesignerSelectionOutline' -Tag 'WpfDesigner' {
     BeforeAll {
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
     }
 
     It 'Should not be hit-test visible, so it never intercepts clicks meant for the target' {
@@ -199,6 +202,7 @@ Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
     BeforeAll {
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
     }
 
     It 'Should resize the target when the handle is dragged' {

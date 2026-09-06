@@ -97,12 +97,33 @@ target — the same sibling-overlay approach already used for the resize handle.
 selection work uniformly for any future control/container type regardless of what DPs it
 exposes.
 
-### Slice C — Container-aware placement
+### Slice C — Container-aware placement (done)
 
 Make control creation selection-sensitive: child-of-selection when the selection is a valid
 container (Window frame or `StackPanel`), floating-on-canvas otherwise. This is where
 `Select-WpfDesignerElement` needs to distinguish container-capable selections from leaf
 selections.
+
+Landed as a PSTypeName marker (`Custom.WpfDesigner.Container`, via
+`Add-WpfDesignerContainerMarker`/`Test-WpfDesignerContainer`) rather than a hardcoded type
+list — scoped to this project since the WPF module's own `Custom.WPF.*` marker system
+(`Add-WPFType`/`Test-WPFType`) is closed to a fixed `ValidateSet`. `Add-WpfDesignerControl`
+checks the current selection against the marker plus `Test-WpfDesignerContainerCapacity`
+(a `Border`, used by the Window frame, only has one `Child` slot; a `Panel` like
+`StackPanel` doesn't) before deciding whether to nest the new element via `Add-WPFObject` or
+fall back to floating on the canvas.
+
+Nesting exposed a real gap in the resize-handle/selection-outline overlay math: both were
+positioned via `Canvas.GetLeft/Top` on the target, which is meaningless once the target's
+actual parent is a `StackPanel` instead of the `Canvas`. `Get-WpfDesignerCanvasRelativePosition`
+now resolves a target's position relative to the root `Canvas` via `TransformToVisual` for
+non-Canvas-parented targets (requires a completed layout pass, same caveat as
+`ActualWidth`/`ActualHeight` elsewhere in this project), falling back to the existing fast
+path for direct canvas children. `Draggable` already refuses to drag anything whose
+`.Parent` isn't literally a `Canvas` (silent warn + no-op), so nested children are
+resize-only for now — reordering children within a container by dragging (the `StackPanel`
+equivalent of free positioning) is out of scope here and would need its own slice if wanted
+later.
 
 ### Slice D — Detach-to-floating
 
@@ -130,7 +151,9 @@ future work — not started until A–E are solid.
   later — likely needs an explicit marker (compare to the WPF module's own
   `Custom.WPF.CollectorOwner` pattern for collector-owner keywords) rather than a hardcoded
   type check list, so it doesn't need revisiting every time a new container type is added.
-  - The solution to this should be discussed with the user.
+  - Resolved in Slice C: a project-scoped `Custom.WpfDesigner.Container` PSTypeName marker
+    (`Add-WpfDesignerContainerMarker`/`Test-WpfDesignerContainer`), not the WPF module's own
+    marker system.
 - Multi-level detach (pulling a `StackPanel` with `Label` children out as one unit) needs its
   subtree to move together — worth an explicit test once Slice D lands.
   - This seems like a big lift, if it seems that a lot of effort would be required, this should only be attemped after all the low hanging fruit has been plucked.

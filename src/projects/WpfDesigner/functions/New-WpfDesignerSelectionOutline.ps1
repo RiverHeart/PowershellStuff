@@ -35,7 +35,7 @@ function New-WpfDesignerSelectionOutline {
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Outline
     BringToFront -InputObject $Outline
-    Update-WpfDesignerSelectionOutlinePosition -Outline $Outline -Target $Target
+    Update-WpfDesignerSelectionOutlinePosition -Outline $Outline -Target $Target -Canvas $Canvas
 
     # GetNewClosure() detaches the handler from module scope, so
     # Update-WpfDesignerSelectionOutlinePosition must be captured as a
@@ -47,7 +47,7 @@ function New-WpfDesignerSelectionOutline {
     # Clear-WpfDesignerSelection can unsubscribe it when the outline goes away.
     $SizeChangedHandler = {
         param($sender, $e)
-        & $UpdatePosition -Outline $Outline -Target $sender
+        & $UpdatePosition -Outline $Outline -Target $sender -Canvas $Canvas
     }.GetNewClosure()
     $Target.add_SizeChanged($SizeChangedHandler)
     $Target | Add-Member -NotePropertyName '_WPFDesignerSelectionOutlineSizeChangedHandler' -NotePropertyValue $SizeChangedHandler -Force

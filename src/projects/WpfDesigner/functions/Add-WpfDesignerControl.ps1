@@ -7,11 +7,15 @@ using namespace System.Windows.Controls
 
 .DESCRIPTION
     Shared "add a control of type X" path backing the toolbar's per-type
-    functions (e.g. Add-WpfDesignerLabel, Add-WpfDesignerStackPanel). Places
-    the new element at a staggered position so repeated clicks don't stack
-    elements exactly on top of each other, then wires selection-on-click,
-    dragging, and resize-handle/selection-outline tracking. Type-specific
-    defaults (initial size, content, etc.) are supplied via -Configure.
+    functions (e.g. Add-WpfDesignerLabel, Add-WpfDesignerStackPanel). When the
+    current selection is a valid container with room for another child (the
+    Window frame, or a StackPanel), the new element is nested inside it;
+    otherwise it floats directly on the canvas at a staggered position so
+    repeated clicks don't stack elements exactly on top of each other. Wires
+    selection-on-click, dragging, and resize-handle/selection-outline
+    tracking either way. Type-specific defaults (initial size, content, etc.)
+    are supplied via -Configure; pass -Container for control types that
+    should themselves become valid drop targets for later placements.
 #>
 function Add-WpfDesignerControl {
     [CmdletBinding()]
@@ -27,7 +31,9 @@ function Add-WpfDesignerControl {
         [string] $Type,
 
         [Parameter(Mandatory)]
-        [scriptblock] $Configure
+        [scriptblock] $Configure,
+
+        [switch] $Container
     )
 
     # The DSL keyword function (Label, StackPanel, ...) auto-attaches to $this
@@ -36,9 +42,26 @@ function Add-WpfDesignerControl {
     $this = $null
     $NewElement = & $Type $Configure
 
-    Add-WPFObject -InputObject $Canvas -ChildObjects $NewElement
-    $StaggerOffset = 20 + (($Canvas.Children.Count - 1) % 8) * 24
-    CanvasPosition -Left $StaggerOffset -Top $StaggerOffset -InputObject $NewElement
+    if ($Container) {
+        Add-WpfDesignerContainerMarker -InputObject $NewElement
+    }
+
+    $Selected = $State.SelectedElement
+    $ParentContainer = if (
+        $Selected -and
+        (Test-WpfDesignerContainer -InputObject $Selected) -and
+        (Test-WpfDesignerContainerCapacity -Container $Selected)
+    ) {
+        $Selected
+    } else {
+        $Canvas
+    }
+
+    Add-WPFObject -InputObject $ParentContainer -ChildObjects $NewElement
+    if ($ParentContainer -eq $Canvas) {
+        $StaggerOffset = 20 + (($Canvas.Children.Count - 1) % 8) * 24
+        CanvasPosition -Left $StaggerOffset -Top $StaggerOffset -InputObject $NewElement
+    }
 
     # GetNewClosure() detaches the handler from module scope, so
     # Select-WpfDesignerElement must be captured as a scriptblock reference
@@ -83,11 +106,11 @@ function Add-WpfDesignerControl {
         param($sender, $e)
         $OutlineProperty = $sender.PSObject.Properties['_WPFDesignerSelectionOutline']
         if ($OutlineProperty -and $OutlineProperty.Value) {
-            & $UpdateOutlinePosition -Outline $OutlineProperty.Value -Target $sender
+            & $UpdateOutlinePosition -Outline $OutlineProperty.Value -Target $sender -Canvas $Canvas
         }
         $HandleProperty = $sender.PSObject.Properties['_WPFDesignerResizeHandle']
         if ($HandleProperty -and $HandleProperty.Value) {
-            & $UpdateHandlePosition -Handle $HandleProperty.Value -Target $sender
+            & $UpdateHandlePosition -Handle $HandleProperty.Value -Target $sender -Canvas $Canvas
         }
     }.GetNewClosure()
 

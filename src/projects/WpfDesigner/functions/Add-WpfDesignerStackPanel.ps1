@@ -22,7 +22,7 @@ function Add-WpfDesignerStackPanel {
         [object] $State
     )
 
-    Add-WpfDesignerControl -Canvas $Canvas -State $State -Type 'StackPanel' -Configure {
+    Add-WpfDesignerControl -Canvas $Canvas -State $State -Type 'StackPanel' -Container -Configure {
         $this.Width = 160
         $this.Height = 120
         $this.Background = '#E5E7EB'

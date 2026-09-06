@@ -11,6 +11,8 @@ Describe 'New-WpfDesignerWindowFrame' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerContainerMarker.ps1"
     }
 
     It 'Should add a Border frame to the canvas and position it' {

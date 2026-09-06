@@ -37,7 +37,7 @@ function New-WpfDesignerResizeHandle {
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Handle
     BringToFront -InputObject $Handle
-    Update-WpfDesignerResizeHandlePosition -Handle $Handle -Target $Target
+    Update-WpfDesignerResizeHandlePosition -Handle $Handle -Target $Target -Canvas $Canvas
 
     # GetNewClosure() detaches the handler from module scope, so
     # Update-WpfDesignerResizeHandlePosition must be captured as a scriptblock
@@ -63,7 +63,7 @@ function New-WpfDesignerResizeHandle {
 
         $Target.Width = & $ClampValue -Value ($Target.Width + $e.HorizontalChange) -Minimum 20 -Maximum $MaxWidth
         $Target.Height = & $ClampValue -Value ($Target.Height + $e.VerticalChange) -Minimum 20 -Maximum $MaxHeight
-        & $UpdatePosition -Handle $sender -Target $Target
+        & $UpdatePosition -Handle $sender -Target $Target -Canvas $Canvas
     }.GetNewClosure()
 
     # SizeChanged catches Width/Height changes from any source (e.g. the
@@ -71,7 +71,7 @@ function New-WpfDesignerResizeHandle {
     # Clear-WpfDesignerSelection can unsubscribe it when the handle goes away.
     $SizeChangedHandler = {
         param($sender, $e)
-        & $UpdatePosition -Handle $Handle -Target $sender
+        & $UpdatePosition -Handle $Handle -Target $sender -Canvas $Canvas
     }.GetNewClosure()
     $Target.add_SizeChanged($SizeChangedHandler)
     $Target | Add-Member -NotePropertyName '_WPFDesignerResizeHandleSizeChangedHandler' -NotePropertyValue $SizeChangedHandler -Force
