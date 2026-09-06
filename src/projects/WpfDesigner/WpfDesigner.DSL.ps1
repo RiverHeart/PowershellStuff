@@ -28,6 +28,13 @@ App 'Window' {
     # block picks up $this = Window and scopes styles to Window.Resources.
     Import "$PSScriptRoot/WpfDesigner.Styles.ps1"
 
+    MenuItem '(F)ile/(E)xit' {
+        Command 'CloseCommand' 'Ctrl+q' {
+            Write-Debug "Close command triggered. Closing window."
+            (Get-WPFWindow).Close()
+        }
+    }
+
     Content {
         Grid 'DesignerGrid' {
             Row 'Expand' {
