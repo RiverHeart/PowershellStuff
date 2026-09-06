@@ -42,7 +42,7 @@ function GridViewColumnHeader {
     }
 
     # Auto-attach self to parent if one exists.
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     if ($Parent) {
         Write-Debug "Beginning auto-attach for $Name (GridViewColumnHeader)"
         Update-WPFObject $Parent $GridViewColumnHeader

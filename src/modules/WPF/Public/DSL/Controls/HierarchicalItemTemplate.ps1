@@ -44,7 +44,7 @@ function HierarchicalItemTemplate {
     Add-WPFType $HierarchicalItemTemplate 'ItemTemplate'
 
     # Auto-attach self to parent TreeView/TreeViewItem if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     if ($Parent) {
         Write-Debug 'Beginning auto-attach for HierarchicalItemTemplate'
         Update-WPFObject $Parent $HierarchicalItemTemplate

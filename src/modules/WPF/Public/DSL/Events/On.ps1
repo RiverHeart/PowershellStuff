@@ -42,7 +42,7 @@ function On {
 
     # Auto-attach self to parent if one exists
     if (-not $InputObject) {
-        $InputObject = $PSCmdlet.GetVariableValue('this')
+        $InputObject = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if (-not $InputObject) {
             Write-Warning "Parent not found for event handler '$Event'"
             return

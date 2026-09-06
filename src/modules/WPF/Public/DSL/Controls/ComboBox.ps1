@@ -41,7 +41,7 @@ function ComboBox {
         Write-Error "Failed to create '$Name' (ComboBox) with error: $_"
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $ComboBox.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (ComboBox)"

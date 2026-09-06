@@ -37,7 +37,7 @@ function Canvas {
             $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Canvas])
         }
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent) {
             Add-WPFObject $Parent $Factory
         }
@@ -60,7 +60,7 @@ function Canvas {
     }
 
     # Auto-attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $Canvas.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Canvas)"

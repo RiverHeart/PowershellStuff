@@ -42,7 +42,7 @@ function StatusBar {
         Write-Error "Failed to create '$Name' (StatusBar) with error: $_"
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $WasAutoAttached = $false
     if ($Parent -and -not $StatusBar.Parent) {
         $AppRootProperty = $Parent.PSObject.Properties['_WPFAppRoot']

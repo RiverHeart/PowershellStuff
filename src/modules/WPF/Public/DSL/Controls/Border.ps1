@@ -53,9 +53,8 @@ function Border {
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
         $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border], $Name)
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent) {
-            Write-Debug "Factory auto-attach: $Name (Border) -> $($Parent.GetType().Name)"
             Add-WPFObject $Parent $Factory
         }
 
@@ -77,8 +76,8 @@ function Border {
         Write-Error "Failed to create '$Name' (Border) with error: $_"
     }
 
-    # Auto-attach if parent exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    # Auto-attach self to parent if one exists
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $Border.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Border)"

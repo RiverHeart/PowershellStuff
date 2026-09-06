@@ -21,7 +21,7 @@ function Footer {
         return
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     if (-not $Parent -or -not ($Parent -is [System.Windows.Window])) {
         Write-Error 'Footer requires an App shell window as the current DSL parent.'
         return
