@@ -26,43 +26,59 @@ function Register-WPFObject {
         [ValidatePattern('^\w+$')]
         [string] $Name,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ValueFromPipeline)]
         [object] $InputObject,
 
         [ValidateNotNullOrEmpty()]
         [string] $ContextId,
 
+        # Todo: Create completer for WPF custom types
+        [ValidateNotNullOrEmpty()]
+        [string] $Type,
+
+        [switch] $PassThru,
+
         [switch] $Overwrite
     )
 
-    # Don't register objects with the default nameless identifier.
-    if ($Name -eq '__Nameless__') { return }
+    process {
+        # Don't register objects with the default nameless identifier.
+        if ($Name -eq '__Nameless__') { return }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
-    $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $InputObject -CreateIfMissing -Name $Name
-    if (-not $ResolvedContextId -and $Parent) {
-        $ResolvedContextId = Resolve-WPFControlContextId -InputObject $Parent -CreateIfMissing -Name $Name
-    }
+        $Parent = $PSCmdlet.GetVariableValue('this')
+        $ResolvedContextId = Resolve-WPFControlContextId -ContextId $ContextId -InputObject $InputObject -CreateIfMissing -Name $Name
+        if (-not $ResolvedContextId -and $Parent) {
+            $ResolvedContextId = Resolve-WPFControlContextId -InputObject $Parent -CreateIfMissing -Name $Name
+        }
 
-    if (-not $ResolvedContextId) {
-        $ResolvedContextId = New-WPFControlContext -Name $Name -Activate
-    }
+        if (-not $ResolvedContextId) {
+            $ResolvedContextId = New-WPFControlContext -Name $Name -Activate
+        }
 
-    $ControlTable = Get-WPFControlTable -ContextId $ResolvedContextId -CreateIfMissing -Name $Name
-    Set-WPFControlContext -InputObject $InputObject -ContextId $ResolvedContextId
+        $ControlTable = Get-WPFControlTable -ContextId $ResolvedContextId -CreateIfMissing -Name $Name
+        Set-WPFControlContext -InputObject $InputObject -ContextId $ResolvedContextId
 
-    if ($InputObject -is [System.Windows.Window]) {
-        Set-WPFControlActiveContext -ContextId $ResolvedContextId
-    }
+        if ($InputObject -is [System.Windows.Window]) {
+            Set-WPFControlActiveContext -ContextId $ResolvedContextId
+        }
 
-    $Type = $InputObject.GetType().Name
-    $KeyExists = $ControlTable.ContainsKey($Name)
-    if (-not $KeyExists -or ($KeyExists -and $Overwrite)) {
-        Write-Debug "Registering object '$Type' as '$Name' in context '$ResolvedContextId'"
-        $ControlTable[$Name] = $InputObject
-    } elseif ($ControlTable[$Name] -eq $InputObject) {
-        Write-Warning "Object '$Type' already registered as '$Name' in context '$ResolvedContextId'."
-    } else {
-        Write-Error "Another object registered as '$Name' already exists in context '$ResolvedContextId'."
+        $TypeName = $InputObject.GetType().Name
+        $KeyExists = $ControlTable.ContainsKey($Name)
+        if (-not $KeyExists -or ($KeyExists -and $Overwrite)) {
+            Write-Debug "Registering object '$TypeName' as '$Name' in context '$ResolvedContextId'"
+            $ControlTable[$Name] = $InputObject
+        } elseif ($ControlTable[$Name] -eq $InputObject) {
+            Write-Warning "Object '$TypeName' already registered as '$Name' in context '$ResolvedContextId'."
+        } else {
+            Write-Error "Another object registered as '$Name' already exists in context '$ResolvedContextId'."
+        }
+
+        if ($PSBoundParameters.ContainsKey('Type')) {
+            $InputObject | Add-WPFType -Type $Type
+        }
+
+        if ($PassThru) {
+            return $InputObject
+        }
     }
 }
