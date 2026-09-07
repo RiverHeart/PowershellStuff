@@ -6,11 +6,13 @@
 .DESCRIPTION
     Centralizes the "should this control auto-attach, and to what" decision
     that used to be duplicated inline in every control keyword. Keywords pass
-    their own -AutoAttach switch and $PSBoundParameters through unchanged;
-    when -AutoAttach was explicitly bound to $false, this returns $null
-    (suppressing auto-attach) regardless of the ambient WPFAutoAttachContext.
-    Otherwise it falls through to the ambient context as before, so existing
-    scripts that never pass -AutoAttach see no behavior change.
+    their own -AutoAttach value and $PSBoundParameters through unchanged.
+    Unlike -Confirm/-WhatIf, -AutoAttach doesn't trigger a behavior by its own
+    presence - the ambient WPFAutoAttachContext is what drives attachment, so
+    -AutoAttach is a value (the target itself, or $null to mean "none")
+    rather than a switch: omitted, it defers to the ambient context; passed
+    explicitly (including as $null), it replaces the ambient context outright
+    - $null suppresses auto-attach, a real object attaches there directly.
 
     An explicit override is preferred over nulling WPFAutoAttachContext in
     the caller's own scope, since that ambient variable can leak through
@@ -26,12 +28,14 @@ function Resolve-WPFAutoAttachTarget {
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $BoundParameters,
 
-        [switch] $AutoAttach
+        [AllowNull()]
+        [object] $AutoAttach
     )
 
-    if ($BoundParameters.ContainsKey('AutoAttach') -and -not $AutoAttach) {
-        return $null
+    if ($BoundParameters.ContainsKey('AutoAttach')) {
+        return $AutoAttach
     }
 
     return $Cmdlet.GetVariableValue('WPFAutoAttachContext')
 }
+

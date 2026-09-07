@@ -39,7 +39,7 @@ function Add-WpfDesignerControl {
     # The DSL keyword function (Label, StackPanel, ...) auto-attaches to the
     # ambient WPFAutoAttachContext when set, so override it here to guarantee
     # the new element stays unparented until we place it on the canvas below.
-    $NewElement = & $Type -AutoAttach:$false $Configure
+    $NewElement = & $Type -AutoAttach $null $Configure
 
     if ($Container) {
         Add-WpfDesignerContainerMarker -InputObject $NewElement

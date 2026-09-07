@@ -26,7 +26,7 @@ function New-WpfDesignerResizeHandle {
     # Thumb() auto-attaches to the ambient WPFAutoAttachContext when set, so
     # override it here to guarantee the handle stays unparented until we
     # explicitly place it below.
-    $Handle = Thumb -AutoAttach:$false {
+    $Handle = Thumb -AutoAttach $null {
         $this.Width = 8
         $this.Height = 8
         $this.Background = 'White'

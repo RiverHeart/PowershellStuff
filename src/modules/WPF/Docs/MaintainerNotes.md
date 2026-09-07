@@ -71,6 +71,8 @@ This mattered when a keyword like `Label` was called from inside an event handle
 
 A `-NoAutoAttach` switch was considered for this generally and rejected as unintuitive for callers; it still exists narrowly on `MenuItem` for its own recursive nested-path construction, which is an unrelated use case. Whether the `WPFParentContext` ambient variable should be introduced, to delineate between having a parent and having a parent we want to attach to, remains up for debate. At this point, the it would be premature with no problem to solve.
 
+Instead, an `-AutoAttach <object>` flag has been introduced to mirror how preference variables work. Namely, `ErrorAction` exists on a cmdlet and provides a direct override for whatever the ambient `$ErrorActionPreference` is set to. In hindsight, having switched from a `switch` to value based param, I wish I had named them `AttachTo` since they both declare targets. 
+
 ### GetNewClosure() and Bare Function Calls
 
 Event handler scriptblocks that need to keep a snapshot of outer variables (for example, per-control drag state) typically call `.GetNewClosure()` before assigning them to `Add_<Event>`. This detaches the scriptblock into its own scope for variable lookups, but it also breaks bare-name calls to other functions defined in the same script/module from inside that scriptblock — they fail to resolve at invoke time with "term not recognized," even though the function is clearly defined and in scope everywhere else.

@@ -27,7 +27,7 @@ function New-WpfDesignerSelectionOutline {
     # Border() auto-attaches to the ambient WPFAutoAttachContext when set, so
     # override it here to guarantee the outline stays unparented until we
     # explicitly place it below.
-    $Outline = Border -AutoAttach:$false {
+    $Outline = Border -AutoAttach $null {
         $this.BorderBrush = '#F59E0B'
         $this.BorderThickness = 2
         $this.IsHitTestVisible = $false
