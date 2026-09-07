@@ -27,45 +27,65 @@ function Key {
         [string[]] $KeyGesture,
 
         [Parameter(Mandatory)]
-        [scriptblock] $Action
+        [scriptblock] $Action,
+
+        [Parameter(ValueFromPipeline)]
+        [object] $InputObject
     )
 
-    if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "Key $($KeyGesture -join ',')"
-        return
+    begin {
+        $IsDisabledBlock = $MyInvocation.InvocationName.StartsWith('-')
+        if ($IsDisabledBlock) {
+            Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "Key $($KeyGesture -join ',')"
+            return
+        }
+
+        $ParsedGestures = @(ConvertTo-KeyGesture -InputObject $KeyGesture)
     }
 
-    $ParsedGestures = @(ConvertTo-KeyGesture -InputObject $KeyGesture)
+    process {
+        if ($IsDisabledBlock) {
+            return
+        }
 
-    $this = $PSCmdlet.GetVariableValue('this')
-    $PSVars = New-WPFVariableList -InputObject $this
-    $Handler = {
-        param($sender, $event)
-        Write-Debug "Key event detected: $($event.Key) with modifiers $($event.KeyboardDevice.Modifiers)"
+        # Auto-attach self to parent if one exists (must run per-invocation: $InputObject binds in process, not begin)
+        if (-not $InputObject) {
+            $InputObject = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
+            if (-not $InputObject) {
+                Write-Warning "Parent not found for event handler 'Key $($KeyGesture -join ',')'"
+                return
+            }
+        }
 
-        $GestureMatches = @($ParsedGestures | Where-Object {
-            $event.Key -eq $_.Key -and $event.KeyboardDevice.Modifiers -eq $_.Modifiers
-        })
-        $IsMatch = $GestureMatches.Count -gt 0
+        $PSVars = New-WPFVariableList -InputObject $InputObject
+        $Handler = {
+            param($sender, $event)
+            Write-Debug "Key event detected: $($event.Key) with modifiers $($event.KeyboardDevice.Modifiers)"
 
-        Write-Debug "Key match: $IsMatch"
+            $GestureMatches = @($ParsedGestures | Where-Object {
+                $event.Key -eq $_.Key -and $event.KeyboardDevice.Modifiers -eq $_.Modifiers
+            })
+            $IsMatch = $GestureMatches.Count -gt 0
 
-        if ($IsMatch) {
-            $RuntimeVars = [System.Collections.Generic.List[psvariable]]::new()
-            if ($null -ne $PSVars) {
-                foreach ($VarItem in @($PSVars)) {
-                    if ($VarItem -is [psvariable]) {
-                        $RuntimeVars.Add($VarItem)
+            Write-Debug "Key match: $IsMatch"
+
+            if ($IsMatch) {
+                $RuntimeVars = [System.Collections.Generic.List[psvariable]]::new()
+                if ($null -ne $PSVars) {
+                    foreach ($VarItem in @($PSVars)) {
+                        if ($VarItem -is [psvariable]) {
+                            $RuntimeVars.Add($VarItem)
+                        }
                     }
                 }
+                $RuntimeVars.Add([psvariable]::new('sender', $sender))
+                $RuntimeVars.Add([psvariable]::new('event', $event))
+                $RuntimeVars.Add([psvariable]::new('_', $event))
+                $RuntimeVars.Add([psvariable]::new('PSItem', $event))
+                $Action.InvokeWithContext($null, $RuntimeVars)
             }
-            $RuntimeVars.Add([psvariable]::new('sender', $sender))
-            $RuntimeVars.Add([psvariable]::new('event', $event))
-            $RuntimeVars.Add([psvariable]::new('_', $event))
-            $RuntimeVars.Add([psvariable]::new('PSItem', $event))
-            $Action.InvokeWithContext($null, $RuntimeVars)
-        }
-    }.GetNewClosure()
+        }.GetNewClosure()
 
-    On PreviewKeyDown $Handler
+        $InputObject | On PreviewKeyDown $Handler
+    }
 }
