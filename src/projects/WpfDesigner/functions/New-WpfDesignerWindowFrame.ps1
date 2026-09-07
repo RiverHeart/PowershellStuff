@@ -28,11 +28,10 @@ function New-WpfDesignerWindowFrame {
     # Sized to comfortably fit inside the default window's viewport pane so it
     # doesn't overflow into neighboring panes before the user resizes anything.
     #
-    # Shadow the ambient WPFAutoAttachContext (the Canvas, injected via this
-    # function's own caller frame) so Border returns unparented instead of
-    # auto-attaching to it - Add-WPFObject below is what actually places it.
-    $WPFAutoAttachContext = $null
-    $Frame = Border {
+    # -AutoAttach:$false overrides the ambient WPFAutoAttachContext (the
+    # Canvas, visible here via this function's own caller frame) so Border
+    # returns unparented - Add-WPFObject below is what actually places it.
+    $Frame = Border -AutoAttach:$false {
         $this.Width = 480
         $this.Height = 360
         $this.Background = 'White'

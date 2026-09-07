@@ -22,7 +22,11 @@ function StackPanel {
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
         [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        # Overrides the ambient WPFAutoAttachContext when explicitly bound
+        # (e.g. -AutoAttach:$false forces the result to stay unparented).
+        [switch] $AutoAttach
     )
 
     # Change behavior based on invocation name.
@@ -50,7 +54,7 @@ function StackPanel {
     }
 
     # Attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
+    $Parent = Resolve-WPFAutoAttachTarget -Cmdlet $PSCmdlet -BoundParameters $PSBoundParameters -AutoAttach:$AutoAttach
     $IsParentedBefore = [bool] $StackPanel.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (StackPanel)"
