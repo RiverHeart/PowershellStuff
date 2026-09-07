@@ -4,14 +4,13 @@ Describe 'Add-WpfDesignerStackPanel' -Tag 'WpfDesigner' {
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-WpfDesignerContainerMarker.ps1"
-        . "$PSScriptRoot/../functions/Test-WpfDesignerContainer.ps1"
+        . "$PSScriptRoot/../functions/Add-PSType.ps1"
+        . "$PSScriptRoot/../functions/Test-PSType.ps1"
         . "$PSScriptRoot/../functions/Test-WpfDesignerContainerCapacity.ps1"
         . "$PSScriptRoot/../functions/Add-WpfDesignerControl.ps1"
         . "$PSScriptRoot/../functions/Add-WpfDesignerStackPanel.ps1"
         . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
         . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
-        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"

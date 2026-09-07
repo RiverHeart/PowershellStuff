@@ -23,5 +23,5 @@ function Get-WpfDesignerContainerChildren {
     $Candidates = [System.Windows.LogicalTreeHelper]::GetChildren($Element) |
         Where-Object { $_ -is [System.Windows.FrameworkElement] }
 
-    return @($Candidates | Where-Object { -not (Test-WpfDesignerOverlay -InputObject $_) })
+    return @($Candidates | Where-Object { -not (Test-PSType -InputObject $_ -TypeName 'Custom.WpfDesigner.Overlay') })
 }

@@ -105,7 +105,7 @@ container (Window frame or `StackPanel`), floating-on-canvas otherwise. This is 
 selections.
 
 Landed as a PSTypeName marker (`Custom.WpfDesigner.Container`, via
-`Add-WpfDesignerContainerMarker`/`Test-WpfDesignerContainer`) rather than a hardcoded type
+`Add-PSType`/`Test-PSType`) rather than a hardcoded type
 list — scoped to this project since the WPF module's own `Custom.WPF.*` marker system
 (`Add-WPFType`/`Test-WPFType`) is closed to a fixed `ValidateSet`. `Add-WpfDesignerControl`
 checks the current selection against the marker plus `Test-WpfDesignerContainerCapacity`
@@ -152,7 +152,7 @@ future work — not started until A–E are solid.
   `Custom.WPF.CollectorOwner` pattern for collector-owner keywords) rather than a hardcoded
   type check list, so it doesn't need revisiting every time a new container type is added.
   - Resolved in Slice C: a project-scoped `Custom.WpfDesigner.Container` PSTypeName marker
-    (`Add-WpfDesignerContainerMarker`/`Test-WpfDesignerContainer`), not the WPF module's own
+    (`Add-PSType`/`Test-PSType`), not the WPF module's own
     marker system.
 - Multi-level detach (pulling a `StackPanel` with `Label` children out as one unit) needs its
   subtree to move together — worth an explicit test once Slice D lands.

@@ -34,7 +34,7 @@ function New-WpfDesignerSelectionOutline {
     }
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Outline
-    Add-WpfDesignerOverlayMarker -InputObject $Outline
+    Add-PSType -InputObject $Outline -TypeName 'Custom.WpfDesigner.Overlay'
     BringToFront -InputObject $Outline
     Update-WpfDesignerSelectionOutlinePosition -Outline $Outline -Target $Target -Canvas $Canvas
 

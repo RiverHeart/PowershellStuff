@@ -41,7 +41,7 @@ function New-WpfDesignerWindowFrame {
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Frame
     CanvasPosition -Left 20 -Top 20 -InputObject $Frame
-    Add-WpfDesignerContainerMarker -InputObject $Frame
+    Add-PSType -InputObject $Frame -TypeName 'Custom.WpfDesigner.Container'
 
     # GetNewClosure() detaches the handler from module scope, so
     # Select-WpfDesignerElement must be captured as a scriptblock reference

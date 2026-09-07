@@ -42,13 +42,13 @@ function Add-WpfDesignerControl {
     $NewElement = & $Type -AutoAttach $null $Configure
 
     if ($Container) {
-        Add-WpfDesignerContainerMarker -InputObject $NewElement
+        Add-PSType -InputObject $NewElement -TypeName 'Custom.WpfDesigner.Container'
     }
 
     $Selected = $State.SelectedElement
     $ParentContainer = if (
         $Selected -and
-        (Test-WpfDesignerContainer -InputObject $Selected) -and
+        (Test-PSType -InputObject $Selected -TypeName 'Custom.WpfDesigner.Container') -and
         (Test-WpfDesignerContainerCapacity -Container $Selected)
     ) {
         $Selected

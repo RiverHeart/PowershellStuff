@@ -4,8 +4,8 @@ Describe 'Get-WpfDesignerContainerChildren' -Tag 'WpfDesigner' {
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-WpfDesignerOverlayMarker.ps1"
-        . "$PSScriptRoot/../functions/Test-WpfDesignerOverlay.ps1"
+        . "$PSScriptRoot/../functions/Add-PSType.ps1"
+        . "$PSScriptRoot/../functions/Test-PSType.ps1"
         . "$PSScriptRoot/../functions/Get-WpfDesignerContainerChildren.ps1"
     }
 
@@ -25,7 +25,7 @@ Describe 'Get-WpfDesignerContainerChildren' -Tag 'WpfDesigner' {
         $Canvas = [System.Windows.Controls.Canvas]::new()
         $Real = [System.Windows.Controls.Label]::new()
         $Overlay = [System.Windows.Controls.Border]::new()
-        Add-WpfDesignerOverlayMarker -InputObject $Overlay
+        Add-PSType -InputObject $Overlay -TypeName 'Custom.WpfDesigner.Overlay'
         $Canvas.Children.Add($Real) | Out-Null
         $Canvas.Children.Add($Overlay) | Out-Null
 

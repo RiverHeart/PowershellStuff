@@ -36,7 +36,7 @@ function New-WpfDesignerResizeHandle {
     }
 
     Add-WPFObject -InputObject $Canvas -ChildObjects $Handle
-    Add-WpfDesignerOverlayMarker -InputObject $Handle
+    Add-PSType -InputObject $Handle -TypeName 'Custom.WpfDesigner.Overlay'
     BringToFront -InputObject $Handle
     Update-WpfDesignerResizeHandlePosition -Handle $Handle -Target $Target -Canvas $Canvas
 
