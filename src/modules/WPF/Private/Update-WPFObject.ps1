@@ -126,6 +126,10 @@ function Update-WPFObject {
                 $InputObject.Child = $Child
             }
         }
+        # Factory (Template mode): reuse Add-WPFObject's attachment logic.
+        elseif ($Child -is [System.Windows.FrameworkElementFactory]) {
+            Add-WPFObject -InputObject $InputObject -ChildObjects $Child
+        }
         else {
             $Message = "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"
 
