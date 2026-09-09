@@ -16,7 +16,7 @@
             Enable        = $true
             CheckCommands = $true
             CheckKeyword  = $true
-            CheckOperator = $true
+            CheckOperator = $false
         }
         PSUseCompatibleSyntax = @{
             Enable = $true

@@ -7,9 +7,7 @@ using namespace System.Windows
 
 $DebugPreference = 'Continue'
 
-if ($PWD -ne $PSScriptRoot) {
-    Set-Location -Path $PSScriptRoot
-}
+Set-Location -Path $PSScriptRoot
 
 Import-Module "$PSScriptRoot/../../modules/WPF" -ErrorAction Stop -Force
 
