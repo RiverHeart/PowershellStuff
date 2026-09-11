@@ -27,18 +27,17 @@ guides) is explicitly out of scope until this shape proves out.
 ## Technical constraint: `Window` can't be embedded
 
 WPF's `Window` class is always top-level; it cannot be a visual child inside another
-element's tree. So "a window rendered on the canvas" cannot literally be a live `Window`
-instance sitting inside the `Canvas`. The on-canvas representation must be an abstract
-stand-in — a styled `Border` acting as window chrome, resizable within the canvas — that the
-designer treats as "the Window" for authoring purposes. A real `[System.Windows.Window]`
-only materializes at export/preview time. This is the same approach visual designers like
-Blend/Visual Studio use.
+element's tree. The on-canvas representation is therefore a styled `Border` proxy. An
+unshown `[System.Windows.Window]` associated with that proxy supplies authentic Window
+properties to the dynamic property panel and exporter. `Width` and `Height` are bound
+two-way between the objects; this intentionally approximates the rendered client area
+because top-level Window dimensions include non-client chrome.
 
 ## Target authoring model
 
 - The `Canvas` hosts zero or more design-time roots:
   - Exactly one abstract Window frame (a resizable `Border` standing in for the exported
-    `Window`'s bounds).
+    `Window`'s bounds). Its child is a default `Canvas` content root for free placement.
   - Any number of "loose"/floating elements or subtrees not currently parented to anything.
 - Toolbar buttons are selection-sensitive:
   - If a container-capable element is selected (the Window frame, or a `StackPanel` already
@@ -109,9 +108,10 @@ Landed as a PSTypeName marker (`Custom.WpfDesigner.Container`, via
 list — scoped to this project since the WPF module's own `Custom.WPF.*` marker system
 (`Add-WPFType`/`Test-WPFType`) is closed to a fixed `ValidateSet`. `Add-WpfDesignerControl`
 checks the current selection against the marker plus `Test-WpfDesignerContainerCapacity`
-(a `Border`, used by the Window frame, only has one `Child` slot; a `Panel` like
-`StackPanel` doesn't) before deciding whether to nest the new element via `Add-WPFObject` or
-fall back to floating on the canvas.
+(a `Border` only has one `Child` slot; a `Panel` like `StackPanel` doesn't) before deciding
+whether to nest the new element via `Add-WPFObject` or fall back to floating on the canvas.
+The Window frame redirects placement to its default child `Canvas`, preserving free-form
+dragging while the proxy remains the selectable representation of the Window itself.
 
 Nesting exposed a real gap in the resize-handle/selection-outline overlay math: both were
 positioned via `Canvas.GetLeft/Top` on the target, which is meaningless once the target's

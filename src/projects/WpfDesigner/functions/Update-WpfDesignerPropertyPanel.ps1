@@ -23,9 +23,16 @@ function Update-WpfDesignerPropertyPanel {
 
     $Panel.Children.Clear()
 
-    $Target = $State.SelectedElement
-    if (-not $Target) {
+    $Selected = $State.SelectedElement
+    if (-not $Selected) {
         return
+    }
+
+    $PropertyTarget = $Selected.PSObject.Properties['_WPFDesignerPropertyTarget']
+    $Target = if ($PropertyTarget -and $PropertyTarget.Value) {
+        $PropertyTarget.Value
+    } else {
+        $Selected
     }
 
     foreach ($Descriptor in Get-WpfDesignerPropertyDescriptor -InputObject $Target) {

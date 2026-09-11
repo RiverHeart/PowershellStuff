@@ -5,9 +5,9 @@ using namespace System.Windows.Controls
     Converts the design surface's placed Labels into runnable WPF DSL script text.
 
 .DESCRIPTION
-    Walks the Canvas's children, skipping anything that isn't a placed Label
-    (for example, the resize handle Thumb), and emits a Window/Canvas/Label
-    DSL block that reconstructs the current design when run.
+    When the design surface contains a Window proxy, reads Window properties
+    from its associated hidden Window and placed Labels from its default
+    content Canvas. Otherwise retains the original flat-Canvas behavior.
 #>
 function ConvertTo-WpfDesignerScript {
     [CmdletBinding()]
@@ -17,11 +17,33 @@ function ConvertTo-WpfDesignerScript {
         [System.Windows.Controls.Canvas] $Canvas
     )
 
+    $WindowModel = $null
+    $ContentCanvas = $Canvas
+    foreach ($Child in $Canvas.Children) {
+        $PropertyTarget = $Child.PSObject.Properties['_WPFDesignerPropertyTarget']
+        $ContentRoot = $Child.PSObject.Properties['_WPFDesignerContentRoot']
+        if (
+            $PropertyTarget -and $PropertyTarget.Value -is [System.Windows.Window] -and
+            $ContentRoot -and $ContentRoot.Value -is [System.Windows.Controls.Canvas]
+        ) {
+            $WindowModel = $PropertyTarget.Value
+            $ContentCanvas = $ContentRoot.Value
+            break
+        }
+    }
+
+    $WindowTitle = if ($WindowModel) { [string] $WindowModel.Title } else { 'Window' }
+    $EscapedTitle = $WindowTitle -replace "'", "''"
+
     $Lines = [System.Collections.Generic.List[string]]::new()
-    $Lines.Add("Window 'Window' {")
+    $Lines.Add("Window '$EscapedTitle' {")
+    if ($WindowModel) {
+        $Lines.Add("    `$this.Width = $($WindowModel.Width)")
+        $Lines.Add("    `$this.Height = $($WindowModel.Height)")
+    }
     $Lines.Add("    Canvas 'Canvas' {")
 
-    foreach ($Child in $Canvas.Children) {
+    foreach ($Child in $ContentCanvas.Children) {
         if ($Child -isnot [System.Windows.Controls.Label]) {
             continue
         }

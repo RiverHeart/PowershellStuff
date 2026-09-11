@@ -37,6 +37,38 @@ Describe 'New-WpfDesignerWindowFrame' -Tag 'WpfDesigner' {
         $State.WindowFrame | Should -Be -ExpectedValue $Frame
     }
 
+    It 'Should associate the frame with a hidden Window property target' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $State = @{ SelectedElement = $null; WindowFrame = $null; WindowModel = $null }
+
+        $Frame = New-WpfDesignerWindowFrame -Canvas $Canvas -State $State
+
+        $State.WindowModel | Should -BeOfType [System.Windows.Window]
+        $Frame._WPFDesignerPropertyTarget | Should -Be -ExpectedValue $State.WindowModel
+    }
+
+    It 'Should synchronize frame and Window dimensions in both directions' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $State = @{ SelectedElement = $null; WindowFrame = $null; WindowModel = $null }
+        $Frame = New-WpfDesignerWindowFrame -Canvas $Canvas -State $State
+
+        $State.WindowModel.Width = 640
+        $Frame.Width | Should -Be -ExpectedValue 640
+
+        $Frame.Height = 420
+        $State.WindowModel.Height | Should -Be -ExpectedValue 420
+    }
+
+    It 'Should provide a Canvas as the frame''s default content root' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $State = @{ SelectedElement = $null; WindowFrame = $null; WindowModel = $null }
+
+        $Frame = New-WpfDesignerWindowFrame -Canvas $Canvas -State $State
+
+        $Frame.Child | Should -BeOfType [System.Windows.Controls.Canvas]
+        $Frame._WPFDesignerContentRoot | Should -Be -ExpectedValue $Frame.Child
+    }
+
     It 'Should select the frame and add a resize handle when clicked' {
         $Canvas = [System.Windows.Controls.Canvas]::new()
         $State = @{ SelectedElement = $null; WindowFrame = $null }

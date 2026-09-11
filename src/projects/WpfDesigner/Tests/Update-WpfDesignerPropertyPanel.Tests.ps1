@@ -22,6 +22,20 @@ Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
         $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
     }
 
+    It 'Should populate rows from an associated property target' {
+        $Panel = [System.Windows.Controls.StackPanel]::new()
+        $Frame = [System.Windows.Controls.Border]::new()
+        $Window = [System.Windows.Window]::new()
+        $Frame | Add-Member -NotePropertyName '_WPFDesignerPropertyTarget' -NotePropertyValue $Window
+        $State = @{ SelectedElement = $Frame }
+
+        Update-WpfDesignerPropertyPanel -Panel $Panel -State $State
+
+        $ExpectedRowCount = @(Get-WpfDesignerPropertyDescriptor -InputObject $Window).Count * 2
+        $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
+        $Panel.Children[1].DataContext | Should -Be -ExpectedValue $Window
+    }
+
     It 'Should replace rather than append rows when selection changes' {
         $Panel = [System.Windows.Controls.StackPanel]::new()
         $State = @{ SelectedElement = [System.Windows.Controls.TextBlock]::new() }

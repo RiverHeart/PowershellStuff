@@ -21,7 +21,9 @@ App 'Window' {
     $this.Height = 700
     State @{
         SelectedElement = $null
+        PropertyPanel   = $null
         WindowFrame     = $null
+        WindowModel     = $null
     }
 
     # Called here (rather than at top-level script scope) so its Resources
@@ -133,7 +135,9 @@ App 'Window' {
 
                             # Populated per-selection by Update-WpfDesignerPropertyPanel
                             # (via Select-WpfDesignerElement / Clear-WpfDesignerSelection).
-                            StackPanel 'PropertyEditorHost' {}
+                            StackPanel 'PropertyEditorHost' {
+                                (Reference 'Window').Tag.PropertyPanel = $this
+                            }
                         }
                     }
                 }

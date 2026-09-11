@@ -17,6 +17,7 @@ Describe 'Add-WpfDesignerControl container-aware placement' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
         . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        . "$PSScriptRoot/../functions/New-WpfDesignerWindowFrame.ps1"
     }
 
     It 'Should float on the canvas when nothing is selected' {
@@ -40,16 +41,24 @@ Describe 'Add-WpfDesignerControl container-aware placement' -Tag 'WpfDesigner' {
         $Canvas.Children | Should -Not -Contain $NewLabel
     }
 
-    It 'Should nest the new element inside the Window frame Border when selected and empty' {
+    It 'Should add and select a draggable element in the selected Window frame''s default Canvas' {
         $Canvas = [System.Windows.Controls.Canvas]::new()
-        $Frame = [System.Windows.Controls.Border]::new()
-        Add-PSType -InputObject $Frame -TypeName 'Custom.WpfDesigner.Container'
-        $Canvas.Children.Add($Frame) | Out-Null
-        $State = @{ SelectedElement = $Frame }
+        $State = @{ SelectedElement = $null; WindowFrame = $null; WindowModel = $null }
+        $Frame = New-WpfDesignerWindowFrame -Canvas $Canvas -State $State
+        $State.SelectedElement = $Frame
 
         $NewLabel = Add-WpfDesignerLabel -Canvas $Canvas -State $State
 
-        $Frame.Child | Should -Be -ExpectedValue $NewLabel
+        $NewLabel.Parent | Should -Be -ExpectedValue $Frame._WPFDesignerContentRoot
+        [System.Windows.Controls.Canvas]::GetLeft($NewLabel) | Should -Be -ExpectedValue 20
+
+        $MouseDevice = [System.Windows.Input.Mouse]::PrimaryDevice
+        $DownArgs = [System.Windows.Input.MouseButtonEventArgs]::new($MouseDevice, [Environment]::TickCount, [System.Windows.Input.MouseButton]::Left)
+        $DownArgs.RoutedEvent = [System.Windows.UIElement]::MouseLeftButtonDownEvent
+        $NewLabel.RaiseEvent($DownArgs)
+
+        $State.SelectedElement | Should -Be -ExpectedValue $NewLabel
+        $DownArgs.Handled | Should -Be -ExpectedValue $true
     }
 
     It 'Should fall back to floating when the selected Border container already has a child' {

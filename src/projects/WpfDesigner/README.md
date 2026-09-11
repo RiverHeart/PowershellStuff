@@ -38,6 +38,13 @@ depends on the WPF module's public commands and DSL keywords.
   (`ConvertTo-WpfDesignerScript`).
 - [x] Abstract Window frame on the canvas: a resizable/selectable `Border` standing in for
   the exported `Window`'s bounds (`New-WpfDesignerWindowFrame`, PLAN.md Slice A).
+- [x] Window proxy properties: selecting the frame edits an associated hidden `Window`,
+  with two-way `Width`/`Height` binding to the frame and a default child `Canvas` for
+  freely positioned controls.
+
+The proxy frame uses `Window.Width` and `Window.Height` as its visual dimensions. This is
+an intentional approximation for the experimental designer: a rendered top-level Window's
+client area can differ because its dimensions include non-client chrome.
 
 ## Todo
 

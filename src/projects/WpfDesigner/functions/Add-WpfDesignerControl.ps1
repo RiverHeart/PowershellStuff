@@ -47,20 +47,24 @@ function Add-WpfDesignerControl {
         Add-PSType -InputObject $NewElement -TypeName 'Custom.WpfDesigner.Container'
     }
 
+    $ParentContainer = $Canvas
     $Selected = $State.SelectedElement
-    $ParentContainer = if (
-        $Selected -and
-        (Test-PSType -InputObject $Selected -TypeName 'Custom.WpfDesigner.Container') -and
-        (Test-WpfDesignerContainerCapacity -Container $Selected)
-    ) {
-        $Selected
-    } else {
-        $Canvas
+    if ($Selected -and (Test-PSType -InputObject $Selected -TypeName 'Custom.WpfDesigner.Container')) {
+        $ContentRootProperty = $Selected.PSObject.Properties['_WPFDesignerContentRoot']
+        $Candidate = if ($ContentRootProperty -and $ContentRootProperty.Value) {
+            $ContentRootProperty.Value
+        } else {
+            $Selected
+        }
+
+        if (Test-WpfDesignerContainerCapacity -Container $Candidate) {
+            $ParentContainer = $Candidate
+        }
     }
 
     Add-WPFObject -InputObject $ParentContainer -ChildObjects $NewElement
-    if ($ParentContainer -eq $Canvas) {
-        $StaggerOffset = 20 + (($Canvas.Children.Count - 1) % 8) * 24
+    if ($ParentContainer -is [System.Windows.Controls.Canvas]) {
+        $StaggerOffset = 20 + (($ParentContainer.Children.Count - 1) % 8) * 24
         CanvasPosition -Left $StaggerOffset -Top $StaggerOffset -InputObject $NewElement
     }
 

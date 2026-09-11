@@ -34,6 +34,36 @@ Describe 'ConvertTo-WpfDesignerScript' -Tag 'WpfDesigner' {
         $Script | Should -Match 'CanvasPosition -Left 20 -Top 44'
     }
 
+    It 'Should export Window proxy properties and labels from its default Canvas' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Frame = [System.Windows.Controls.Border]::new()
+        $ContentRoot = [System.Windows.Controls.Canvas]::new()
+        $Window = [System.Windows.Window]::new()
+        $Window.Title = 'Sample Window'
+        $Window.Width = 640
+        $Window.Height = 420
+        $Frame.Child = $ContentRoot
+        $Frame | Add-Member -NotePropertyName '_WPFDesignerPropertyTarget' -NotePropertyValue $Window
+        $Frame | Add-Member -NotePropertyName '_WPFDesignerContentRoot' -NotePropertyValue $ContentRoot
+        $Canvas.Children.Add($Frame) | Out-Null
+
+        $Label = [System.Windows.Controls.Label]::new()
+        $Label.Content = 'Inside'
+        $Label.Width = 100
+        $Label.Height = 26
+        [System.Windows.Controls.Canvas]::SetLeft($Label, 32)
+        [System.Windows.Controls.Canvas]::SetTop($Label, 48)
+        $ContentRoot.Children.Add($Label) | Out-Null
+
+        $Script = ConvertTo-WpfDesignerScript -Canvas $Canvas
+
+        $Script | Should -Match "Window 'Sample Window' \{"
+        $Script | Should -Match '\$this\.Width = 640'
+        $Script | Should -Match '\$this\.Height = 420'
+        $Script | Should -Match "\`$this\.Content = 'Inside'"
+        $Script | Should -Match 'CanvasPosition -Left 32 -Top 48'
+    }
+
     It 'Should escape single quotes in Label content' {
         $Canvas = [System.Windows.Controls.Canvas]::new()
         $Label = [System.Windows.Controls.Label]::new()
