@@ -16,7 +16,9 @@ function Clear-WpfDesignerSelection {
         [System.Windows.Controls.Canvas] $Canvas,
 
         [Parameter(Mandatory)]
-        [object] $State
+        [object] $State,
+
+        [System.Windows.Controls.Panel] $Panel
     )
 
     $Previous = $State.SelectedElement
@@ -45,4 +47,8 @@ function Clear-WpfDesignerSelection {
     }
 
     $State.SelectedElement = $null
+
+    if ($Panel) {
+        Update-WpfDesignerPropertyPanel -Panel $Panel -State $State
+    }
 }

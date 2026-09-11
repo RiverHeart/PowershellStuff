@@ -56,7 +56,7 @@ App 'Window' {
                                 $this.Content = '+ Label'
 
                                 On Click {
-                                    Add-WpfDesignerLabel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag
+                                    Add-WpfDesignerLabel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag -Panel (Reference 'PropertyEditorHost')
                                 }
                             }
 
@@ -65,7 +65,7 @@ App 'Window' {
                                 $this.Margin = 0, 4, 0, 0
 
                                 On Click {
-                                    Add-WpfDesignerStackPanel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag
+                                    Add-WpfDesignerStackPanel -Canvas (Reference 'DesignSurface') -State (Reference 'Window').Tag -Panel (Reference 'PropertyEditorHost')
                                 }
                             }
 
@@ -105,7 +105,7 @@ App 'Window' {
                             # Deselect when clicking empty canvas. Suppressed for clicks on a
                             # control because Draggable marks that event Handled first.
                             On MouseLeftButtonDown {
-                                Clear-WpfDesignerSelection -Canvas $this -State (Reference 'Window').Tag
+                                Clear-WpfDesignerSelection -Canvas $this -State (Reference 'Window').Tag -Panel (Reference 'PropertyEditorHost')
                             }
                         }
                     }
@@ -131,40 +131,9 @@ App 'Window' {
                                 $this.Margin = 0, 0, 0, 8
                             }
 
-                            TextBlock 'PropertyContentLabel' {
-                                $this.Text = 'Content'
-                                $this.Margin = 0, 0, 0, 2
-                            }
-
-                            TextBox 'PropertyContentInput' {
-                                $this.Margin = 0, 0, 0, 8
-                                BindProperty Text Content -TwoWay
-                                Add-WpfDesignerEnterCommit -InputObject $this
-                            }
-
-                            TextBlock 'PropertyWidthLabel' {
-                                $this.Text = 'Width'
-                                $this.Margin = 0, 0, 0, 2
-                            }
-
-                            TextBox 'PropertyWidthInput' {
-                                $this.Margin = 0, 0, 0, 8
-                                BindProperty Text Width -TwoWay
-                                Add-WpfDesignerEnterCommit -InputObject $this
-                                Add-WpfDesignerPropertyMinimum -InputObject $this -PropertyName Width -Minimum 20 -State (Reference 'Window').Tag
-                            }
-
-                            TextBlock 'PropertyHeightLabel' {
-                                $this.Text = 'Height'
-                                $this.Margin = 0, 0, 0, 2
-                            }
-
-                            TextBox 'PropertyHeightInput' {
-                                $this.Margin = 0, 0, 0, 8
-                                BindProperty Text Height -TwoWay
-                                Add-WpfDesignerEnterCommit -InputObject $this
-                                Add-WpfDesignerPropertyMinimum -InputObject $this -PropertyName Height -Minimum 20 -State (Reference 'Window').Tag
-                            }
+                            # Populated per-selection by Update-WpfDesignerPropertyPanel
+                            # (via Select-WpfDesignerElement / Clear-WpfDesignerSelection).
+                            StackPanel 'PropertyEditorHost' {}
                         }
                     }
                 }

@@ -20,7 +20,9 @@ function Select-WpfDesignerElement {
         [System.Windows.FrameworkElement] $Target,
 
         [Parameter(Mandatory)]
-        [object] $State
+        [object] $State,
+
+        [System.Windows.Controls.Panel] $Panel
     )
 
     if ($State.SelectedElement -eq $Target) {
@@ -41,4 +43,8 @@ function Select-WpfDesignerElement {
     $Target | Add-Member -NotePropertyName '_WPFDesignerResizeHandle' -NotePropertyValue $Handle -Force
 
     $State.SelectedElement = $Target
+
+    if ($Panel) {
+        Update-WpfDesignerPropertyPanel -Panel $Panel -State $State
+    }
 }

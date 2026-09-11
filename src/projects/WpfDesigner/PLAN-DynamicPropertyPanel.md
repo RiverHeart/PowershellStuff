@@ -37,12 +37,17 @@ An event-driven rebuild that hand-authors a `TextBlock`/input pair per property 
 selection change scales with *properties on the selected object, every time it's
 selected* — not once per control type. The design goal instead is:
 
-- Compute the descriptor list for a `[type]` once, cache it, so re-selecting the same kind
-  of control is free.
 - Key rendering off `EditorKind` (a small closed set: `Text`, `Number`, `Bool`, `Enum`, and
   eventually more) rather than per-control-type or per-property blocks, so the amount of
   panel-building code stays flat as more WPF control types gain support, and only grows
   when a genuinely new *kind* of editor is needed.
+
+Caching the descriptor list per `[type]` (so re-selecting the same kind of control skips
+reflection) was considered but is **not** part of this plan's scope — reflection cost for a
+handful of properties on a single selected element is unmeasured, and it's premature to
+design a cache around a cost that hasn't been shown to matter. Ship Slice B calling
+`Get-WpfDesignerPropertyDescriptor` fresh on every selection; only add a cache later if
+selection is observed to lag, with a profiled reason to point at.
 
 ## Scope for this iteration
 
@@ -108,6 +113,13 @@ Tests: one case per `EditorKind` asserting the right control type is produced an
 setting a value through the generated control's binding actually updates the target
 object's property (round-trip, not just "a `TextBox` exists").
 
+**Construction note:** these rows are built from a PowerShell function, not authored inline
+in a declarative DSL tree, so the plain `TextBox 'Name' { ... }` keyword syntax doesn't apply
+here. Follow the same pattern `Add-WpfDesignerControl` already uses for this — call the
+keyword function directly with auto-attach suppressed (`& 'TextBox' -AutoAttach $null
+{ ... }`) and attach the result with `Add-WPFObject`, rather than relying on ambient
+`WPFAutoAttachContext`.
+
 ### Slice B — Rebuild panel on selection change
 
 Add an `Update-WpfDesignerPropertyPanel -Panel <parent panel> -State <state>` function that:
@@ -127,14 +139,19 @@ Tests: selecting a `TextBlock` populates rows matching its descriptor list; sele
 different element type replaces (not appends to) the previous rows; clearing selection
 empties the panel.
 
-### Slice C — Per-`Type` override table
+Note: `TypeDescriptor.GetProperties` doesn't guarantee `Content`/`Width`/`Height`-first
+ordering, so the panel's row order will look shuffled relative to today until Slice D's
+category grouping (or some ad hoc ordering) lands. Expected, not a bug.
 
-A lookup keyed by `[Type]` (and, within that, property name) that Slice A's row builders
-consult for behavior reflection alone can't provide — the existing Width/Height minimum-20
-clamp is the motivating example, and `Window.WindowState` (called out in the original
-design discussion as something that should surface despite not being a plain
-enum-on-a-simple-object case) is a candidate for an explicit *addition* the base descriptor
-list wouldn't otherwise surface cleanly.
+### Slice C — Property override table
+
+A lookup that Slice A's row builders consult for behavior reflection alone can't provide —
+the existing Width/Height minimum-20 clamp is the motivating example. Key this primarily by
+**property name**, not by concrete `[Type]`: Width/Height are a `FrameworkElement`-level
+concern, not specific to `Label` or `StackPanel`, so a `[Type]`-keyed table would need a
+duplicate entry for every new control type added to the toolbar — working against the same
+flat-not-per-control-type goal `EditorKind` was designed for. Scope narrowly by property type
+instead where needed (e.g. "name is Width/Height and the target is a `FrameworkElement`").
 
 Keep this table narrow — additions/behavior tweaks for real gaps, not a general-purpose
 allow/deny list re-implementing what `Get-WpfDesignerPropertyDescriptor` already filters.
@@ -152,10 +169,16 @@ override behavior applied instead of (or in addition to) the base row.
 ## Open questions / risks
 
 - Should the override table (Slice C) live as data (a hashtable literal) or as small
-  per-`Type` functions? A hashtable keeps it inspectable at a glance; functions make
+  per-property functions? A hashtable keeps it inspectable at a glance; functions make
   complex per-property logic (like the existing clamp) easier to express. Lean toward
   hashtable entries whose values are scriptblocks, so both concerns are covered without a
   second mechanism.
+- The original design discussion also floated `Window.WindowState` as a Slice C candidate,
+  but that doesn't hold up: `WindowState` is a plain enum property that `EditorKind` already
+  classifies with no special-casing, *and* `Window` is never itself a selectable
+  `State.SelectedElement` in the current app (only `Label`/`StackPanel` instances added via
+  `Add-WpfDesignerControl` are selectable). Treat this as stale unless a real reflection gap
+  turns up during Slice C.
 - `Get-WpfDesignerPropertyDescriptor` currently has exactly one consumer once this plan
   lands (this panel). If a second consumer shows up later, revisit whether the raw
   reflection layer (not the `EditorKind` opinion) belongs in the WPF module instead of this

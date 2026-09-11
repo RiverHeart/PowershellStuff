@@ -33,7 +33,9 @@ function Add-WpfDesignerControl {
         [Parameter(Mandatory)]
         [scriptblock] $Configure,
 
-        [switch] $Container
+        [switch] $Container,
+
+        [System.Windows.Controls.Panel] $Panel
     )
 
     # The DSL keyword function (Label, StackPanel, ...) auto-attaches to the
@@ -71,7 +73,7 @@ function Add-WpfDesignerControl {
     # event Handled, which suppresses the canvas-level deselect handler.
     On -Event MouseLeftButtonDown -InputObject $NewElement -ScriptBlock {
         param($sender, $e)
-        & $SelectHandler -Canvas $Canvas -Target $sender -State $State
+        & $SelectHandler -Canvas $Canvas -Target $sender -State $State -Panel $Panel
     }.GetNewClosure()
 
     Draggable -InputObject $NewElement -BringToFrontOnDrag -BoundToParent

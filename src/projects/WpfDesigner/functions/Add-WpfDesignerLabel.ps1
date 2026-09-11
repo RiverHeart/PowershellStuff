@@ -17,10 +17,12 @@ function Add-WpfDesignerLabel {
         [System.Windows.Controls.Canvas] $Canvas,
 
         [Parameter(Mandatory)]
-        [object] $State
+        [object] $State,
+
+        [System.Windows.Controls.Panel] $Panel
     )
 
-    Add-WpfDesignerControl -Canvas $Canvas -State $State -Type 'Label' -Configure {
+    Add-WpfDesignerControl -Canvas $Canvas -State $State -Type 'Label' -Panel $Panel -Configure {
         $this.Content = 'Label'
         $this.Width = 100
         $this.Height = 26

@@ -12,6 +12,33 @@ Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
         . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerEditorKind.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyDescriptor.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyEditor.ps1"
+        . "$PSScriptRoot/../functions/Update-WpfDesignerPropertyPanel.ps1"
+    }
+
+    It 'Should populate the property panel for the newly selected target when -Panel is supplied' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Target = [System.Windows.Controls.TextBlock]::new()
+        $Canvas.Children.Add($Target) | Out-Null
+        $State = @{ SelectedElement = $null }
+        $Panel = [System.Windows.Controls.StackPanel]::new()
+
+        Select-WpfDesignerElement -Canvas $Canvas -Target $Target -State $State -Panel $Panel
+
+        $ExpectedRowCount = @(Get-WpfDesignerPropertyDescriptor -InputObject $Target).Count * 2
+        $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
+    }
+
+    It 'Should leave the property panel untouched when -Panel is not supplied' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Target = [System.Windows.Controls.TextBlock]::new()
+        $Canvas.Children.Add($Target) | Out-Null
+        $State = @{ SelectedElement = $null }
+
+        { Select-WpfDesignerElement -Canvas $Canvas -Target $Target -State $State } | Should -Not -Throw
     }
 
     It 'Should mark the target as selected and add a selection outline and resize handle' {
@@ -97,6 +124,26 @@ Describe 'Clear-WpfDesignerSelection' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
         . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
         . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerEditorKind.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyDescriptor.ps1"
+        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyEditor.ps1"
+        . "$PSScriptRoot/../functions/Update-WpfDesignerPropertyPanel.ps1"
+    }
+
+    It 'Should empty the property panel when clearing selection with -Panel supplied' {
+        $Canvas = [System.Windows.Controls.Canvas]::new()
+        $Target = [System.Windows.Controls.Label]::new()
+        $Target.Width = 100
+        $Target.Height = 26
+        $Canvas.Children.Add($Target) | Out-Null
+        $State = @{ SelectedElement = $null }
+        $Panel = [System.Windows.Controls.StackPanel]::new()
+        Select-WpfDesignerElement -Canvas $Canvas -Target $Target -State $State -Panel $Panel
+
+        Clear-WpfDesignerSelection -Canvas $Canvas -State $State -Panel $Panel
+
+        $Panel.Children.Count | Should -Be -ExpectedValue 0
     }
 
     It 'Should remove the outline and resize handle and clear selection state' {
