@@ -73,6 +73,7 @@ function Get-WpfDesignerPropertyEditor {
         }
         'Bool' {
             $CheckBox = [System.Windows.Controls.CheckBox]::new()
+            $CheckBox.Content = $Descriptor.Name
             $CheckBox.DataContext = $Target
             BindProperty -InputObject $CheckBox IsChecked $Descriptor.Name -TwoWay
             $CheckBox
@@ -89,10 +90,16 @@ function Get-WpfDesignerPropertyEditor {
         }
     }
     $Input.Margin = 0, 0, 0, 8
+    $Elements = if ($Descriptor.EditorKind -eq 'Bool') {
+        @($Input)
+    } else {
+        @($Label, $Input)
+    }
 
     [pscustomobject] @{
-        Label = $Label
-        Input = $Input
+        Label    = $Label
+        Input    = $Input
+        Elements = $Elements
     }
 }
 

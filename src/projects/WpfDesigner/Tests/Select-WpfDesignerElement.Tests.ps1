@@ -28,7 +28,8 @@ Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
 
         Select-WpfDesignerElement -Canvas $Canvas -Target $Target -State $State -Panel $Panel
 
-        $ExpectedRowCount = @(Get-WpfDesignerPropertyDescriptor -InputObject $Target).Count * 2
+        $Descriptors = @(Get-WpfDesignerPropertyDescriptor -InputObject $Target)
+        $ExpectedRowCount = ($Descriptors | ForEach-Object { if ($_.EditorKind -eq 'Bool') { 1 } else { 2 } } | Measure-Object -Sum).Sum
         $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
     }
 

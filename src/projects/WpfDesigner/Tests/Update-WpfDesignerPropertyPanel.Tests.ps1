@@ -11,15 +11,19 @@ Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
         . "$PSScriptRoot/../functions/Update-WpfDesignerPropertyPanel.ps1"
     }
 
-    It 'Should populate one Label + input row per property descriptor' {
+    It 'Should populate editor elements for each property descriptor' {
         $Panel = [System.Windows.Controls.StackPanel]::new()
         $Target = [System.Windows.Controls.TextBlock]::new()
         $State = @{ SelectedElement = $Target }
 
         Update-WpfDesignerPropertyPanel -Panel $Panel -State $State
 
-        $ExpectedRowCount = @(Get-WpfDesignerPropertyDescriptor -InputObject $Target).Count * 2
+        $Descriptors = @(Get-WpfDesignerPropertyDescriptor -InputObject $Target)
+        $ExpectedRowCount = ($Descriptors | ForEach-Object { if ($_.EditorKind -eq 'Bool') { 1 } else { 2 } } | Measure-Object -Sum).Sum
         $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
+        $BoolDescriptor = $Descriptors | Where-Object EditorKind -eq 'Bool' | Select-Object -First 1
+        $BoolEditor = $Panel.Children | Where-Object { $_ -is [System.Windows.Controls.CheckBox] -and $_.Content -eq $BoolDescriptor.Name }
+        $BoolEditor | Should -HaveCount 1
     }
 
     It 'Should populate rows from an associated property target' {
@@ -31,9 +35,10 @@ Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
 
         Update-WpfDesignerPropertyPanel -Panel $Panel -State $State
 
-        $ExpectedRowCount = @(Get-WpfDesignerPropertyDescriptor -InputObject $Window).Count * 2
+        $Descriptors = @(Get-WpfDesignerPropertyDescriptor -InputObject $Window)
+        $ExpectedRowCount = ($Descriptors | ForEach-Object { if ($_.EditorKind -eq 'Bool') { 1 } else { 2 } } | Measure-Object -Sum).Sum
         $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
-        $Panel.Children[1].DataContext | Should -Be -ExpectedValue $Window
+        @($Panel.Children | Where-Object DataContext -eq $Window).Count | Should -BeGreaterThan 0
     }
 
     It 'Should replace rather than append rows when selection changes' {
@@ -44,7 +49,8 @@ Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
         $State.SelectedElement = [System.Windows.Controls.Label]::new()
         Update-WpfDesignerPropertyPanel -Panel $Panel -State $State
 
-        $ExpectedRowCount = @(Get-WpfDesignerPropertyDescriptor -InputObject $State.SelectedElement).Count * 2
+        $Descriptors = @(Get-WpfDesignerPropertyDescriptor -InputObject $State.SelectedElement)
+        $ExpectedRowCount = ($Descriptors | ForEach-Object { if ($_.EditorKind -eq 'Bool') { 1 } else { 2 } } | Measure-Object -Sum).Sum
         $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
     }
 

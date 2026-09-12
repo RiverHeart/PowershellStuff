@@ -6,9 +6,10 @@ using namespace System.Windows.Controls
 
 .DESCRIPTION
     Clears Panel's existing children and, if State.SelectedElement is set,
-    rebuilds one Label + input row per Get-WpfDesignerPropertyDescriptor
-    result. Called from Select-WpfDesignerElement and Clear-WpfDesignerSelection
-    so the panel always reflects whatever is currently selected (or nothing).
+    rebuilds one editor row per Get-WpfDesignerPropertyDescriptor result.
+    Boolean editors use a single CheckBox with inline content; other editors
+    use separate label and input elements. Called from Select-WpfDesignerElement
+    and Clear-WpfDesignerSelection so the panel always reflects the selection.
 #>
 function Update-WpfDesignerPropertyPanel {
     [CmdletBinding()]
@@ -37,6 +38,6 @@ function Update-WpfDesignerPropertyPanel {
 
     foreach ($Descriptor in Get-WpfDesignerPropertyDescriptor -InputObject $Target) {
         $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
-        Add-WPFObject -InputObject $Panel -ChildObjects $Editor.Label, $Editor.Input
+        Add-WPFObject -InputObject $Panel -ChildObjects $Editor.Elements
     }
 }

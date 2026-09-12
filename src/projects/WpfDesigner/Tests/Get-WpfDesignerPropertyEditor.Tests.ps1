@@ -63,6 +63,9 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
         $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
 
         $Editor.Input | Should -BeOfType [System.Windows.Controls.CheckBox]
+        $Editor.Input.Content | Should -Be -ExpectedValue 'IsEnabled'
+        $Editor.Elements | Should -HaveCount 1
+        $Editor.Elements[0] | Should -Be $Editor.Input
 
         $Editor.Input.IsChecked = $false
 
