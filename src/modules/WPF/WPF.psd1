@@ -112,6 +112,7 @@ FunctionsToExport = @(
     'ComboBox'
     'DataGrid'
     'DataGridTextColumn'
+    'Expander'
     'ListView'
     'GridView'
     'GridViewColumn'

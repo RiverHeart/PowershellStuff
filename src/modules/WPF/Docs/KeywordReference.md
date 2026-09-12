@@ -21,6 +21,7 @@ Scope of this page:
     * [Border](#border)
     * [ContentPresenter](#contentpresenter)
     * [Button](#button)
+    * [Expander](#expander)
     * [Label](#label)
     * [TextBlock](#textblock)
     * [TextBox](#textbox)
@@ -350,6 +351,21 @@ Creates a Button.
 ```powershell
 Button 'SaveButton' {
     $this.Content = 'Save'
+}
+```
+
+### Expander
+
+Creates a WPF `Expander`. Set its header through `$this.Header`; a nested
+control becomes its collapsible content.
+
+```powershell
+Expander 'Details' {
+    $this.Header = 'More details'
+
+    TextBlock {
+        $this.Text = 'Additional information'
+    }
 }
 ```
 
