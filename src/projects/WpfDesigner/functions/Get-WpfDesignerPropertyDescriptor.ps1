@@ -27,7 +27,12 @@ function Get-WpfDesignerPropertyDescriptor {
     # Powershell fails to implicitly enumerate PropertyDescriptorCollection via foreach
     # so an explicit call to `GetEnumerator()` is necessary here
     foreach ($Property in $Properties.GetEnumerator()) {
-        if ($Property.IsReadOnly) {
+
+        # NOTE: Blank ComboBoxes correspond to attached-property descriptors such as
+        # `Typography.Fraction` or `RenderOptions.EdgeMode`. Those names are being treated as
+        # ordinary binding paths, so they cannot initialize; the clean fix is to omit attached
+        # properties until the designer has parent-aware attached-property support.
+        if ($Property.IsReadOnly -or $Property.Name.Contains('.')) {
             continue
         }
 

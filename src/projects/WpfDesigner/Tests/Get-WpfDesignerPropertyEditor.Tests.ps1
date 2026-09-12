@@ -38,6 +38,24 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
         $Target.Width | Should -Be -ExpectedValue 150
     }
 
+    It 'Should display and accept None for an unbounded Number property' {
+        $Target = [System.Windows.Controls.TextBlock]::new()
+        $Descriptor = [pscustomobject] @{ Name = 'MaxWidth'; PropertyType = [double]; EditorKind = 'Number' }
+
+        $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
+
+        $Editor.Input.Text | Should -Be -ExpectedValue 'None'
+
+        $Editor.Input.Text = '240'
+        $BindingExpression = [System.Windows.Data.BindingOperations]::GetBindingExpression($Editor.Input, [System.Windows.Controls.TextBox]::TextProperty)
+        $BindingExpression.UpdateSource()
+        $Target.MaxWidth | Should -Be -ExpectedValue 240
+
+        $Editor.Input.Text = 'None'
+        $BindingExpression.UpdateSource()
+        [double]::IsPositiveInfinity($Target.MaxWidth) | Should -BeTrue
+    }
+
     It 'Should build a two-way bound CheckBox for a Bool property' {
         $Target = [System.Windows.Controls.TextBlock]::new()
         $Descriptor = [pscustomobject] @{ Name = 'IsEnabled'; PropertyType = [bool]; EditorKind = 'Bool' }
@@ -59,6 +77,7 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
 
         $Editor.Input | Should -BeOfType [System.Windows.Controls.ComboBox]
         $Editor.Input.ItemsSource | Should -Contain ([System.Windows.HorizontalAlignment]::Right)
+        $Editor.Input.SelectedItem | Should -Be ([System.Windows.HorizontalAlignment]::Stretch)
 
         $Editor.Input.SelectedItem = [System.Windows.HorizontalAlignment]::Right
 

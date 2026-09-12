@@ -118,25 +118,26 @@ App 'Window' {
                         $this.BorderBrush = '#CCCCCC'
                         $this.BorderThickness = 1, 0, 0, 0
 
-                        StackPanel 'PropertyPanelContent' {
-                            $this.Margin = 8
+                        ScrollViewer {
+                            StackPanel 'PropertyPanelContent' {
+                                $this.Margin = 8
 
-                            # Re-scopes DataContext for this panel to whatever is
-                            # currently selected, so the fields below can bind to it
-                            # with plain inherited-DataContext paths.
-                            BindProperty DataContext SelectedElement
-                            Bind IsEnabled -To Window.Tag.SelectedElement -Converter { [bool] $_ }
+                                # Re-scopes DataContext for this panel to whatever is
+                                # currently selected, so the fields below can bind to it
+                                # with plain inherited-DataContext paths.
+                                BindProperty DataContext SelectedElement
+                                Bind IsEnabled -To Window.Tag.SelectedElement -Converter { [bool] $_ }
 
-                            TextBlock 'PropertyPanelHeader' {
-                                $this.Text = 'Properties'
-                                $this.FontWeight = 'Bold'
-                                $this.Margin = 0, 0, 0, 8
-                            }
+                                Expander 'PropertyPanelExpander' {
+                                    $this.Header = 'Properties'
+                                    $this.IsExpanded = $true
 
-                            # Populated per-selection by Update-WpfDesignerPropertyPanel
-                            # (via Select-WpfDesignerElement / Clear-WpfDesignerSelection).
-                            StackPanel 'PropertyEditorHost' {
-                                (Reference 'Window').Tag.PropertyPanel = $this
+                                    # Populated per-selection by Update-WpfDesignerPropertyPanel
+                                    # (via Select-WpfDesignerElement / Clear-WpfDesignerSelection).
+                                    StackPanel 'PropertyEditorHost' {
+                                        (Reference 'Window').Tag.PropertyPanel = $this
+                                    }
+                                }
                             }
                         }
                     }

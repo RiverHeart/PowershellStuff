@@ -40,6 +40,14 @@ Describe 'Get-WpfDesignerPropertyDescriptor' -Tag 'WpfDesigner' {
         @($Descriptors | Where-Object Name -eq 'ActualWidth') | Should -HaveCount 0
     }
 
+    It 'Should exclude attached properties that require parent-aware editing' {
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+
+        $Descriptors = Get-WpfDesignerPropertyDescriptor -InputObject $TextBlock
+
+        @($Descriptors | Where-Object Name -eq 'Typography.Fraction') | Should -HaveCount 0
+    }
+
     It 'Should exclude a property with an unrecognized type' {
         $TextBlock = [System.Windows.Controls.TextBlock]::new()
 

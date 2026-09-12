@@ -31,7 +31,9 @@ depends on the WPF module's public commands and DSL keywords.
 - [x] Placed Labels have a visible border and a hover highlight (`Style Label`).
 - [x] Selection of a placed Label (click to select, click empty canvas to deselect).
 - [x] Resize handle for the selected Label (bottom-right corner, 20px minimum).
-- [x] Property panel bound to the selected Label (`Content`/`Width`/`Height`, two-way).
+- [x] Dynamic property panel with two-way text, numeric, boolean, and enum editors.
+- [x] Unbounded numeric values such as `MaxWidth` display and accept `None`.
+- [x] Attached properties are omitted until parent-aware editing is supported.
 - [x] Panel Width/Height edits clamp to the resize handle's 20px minimum on commit.
 - [x] Panel fields commit on Enter without requiring focus loss.
 - [x] Export the design as runnable DSL script text, copied to the clipboard

@@ -45,7 +45,29 @@ function Get-WpfDesignerPropertyEditor {
         'Number' {
             $TextBox = [System.Windows.Controls.TextBox]::new()
             $TextBox.DataContext = $Target
-            BindProperty -InputObject $TextBox Text $Descriptor.Name -TwoWay
+            if ($Descriptor.PropertyType -eq [double]) {
+                $ConvertNumber = {
+                    param($Value)
+
+                    if ([double]::IsPositiveInfinity($Value)) { return 'None' }
+                    return $Value
+                }
+                $ConvertNumberBack = {
+                    param($Value)
+
+                    if ($Value -is [string] -and $Value.Trim() -ieq 'None') {
+                        return [double]::PositiveInfinity
+                    }
+                    return $Value
+                }
+                $ConfigureBinding = {
+                    $this.Converter = New-WPFValueConverter $ConvertNumber $ConvertNumberBack
+                }.GetNewClosure()
+
+                BindProperty -InputObject $TextBox Text $Descriptor.Name -TwoWay -ScriptBlock $ConfigureBinding
+            } else {
+                BindProperty -InputObject $TextBox Text $Descriptor.Name -TwoWay
+            }
             Add-WpfDesignerEnterCommit -InputObject $TextBox
             $TextBox
         }
