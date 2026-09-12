@@ -42,7 +42,7 @@ function Image {
     }
 
     # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $Image.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Image)"

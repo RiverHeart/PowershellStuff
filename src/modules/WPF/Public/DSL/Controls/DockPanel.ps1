@@ -37,7 +37,7 @@ function DockPanel {
             $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.DockPanel])
         }
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent) {
             Add-WPFObject $Parent $Factory
         }
@@ -60,7 +60,7 @@ function DockPanel {
     }
 
     # Auto-attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $DockPanel.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (DockPanel)"

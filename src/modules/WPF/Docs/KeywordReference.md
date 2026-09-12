@@ -21,6 +21,7 @@ Scope of this page:
     * [Border](#border)
     * [ContentPresenter](#contentpresenter)
     * [Button](#button)
+    * [Expander](#expander)
     * [Label](#label)
     * [TextBlock](#textblock)
     * [TextBox](#textbox)
@@ -30,16 +31,21 @@ Scope of this page:
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
     * [DockPanel](#dockpanel)
+    * [Canvas](#canvas)
     * [DataGrid](#datagrid)
     * [DataGridTextColumn](#datagridtextcolumn)
     * [ListView](#listview)
     * [GridView](#gridview)
     * [GridViewColumn](#gridviewcolumn)
     * [GridViewColumnHeader](#gridviewcolumnheader)
+    * [TreeView](#treeview)
+    * [TreeViewItem](#treeviewitem)
+    * [HierarchicalItemTemplate](#hierarchicalitemtemplate)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
     * [MenuItem](#menuitem)
     * [StatusBar](#statusbar)
+    * [Thumb](#thumb)
 * [Shapes](#shapes)
     * [Path](#path)
     * [Rectangle](#rectangle)
@@ -83,9 +89,14 @@ Scope of this page:
     * [Unregister-WPFCompletionType](#unregister-wpfcompletiontype)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
+    * [CanvasPosition](#canvasposition)
+    * [BringToFront](#bringtofront)
+    * [SendToBack](#sendtoback)
+    * [Draggable](#draggable)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
+    * [Start-WPFApplication](#start-wpfapplication)
     * [New-WPFProject](#new-wpfproject)
     * [Get-WPFTextInput](#get-wpftextinput)
 * [Application Storage](#application-storage)
@@ -344,6 +355,21 @@ Button 'SaveButton' {
 }
 ```
 
+### Expander
+
+Creates a WPF `Expander`. Set its header through `$this.Header`; a nested
+control becomes its collapsible content.
+
+```powershell
+Expander 'Details' {
+    $this.Header = 'More details'
+
+    TextBlock {
+        $this.Text = 'Additional information'
+    }
+}
+```
+
 ### Label
 
 Creates a Label.
@@ -443,6 +469,19 @@ DockPanel 'Layout' {
 }
 ```
 
+### Canvas
+
+Creates a Canvas. Use `CanvasPosition` to place children with the
+`Canvas.Left`/`Top`/`Right`/`Bottom` attached properties.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
+}
+```
+
 ### DataGrid
 
 Creates a DataGrid. Use `$this.ItemsSource` to bind data and `$this.AutoGenerateColumns` to control column generation.
@@ -533,6 +572,93 @@ GridViewColumn {
 }
 ```
 
+### TreeView
+
+Creates a TreeView. Supports named and nameless forms. Nested `TreeViewItem`
+blocks are added to the `Items` collection.
+
+```powershell
+TreeView 'FileTree' {
+    TreeViewItem 'src' {
+        $this.Header = 'src'
+
+        TreeViewItem 'Public' {
+            $this.Header = 'Public'
+        }
+
+        TreeViewItem 'Private' {
+            $this.Header = 'Private'
+        }
+    }
+}
+```
+
+This manual, nested-`TreeViewItem` form is a good fit for a small or fixed
+tree shape known ahead of time. For a tree built from an arbitrary object
+graph (for example, a recursive `Children` property of unknown depth), use
+[HierarchicalItemTemplate](#hierarchicalitemtemplate) instead of hand-writing
+recursive `TreeViewItem` code.
+
+### TreeViewItem
+
+Creates a TreeViewItem. Set `$this.Header` to control the displayed text and
+nest further `TreeViewItem` blocks to build hierarchy.
+
+```powershell
+TreeViewItem 'Documents' {
+    $this.Header = 'Documents'
+
+    TreeViewItem 'ReadmeFile' {
+        $this.Header = 'README.md'
+    }
+}
+```
+
+### HierarchicalItemTemplate
+
+Creates a `HierarchicalDataTemplate` for a `TreeView` or `TreeViewItem` and
+auto-attaches it to the parent's `ItemTemplate`. Rather than manually creating
+a `TreeViewItem` per node, set `ItemsSource` on the `TreeView` and describe how
+to render *one* node; WPF applies that description recursively, generating
+`TreeViewItem` containers lazily as branches are expanded:
+
+```powershell
+$Root = [pscustomobject] @{
+    Header   = 'src'
+    Children = @(
+        [pscustomobject] @{ Header = 'Public'; Children = @() }
+        [pscustomobject] @{ Header = 'Private'; Children = @() }
+    )
+}
+
+TreeView 'FileTree' {
+    $this.ItemsSource = @($Root)
+
+    HierarchicalItemTemplate 'Children' {
+        TextBlock {
+            BindProperty Text Header
+        }
+    }
+}
+```
+
+The first argument is the property on each data item that holds its child
+collection. The nested block builds the per-node visual using factory-mode
+controls (currently `TextBlock`) — the same mechanism `Template` uses to build
+a `ControlTemplate`'s visual tree — so `BindProperty` and the colon shorthand
+(`Text: 'value'`) work as usual, but `$this.Property = value` does not, since
+the block is building a reusable template recipe rather than a live control.
+
+Compared to hand-written recursion (building `TreeViewItem` objects yourself
+and iterating child collections in PowerShell), `HierarchicalItemTemplate`:
+
+- generates containers lazily, only for expanded nodes, instead of eagerly
+  materializing every `TreeViewItem` up front
+- reflects later additions/removals automatically when the child collection is
+  an `ObservableCollection`
+- is defined once per `TreeView`/`TreeViewItem`, instead of being re-derived by
+  every caller that needs a tree
+
 ### DatePicker
 
 Creates a DatePicker.
@@ -580,6 +706,24 @@ App 'Example' {
         TextBlock 'ReadyText' {
             $this.Text = 'Ready'
         }
+    }
+}
+```
+
+### Thumb
+
+Creates a WPF `Thumb`. `Thumb` has no content and is typically used inside a
+custom template or control composition to provide drag behavior, handling
+`DragStarted`, `DragDelta`, and `DragCompleted` events.
+
+```powershell
+Thumb 'Handle' {
+    $this.Width = 12
+    $this.Height = 12
+
+    On DragDelta {
+        param($sender, $e)
+        Write-Host "$($e.HorizontalChange), $($e.VerticalChange)"
     }
 }
 ```
@@ -1658,6 +1802,96 @@ StatusBarItem 'StatusZoomItem' {
 Dock Top -InputObject $SomeControl
 ```
 
+### CanvasPosition
+
+Sets the `Canvas.Left`, `Canvas.Top`, `Canvas.Right`, `Canvas.Bottom`, and
+`Panel.ZIndex` attached properties on the current object. Only the parameters
+you supply are applied.
+
+`-Left`/`-Right` and `-Top`/`-Bottom` are mutually exclusive pairs; supplying
+both sides of an axis raises an error.
+
+Use inside a DSL block to target `$this`, or pass `-InputObject` explicitly.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
+}
+```
+
+```powershell
+CanvasPosition -Left 5 -ZIndex 2 -InputObject $SomeControl
+```
+
+### BringToFront
+
+Sets `Panel.ZIndex` on the current object to one greater than the highest
+`ZIndex` among its sibling elements, so it renders above the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Back' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Front' {
+        CanvasPosition -Left 0 -Top 0
+        BringToFront
+    }
+}
+```
+
+### SendToBack
+
+Sets `Panel.ZIndex` on the current object to one less than the lowest
+`ZIndex` among its sibling elements, so it renders behind the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Front' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Back' {
+        CanvasPosition -Left 0 -Top 0
+        SendToBack
+    }
+}
+```
+
+### Draggable
+
+Wires up `MouseLeftButtonDown`/`MouseMove`/`MouseLeftButtonUp` handlers so the
+current object can be dragged around its parent Canvas with the mouse.
+Position updates go through `CanvasPosition`. The parent is resolved when a
+drag starts, so `Draggable` can be called before the object is attached to its
+final Canvas; if the parent isn't a Canvas at that point, a warning is written
+and the drag is ignored.
+
+Use `-BringToFrontOnDrag` to raise the object's `ZIndex` when a drag begins,
+`-BoundToParent` to keep the object fully within its parent Canvas (clamped
+using the Canvas's and object's actual size), and `-OnDragEnd` to run custom
+logic (for example, persisting the final position) after the mouse is
+released.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 10
+        Draggable -BringToFrontOnDrag
+    }
+}
+```
+
+```powershell
+Draggable -InputObject $SomeControl -BoundToParent
+```
+
+```powershell
+Draggable -InputObject $SomeControl -OnDragEnd {
+    param($Target)
+    Write-Host "Dropped at $([System.Windows.Controls.Canvas]::GetLeft($Target)), $([System.Windows.Controls.Canvas]::GetTop($Target))"
+}
+```
+
 ### Get-WPFWindow
 
 Gets the current root window for the resolved DSL context.
@@ -1735,6 +1969,21 @@ Window 'Window' {
     $this.Title = 'Hello'
 } | Show-WPFWindow
 ```
+
+### Start-WPFApplication
+
+Imports an application module and runs a module-relative entry point inside its
+session state. This lets the entry point use application functions without
+exporting them from the module.
+
+```powershell
+Start-WPFApplication `
+    -ModulePath "$PSScriptRoot/MyApp.psd1" `
+    -EntryPoint 'src/Views/main.gui.ps1' `
+    -Force
+```
+
+The entry point must be a file beneath the application module root.
 
 ### New-WPFProject
 

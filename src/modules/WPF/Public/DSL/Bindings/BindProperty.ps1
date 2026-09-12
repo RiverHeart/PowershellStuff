@@ -170,8 +170,10 @@ function BindProperty {
             return
         }
 
-        # Resolve the target dependency property
-        $TargetType = $Target.GetType()
+        # Resolve the target dependency property. Inside a template factory
+        # context, the factory's recipe Type is the real target type.
+        $IsFactoryTarget = $Target -is [System.Windows.FrameworkElementFactory]
+        $TargetType = if ($IsFactoryTarget) { $Target.Type } else { $Target.GetType() }
         $ResolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $TargetType
 
         if (-not $ResolvedProperty) {
@@ -190,6 +192,8 @@ function BindProperty {
             $binding.ElementName = $ElementName
         } elseif ($PSBoundParameters.ContainsKey('Source')) {
             $binding.Source = $Source
+        } elseif ($IsFactoryTarget) {
+            Write-Verbose "BindProperty: No source selector specified inside a template factory context; using the generated element's inherited DataContext for path '$Path'."
         } else {
             $dataContextProperty = $Target.PSObject.Properties['DataContext']
             if ($null -eq $dataContextProperty) {
@@ -215,8 +219,13 @@ function BindProperty {
             $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
         }
 
-        # Apply the binding using BindingOperations
-        $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $ResolvedProperty.DependencyProperty, $binding)
+        # Apply the binding using BindingOperations, or FrameworkElementFactory's
+        # own SetBinding when targeting a template factory recipe.
+        if ($IsFactoryTarget) {
+            $Target.SetBinding($ResolvedProperty.DependencyProperty, $binding)
+        } else {
+            $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $ResolvedProperty.DependencyProperty, $binding)
+        }
         Write-Verbose "BindProperty: Successfully bound '$Property' on $($TargetType.Name) to '$Path'."
     }
 }

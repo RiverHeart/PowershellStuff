@@ -22,40 +22,66 @@ function TextBlock {
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
         [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        [System.Windows.FrameworkElement] $AutoAttach,
+        [switch] $Factory
     )
+
+    $TypeName = 'TextBlock'
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
         Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name $Name
         return
     }
 
-    try {
-        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+    # Factory mode: inside a Template/HierarchicalItemTemplate block, produce a
+    # FrameworkElementFactory instead of a live TextBlock instance.
+    $CreateFactory =
+        if ($Factory) { $Factory }
+        else { $PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true }
+
+    if ($CreateFactory) {
+        $TypeName = "$TypeName Factory"
+        Write-Debug "Creating $Name ($TypeName)"
         if ($Name -ne '__Nameless__') {
-            $TextBlock.Name = $Name
-            Register-WPFObject $Name $TextBlock
+            $OutputObject = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.TextBlock], $Name)
+        } else {
+            $OutputObject = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.TextBlock])
         }
-        Add-WPFType $TextBlock 'Control'
-    } catch {
-        Write-Error "Failed to create '$Name' (TextBlock) with error: $_"
+    } else {
+        Write-Debug "Creating $Name ($TypeName)"
+        try {
+            $OutputObject = [System.Windows.Controls.TextBlock]::new()
+            if ($Name -ne '__Nameless__') {
+                $OutputObject.Name = $Name
+                Register-WPFObject $Name $OutputObject
+            }
+            Add-WPFType $OutputObject 'Control'
+        } catch {
+            Write-Error "Failed to create '$Name' ($TypeName) with error: $_"
+        }
     }
 
     # Attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
-    $IsParentedBefore = [bool] $TextBlock.Parent
-    if ($Parent -and -not $IsParentedBefore) {
-        Write-Debug "Beginning auto-attach for $Name (TextBlock)"
-        Update-WPFObject $Parent $TextBlock
+    $Parent = Resolve-WPFAutoAttachTarget `
+        -Cmdlet $PSCmdlet `
+        -BoundParameters $PSBoundParameters `
+        -AutoAttach $AutoAttach
+
+    $AlreadyParented = [bool] $OutputObject.Parent
+    if ($Parent -and -not $AlreadyParented) {
+        Write-Debug "Auto-attaching $Name ($TypeName) to $($Parent.Name) ($($Parent.GetType().Name))"
+        Update-WPFObject $Parent $OutputObject
     }
 
     # NOTE: Allow exceptions from child objects to bubble up
-    Write-Debug "Processing child elements for $Name (TextBlock)"
-    Update-WPFObject $TextBlock $ScriptBlock
+    Write-Debug "Processing child elements for $Name ($TypeName)"
+    Update-WPFObject $OutputObject $ScriptBlock
 
-    $IsParentedAfter = [bool] $TextBlock.Parent
+    $BecameParented = [bool] $OutputObject.Parent
     $IsCollectingChildren = [bool] $PSCmdlet.GetVariableValue('WPFCollectChildren')
-    if ($IsCollectingChildren -or -not $IsParentedAfter) {
-        return $TextBlock
+    if ($IsCollectingChildren -or -not $BecameParented) {
+        return $OutputObject
     }
 }

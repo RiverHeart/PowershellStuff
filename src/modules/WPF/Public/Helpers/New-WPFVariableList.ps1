@@ -25,6 +25,12 @@ function New-WPFVariableList {
     $PrefSource = if ($CallerSessionState) { $CallerSessionState.PSVariable } else { $PSCmdlet.SessionState.PSVariable }
     $DefaultVars = @(
         if ($null -ne $InputObject) { [psvariable]::new('this', $InputObject) }
+        # Dedicated marker for the "current DSL parent" so control keywords can
+        # resolve auto-attach targets without relying on `$this`, which
+        # PowerShell also auto-binds to the sender inside WPF event handler
+        # delegates (see Docs/MaintainerNotes.md, "Auto-Attach vs. Event
+        # Handler `$this`").
+        if ($null -ne $InputObject) { [psvariable]::new('WPFAutoAttachContext', $InputObject) }
         $PrefSource.Get('WarningPreference'),
         $PrefSource.Get('DebugPreference'),
         $PrefSource.Get('ErrorActionPreference'),
@@ -40,7 +46,8 @@ function New-WPFVariableList {
     # Propagate factory context so nested DSL keywords (Border, ContentPresenter,
     # etc.) produce FrameworkElementFactory nodes instead of live instances.
     if ($InputObject -is [System.Windows.FrameworkElementFactory] -or
-        $InputObject -is [System.Windows.Controls.ControlTemplate]
+        $InputObject -is [System.Windows.Controls.ControlTemplate] -or
+        $InputObject -is [System.Windows.DataTemplate]
     ) {
         $PSVars.Add([psvariable]::new('WPFFactoryContext', $true))
     }

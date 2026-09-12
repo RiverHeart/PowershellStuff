@@ -40,7 +40,7 @@ function Menu {
         Add-WPFType $Menu 'Control'
 
         # Register as stable __WPFMenu alias if parent is a Window
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent -is [System.Windows.Window]) {
             $ContextId = Get-WPFControlContextId -InputObject $Parent -ErrorAction SilentlyContinue
             if ($ContextId) {
@@ -52,7 +52,7 @@ function Menu {
     }
 
     # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $Menu.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Menu)"

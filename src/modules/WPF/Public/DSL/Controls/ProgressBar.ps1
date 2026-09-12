@@ -42,7 +42,7 @@ function ProgressBar {
         Write-Error "Failed to create '$Name' (ProgressBar) with error: $_"
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $ProgressBar.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (ProgressBar)"

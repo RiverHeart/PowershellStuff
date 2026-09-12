@@ -37,7 +37,12 @@ function Border {
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
         [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        # Overrides the ambient WPFAutoAttachContext when explicitly bound -
+        # $null suppresses auto-attach, a real object attaches there directly.
+        [AllowNull()]
+        [object] $AutoAttach
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
@@ -53,9 +58,8 @@ function Border {
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
         $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Border], $Name)
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = Resolve-WPFAutoAttachTarget -Cmdlet $PSCmdlet -BoundParameters $PSBoundParameters -AutoAttach $AutoAttach
         if ($Parent) {
-            Write-Debug "Factory auto-attach: $Name (Border) -> $($Parent.GetType().Name)"
             Add-WPFObject $Parent $Factory
         }
 
@@ -77,8 +81,8 @@ function Border {
         Write-Error "Failed to create '$Name' (Border) with error: $_"
     }
 
-    # Auto-attach if parent exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    # Auto-attach self to parent if one exists
+    $Parent = Resolve-WPFAutoAttachTarget -Cmdlet $PSCmdlet -BoundParameters $PSBoundParameters -AutoAttach $AutoAttach
     $IsParentedBefore = [bool] $Border.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Border)"

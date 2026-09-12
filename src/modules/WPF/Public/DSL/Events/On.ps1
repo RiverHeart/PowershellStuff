@@ -32,23 +32,33 @@ function On {
         [Parameter(Mandatory, Position = 1)]
         [scriptblock] $ScriptBlock,
 
+        [Parameter(ValueFromPipeline)]
         [object] $InputObject
     )
 
-    if ($MyInvocation.InvocationName.StartsWith('-')) {
-        Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "On $Event"
-        return
-    }
-
-    # Auto-attach self to parent if one exists
-    if (-not $InputObject) {
-        $InputObject = $PSCmdlet.GetVariableValue('this')
-        if (-not $InputObject) {
-            Write-Warning "Parent not found for event handler '$Event'"
+    begin {
+        $IsDisabledBlock = $MyInvocation.InvocationName.StartsWith('-')
+        if ($IsDisabledBlock) {
+            Write-WPFDisabledBlockWarning -Invocation $MyInvocation -Name "On $Event"
             return
         }
     }
 
-    Write-Debug "Adding handler for event '$Event' to object '$($InputObject.Name)' ($($InputObject.GetType().Name))"
-    $InputObject."Add_$Event"($ScriptBlock)
+    process {
+        if ($IsDisabledBlock) {
+            return
+        }
+
+        # Auto-attach self to parent if one exists
+        if (-not $InputObject) {
+            $InputObject = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
+            if (-not $InputObject) {
+                Write-Warning "Parent not found for event handler '$Event'"
+                return
+            }
+        }
+
+        Write-Debug "Adding handler for event '$Event' to object '$($InputObject.Name)' ($($InputObject.GetType().Name))"
+        $InputObject."Add_$Event"($ScriptBlock)
+    }
 }

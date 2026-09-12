@@ -85,7 +85,7 @@ function Update-WPFObject {
             Set-WPFObjectSpec -InputObject $InputObject -Name 'Command' -Value $Child | Out-Null
         }
         # Control
-        elseif (Test-WPFType $Child @('Control', 'GridDefinition', 'DataGridColumn', 'ListViewView', 'GridViewColumn')) {
+        elseif (Test-WPFType $Child @('Control', 'GridDefinition', 'DataGridColumn', 'ListViewView', 'GridViewColumn', 'ItemTemplate')) {
             # NOTE: Most controls are auto-attaching to their parents during
             # creation so their parent is available to their children before
             # recursing through their scriptblock but for objects being created
@@ -125,6 +125,10 @@ function Update-WPFObject {
             } elseif ($InputObject -is [System.Windows.Controls.Border]) {
                 $InputObject.Child = $Child
             }
+        }
+        # Factory (Template mode): reuse Add-WPFObject's attachment logic.
+        elseif ($Child -is [System.Windows.FrameworkElementFactory]) {
+            Add-WPFObject -InputObject $InputObject -ChildObjects $Child
         }
         else {
             $Message = "Cannot add '$ChildName' ($ChildType) to '$thisName' ($thisType)"

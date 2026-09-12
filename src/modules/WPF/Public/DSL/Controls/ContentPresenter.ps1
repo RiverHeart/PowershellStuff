@@ -42,7 +42,7 @@ function ContentPresenter {
             $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ContentPresenter])
         }
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent) {
             Add-WPFObject $Parent $Factory
         }
@@ -61,7 +61,7 @@ function ContentPresenter {
         Register-WPFObject $Name $Presenter
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     if ($Parent) {
         Add-WPFObject $Parent $Presenter
     }

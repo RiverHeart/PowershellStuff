@@ -41,4 +41,33 @@ Describe 'ComboBox' -Tag 'ComboBox' {
         $Parent.Children[0] | Should -BeOfType [System.Windows.Controls.ComboBox]
         $Parent.Children[0].Name | Should -Be "ComboBox_$Id"
     }
+
+    It 'Should not auto-attach a control created from a scope with an ambient event-handler $this' {
+        InModuleScope WPF {
+            $Sender = [System.Windows.Controls.Button]::new()
+            $this = $Sender
+
+            $NewComboBox = ComboBox 'FromHandler' {}
+
+            $NewComboBox | Should -Not -Be $null
+            $NewComboBox.Parent | Should -Be $null
+        }
+    }
+
+    It 'Should honor an explicit -AutoAttach override' {
+        Import-Module -Name "$PSScriptRoot/../../../WPF.psd1" -Force
+        $Id = [guid]::NewGuid().ToString('N')
+        $Parent = [System.Windows.Controls.StackPanel]::new()
+        $OtherParent = [System.Windows.Controls.StackPanel]::new()
+        $PSVars = New-WPFVariableList -InputObject $Parent
+
+        $Result = {
+            ComboBox "ComboBox_$Id" -AutoAttach $OtherParent {}
+        }.InvokeWithContext($null, $PSVars)
+
+        @($Result).Count | Should -Be 0
+        $Parent.Children | Should -HaveCount 0
+        $OtherParent.Children | Should -HaveCount 1
+        $OtherParent.Children[0].Name | Should -Be "ComboBox_$Id"
+    }
 }

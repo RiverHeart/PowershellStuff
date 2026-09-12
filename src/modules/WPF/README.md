@@ -200,12 +200,12 @@ Many reasons, but a few big ones:
 ## When Not To Use It
 
 - You need cross-platform support.
-    - [PSAvalonia](https://github.com/ironmansoftware/psavalonia) suggests this might be possible if I swap the backend but I don't have the motivation to pursue that currently.
+    - [PSAvalonia](https://github.com/ironmansoftware/psavalonia) and [ConsoleGuiTools](https://github.com/RiverHeart/ConsoleGuiTools) show using Avalonia is possible. I don't have the motivation to pursue this currently but I have forked these projects just in case I need a reference implementation.
 - You need to ship a standalone binary/exe. This project intentionally avoids third-party modules, so binary distribution is not a supported workflow.
 - You team requires a XAML-first designer workflow.
 - You need long-term API stability right now.
 - You need a guarantee I'll work on this forever.
-    - Microsoft seems to believe they own our computers more than we do. If I migrate to Linux full-time it'll make it difficult to work on this unless it turns into a work project.
+    - Microsoft seems to believe they own our computers more than we do. If I migrate to Linux full-time it'll make it difficult to work on this unless it turns into a work project or I pursue Avalonia as a backend target.
 
 ## System Requirements
 

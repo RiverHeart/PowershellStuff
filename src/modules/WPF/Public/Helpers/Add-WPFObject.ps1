@@ -41,6 +41,21 @@ function Add-WPFObject {
             $InputObject.VisualTree = $Child
             continue
         }
+        elseif ($InputObject -is [System.Windows.DataTemplate] -and
+            $Child -is [System.Windows.FrameworkElementFactory]
+        ) {
+            Write-Debug "Setting VisualTree: '$ChildName' ($ChildType) -> DataTemplate"
+            $InputObject.VisualTree = $Child
+            continue
+        }
+        elseif (
+            $InputObject -is [System.Windows.Controls.ItemsControl] -and
+            $Child -is [System.Windows.DataTemplate]
+        ) {
+            Write-Debug "Setting ItemTemplate '$ChildName' ($ChildType) on '$SelfName' ($SelfType)"
+            $InputObject.ItemTemplate = $Child
+            continue
+        }
         elseif (
             $InputObject -is [System.Windows.Controls.DataGrid] -and
             $Child -is [System.Windows.Controls.DataGridColumn]

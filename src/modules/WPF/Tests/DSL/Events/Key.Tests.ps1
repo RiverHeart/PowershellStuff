@@ -17,7 +17,8 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
                 $script:CapturedHandler = $ScriptBlock
             }
 
-            Key 'Escape' {
+            $Parent = [pscustomobject]@{ Name = 'Parent' }
+            $Parent | Key 'Escape' {
                 $script:ActionExecuted = $true
             }
 
@@ -49,7 +50,8 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
                 $script:CapturedHandler = $ScriptBlock
             }
 
-            Key 'Escape' {
+            $Parent = [pscustomobject]@{ Name = 'Parent' }
+            $Parent | Key 'Escape' {
                 $script:ActionExecuted = $true
             }
 
@@ -80,7 +82,8 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
                 $script:CapturedHandler = $ScriptBlock
             }
 
-            Key 'Escape' {
+            $Parent = [pscustomobject]@{ Name = 'Parent' }
+            $Parent | Key 'Escape' {
                 $event.Handled = $true
             }
 
@@ -113,7 +116,8 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
                 $script:CapturedHandler = $ScriptBlock
             }
 
-            Key 'Escape' {
+            $Parent = [pscustomobject]@{ Name = 'Parent' }
+            $Parent | Key 'Escape' {
                 $script:ActionExecuted = $true
             }
 
@@ -145,7 +149,8 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
                 $script:CapturedHandler = $ScriptBlock
             }
 
-            Key 'Ctrl+Shift+S' {
+            $Parent = [pscustomobject]@{ Name = 'Parent' }
+            $Parent | Key 'Ctrl+Shift+S' {
                 $script:ExecutionCount++
             }
 
@@ -202,7 +207,8 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
                 $script:CapturedHandler = $ScriptBlock
             }
 
-            Key @('Ctrl+S', 'F11') {
+            $Parent = [pscustomobject]@{ Name = 'Parent' }
+            $Parent | Key @('Ctrl+S', 'F11') {
                 $script:ExecutionCount++
             }
 
@@ -227,5 +233,64 @@ Describe 'Key' -Tag 'Key', 'Category:Events' {
         }
 
         $ExecutionCount | Should -Be 2
+    }
+
+    It 'Should use the resolved InputObject rather than an ambient event-handler $this' {
+        InModuleScope WPF {
+            # Regression: Key built its handler-closure variables and piped
+            # into On using $PSCmdlet.GetVariableValue('this') instead of the
+            # $InputObject it had already resolved (from the pipeline or
+            # WPFAutoAttachContext), so a stale ambient $this would win.
+            $script:VariableListSource = $null
+            $script:OnInputObject = $null
+
+            Mock -CommandName New-WPFVariableList -MockWith {
+                param($InputObject)
+                $script:VariableListSource = $InputObject
+                [System.Collections.Generic.List[psvariable]]::new()
+            }
+
+            Mock -CommandName On -MockWith {
+                param($Event, $ScriptBlock, $InputObject)
+                $script:OnInputObject = $InputObject
+            }
+
+            $DecoyThis = [pscustomobject]@{ Name = 'DecoyThis' }
+            $RealParent = [pscustomobject]@{ Name = 'RealParent' }
+
+            $PSVars = [System.Collections.Generic.List[psvariable]]::new()
+            $PSVars.Add([psvariable]::new('this', $DecoyThis))
+
+            { $RealParent | Key 'Escape' {} }.InvokeWithContext($null, $PSVars)
+
+            $script:VariableListSource.Name | Should -Be 'RealParent'
+            $script:OnInputObject.Name | Should -Be 'RealParent'
+        }
+    }
+
+    It 'Should use the WPFAutoAttachContext rather than an ambient event-handler $this' {
+        InModuleScope WPF {
+            $script:OnInputObject = $null
+
+            Mock -CommandName New-WPFVariableList -MockWith {
+                [System.Collections.Generic.List[psvariable]]::new()
+            }
+
+            Mock -CommandName On -MockWith {
+                param($Event, $ScriptBlock, $InputObject)
+                $script:OnInputObject = $InputObject
+            }
+
+            $DecoyThis = [pscustomobject]@{ Name = 'DecoyThis' }
+            $RealParent = [pscustomobject]@{ Name = 'RealParent' }
+
+            $PSVars = [System.Collections.Generic.List[psvariable]]::new()
+            $PSVars.Add([psvariable]::new('this', $DecoyThis))
+            $PSVars.Add([psvariable]::new('WPFAutoAttachContext', $RealParent))
+
+            { Key 'Escape' {} }.InvokeWithContext($null, $PSVars)
+
+            $script:OnInputObject.Name | Should -Be 'RealParent'
+        }
     }
 }
