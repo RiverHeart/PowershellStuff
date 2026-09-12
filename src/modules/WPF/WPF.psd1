@@ -218,6 +218,7 @@ FunctionsToExport = @(
     'Set-WPFClipboard'
     'Set-WPFWindowFullScreen'
     'Show-WPFWindow'
+    'Start-WPFApplication'
     'Switch-WPFTheme'
     'Unregister-WPFCompletionType'
     'Unregister-WPFObject'

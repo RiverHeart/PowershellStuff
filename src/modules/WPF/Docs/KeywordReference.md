@@ -96,6 +96,7 @@ Scope of this page:
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
+    * [Start-WPFApplication](#start-wpfapplication)
     * [New-WPFProject](#new-wpfproject)
     * [Get-WPFTextInput](#get-wpftextinput)
 * [Application Storage](#application-storage)
@@ -1968,6 +1969,21 @@ Window 'Window' {
     $this.Title = 'Hello'
 } | Show-WPFWindow
 ```
+
+### Start-WPFApplication
+
+Imports an application module and runs a module-relative entry point inside its
+session state. This lets the entry point use application functions without
+exporting them from the module.
+
+```powershell
+Start-WPFApplication `
+    -ModulePath "$PSScriptRoot/MyApp.psd1" `
+    -EntryPoint 'src/Views/main.gui.ps1' `
+    -Force
+```
+
+The entry point must be a file beneath the application module root.
 
 ### New-WPFProject
 
