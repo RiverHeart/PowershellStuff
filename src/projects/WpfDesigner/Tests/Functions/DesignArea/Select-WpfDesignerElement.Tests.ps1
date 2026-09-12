@@ -1,22 +1,10 @@
 Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
-        . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
-        . "$PSScriptRoot/../functions/Add-PSType.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
-        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerEditorKind.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyDescriptor.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyEditor.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerPropertyPanel.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should populate the property panel for the newly selected target when -Panel is supplied' {
@@ -113,23 +101,11 @@ Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
 
 Describe 'Clear-WpfDesignerSelection' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
-        . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
-        . "$PSScriptRoot/../functions/Add-PSType.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
-        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerEditorKind.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyDescriptor.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyEditor.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerPropertyPanel.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should empty the property panel when clearing selection with -Panel supplied' {
@@ -193,14 +169,11 @@ Describe 'Clear-WpfDesignerSelection' -Tag 'WpfDesigner' {
 
 Describe 'New-WpfDesignerSelectionOutline' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-PSType.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should not be hit-test visible, so it never intercepts clicks meant for the target' {
@@ -247,14 +220,11 @@ Describe 'New-WpfDesignerSelectionOutline' -Tag 'WpfDesigner' {
 
 Describe 'New-WpfDesignerResizeHandle' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-PSType.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should resize the target when the handle is dragged' {

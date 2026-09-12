@@ -1,11 +1,10 @@
 Describe 'Get-WpfDesignerPropertyDescriptor' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Get-WpfDesignerEditorKind.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyDescriptor.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should include a writable string property as Text' {

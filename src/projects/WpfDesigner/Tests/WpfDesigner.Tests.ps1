@@ -1,6 +1,10 @@
 Describe 'WpfDesigner scaffold' -Tag 'WpfDesigner' {
+    BeforeAll {
+        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+    }
+
     It 'Should launch and auto-close without error' {
-        $ScriptPath = "$PSScriptRoot/../WpfDesigner.DSL.ps1"
+        $ScriptPath = "$PSScriptRoot/../app.ps1"
 
         $Output = & pwsh -NoProfile -NonInteractive -Command {
             param($Path)

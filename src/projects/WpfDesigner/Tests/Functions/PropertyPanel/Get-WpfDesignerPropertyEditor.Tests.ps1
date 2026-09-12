@@ -1,11 +1,10 @@
 Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyEditor.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should build a two-way bound TextBox for a Text property' {

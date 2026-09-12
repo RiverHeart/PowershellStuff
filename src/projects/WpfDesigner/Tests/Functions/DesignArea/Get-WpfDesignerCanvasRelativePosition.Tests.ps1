@@ -1,10 +1,10 @@
 Describe 'Get-WpfDesignerCanvasRelativePosition' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should return the Canvas.Left/Top position for a direct canvas child' {

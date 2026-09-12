@@ -7,12 +7,6 @@ using namespace System.Windows
 
 $DebugPreference = 'Continue'
 
-Set-Location -Path $PSScriptRoot
-
-Import-Module "$PSScriptRoot/../../modules/WPF" -ErrorAction Stop -Force
-
-Import "$PSScriptRoot/functions"
-
 App 'Window' {
     $this.Title = 'WPF Designer'
     $this.WindowState = [WindowState]::Maximized
@@ -28,7 +22,7 @@ App 'Window' {
 
     # Called here (rather than at top-level script scope) so its Resources
     # block picks up $this = Window and scopes styles to Window.Resources.
-    Import "$PSScriptRoot/WpfDesigner.Styles.ps1"
+    Import "$PSScriptRoot/../Styles/main.styles.ps1"
 
     MenuItem '(F)ile/(E)xit' {
         Command 'CloseCommand' 'Ctrl+q' {

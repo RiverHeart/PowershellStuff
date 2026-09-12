@@ -1,10 +1,10 @@
 Describe 'ConvertTo-WpfDesignerScript' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/ConvertTo-WpfDesignerScript.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should emit a Window/Canvas block with no Labels' {

@@ -1,13 +1,10 @@
 Describe 'Get-WpfDesignerElementTree' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-PSType.ps1"
-        . "$PSScriptRoot/../functions/Test-PSType.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerContainerChildren.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerElementTree.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should return an empty array for an empty canvas' {

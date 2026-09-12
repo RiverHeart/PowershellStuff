@@ -1,14 +1,10 @@
 Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerEditorKind.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyDescriptor.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerPropertyEditor.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerPropertyPanel.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should populate editor elements for each property descriptor' {

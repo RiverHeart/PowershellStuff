@@ -1,23 +1,10 @@
 Describe 'Add-WpfDesignerControl container-aware placement' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-PSType.ps1"
-        . "$PSScriptRoot/../functions/Test-PSType.ps1"
-        . "$PSScriptRoot/../functions/Test-WpfDesignerContainerCapacity.ps1"
-        . "$PSScriptRoot/../functions/Add-WpfDesignerControl.ps1"
-        . "$PSScriptRoot/../functions/Add-WpfDesignerLabel.ps1"
-        . "$PSScriptRoot/../functions/Add-WpfDesignerStackPanel.ps1"
-        . "$PSScriptRoot/../functions/Select-WpfDesignerElement.ps1"
-        . "$PSScriptRoot/../functions/Clear-WpfDesignerSelection.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerResizeHandle.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerResizeHandlePosition.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerSelectionOutline.ps1"
-        . "$PSScriptRoot/../functions/Update-WpfDesignerSelectionOutlinePosition.ps1"
-        . "$PSScriptRoot/../functions/Get-WpfDesignerCanvasRelativePosition.ps1"
-        . "$PSScriptRoot/../functions/New-WpfDesignerWindowFrame.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should float on the canvas when nothing is selected' {

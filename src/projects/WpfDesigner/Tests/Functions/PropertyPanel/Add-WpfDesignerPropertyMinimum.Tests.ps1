@@ -1,10 +1,10 @@
 Describe 'Add-WpfDesignerPropertyMinimum' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-WpfDesignerPropertyMinimum.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should clamp a below-minimum committed value on LostFocus' {
@@ -65,11 +65,11 @@ Describe 'Add-WpfDesignerPropertyMinimum' -Tag 'WpfDesigner' {
 
 Describe 'Add-WpfDesignerEnterCommit' -Tag 'WpfDesigner' {
     BeforeDiscovery {
-        Import-Module -Name "$PSScriptRoot/../../../modules/WPF/WPF.psd1" -Force
+        Import-Module -Name "$PSScriptRoot/../../../../../modules/WPF/WPF.psd1" -Force
     }
 
     BeforeAll {
-        . "$PSScriptRoot/../functions/Add-WpfDesignerEnterCommit.ps1"
+        Import-Module -Name "$PSScriptRoot/../../../WpfDesigner.psm1" -Force
     }
 
     It 'Should not throw when Enter is pressed' {
