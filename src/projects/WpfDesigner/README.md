@@ -22,6 +22,10 @@ depends on the WPF module's public commands and DSL keywords.
 ./WpfDesigner.DSL.ps1
 ```
 
+## Testing
+
+The WPF Designer is the first DSL application to use a module for organization and isolation. A nuance of this that modules have private and public variables. For an application module, it doesn't make sense to export any functions but, at the same time, it doesn't make sense not to export them so they can be easily tested with Pester. So, while hacky, the tests are importing the `*.psm1` file rather than the `*.psd1` file so that no restrictions are applied to the functions. `Start-WPFApplication` calls `*.psd1` so functions are isolated at runtime.  
+
 ## Status
 
 - [x] Scaffold: entry script launches a bare window.
@@ -51,5 +55,4 @@ client area can differ because its dimensions include non-client chrome.
 
 ## Todo
 
-Nothing outstanding.
 - Consider a way to avoid DataContext null warning when intentional. 
