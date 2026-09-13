@@ -90,17 +90,18 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
 
     It 'Should build a two-way bound ComboBox for an Enum property' {
         $Target = [System.Windows.Controls.TextBlock]::new()
-        $Descriptor = [pscustomobject] @{ Name = 'HorizontalAlignment'; PropertyType = [System.Windows.HorizontalAlignment]; EditorKind = 'Enum' }
+        $Descriptor = [pscustomobject] @{ Name = 'TextWrapping'; PropertyType = [System.Windows.TextWrapping]; EditorKind = 'Enum' }
 
         $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
 
         $Editor.Input | Should -BeOfType [System.Windows.Controls.ComboBox]
-        $Editor.Input.ItemsSource | Should -Contain ([System.Windows.HorizontalAlignment]::Right)
-        $Editor.Input.SelectedItem | Should -Be ([System.Windows.HorizontalAlignment]::Stretch)
+        $Editor.Input.ItemTemplate | Should -BeNullOrEmpty
+        $Editor.Input.ItemsSource | Should -Contain ([System.Windows.TextWrapping]::WrapWithOverflow)
+        $Editor.Input.SelectedItem | Should -Be ([System.Windows.TextWrapping]::NoWrap)
 
-        $Editor.Input.SelectedItem = [System.Windows.HorizontalAlignment]::Right
+        $Editor.Input.SelectedItem = [System.Windows.TextWrapping]::WrapWithOverflow
 
-        $Target.HorizontalAlignment | Should -Be -ExpectedValue ([System.Windows.HorizontalAlignment]::Right)
+        $Target.TextWrapping | Should -Be -ExpectedValue ([System.Windows.TextWrapping]::WrapWithOverflow)
     }
 
     It 'Should label the row with the property name' {
