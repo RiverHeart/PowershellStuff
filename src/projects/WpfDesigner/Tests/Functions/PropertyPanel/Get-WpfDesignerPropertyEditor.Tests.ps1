@@ -22,6 +22,23 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
         $Target.Text | Should -Be -ExpectedValue 'Updated'
     }
 
+    It 'Should build a read-only TextBox for uneditable Text content' {
+        $Target = [System.Windows.Controls.Label]::new()
+        $Target.Content = [System.Windows.Controls.StackPanel]::new()
+        $Descriptor = [pscustomobject] @{
+            Name         = 'Content'
+            PropertyType = [object]
+            EditorKind   = 'Text'
+            IsReadOnly   = $true
+        }
+
+        $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
+        $Binding = [System.Windows.Data.BindingOperations]::GetBinding($Editor.Input, [System.Windows.Controls.TextBox]::TextProperty)
+
+        $Editor.Input.IsReadOnly | Should -BeTrue
+        $Binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::OneWay)
+    }
+
     It 'Should build a two-way bound TextBox for a Number property' {
         $Target = [System.Windows.Controls.TextBlock]::new()
         $Descriptor = [pscustomobject] @{ Name = 'Width'; PropertyType = [double]; EditorKind = 'Number' }
