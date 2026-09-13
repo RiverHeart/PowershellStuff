@@ -23,6 +23,7 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $binding | Should -Not -BeNullOrEmpty
         $binding.Path.Path | Should -Be 'ItemsSource.Count'
         $binding.Source | Should -Be $Grid
+        $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::OneWay)
     }
 
     It 'Should bind with -Self relative source' {
@@ -116,11 +117,11 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $TextBlock.Text | Should -Be 'Value: 4'
     }
 
-    It 'Should update the source with -TwoWay' {
+    It 'Should update the source with Mode TwoWay' {
         $TextBox = [System.Windows.Controls.TextBox]::new()
         $State = New-WPFObservableState @{ Value = 'Initial' }
 
-        BindProperty -InputObject $TextBox -Property Text -Path Value -Source $State -TwoWay
+        BindProperty -InputObject $TextBox -Property Text -Path Value -Source $State -Mode TwoWay
 
         $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBox, [System.Windows.Controls.TextBox]::TextProperty)
         $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::TwoWay)
@@ -128,6 +129,20 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $TextBox.Text = 'Updated'
         $TextBox.GetBindingExpression([System.Windows.Controls.TextBox]::TextProperty).UpdateSource()
         $State.Value | Should -Be 'Updated'
+    }
+
+    It 'Should bind once with Mode OneTime' {
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        $State = New-WPFObservableState @{ Value = 'Initial' }
+
+        BindProperty -InputObject $TextBlock -Property Text -Path Value -Source $State -Mode OneTime
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBlock, [System.Windows.Controls.TextBlock]::TextProperty)
+        $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::OneTime)
+        $TextBlock.Text | Should -Be 'Initial'
+
+        $State.Value = 'Updated'
+        $TextBlock.Text | Should -Be 'Initial'
     }
 
     It 'Should work inside a DSL control body with $this' {

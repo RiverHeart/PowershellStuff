@@ -103,11 +103,11 @@ fine, but keep the per-kind logic in one place rather than duplicating it at eve
 site) that, given a `PropertyDescriptor`-shaped input (`Name`, `PropertyType`) plus the
 target object and `$State`, returns a `Label` + input control pair wired up:
 
-- `Text` → `TextBox`, `BindProperty Text <Name> -TwoWay`, `Add-WpfDesignerEnterCommit`.
+- `Text` → `TextBox`, `BindProperty Text <Name> -Mode TwoWay`, `Add-WpfDesignerEnterCommit`.
 - `Number` → same as `Text`, plus the Slice C override hook for clamping.
-- `Bool` → `CheckBox`, `BindProperty IsChecked <Name> -TwoWay`.
+- `Bool` → `CheckBox`, `BindProperty IsChecked <Name> -Mode TwoWay`.
 - `Enum` → `ComboBox`, `ItemsSource = [Enum]::GetValues($PropertyType)`,
-  `BindProperty SelectedItem <Name> -TwoWay`.
+  `BindProperty SelectedItem <Name> -Mode TwoWay`.
 
 Tests: one case per `EditorKind` asserting the right control type is produced and that
 setting a value through the generated control's binding actually updates the target

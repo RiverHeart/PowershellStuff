@@ -1232,14 +1232,17 @@ For properties that should update their source:
 
 ```powershell
 ComboBox 'Picker' {
-    BindProperty SelectedItem UserSelection -TwoWay
+    BindProperty SelectedItem UserSelection -Mode TwoWay
 }
 ```
 
 `-Converter` is shorthand for assigning a `New-WPFValueConverter` to the WPF
-binding. `-TwoWay` sets the WPF binding mode to `TwoWay`. Use `-ScriptBlock` for
-other binding properties such as `UpdateSourceTrigger`, `FallbackValue`, or
-`TargetNullValue`, or to override the shorthand configuration.
+binding. `-Mode` accepts `OneWay`, `TwoWay`, or `OneTime` and defaults to
+`OneWay`. The source is always the binding path and the target is always the
+named dependency property; `OneWayToSource` is intentionally not part of this
+contract. Use `-ScriptBlock` for other binding properties such as
+`UpdateSourceTrigger`, `FallbackValue`, or `TargetNullValue`, or for advanced
+binding configuration.
 
 ### Binding
 

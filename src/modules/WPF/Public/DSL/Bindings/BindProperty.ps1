@@ -39,8 +39,10 @@
 .PARAMETER InputObject
     The target control. Accepts pipeline input. Defaults to $this in DSL context.
 
-.PARAMETER TwoWay
-    Configures the binding to update both the target and source properties.
+.PARAMETER Mode
+    Controls when values flow from the source path to the target property.
+    OneWay is the default. TwoWay also updates the source when the target
+    changes. OneTime initializes the target once without observing changes.
 
 .PARAMETER Converter
     Optional scriptblock used to convert source values before assigning them to
@@ -140,7 +142,8 @@ function BindProperty {
         [object] $InputObject,
 
         [Parameter()]
-        [switch] $TwoWay,
+        [ValidateSet('OneWay', 'TwoWay', 'OneTime')]
+        [string] $Mode = 'OneWay',
 
         [Parameter()]
         [scriptblock] $Converter,
@@ -205,9 +208,7 @@ function BindProperty {
             }
         }
 
-        if ($TwoWay) {
-            $binding.Mode = [System.Windows.Data.BindingMode]::TwoWay
-        }
+        $binding.Mode = [System.Windows.Data.BindingMode]::$Mode
 
         if ($Converter) {
             $binding.Converter = New-WPFValueConverter $Converter
