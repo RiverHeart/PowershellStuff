@@ -157,7 +157,7 @@ Selection should continue to use the existing outline and resize thumb. Nested c
 are not draggable while parented to a `StackPanel`, but they remain resizable; replacing
 the resize thumb with a detach affordance would unnecessarily discard that capability.
 
-#### D2 — Add one reparenting primitive
+#### D2 — Add one reparenting primitive (done)
 
 Implement an approved-verb command named `Move-WpfDesignerElement`. "Detach" remains the
 clear user-facing label, but does not need to be the PowerShell function name (and therefore
@@ -198,6 +198,15 @@ Tests for this increment:
 - Invalid moves make no tree or selection changes.
 - Selection overlays remain design-surface children and no event handlers or overlays are
   leaked across the move.
+
+Landed as `Move-WpfDesignerElement`, with an extensible `FrameworkElement` target parameter
+and an explicit first-slice restriction to a `Canvas` target. It validates before mutation,
+captures root-canvas coordinates, clears and recreates selection chrome, handles both
+`Panel.Children` and `Decorator.Child` source shapes, and restores the original parent,
+sibling index, and selection if destination insertion fails. Existing `Draggable` handlers
+become active after the move because they resolve the current parent when dragging starts.
+Focused tests cover position preservation, fresh non-leaking overlays, drag reactivation,
+intact subtree identity/order, both source shapes, rejected moves, and forced rollback.
 
 #### D3 — Expose an explicit Detach command
 
