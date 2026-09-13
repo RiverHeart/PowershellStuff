@@ -128,7 +128,105 @@ later.
 ### Slice D — Detach-to-floating
 
 Let a selected element (or its whole subtree) be pulled back out of its current container
-and become loose on the canvas again, at its last known position, still fully formed.
+and become loose on the canvas again, at its last known position, still fully formed. Keep
+this deliberately incremental: explicit reparenting comes first; drag-to-reparent and a
+full Visual Studio-style tree are follow-up interaction layers, not prerequisites.
+
+#### D1 — Make nested selection reliable (done)
+
+Controls created by `Add-WpfDesignerControl` already receive their own selection handler,
+even when nested. The current failure is routed-event handling: a nested child's
+`Draggable` handler rejects its non-`Canvas` parent without marking the mouse event handled,
+so the event continues to its containing `StackPanel`, whose handler replaces the child
+selection with the parent selection.
+
+Stop that designer-created ancestor bubbling after the nested child has selected itself,
+without changing the WPF module's general `Draggable` behavior. Prove separately that a
+nested `Label` and nested `StackPanel` can be selected, that the property panel follows the
+child selection, and that clicking a container outside one of its children still selects
+the container.
+
+Landed in `Add-WpfDesignerControl`: its selection handler now marks the routed mouse event
+handled when the element's immediate parent is not a `Canvas`. Direct `Canvas` children
+still leave the event available for `Draggable`, while nested children retain their own
+selection instead of allowing an ancestor container to replace it. Routed-event tests cover
+nested `Label` selection plus property-panel refresh, nested `StackPanel` selection, and a
+direct click on the outer container.
+
+Selection should continue to use the existing outline and resize thumb. Nested controls
+are not draggable while parented to a `StackPanel`, but they remain resizable; replacing
+the resize thumb with a detach affordance would unnecessarily discard that capability.
+
+#### D2 — Add one reparenting primitive
+
+Implement an approved-verb command named `Move-WpfDesignerElement`. "Detach" remains the
+clear user-facing label, but does not need to be the PowerShell function name (and therefore
+does not require an alias solely to avoid `Import-Module` approved-verb warnings). Design
+the command around a target container rather than around "detach" specifically so the same
+primitive can later support moves initiated from a visual tree.
+
+For the first increment, the supported move is from a nested container to the root design
+`Canvas`. It should perform the operation in this order:
+
+1. Validate the source and target before mutating either tree. Reject the Window frame,
+  design-time overlays, an already-floating element, and any unsupported target.
+2. Capture the selected element's root-canvas-relative position with
+  `Get-WpfDesignerCanvasRelativePosition` while it is still in the laid-out visual tree.
+3. Clear selection so the root-canvas outline and thumb are removed and their
+  `SizeChanged` handlers are unsubscribed before the element moves.
+4. Remove the element from its actual parent through a small parent-shape-aware helper
+  (`Panel.Children.Remove`, or clearing a matching single-content slot such as
+  `Border.Child`). Do not remove or rebuild the element's descendants.
+5. Add the same element instance to the root design `Canvas`, restore the captured position
+  through `Canvas.Left`/`Canvas.Top`, and select it again. Its existing `Draggable` handlers
+  resolve the parent at drag start, so they should become active automatically once the
+  parent is a `Canvas`.
+
+The move must be effectively transactional: validation happens before removal, and a
+failed target insertion must restore the element to its original parent and position/order
+rather than leave it unparented. The first implementation need not expose arbitrary target
+containers, but its parameter and validation shape should not prevent that extension.
+
+Tests for this increment:
+
+- A nested `Label` becomes a direct root-`Canvas` child at the same visual position and is
+  selected and draggable afterward.
+- A nested `StackPanel` moves as one intact subtree; its child object identities and order
+  are unchanged. Moving the subtree root is ordinary WPF reparenting, not a recursive
+  detach operation.
+- Detaching from both a `Panel` and a single-child host is covered.
+- Invalid moves make no tree or selection changes.
+- Selection overlays remain design-surface children and no event handlers or overlays are
+  leaked across the move.
+
+#### D3 — Expose an explicit Detach command
+
+Add a `Detach` button beside the property panel or other selected-element actions. Enable
+it only when the current selection is a movable nested element; disable it for the Window
+frame, overlays, and elements already on the root design `Canvas`. The button invokes
+`Move-WpfDesignerElement` and refreshes any structure-dependent UI after a successful move.
+
+This explicit command is the Slice D interaction. It avoids overloading the resize thumb
+and establishes deterministic reparenting behavior before drag/drop introduces hit testing
+and cancellation paths.
+
+#### Follow-up — Visual tree and direct reparenting
+
+`Get-WpfDesignerElementTree` already supplies a recursive, depth-annotated hierarchy and
+filters design-time overlays, so a visual-tree pane would not start from zero. A first pane
+can rebuild after structural changes, synchronize its selected row with
+`State.SelectedElement`, and offer context-menu commands such as `Detach` and later
+`Move to <container>`. It should preserve expansion and selection state across refreshes.
+
+Once that selection surface is useful, extend `Move-WpfDesignerElement` to accept marked
+containers, resolve the Window frame to its `_WPFDesignerContentRoot`, call
+`Test-WpfDesignerContainerCapacity`, and preserve `StackPanel` insertion order. This is a
+controlled second route to reparenting without requiring pointer drag/drop.
+
+Direct drag-to-reparent remains deferred. It requires drop-target hit testing and
+highlighting, container-capacity validation, `StackPanel` insertion semantics, coordinate
+conversion, and rollback when a drop is invalid. Those concerns should build on the tested
+move primitive rather than be implemented at the same time as it.
 
 ### Slice E — Recursive export
 
@@ -156,4 +254,6 @@ future work — not started until A–E are solid.
     marker system.
 - Multi-level detach (pulling a `StackPanel` with `Label` children out as one unit) needs its
   subtree to move together — worth an explicit test once Slice D lands.
-  - This seems like a big lift, if it seems that a lot of effort would be required, this should only be attemped after all the low hanging fruit has been plucked.
+  - Resolved in the Slice D plan: move the subtree root as the same object. WPF retains its
+    descendants, so no recursive reconstruction is needed; tests should verify identity and
+    child order.
