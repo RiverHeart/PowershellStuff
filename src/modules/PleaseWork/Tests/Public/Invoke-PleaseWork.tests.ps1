@@ -290,6 +290,55 @@ native: {
         $LASTEXITCODE | Should -Be 7
     }
 
+    It 'stops a non-runspace task when an exec scriptblock returns an unexpected native exit code' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec { & $PowerShellPath -NoProfile -Command 'exit 7' }
+    'after native command'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        {
+            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath
+        } | Should -Throw '*exited with code 7*'
+
+        $LASTEXITCODE | Should -Be 7
+    }
+
+    It 'streams output from a native pipeline in an exec scriptblock' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec { 'pipeline input' | & $PowerShellPath -NoProfile -Command '$input' }
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath |
+            Should -Be 'pipeline input'
+    }
+
+    It 'allows configured native success exit codes in an exec scriptblock' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        @'
+native: {
+    param ([string] $PowerShellPath)
+    exec { & $PowerShellPath -NoProfile -Command 'exit 7' } -SuccessExitCode 7
+    'continued'
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath |
+            Should -Be 'continued'
+
+        $LASTEXITCODE | Should -Be 0
+    }
+
     It 'allows configured native success exit codes in a non-runspace task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -337,6 +386,42 @@ inspect: {
                 $OriginalPSModulePath -split [IO.Path]::PathSeparator |
                     Where-Object { $_ -ne $UserModulePath }
             ) -join [IO.Path]::PathSeparator)
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
+    }
+
+    It 'normalizes the user module path for a child PowerShell edition in an exec scriptblock' {
+        $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+        $ChildPowerShellName = if ($PSEdition -eq 'Desktop') { 'pwsh' } else { 'powershell.exe' }
+        $UserModuleDirectoryName = if ($PSEdition -eq 'Desktop') {
+            'PowerShell'
+        } else {
+            'WindowsPowerShell'
+        }
+        $PowerShellPath = (Get-Command $ChildPowerShellName).Source
+        $UserModulePath = Join-Path `
+            ([Environment]::GetFolderPath('MyDocuments')) `
+            "$UserModuleDirectoryName\Modules"
+        $OriginalPSModulePath = $env:PSModulePath
+        $env:PSModulePath = @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -ne $UserModulePath }
+        ) -join [IO.Path]::PathSeparator
+        @'
+inspect: {
+    param ([string] $PowerShellPath, [string] $UserModulePath)
+    exec { & $PowerShellPath -NoProfile -Command "`$env:PSModulePath -split [IO.Path]::PathSeparator -contains '$UserModulePath'" }
+}
+'@ | Set-Content -LiteralPath $TaskFile
+
+        try {
+            $ChildHasUserModulePath = please inspect `
+                -TaskFile $TaskFile `
+                -PowerShellPath $PowerShellPath `
+                -UserModulePath $UserModulePath
+
+            [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeTrue
         } finally {
             $env:PSModulePath = $OriginalPSModulePath
         }

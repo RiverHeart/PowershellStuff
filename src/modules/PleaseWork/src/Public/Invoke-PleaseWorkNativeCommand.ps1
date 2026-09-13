@@ -18,17 +18,26 @@
     Basic usage with a custom success exit code:
 
     Invoke-PleaseWorkNativeCommand cmd '/c', 'echo Hello World' -SuccessExitCode @(0, 1)
+
+.EXAMPLE
+    Invoke a native command using normal PowerShell syntax:
+
+    Invoke-PleaseWorkNativeCommand { dotnet restore }
 #>
 function Invoke-PleaseWorkNativeCommand {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='FilePath')]
     [Alias('exec')]
     param (
-        [Parameter(Mandatory,Position=0)]
+        [Parameter(Mandatory,Position=0,ParameterSetName='FilePath')]
         [ValidateNotNullOrEmpty()]
         [string] $FilePath,
 
-        [Parameter(Position=1,ValueFromRemainingArguments)]
+        [Parameter(Position=1,ValueFromRemainingArguments,ParameterSetName='FilePath')]
         [object[]] $ArgumentList = @(),
+
+        [Parameter(Mandatory,Position=0,ParameterSetName='ScriptBlock')]
+        [ValidateNotNull()]
+        [scriptblock] $ScriptBlock,
 
         [Parameter()]
         [int[]] $SuccessExitCode = @(0)
@@ -38,18 +47,25 @@ function Invoke-PleaseWorkNativeCommand {
     # pwsh can find modules in the expected user module path.
     $OriginalPSModulePath = $env:PSModulePath
     try {
-        $CommandName = [IO.Path]::GetFileNameWithoutExtension($FilePath)
         $NormalizePowerShellModulePath = -not (
             $null -ne $script:PleaseWorkConfig -and
             $script:PleaseWorkConfig.Contains('NormalizePowerShellModulePath') -and
             $script:PleaseWorkConfig['NormalizePowerShellModulePath'] -eq $false
         )
 
-        if ($NormalizePowerShellModulePath -and $CommandName -in @('powershell', 'pwsh')) {
-            $UserModulePath = if ($CommandName -eq 'pwsh' -and ($IsLinux -or $IsMacOS)) {
+        if ($PSCmdlet.ParameterSetName -eq 'FilePath') {
+            $PowerShellCommandName = [IO.Path]::GetFileNameWithoutExtension($FilePath)
+        } elseif ($PSEdition -eq 'Core' -and -not ($IsLinux -or $IsMacOS)) {
+            $PowerShellCommandName = 'powershell'
+        } elseif ($PSEdition -eq 'Desktop') {
+            $PowerShellCommandName = 'pwsh'
+        }
+
+        if ($NormalizePowerShellModulePath -and $PowerShellCommandName -in @('powershell', 'pwsh')) {
+            $UserModulePath = if ($PowerShellCommandName -eq 'pwsh' -and ($IsLinux -or $IsMacOS)) {
                 Join-Path $HOME '.local/share/powershell/Modules'
             } else {
-                $UserModuleDirectoryName = if ($CommandName -eq 'powershell') {
+                $UserModuleDirectoryName = if ($PowerShellCommandName -eq 'powershell') {
                     'WindowsPowerShell'
                 } else {
                     'PowerShell'
@@ -65,22 +81,32 @@ function Invoke-PleaseWorkNativeCommand {
             }
         }
 
-        & $FilePath @ArgumentList
+        $global:LASTEXITCODE = 0
+        if ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
+            & $ScriptBlock
+        } else {
+            & $FilePath @ArgumentList
+        }
         $ExitCode = [int] $global:LASTEXITCODE
     } finally {
         $env:PSModulePath = $OriginalPSModulePath
     }
 
     if ($SuccessExitCode -notcontains $ExitCode) {
+        $CommandDescription = if ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
+            'script block'
+        } else {
+            $FilePath
+        }
         $Exception = [System.ComponentModel.Win32Exception]::new(
             $ExitCode,
-            "Native command '$FilePath' exited with code $ExitCode."
+            "Native command '$CommandDescription' exited with code $ExitCode."
         )
         $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
             $Exception,
             'PleaseWork.NativeCommandFailed',
             [System.Management.Automation.ErrorCategory]::NotSpecified,
-            $FilePath
+            $(if ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') { $ScriptBlock } else { $FilePath })
         )
         $PSCmdlet.ThrowTerminatingError($ErrorRecord)
     }

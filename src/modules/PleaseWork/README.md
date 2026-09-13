@@ -21,7 +21,7 @@ test: lint {
 }
 
 build: test {
-    dotnet build
+    exec { dotnet build }
 }
 ```
 
@@ -113,6 +113,16 @@ PowerShell 5.1 and PowerShell Core:
 
 ```powershell
 build: {
+    exec { dotnet build --configuration Release }
+}
+```
+
+The scriptblock form supports normal PowerShell command syntax, including pipelines, splatting,
+and redirection. The direct command form remains available when no surrounding PowerShell
+expression is needed:
+
+```powershell
+build: {
     exec dotnet build --configuration Release
 }
 ```
@@ -128,7 +138,7 @@ compare: {
 
 `exec` streams the native command's output normally and throws a terminating error containing the unexpected exit code. After an accepted exit, it normalizes `$global:LASTEXITCODE` to `0` so the task's final native-status check uses the same success policy.
 
-When `exec` launches `powershell.exe` or `pwsh.exe`, it temporarily adds that edition's conventional user module directory to `PSModulePath`. This corrects inherited cross-edition paths before the child process starts. Set `$PleaseConfig.NormalizePowerShellModulePath = $false` to disable this behavior. The caller's original `PSModulePath` is restored after execution.
+When `exec` launches `powershell.exe` or `pwsh.exe`, it temporarily adds that edition's conventional user module directory to `PSModulePath`. In scriptblock form on Windows, it adds the opposite edition's user module directory because the executable is not known in advance. This corrects inherited cross-edition paths before the child process starts. Set `$PleaseConfig.NormalizePowerShellModulePath = $false` to disable this behavior. The caller's original `PSModulePath` is restored after execution.
 
 On PowerShell 7, callers can set `$PSNativeCommandUseErrorActionPreference` to `$true` to make a nonzero native exit code participate in PowerShell error handling. In that mode, the injected
 `$ErrorActionPreference = 'Stop'` causes the task to stop at the first failing native command.
@@ -181,3 +191,4 @@ The runner's overall outcome is therefore aggregate: it fails when any task fail
 
 * Tasks beginning with an underscore should be considered hidden/internal.
 * Ensure that the base PleaseWork cmdlet does not take positional parameters other than the task name so users can effectively forward remaining arguments to the task itself. This would be in service of calling CLI utilities from those tasks that depend on positional params themselves. 
+* Fix task-body comment-based help under Windows PowerShell 5.1, where the AST returns a null `CommentHelpInfo` and the `displays comment-based help declared inside a task body` test fails.
