@@ -9,6 +9,8 @@ Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
 
     It 'Should populate editor elements for each property descriptor' {
         $Panel = [System.Windows.Controls.StackPanel]::new()
+        $CategoryStyle = [System.Windows.Style]::new([System.Windows.Controls.Expander])
+        $Panel.Resources['PropertyCategoryExpanderStyle'] = $CategoryStyle
         $Target = [System.Windows.Controls.TextBlock]::new()
         $State = @{ SelectedElement = $Target }
 
@@ -20,6 +22,7 @@ Describe 'Update-WpfDesignerPropertyPanel' -Tag 'WpfDesigner' {
         $EditorElements = @($Panel.Children | ForEach-Object { $_.Content.Children })
         $Panel.Children.Count | Should -Be -ExpectedValue $Categories.Count
         @($Panel.Children | Where-Object { $_ -isnot [System.Windows.Controls.Expander] -or -not $_.IsExpanded }) | Should -HaveCount 0
+        @($Panel.Children | Where-Object Style -ne $CategoryStyle) | Should -HaveCount 0
         @($Panel.Children.Header) | Should -Be $Categories.Name
         $EditorElements | Should -HaveCount $ExpectedRowCount
         $BoolDescriptor = $Descriptors | Where-Object EditorKind -eq 'Bool' | Select-Object -First 1

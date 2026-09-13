@@ -53,6 +53,10 @@ function Update-WpfDesignerPropertyPanel {
         $CategorySection.IsExpanded = $true
         $CategorySection.Content = $CategoryPanel
         $CategorySection.Margin = 0, 0, 0, 4
+        $CategorySection.SetResourceReference(
+            [System.Windows.FrameworkElement]::StyleProperty,
+            'PropertyCategoryExpanderStyle'
+        )
         $Panel.Children.Add($CategorySection) | Out-Null
     }
 }
