@@ -5,21 +5,13 @@ $PleaseConfig = @{
 # Runs ScriptAnalyzer against changed Powershell files.
 lint: changed(':(glob)**/*.ps1') {
     exec {
-        $ChangedFiles | powershell -NoProfile -Command {
-            param ([string] $SettingsPath)
-            $input | Invoke-ScriptAnalyzer -EnableExit -Settings $SettingsPath
-        } -args "$GitRoot/PSScriptAnalyzerSettings.psd1"
+        $ChangedFiles | powershell -NoProfile -Command "`$input | Invoke-ScriptAnalyzer -EnableExit -Settings $SettingsPath '$GitRoot/PSScriptAnalyzerSettings.psd1'"
     }
 }
 
 # Runs ScriptAnalyzer against all Powershell files.
 lint-full: {
-    exec {
-        powershell -NoProfile -Command {
-            param ([string] $SettingsPath)
-            Invoke-ScriptAnalyzer -Path '.' -Recurse -EnableExit -Settings $SettingsPath
-        } -args "$GitRoot/PSScriptAnalyzerSettings.psd1"
-    }
+    exec powershell -NoProfile -Command "Invoke-ScriptAnalyzer -Path '.' -Recurse -EnableExit -Settings '$GitRoot/PSScriptAnalyzerSettings.psd1'"
 }
 
 # Runs Pester tests against changed Powershell files.
