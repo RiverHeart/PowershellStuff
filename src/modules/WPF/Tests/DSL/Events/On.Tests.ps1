@@ -23,4 +23,32 @@ Describe 'On' -Tag 'On', 'Category:Events' {
 
         Remove-Variable -Name OnThisName -Scope Global -ErrorAction SilentlyContinue
     }
+
+    It 'Attaches to the WPFAutoAttachContext object, not an ambient event-handler $this' {
+        InModuleScope WPF {
+            # Regression: On previously accepted its InputObject via ambient
+            # $this instead of the WPFAutoAttachContext/pipeline value, so a
+            # stale $this from an enclosing real event handler would win.
+            $DecoySender = [pscustomobject]@{ Name = 'DecoySender' }
+            Add-Member -InputObject $DecoySender -MemberType ScriptMethod -Name Add_Click -Value {
+                throw 'On should not attach to the ambient $this sender'
+            }
+
+            $RealParent = [pscustomobject]@{ Name = 'RealParent'; AttachedHandler = $null }
+            Add-Member -InputObject $RealParent -MemberType ScriptMethod -Name Add_Click -Value {
+                param($Handler)
+                $this.AttachedHandler = $Handler
+            }
+
+            $this = $DecoySender
+            $PSVars = [System.Collections.Generic.List[psvariable]]::new()
+            $PSVars.Add([psvariable]::new('WPFAutoAttachContext', $RealParent))
+
+            { On Click {} }.InvokeWithContext($null, $PSVars)
+
+            # An empty scriptblock stringifies to '', so -BeNullOrEmpty would false-positive here.
+            $RealParent.AttachedHandler | Should -Not -Be $null
+            $RealParent.AttachedHandler | Should -BeOfType ([scriptblock])
+        }
+    }
 }

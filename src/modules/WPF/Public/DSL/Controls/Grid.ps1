@@ -45,7 +45,7 @@ function Grid {
             $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.Grid])
         }
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent) {
             Add-WPFObject $Parent $Factory
         }
@@ -70,9 +70,9 @@ function Grid {
     }
 
     # Attach to parent if one exists so child controls can resolve hierarchy.
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     if (-not $Parent) {
-        $Parent = Get-Variable -Name 'this' -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
+        $Parent = Get-Variable -Name 'WPFAutoAttachContext' -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
     }
     if ($Parent) {
         Write-Debug "Beginning auto-attach for $Name (Grid)"
@@ -90,7 +90,7 @@ function Grid {
         }
 
         if ('WPF.Grid.RowSpec' -notin $Row.PSTypeNames) {
-            throw "Grid rows must be declared with Row { ... }"
+            throw "Expected RowSpec but received '$($Row.GetType().Name)'. Grid rows must be declared with Row { ... }"
         }
 
         if ($Grid.RowDefinitions.Count -le $RowIndex) {
@@ -109,7 +109,7 @@ function Grid {
             }
 
             if ('WPF.Grid.ColumnSpec' -notin $Column.PSTypeNames) {
-                throw "Grid columns must be declared with Column { ... }"
+                throw "Expected ColumnSpec but received '$($Column.GetType().Name)'. Grid columns must be declared with Column { ... }"
             }
 
             if ($Grid.ColumnDefinitions.Count -le $ColumnIndex) {

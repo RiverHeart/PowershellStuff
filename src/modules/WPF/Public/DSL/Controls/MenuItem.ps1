@@ -94,7 +94,7 @@ function MenuItem {
     }
 
     # Auto-attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $WasAutoAttached = $False
     if (-not $NoAutoAttach -and $Parent -and -not $WPFObject.Parent) {
         if ($Parent -is [System.Windows.Window]) {

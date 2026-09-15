@@ -23,6 +23,7 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $binding | Should -Not -BeNullOrEmpty
         $binding.Path.Path | Should -Be 'ItemsSource.Count'
         $binding.Source | Should -Be $Grid
+        $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::OneWay)
     }
 
     It 'Should bind with -Self relative source' {
@@ -80,6 +81,9 @@ Describe 'BindProperty' -Tag 'BindProperty' {
 
         $Warnings.Count | Should -Be 1
         $Warnings[0].ToString() | Should -Match 'DataContext is null'
+        $Warnings[0].ToString() | Should -Match 'Initialize or inherit a non-null DataContext'
+        $Warnings[0].ToString() | Should -Match 'specify -Source'
+        $Warnings[0].ToString() | Should -Match 'FallbackValue'
     }
 
     It 'Should allow configuring the binding via ScriptBlock' {
@@ -99,6 +103,48 @@ Describe 'BindProperty' -Tag 'BindProperty' {
         $binding.Converter | Should -Not -BeNullOrEmpty
     }
 
+    It 'Should convert source values with -Converter' {
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        $Source = [pscustomobject] @{ Value = 4 }
+
+        BindProperty -InputObject $TextBlock -Property Text -Path Value -Source $Source -Converter {
+            param($Value)
+            "Value: $Value"
+        }
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBlock, [System.Windows.Controls.TextBlock]::TextProperty)
+        $binding.Converter | Should -Not -BeNullOrEmpty
+        $TextBlock.Text | Should -Be 'Value: 4'
+    }
+
+    It 'Should update the source with Mode TwoWay' {
+        $TextBox = [System.Windows.Controls.TextBox]::new()
+        $State = New-WPFObservableState @{ Value = 'Initial' }
+
+        BindProperty -InputObject $TextBox -Property Text -Path Value -Source $State -Mode TwoWay
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBox, [System.Windows.Controls.TextBox]::TextProperty)
+        $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::TwoWay)
+
+        $TextBox.Text = 'Updated'
+        $TextBox.GetBindingExpression([System.Windows.Controls.TextBox]::TextProperty).UpdateSource()
+        $State.Value | Should -Be 'Updated'
+    }
+
+    It 'Should bind once with Mode OneTime' {
+        $TextBlock = [System.Windows.Controls.TextBlock]::new()
+        $State = New-WPFObservableState @{ Value = 'Initial' }
+
+        BindProperty -InputObject $TextBlock -Property Text -Path Value -Source $State -Mode OneTime
+
+        $binding = [System.Windows.Data.BindingOperations]::GetBinding($TextBlock, [System.Windows.Controls.TextBlock]::TextProperty)
+        $binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::OneTime)
+        $TextBlock.Text | Should -Be 'Initial'
+
+        $State.Value = 'Updated'
+        $TextBlock.Text | Should -Be 'Initial'
+    }
+
     It 'Should work inside a DSL control body with $this' {
         $DummySource = [pscustomobject]@{ Value = 42 }
 
@@ -113,6 +159,36 @@ Describe 'BindProperty' -Tag 'BindProperty' {
 
         $BindingApplied | Should -Not -BeNullOrEmpty
         $BindingApplied.Path.Path | Should -Be 'Value'
+    }
+
+    It 'Should bind inside a FrameworkElementFactory template context' {
+        $Id = [guid]::NewGuid().ToString('N')
+        $StyleName = "ButtonTextBindingTemplate_$Id"
+        $Button = [System.Windows.Controls.Button]::new()
+
+        Style $StyleName Button {
+            Template {
+                Border 'TemplateBorder' {
+                    TextBlock 'TemplateText' {
+                        BindProperty Text Content -TemplatedParent
+                    }
+                }
+            }
+        }
+
+        $Vars = New-WPFVariableList -InputObject $Button
+        { UseStyle $StyleName }.InvokeWithContext($null, $Vars) | Out-Null
+
+        $Button.Content = 'ClickMe'
+        $Button.ApplyTemplate() | Out-Null
+        $TemplateText = $Button.Template.FindName('TemplateText', $Button)
+
+        $TemplateText | Should -Not -BeNullOrEmpty
+        $TemplateText.Text | Should -Be 'ClickMe'
+
+        $BindingApplied = [System.Windows.Data.BindingOperations]::GetBinding($TemplateText, [System.Windows.Controls.TextBlock]::TextProperty)
+        $BindingApplied.Path.Path | Should -Be 'Content'
+        $BindingApplied.RelativeSource.Mode | Should -Be ([System.Windows.Data.RelativeSourceMode]::TemplatedParent)
     }
 
     It 'Should bind owner-qualified attached-property targets' {

@@ -22,7 +22,12 @@ function Label {
 
         [Parameter(Mandatory, ParameterSetName = 'Name', Position = 1)]
         [Parameter(Mandatory, ParameterSetName = 'ScriptBlock', Position = 0)]
-        [ScriptBlock] $ScriptBlock
+        [ScriptBlock] $ScriptBlock,
+
+        # Overrides the ambient WPFAutoAttachContext when explicitly bound -
+        # $null suppresses auto-attach, a real object attaches there directly.
+        [AllowNull()]
+        [object] $AutoAttach
     )
 
     if ($MyInvocation.InvocationName.StartsWith('-')) {
@@ -42,7 +47,7 @@ function Label {
     }
 
     # Auto-attach self to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = Resolve-WPFAutoAttachTarget -Cmdlet $PSCmdlet -BoundParameters $PSBoundParameters -AutoAttach $AutoAttach
     $IsParentedBefore = [bool] $Label.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Label)"

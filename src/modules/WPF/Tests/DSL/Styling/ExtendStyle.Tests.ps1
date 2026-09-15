@@ -9,13 +9,13 @@ Describe 'ExtendStyle' -Tag 'ExtendStyle' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style Button {
-            Setter FontSize 15
-            Setter Margin '1,2,3,4'
+            FontSize: 15
+            Margin: '1,2,3,4'
         }
 
         Style $baseName Button {
             ExtendStyle Button
-            Setter Background '#0A84FF'
+            Background: '#0A84FF'
         }
 
         $psVars = New-WPFVariableList -InputObject $button
@@ -33,13 +33,13 @@ Describe 'ExtendStyle' -Tag 'ExtendStyle' {
         $button = [System.Windows.Controls.Button]::new()
 
         Style $baseName Button {
-            Setter Padding '7,9,7,9'
-            Setter FontSize 13
+            Padding: '7,9,7,9'
+            FontSize: 13
         }
 
         Style $childName Button {
             ExtendStyle $baseName
-            Setter Opacity 0.8
+            Opacity: 0.8
         }
 
         $psVars = New-WPFVariableList -InputObject $button

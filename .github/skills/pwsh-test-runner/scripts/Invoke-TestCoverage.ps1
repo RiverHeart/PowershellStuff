@@ -235,7 +235,7 @@ try {
     $effectiveCoverageMode = Resolve-EffectiveCoverageMode -RequestedMode $CoverageMode -SuiteConfig $suiteConfig
     $coverageOutputPath = Resolve-CoverageOutputPath -SuiteConfig $suiteConfig -RepositoryRoot $repoRoot -TestSuite $TestSuite
 
-    $invokeTestScript = Join-Path -Path $PSScriptRoot -ChildPath 'Invoke-Test.ps1'
+    $invokeTestScript = Join-Path -Path $repoRoot -ChildPath 'tools/Invoke-Test.ps1'
     $invokeTestParameters = @{
         TestSuite = $TestSuite
         CoverageMode = 'Full'

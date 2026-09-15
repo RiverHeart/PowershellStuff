@@ -42,7 +42,7 @@ function StatusBarItem {
         Write-Error "Failed to create '$Name' (StatusBarItem) with error: $_"
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $StatusBarItem.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (StatusBarItem)"

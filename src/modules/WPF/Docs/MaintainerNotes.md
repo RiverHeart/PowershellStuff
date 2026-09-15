@@ -8,6 +8,9 @@ Use the development log for dated progress entries and in-flight investigation n
 
 - Improve error handling so child object failures bubble up cleanly and produce a useful call stack.
 - Evaluate global resource support so keyed LinearGradientBrush definitions can be referenced outside Theme contexts (for example, style-only workflows). Current keyed behavior is Theme-only because there is no Application.Resources or module-level global resource registry path yet.
+- Investigate a `Style` implementation that doesn't require a `Resources` declaration to get window/element-scoped behavior. Today, bare `Style` (no enclosing `Resources` block) registers into the global `$script:WPFStyleTable` / `$script:WPFImplicitStyleTable` tables, while `Resources { Style ... }` scopes the style to that target's `ResourceDictionary`. See `Resources.ps1` and `Style.ps1` for the `$this`-based dispatch, and `Resources.Tests.ps1` for the leak-prevention test that encodes this contract. Any change must preserve the existing global-vs-scoped distinction rather than silently changing what bare `Style` means.
+- Make `Style` behave like `Command` to deprecate `UseStyle`: a single keyword that handles both definition and attachment (`Command 'Save' { ... }` to define, `Command $SaveCommand` or `Command 'Save'` to attach), rather than requiring a separate `UseStyle` call as the only attachment mechanic. This is about unifying the define/attach surface under one keyword, not about dropping the named-style registry in favor of returning a plain variable. Compare `Command.ps1`'s dual-mode dispatch against `Style.ps1` (definition-only) plus `UseStyle.ps1` (attachment-only).
+- Add a PSScriptAnalyzer rule to flag `Should -BeNullOrEmpty` / `Should -Not -BeNullOrEmpty` usage against WPF control instances or scriptblocks in `Tests/`, since both can stringify to `''` and make the assertion pass/fail for the wrong reason. See the "Test Assertion Pitfall" section of `wpf.instructions.md` for the manual guidance this rule would replace with deterministic, automated detection.
 
 ## Design Notes
 
@@ -59,6 +62,36 @@ startup/render issue coverage for very small values and allows
 For runs that should not modify app script parameters, set
 `WPF_AUTO_CLOSE_SECONDS` to a numeric value in the environment.
 
+### Auto-Attach vs. Event Handler `$this`
+
+Control keywords (`Label`, `Button`, etc.) used to decide whether to auto-attach to a parent by checking `$PSCmdlet.GetVariableValue('this')`. That collided with a separate PowerShell behavior: when a scriptblock is invoked as a WPF event handler delegate (for example, via `On Click { ... }`), PowerShell automatically binds `$this` to the sender in that scriptblock's scope. From inside a nested scope there was no way to tell these two cases apart — both were just "`$this` is set in an ancestor scope."
+
+This mattered when a keyword like `Label` was called from inside an event handler to build a control programmatically (as opposed to declaratively inside another control's block). The ambient `$this` (the sender) got mistaken for a DSL parent, and the new control was auto-attached to the wrong object.
+
+**Resolved:** auto-attach checks now read a dedicated `WPFAutoAttachContext` variable instead of `$this`. `New-WPFVariableList` sets `WPFAutoAttachContext` to the same value as `this` whenever an `InputObject` is supplied, so declarative nesting (processed through `Update-WPFObject`/`InvokeWithContext`) behaves exactly as before. Because `WPFAutoAttachContext` is not a name PowerShell auto-populates for event handler delegates, calling a control keyword from inside an `On`/`When` handler body no longer mistakes the ambient sender `$this` for a DSL parent — no manual `$this = $null` shadowing is required anymore. See `Tests/AutoAttachEventHandlerCollision.Tests.ps1` for the regression coverage.
+
+A `-NoAutoAttach` switch was considered for this generally and rejected as unintuitive for callers; it still exists narrowly on `MenuItem` for its own recursive nested-path construction, which is an unrelated use case. Whether the `WPFParentContext` ambient variable should be introduced, to delineate between having a parent and having a parent we want to attach to, remains up for debate. At this point, the it would be premature with no problem to solve.
+
+Instead, an `-AutoAttach <object>` flag has been introduced to mirror how preference variables work. Namely, `ErrorAction` exists on a cmdlet and provides a direct override for whatever the ambient `$ErrorActionPreference` is set to. In hindsight, having switched from a `switch` to value based param, I wish I had named them `AttachTo` since they both declare targets. 
+
+### GetNewClosure() and Bare Function Calls
+
+Event handler scriptblocks that need to keep a snapshot of outer variables (for example, per-control drag state) typically call `.GetNewClosure()` before assigning them to `Add_<Event>`. This detaches the scriptblock into its own scope for variable lookups, but it also breaks bare-name calls to other functions defined in the same script/module from inside that scriptblock — they fail to resolve at invoke time with "term not recognized," even though the function is clearly defined and in scope everywhere else.
+
+The existing `Draggable` implementation already works around this by capturing the function as a scriptblock reference before closing over it, then invoking it indirectly:
+
+```powershell
+$ComputeDraggedPosition = ${function:Get-WPFDraggedPosition}
+
+$MouseMoveHandler = {
+    param($sender, $e)
+    # ...
+    & $ComputeDraggedPosition -AnchorLeft $DragState.AnchorLeft -AnchorTop $DragState.AnchorTop ...
+}.GetNewClosure()
+```
+
+Capturing the reference via `${function:Name}` works regardless of which file defined the function, as long as it has already been loaded into the session (dot-sourced or imported) before the capturing line executes — this is a session-wide function-table lookup, not a file-scoped one. Any new keyword or consumer code that builds `GetNewClosure()`'d event handlers and needs to call another function from inside them should follow this same capture-and-invoke pattern rather than calling the function by bare name.
+
 ### RelayCommand
 
 While working on menu support, the initial expectation was that `ICommand` could be attached directly to a `MenuItem` with a simple command object. In practice, usable command wiring in WPF revolved around a `RelayCommand` implementation and, initially, `CommandBinding`.
@@ -90,10 +123,3 @@ See [RelayCommandSyntaxProposal.md](RelayCommandSyntaxProposal.md) for the propo
 - Move dated progress updates into `Docs/DevLog/`.
 - Move durable backlog items into GitHub issues once the module gets its own repository.
 - Keep private scratch notes outside the repo until they are worth sharing.
-
-
-## Pre-AI Commit
-
-For anyone who cares.
-
-https://github.com/RiverHeart/PowershellStuff/commit/7c7aa15707a1f8f36cc1d0209bcf7658075b39b3

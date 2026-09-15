@@ -2,12 +2,28 @@
   "isRoot": true,
   "TestSuites": [
     {
+      "Name": "TestRunnerSkills",
+      "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
+    },
+    {
       "Name": "WPF",
       "ConfigPath": "src/modules/WPF/pester.json"
     },
     {
-      "Name": "TestRunnerSkills",
-      "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
+      "Name": "PleaseWork",
+      "ConfigPath": "src/modules/PleaseWork/pester.json"
+    },
+    {
+      "Name": "AstEditor",
+      "ConfigPath": "src/modules/AstEditor/pester.json"
+    },
+    {
+      "Name": "TabCentral",
+      "ConfigPath": "src/modules/TabCentral/pester.json"
+    },
+    {
+      "Name": "WpfDesigner",
+      "ConfigPath": "src/projects/WpfDesigner/pester.json"
     }
   ]
 }

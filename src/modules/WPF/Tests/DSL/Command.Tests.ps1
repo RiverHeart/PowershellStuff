@@ -43,6 +43,59 @@ Describe 'Command' -Tag 'Command' {
         $Parent.Command.CanExecute($null) | Should -BeTrue
     }
 
+    It 'Should return a reusable command definition outside a control scriptblock' {
+        $Definition = Command 'DoThing' {
+            Execute { $null = $true }
+            CanExecute { $true }
+        }
+
+        $Definition.PSObject.TypeNames | Should -Contain 'WPF.CommandDefinition'
+        $Definition.Name | Should -Be 'DoThing'
+        $Definition.Command | Should -Be $null
+    }
+
+    It 'Should attach the same command instance to multiple controls' {
+        $Definition = Command 'DoThing' {
+            Execute { $null = $true }
+            CanExecute { $true }
+        }
+        $FirstParent = [System.Windows.Controls.Button]::new()
+        $SecondParent = [System.Windows.Controls.Button]::new()
+
+        {
+            Command $Definition
+        }.InvokeWithContext($null, (New-WPFVariableList -InputObject $FirstParent))
+        {
+            Command $Definition
+        }.InvokeWithContext($null, (New-WPFVariableList -InputObject $SecondParent))
+
+        $FirstParent.Command | Should -BeOfType [RelayCommand]
+        [object]::ReferenceEquals($FirstParent.Command, $SecondParent.Command) | Should -BeTrue
+        [object]::ReferenceEquals($Definition.Command, $FirstParent.Command) | Should -BeTrue
+    }
+
+    It 'Should attach a reusable command with a gesture' {
+        InModuleScope WPF {
+            Clear-WPFControlRegistry
+        }
+
+        $Window = [System.Windows.Window]::new()
+        Register-WPFObject -Name 'Window' -InputObject $Window -Overwrite
+        $Definition = Command 'DoThing' {
+            Execute { $null = $true }
+        }
+        $Parent = [System.Windows.Controls.MenuItem]::new()
+
+        {
+            Command $Definition 'Ctrl+P'
+        }.InvokeWithContext($null, (New-WPFVariableList -InputObject $Parent))
+
+        $Parent.Command | Should -BeOfType [RelayCommand]
+        $Parent.InputGestureText | Should -Be 'Ctrl+P'
+        $Window.InputBindings.Count | Should -Be 1
+        $Window.InputBindings[0].Command | Should -BeExactly $Parent.Command
+    }
+
     It 'Should add a CommandBinding and assign routed command when BoundTo is supplied' {
         InModuleScope WPF {
             Clear-WPFControlRegistry

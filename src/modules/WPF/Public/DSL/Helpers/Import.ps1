@@ -38,11 +38,15 @@ function Import {
 
         foreach ($File in $Files) {
             Write-Debug "Importing: $($File.FullName)"
-            $ExecutionContext.InvokeCommand.InvokeScript(
-                <# SessionState #> $PSCmdlet.SessionState,
-                <# string script #> [scriptblock]::Create(". $($File.FullName)"),
-                <# Params System.Object[] args #> $null
-            )
+            try {
+                $ExecutionContext.InvokeCommand.InvokeScript(
+                    <# SessionState #> $PSCmdlet.SessionState,
+                    <# string script #> [scriptblock]::Create(". $($File.FullName)"),
+                    <# Params System.Object[] args #> $null
+                )
+            } catch {
+                throw "Failed to import file: $($File.FullName). Error: $_"
+            }
         }
     }
 }

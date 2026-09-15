@@ -21,23 +21,31 @@ Scope of this page:
     * [Border](#border)
     * [ContentPresenter](#contentpresenter)
     * [Button](#button)
+    * [Expander](#expander)
     * [Label](#label)
     * [TextBlock](#textblock)
     * [TextBox](#textbox)
+    * [ComboBox](#combobox)
+    * [ProgressBar](#progressbar)
     * [Image](#image)
     * [ScrollViewer](#scrollviewer)
     * [StackPanel](#stackpanel)
     * [DockPanel](#dockpanel)
+    * [Canvas](#canvas)
     * [DataGrid](#datagrid)
     * [DataGridTextColumn](#datagridtextcolumn)
     * [ListView](#listview)
     * [GridView](#gridview)
     * [GridViewColumn](#gridviewcolumn)
     * [GridViewColumnHeader](#gridviewcolumnheader)
+    * [TreeView](#treeview)
+    * [TreeViewItem](#treeviewitem)
+    * [HierarchicalItemTemplate](#hierarchicalitemtemplate)
     * [DatePicker](#datepicker)
     * [Menu](#menu)
     * [MenuItem](#menuitem)
     * [StatusBar](#statusbar)
+    * [Thumb](#thumb)
 * [Shapes](#shapes)
     * [Path](#path)
     * [Rectangle](#rectangle)
@@ -81,11 +89,23 @@ Scope of this page:
     * [Unregister-WPFCompletionType](#unregister-wpfcompletiontype)
     * [ConvertTo-KeyGesture](#convertto-keygesture)
     * [Dock](#dock)
+    * [CanvasPosition](#canvasposition)
+    * [BringToFront](#bringtofront)
+    * [SendToBack](#sendtoback)
+    * [Draggable](#draggable)
     * [Reference](#reference)
     * [Import](#import)
     * [Show-WPFWindow](#show-wpfwindow)
+    * [Start-WPFApplication](#start-wpfapplication)
     * [New-WPFProject](#new-wpfproject)
     * [Get-WPFTextInput](#get-wpftextinput)
+* [Application Storage](#application-storage)
+    * [New-WPFAppStorage](#new-wpfappstorage)
+    * [Get-WPFStoredItem](#get-wpfstoreditem)
+    * [Set-WPFStoredItem](#set-wpfstoreditem)
+    * [Remove-WPFStoredItem](#remove-wpfstoreditem)
+* [Completers](#completers)
+    * [Complete-WPFColor](#complete-wpfcolor)
 * [Compatibility Note](#compatibility-note)
 
 
@@ -335,6 +355,21 @@ Button 'SaveButton' {
 }
 ```
 
+### Expander
+
+Creates a WPF `Expander`. Set its header through `$this.Header`; a nested
+control becomes its collapsible content.
+
+```powershell
+Expander 'Details' {
+    $this.Header = 'More details'
+
+    TextBlock {
+        $this.Text = 'Additional information'
+    }
+}
+```
+
 ### Label
 
 Creates a Label.
@@ -364,6 +399,33 @@ TextBox 'SearchText' {
     $this.Width = 250
 }
 ```
+
+### ComboBox
+
+Creates a ComboBox. Set `ItemsSource` directly or bind it to a collection, then use `SelectedItem` for the current selection.
+
+```powershell
+ComboBox 'Options' {
+    $this.DisplayMemberPath = 'Name'
+    BindProperty ItemsSource OptionsList
+    BindProperty SelectedItem SelectedOption
+}
+```
+
+### ProgressBar
+
+Creates a ProgressBar. Configure determinate progress with `Minimum`, `Maximum`, and `Value`, or set `IsIndeterminate` for ongoing activity.
+
+```powershell
+ProgressBar 'LoadingIndicator' {
+    $this.Minimum = 0
+    $this.Maximum = 100
+    $this.Value = 40
+    $this.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+}
+```
+
+Custom control templates can provide the standard `PART_Track`, `PART_Indicator`, and `PART_GlowRect` template parts.
 
 ### Image
 
@@ -404,6 +466,19 @@ Creates a DockPanel.
 DockPanel 'Layout' {
     Label 'Left' {}
     Label 'Right' {}
+}
+```
+
+### Canvas
+
+Creates a Canvas. Use `CanvasPosition` to place children with the
+`Canvas.Left`/`Top`/`Right`/`Bottom` attached properties.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
 }
 ```
 
@@ -497,6 +572,93 @@ GridViewColumn {
 }
 ```
 
+### TreeView
+
+Creates a TreeView. Supports named and nameless forms. Nested `TreeViewItem`
+blocks are added to the `Items` collection.
+
+```powershell
+TreeView 'FileTree' {
+    TreeViewItem 'src' {
+        $this.Header = 'src'
+
+        TreeViewItem 'Public' {
+            $this.Header = 'Public'
+        }
+
+        TreeViewItem 'Private' {
+            $this.Header = 'Private'
+        }
+    }
+}
+```
+
+This manual, nested-`TreeViewItem` form is a good fit for a small or fixed
+tree shape known ahead of time. For a tree built from an arbitrary object
+graph (for example, a recursive `Children` property of unknown depth), use
+[HierarchicalItemTemplate](#hierarchicalitemtemplate) instead of hand-writing
+recursive `TreeViewItem` code.
+
+### TreeViewItem
+
+Creates a TreeViewItem. Set `$this.Header` to control the displayed text and
+nest further `TreeViewItem` blocks to build hierarchy.
+
+```powershell
+TreeViewItem 'Documents' {
+    $this.Header = 'Documents'
+
+    TreeViewItem 'ReadmeFile' {
+        $this.Header = 'README.md'
+    }
+}
+```
+
+### HierarchicalItemTemplate
+
+Creates a `HierarchicalDataTemplate` for a `TreeView` or `TreeViewItem` and
+auto-attaches it to the parent's `ItemTemplate`. Rather than manually creating
+a `TreeViewItem` per node, set `ItemsSource` on the `TreeView` and describe how
+to render *one* node; WPF applies that description recursively, generating
+`TreeViewItem` containers lazily as branches are expanded:
+
+```powershell
+$Root = [pscustomobject] @{
+    Header   = 'src'
+    Children = @(
+        [pscustomobject] @{ Header = 'Public'; Children = @() }
+        [pscustomobject] @{ Header = 'Private'; Children = @() }
+    )
+}
+
+TreeView 'FileTree' {
+    $this.ItemsSource = @($Root)
+
+    HierarchicalItemTemplate 'Children' {
+        TextBlock {
+            BindProperty Text Header
+        }
+    }
+}
+```
+
+The first argument is the property on each data item that holds its child
+collection. The nested block builds the per-node visual using factory-mode
+controls (currently `TextBlock`) — the same mechanism `Template` uses to build
+a `ControlTemplate`'s visual tree — so `BindProperty` and the colon shorthand
+(`Text: 'value'`) work as usual, but `$this.Property = value` does not, since
+the block is building a reusable template recipe rather than a live control.
+
+Compared to hand-written recursion (building `TreeViewItem` objects yourself
+and iterating child collections in PowerShell), `HierarchicalItemTemplate`:
+
+- generates containers lazily, only for expanded nodes, instead of eagerly
+  materializing every `TreeViewItem` up front
+- reflects later additions/removals automatically when the child collection is
+  an `ObservableCollection`
+- is defined once per `TreeView`/`TreeViewItem`, instead of being re-derived by
+  every caller that needs a tree
+
 ### DatePicker
 
 Creates a DatePicker.
@@ -548,6 +710,24 @@ App 'Example' {
 }
 ```
 
+### Thumb
+
+Creates a WPF `Thumb`. `Thumb` has no content and is typically used inside a
+custom template or control composition to provide drag behavior, handling
+`DragStarted`, `DragDelta`, and `DragCompleted` events.
+
+```powershell
+Thumb 'Handle' {
+    $this.Width = 12
+    $this.Height = 12
+
+    On DragDelta {
+        param($sender, $e)
+        Write-Host "$($e.HorizontalChange), $($e.VerticalChange)"
+    }
+}
+```
+
 ## Shapes
 
 ### Path
@@ -586,28 +766,64 @@ Border 'Banner' {
 
 ### Command
 
-Creates or references a RoutedUICommand and binds shortcut gestures and a handler.
+Creates or attaches a command and optionally binds shortcut gestures.
 
 `Execute` and `CanExecute` are contextual child keywords of `Command`.
 They are intended to be used inside a `Command { ... }` specification block.
 
+Outside a control scriptblock, `Command 'Name' { ... }` returns a reusable
+`WPF.CommandDefinition`. Pass that object to `Command` inside each control that
+should use it. The command is materialized on first attachment, then the same
+`ICommand` instance is reused by later attachments. Gestures belong to the
+attachment site rather than the definition.
+
 ```powershell
-Command 'Open' {
-    # Uses built-in ApplicationCommand if available
-}
-
-Command 'MyCommand' 'Ctrl+M' {
-    Write-Host 'Run custom command'
-}
-
-Command 'SaveAs' 'Ctrl+Shift+S' {
+$SaveCommand = Command 'Save' {
     Execute { Write-Host 'Saving...' }
     CanExecute { $IsFileLoaded }
-    # RelayCommand does not rely on CommandManager in this module,
-    # so we refresh availability explicitly when file state changes.
-    (Reference 'Window').Tag.SaveAsCommand = $this.Command
+}
+
+Button 'SaveButton' {
+    Command $SaveCommand
+}
+
+MenuItem '(F)ile/(S)ave' {
+    Command $SaveCommand 'Ctrl+S'
 }
 ```
+
+Inline definitions remain supported:
+
+```powershell
+Button 'RunButton' {
+    Command 'Run' {
+        Write-Host 'Run command'
+    }
+}
+```
+
+Root definitions cannot declare gestures because they are not associated with
+a window. Supply a gesture when attaching the definition to a control.
+
+### NotifyCanExecuteChanged
+
+Explicitly notifies relay commands that their `CanExecute` result may have
+changed. Pass registered control names directly, or pipe controls, reusable
+command definitions, or relay commands to the keyword.
+
+When multiple targets expose the same command instance, that command is
+notified once per invocation.
+
+```powershell
+NotifyCanExecuteChanged 'SaveButton', 'RefreshButton'
+```
+
+```powershell
+Reference 'SaveButton', 'RefreshButton' | NotifyCanExecuteChanged
+```
+
+This keyword does not observe state or trigger automatically. Call it explicitly
+after changing values used by a command's `CanExecute` block.
 
 ### Key
 
@@ -779,16 +995,61 @@ Bind IsEnabled -To Window.Tag.IsFileLoaded
 
 Unified binding sugar that delegates to existing binding keywords.
 
-Use `-ToState` for state-style binding (delegates to `Bind`):
+`Link` is the only public command in its implementation group. Endpoint
+resolution, value conversion, and route-specific connectors are internal and
+are not exported as DSL keywords.
+
+By default, `Link` applies values in one direction only (source -> target).
+Use `-Sync` for supported two-way Property and State links.
+
+Canonical directional form:
 
 ```powershell
-Link Visibility -ToState IsFullScreen -Invert
+Link <Source> -To <Target>
+```
+
+Examples:
+
+```powershell
+Link IsFileLoaded -To IsEnabled
+Link Text -To SearchQuery
+Link Text -To SearchQuery -Sync
+```
+
+Directional support in current version:
+
+- `State -> Property`: supported
+- `Property -> Property`: supported
+- `Property -> State`: supported
+- `State -> State`: supported (one-way)
+
+For directional `Property -> Property`, `-Map`, `-Transform`, `-Default`, `-StrictMap`, and `-Invert` are not yet supported.
+When both endpoint kinds are explicitly `Property`, `Link` uses only `-InputObject` (or the current `$this`) and does not require a window or State context.
+For directional `Property -> State`, `-Transform`, `-Map`, `-Default`, and `-StrictMap` are supported.
+For directional `Property -> State`, `-Map` and `-Transform` are mutually exclusive, and `-Default`/`-StrictMap` require `-Map`.
+For directional `Property -> State`, `-Invert` is supported and is applied before `-Map`/`-Transform`.
+For directional `State -> State`, source and target must be different state properties.
+
+`-Sync` enables two-way synchronization for directional Property and State links:
+
+```powershell
+Link Text -To SearchQuery -Sync
+Link IsEnabled -To IsEnabled -FromKind State -ToKind Property -Sync
+```
+
+`-Sync` is not supported for `Property -> Property` or `State -> State` links.
+`-Sync` cannot be combined with `-Map`, `-Transform`, `-Default`, `-StrictMap`, or `-Invert`.
+
+Use directional state -> property binding:
+
+```powershell
+Link IsFullScreen -To Visibility -Invert
 ```
 
 Map state values without writing a converter block:
 
 ```powershell
-Link ToolTip -ToState IsCopyFeedbackActive -Map @{
+Link IsCopyFeedbackActive -To ToolTip -Map @{
     $true  = 'Copied to clipboard'
     $false = 'Copy image to clipboard'
 }
@@ -798,7 +1059,7 @@ Map entries should be final values/objects, not deferred scriptblocks. For
 control content values, evaluate the object at map creation time:
 
 ```powershell
-Link Content -ToState IsCopyFeedbackActive -Map @{
+Link IsCopyFeedbackActive -To Content -Map @{
     $true  = (Path 'images/clipboard-check-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
     $false = (Path 'images/clipboard-solid-full.svg' { UseStyle 'ImageViewer.IconPath' })
 }
@@ -808,37 +1069,94 @@ Link Content -ToState IsCopyFeedbackActive -Map @{
 `-Default` for unmatched values:
 
 ```powershell
-Link Content -ToState FigureDrawingPreset -Map @{
+Link FigureDrawingPreset -To Content -Map @{
     Quick    = '2 min'
     Balanced = '5 min'
     Long     = '10 min'
 } -Default 'Custom'
 ```
 
-Use `-Property` for WPF-style dependency binding (delegates to `BindProperty`):
+#### Link resolution boundary
+
+`Link` endpoints are exact member names, not WPF `Binding.Path` expressions.
+Each endpoint is resolved against only:
+
+- properties on the current control (or `-InputObject`)
+- top-level properties in the root window State
+
+This is a deliberate contract boundary, not a WPF limitation. `Link` eagerly
+classifies both endpoint kinds before choosing a connector, while WPF paths and
+inherited `DataContext` are late-bound and may not be resolvable when the UI is
+built. Link routes also use different underlying mechanisms, including WPF
+bindings and observable State callbacks, so paths and source selectors cannot
+be forwarded consistently across every Property/State pairing.
+
+An earlier target-first `Link` API did forward paths and source selectors to
+`BindProperty`; canonical source-to-target syntax removed that route-specific
+surface in favor of one predictable endpoint model. Supporting richer endpoints
+again is possible, but would be a contract expansion rather than exposing a
+capability that WPF lacks.
+
+`Link` does not inspect the control's inherited or locally assigned
+`DataContext`. It also does not accept WPF source selectors such as `-Source`,
+`-ElementName`, `-Self`, or `-TemplatedParent`. Property-to-Property links use
+the same current control for both endpoints, so a simple self-source binding
+can still be written explicitly:
 
 ```powershell
-Link Text -Property Count
-Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
+Link ActualWidth -To Width -FromKind Property -ToKind Property
 ```
 
-When choosing between the two modes:
-
-- Prefer `-ToState` for app/view state properties created with `State` (for example, `Results`, `IsLoading`, `CurrentFile`).
-- `-ToState` resolves through the current window state path and stays explicit even if a child subtree overrides `DataContext`.
-- Prefer `-Property` for regular WPF binding paths and custom sources (`-Self`, `-ElementName`, `-Source`, `-TemplatedParent`).
-- In `-Property` mode with no explicit source selector, binding uses inherited `DataContext`.
-
-`-Path` is supported as an alias for `-Property`:
+For example, a dotted WPF binding path is not a valid `Link` endpoint:
 
 ```powershell
-Link Text -Path CurrentFile.Name
+# Link 'SelectedPokemon.Name' -To Text
+# Fails because no exact member named 'SelectedPokemon.Name' exists.
+BindProperty Text 'SelectedPokemon.Name'
 ```
 
-Use `-AsBinding` for advanced trigger/template scenarios (delegates to `Binding`):
+A nested `DataContext` is another important distinction:
 
 ```powershell
-$binding = Link -AsBinding -Property IsEnabled -Self
+Border {
+    BindProperty DataContext Detail
+
+    TextBlock {
+        BindProperty Text Name
+    }
+}
+```
+
+Here, `Name` is read from the `TextBlock`'s inherited `DataContext`. Replacing
+the last line with `Link Name -To Text` would not express that binding. Because
+`TextBlock` itself has a `Name` property, `Link` can resolve it as a
+Property-to-Property link on the control instead of reading `DataContext.Name`.
+
+Use `BindProperty` when the source is:
+
+- an inherited or local `DataContext`
+- a dotted WPF binding path
+- another element or explicit source object
+- a relative source other than the current control, such as `TemplatedParent`
+- a binding that needs `FallbackValue`, `TargetNullValue`, or other custom WPF binding configuration
+
+Use `Link` when both endpoints are top-level members of the current control or
+root window State and directional intent is the clearest way to describe the
+relationship.
+
+State-to-Property links preserve collection object identity. For example,
+linking an `ObservableCollection` to `ItemsSource` keeps later collection
+changes visible to the control:
+
+```powershell
+Link SourceItems -To ItemsSource
+```
+
+Use `Binding` directly when an advanced API requires a binding object, such as
+a trigger, template, or data-grid column:
+
+```powershell
+$binding = Binding 'IsEnabled' -Self
 ```
 
 ### BindProperty
@@ -859,18 +1177,72 @@ Rectangle 'Loading' {
 }
 ```
 
-With a value converter:
+When no source selector is specified, `BindProperty` uses the target's inherited
+`DataContext`. Initialize that context before creating child bindings. This is
+especially important when a panel changes its `DataContext` to a nested object:
 
 ```powershell
-Label 'Status' {
-    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
-        $this.Converter = New-WPFValueConverter {
-            param($File)
-            if ($File) { "File: $($File.Name)" } else { 'No file' }
+Window 'MyApp' {
+    State @{
+        Detail = [pscustomobject] @{ Name = '' }
+    }
+
+    Border {
+        BindProperty DataContext Detail
+
+        TextBlock {
+            BindProperty Text Name
         }
     }
 }
 ```
+
+If `Detail` starts as `$null`, the child `Name` binding is temporarily unresolved
+and `BindProperty` warns. Prefer a neutral initial object when it represents valid
+application state. Alternatively, specify `-Source` when the source is known and
+should not come from `DataContext`.
+
+There are two different null cases when configuring a binding through
+`-ScriptBlock`:
+
+- `FallbackValue` is displayed when the source or binding path cannot be resolved.
+- `TargetNullValue` is displayed when the path resolves but its value is `$null`.
+
+```powershell
+Image 'Preview' {
+    BindProperty Source ImageUri -ScriptBlock {
+        $this.FallbackValue = $PlaceholderImage
+        $this.TargetNullValue = $PlaceholderImage
+    }
+}
+```
+
+With a value converter:
+
+```powershell
+Label 'Status' {
+    BindProperty Content CurrentFile -Source (Reference 'Window').Tag -Converter {
+        param($File)
+        if ($File) { "File: $($File.Name)" } else { 'No file' }
+    }
+}
+```
+
+For properties that should update their source:
+
+```powershell
+ComboBox 'Picker' {
+    BindProperty SelectedItem UserSelection -Mode TwoWay
+}
+```
+
+`-Converter` is shorthand for assigning a `New-WPFValueConverter` to the WPF
+binding. `-Mode` accepts `OneWay`, `TwoWay`, or `OneTime` and defaults to
+`OneWay`. The source is always the binding path and the target is always the
+named dependency property; `OneWayToSource` is intentionally not part of this
+contract. Use `-ScriptBlock` for other binding properties such as
+`UpdateSourceTrigger`, `FallbackValue`, or `TargetNullValue`, or for advanced
+binding configuration.
 
 ### Binding
 
@@ -1433,6 +1805,96 @@ StatusBarItem 'StatusZoomItem' {
 Dock Top -InputObject $SomeControl
 ```
 
+### CanvasPosition
+
+Sets the `Canvas.Left`, `Canvas.Top`, `Canvas.Right`, `Canvas.Bottom`, and
+`Panel.ZIndex` attached properties on the current object. Only the parameters
+you supply are applied.
+
+`-Left`/`-Right` and `-Top`/`-Bottom` are mutually exclusive pairs; supplying
+both sides of an axis raises an error.
+
+Use inside a DSL block to target `$this`, or pass `-InputObject` explicitly.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 20
+    }
+}
+```
+
+```powershell
+CanvasPosition -Left 5 -ZIndex 2 -InputObject $SomeControl
+```
+
+### BringToFront
+
+Sets `Panel.ZIndex` on the current object to one greater than the highest
+`ZIndex` among its sibling elements, so it renders above the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Back' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Front' {
+        CanvasPosition -Left 0 -Top 0
+        BringToFront
+    }
+}
+```
+
+### SendToBack
+
+Sets `Panel.ZIndex` on the current object to one less than the lowest
+`ZIndex` among its sibling elements, so it renders behind the rest of its
+parent Panel's children. The object must already be attached to a Panel.
+
+```powershell
+Canvas 'Board' {
+    Label 'Front' { CanvasPosition -Left 0 -Top 0 }
+    Label 'Back' {
+        CanvasPosition -Left 0 -Top 0
+        SendToBack
+    }
+}
+```
+
+### Draggable
+
+Wires up `MouseLeftButtonDown`/`MouseMove`/`MouseLeftButtonUp` handlers so the
+current object can be dragged around its parent Canvas with the mouse.
+Position updates go through `CanvasPosition`. The parent is resolved when a
+drag starts, so `Draggable` can be called before the object is attached to its
+final Canvas; if the parent isn't a Canvas at that point, a warning is written
+and the drag is ignored.
+
+Use `-BringToFrontOnDrag` to raise the object's `ZIndex` when a drag begins,
+`-BoundToParent` to keep the object fully within its parent Canvas (clamped
+using the Canvas's and object's actual size), and `-OnDragEnd` to run custom
+logic (for example, persisting the final position) after the mouse is
+released.
+
+```powershell
+Canvas 'Board' {
+    Label 'Piece' {
+        CanvasPosition -Left 10 -Top 10
+        Draggable -BringToFrontOnDrag
+    }
+}
+```
+
+```powershell
+Draggable -InputObject $SomeControl -BoundToParent
+```
+
+```powershell
+Draggable -InputObject $SomeControl -OnDragEnd {
+    param($Target)
+    Write-Host "Dropped at $([System.Windows.Controls.Canvas]::GetLeft($Target)), $([System.Windows.Controls.Canvas]::GetTop($Target))"
+}
+```
+
 ### Get-WPFWindow
 
 Gets the current root window for the resolved DSL context.
@@ -1511,6 +1973,21 @@ Window 'Window' {
 } | Show-WPFWindow
 ```
 
+### Start-WPFApplication
+
+Imports an application module and runs a module-relative entry point inside its
+session state. This lets the entry point use application functions without
+exporting them from the module.
+
+```powershell
+Start-WPFApplication `
+    -ModulePath "$PSScriptRoot/MyApp.psd1" `
+    -EntryPoint 'src/Views/main.gui.ps1' `
+    -Force
+```
+
+The entry point must be a file beneath the application module root.
+
 ### New-WPFProject
 
 Creates a generic WPF DSL project scaffold with a starter window script, style file, and conventional folders.
@@ -1544,6 +2021,65 @@ $Interval = Get-WPFTextInput -Prompt 'Enter slideshow interval in seconds:' -Tit
 
 ```powershell
 $Interval = Get-WPFTextInput -Prompt 'Seconds:' -Title 'Slideshow' -DefaultValue '3.0' -Numeric -AllowDecimal -Minimum 0.5 -Maximum 600
+```
+
+## Application Storage
+
+These supporting commands provide durable, per-user storage for application data.
+They are regular module commands rather than control keywords, so they can be used
+before creating a WPF window. Stored values use JSON by default; specify
+`-Format CliXml` when PowerShell-specific type fidelity is useful. Both formats
+store data snapshots and do not restore custom class instances. Cache expiry,
+schema versions, class reconstruction, and invalidation remain the application's
+responsibility.
+
+### New-WPFAppStorage
+
+Creates an explicit storage context. By default, data is stored beneath
+`%LOCALAPPDATA%\WPF\<Application>`. Specify `-Publisher` to use a different
+application namespace.
+
+```powershell
+$Storage = New-WPFAppStorage -Application 'PokeBrowser'
+```
+
+### Get-WPFStoredItem
+
+Reads and deserializes an item. A missing item returns no output; corrupt data
+produces an error.
+
+```powershell
+$UserPreferences = Get-WPFStoredItem -Storage $Storage -Name 'UserPreferences'
+```
+
+### Set-WPFStoredItem
+
+Serializes a value in the selected format and atomically replaces any item with
+the same name and format. Concurrent writes to the same item are rejected.
+
+```powershell
+Set-WPFStoredItem -Storage $Storage -Name 'UserPreferences' -Value $UserPreferences
+```
+
+### Remove-WPFStoredItem
+
+Removes an item when it exists. The command supports `-WhatIf` and `-Confirm`.
+
+```powershell
+Remove-WPFStoredItem -Storage $Storage -Name 'UserPreferences'
+```
+
+## Completers
+
+### Complete-WPFColor
+
+Completes WPF named colors and hexadecimal color values. Hexadecimal insertion
+text is enclosed in quotes (for example, `'#FFFFFF'`) so PowerShell does not
+interpret the hash as the start of a comment. The completion list displays the
+unquoted value (for example, `#FFFFFF`).
+
+```powershell
+Complete-WPFColor -WordToComplete 'FFFFFF'
 ```
 
 ## Compatibility Note

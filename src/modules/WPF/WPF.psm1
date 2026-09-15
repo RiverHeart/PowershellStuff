@@ -9,6 +9,7 @@ $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
 $script:LastDialogResult = $false
 $script:LastDialogCloseReason = 'Unknown'
+$script:WPFStrictMode = $false
 
 # Create module var to map context ids to control tables
 if (-not $Script:WPFControlRegistry) {
@@ -93,3 +94,24 @@ Export-ModuleMember `
     -Cmdlet $CmdletsToExport `
     -Variable $VariablesToExport `
     -Alias $AliasesToExport
+
+
+# Resource Cleanup
+#-----------------
+
+<#
+NOTE:
+    The following block of code will probably be useful at some point so
+    I'm leaving this here.
+
+    See: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/remove-module?view=powershell-7.6#example-5-using-the-onremove-event
+#>
+
+# # Perform any necessary cleanup when the module is removed
+# $OnRemoveScript = {}
+# $ExecutionContext.SessionState.Module.OnRemove += $OnRemoveScript
+# $RegisterEngineEventParams = @{
+#     Action = $OnRemoveScript
+#     SourceIdentifier = ([System.Management.Automation.PSEngineEvent]::Exiting)
+# }
+# Register-EngineEvent @RegisterEngineEventParams

@@ -38,7 +38,7 @@ function ScrollViewer {
     if ($PSCmdlet.GetVariableValue('WPFFactoryContext') -eq $true) {
         $Factory = [System.Windows.FrameworkElementFactory]::new([System.Windows.Controls.ScrollViewer], $Name)
 
-        $Parent = $PSCmdlet.GetVariableValue('this')
+        $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if ($Parent) {
             Add-WPFObject $Parent $Factory
         }
@@ -61,7 +61,7 @@ function ScrollViewer {
     }
 
     # Attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $ScrollViewer.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (ScrollViewer)"

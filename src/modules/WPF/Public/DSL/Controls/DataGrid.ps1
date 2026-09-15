@@ -42,7 +42,7 @@ function DataGrid {
     }
 
     # Attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $DataGrid.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (DataGrid)"

@@ -42,7 +42,7 @@ function TextBox {
     }
 
     # Attach to parent if one exists
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $HadParentBeforeAttach = [bool] $TextBox.Parent
     if ($Parent -and -not $HadParentBeforeAttach) {
         Write-Debug "Beginning auto-attach for $Name (TextBox)"

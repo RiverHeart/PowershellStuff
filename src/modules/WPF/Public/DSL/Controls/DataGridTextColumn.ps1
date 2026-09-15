@@ -80,7 +80,7 @@ function DataGridTextColumn {
         return
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     if ($Parent) {
         Write-Debug "Beginning auto-attach for '$Header' (DataGridTextColumn)"
         Update-WPFObject $Parent $DataGridTextColumn

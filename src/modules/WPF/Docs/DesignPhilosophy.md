@@ -18,7 +18,7 @@ Many frameworks make complex things easy at the cost of making simple things har
 
 If the quintessential app includes a menu, a body, maybe a footer and/or status bar, it shouldn't be hard to create that. With that in mind, the DSL isn't going to force you to figure out how `Menu` interacts with `DockPanel` and how `Window` can only have a single child container so you need to stick your `DockPanel/Menu` combo into another container so you can place your `Button` and `StatusBar` and figure out how those work. Those are unimportant implementation details when you're just getting started. If you use `App` instead of a `Window`, you get `Menu`, `Content`, `Footer` and `StatusBar` blocks.
 
-Making a control visible depending on a boolean property is another example. In C#/WPF, you need to write a visibility converter for this common scenario. In the DSL you add `State @{ IsFullScreen = $true }` to your `Window`/`App` and `Link Visibility -ToState IsFullScreen -Invert` to each property you want to toggle visibility on and it infers what you want to happen.
+Making a control visible depending on a boolean property is another example. In C#/WPF, you need to write a visibility converter for this common scenario. In the DSL you add `State @{ IsFullScreen = $true }` to your `Window`/`App` and `Link IsFullScreen -To Visibility -Invert` to each property you want to toggle visibility on and it infers what you want to happen.
 
 ## One Obvious Way
 

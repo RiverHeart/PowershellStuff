@@ -1,7 +1,7 @@
 # Feature Proposal: Link Keyword Contract (v1)
 
 ## Summary
-Introduce `Link` as a single entrypoint keyword for binding scenarios. `Link` is syntax sugar only and delegates to existing binding primitives (`Bind`, `BindProperty`, and optionally `Binding` for advanced output-oriented scenarios). The user-facing vocabulary should prefer `-Property` for source member intent, with `-Path` supported as an alias for compatibility with WPF terminology.
+Introduce `Link` as a single entrypoint keyword for directional binding scenarios. `Link` is syntax sugar only and dispatches to existing binding primitives or observable-state callbacks. The canonical user-facing shape is source-to-target directional syntax.
 
 ## Problem
 The current surface area exposes multiple concepts (`State`, `Bind`, `BindProperty`, `Binding`) that are each valid but increase cognitive load for common scenarios. New users are expected to struggle deciding which keyword to use.
@@ -9,9 +9,7 @@ The current surface area exposes multiple concepts (`State`, `Bind`, `BindProper
 ## Goals
 * Provide one obvious binding entrypoint for most scripts.
 * Keep existing keywords as escape hatches without behavior regressions.
-* Prioritize intent-oriented naming in `Link`:
-* Default source member term: `-Property`
-* Compatibility alias: `-Path`
+* Prioritize directional intent in `Link` with canonical `Link <Source> -To <Target>` syntax.
 * Preserve predictable dispatch rules that are easy to document and test.
 
 ## Non-Goals
@@ -20,91 +18,91 @@ The current surface area exposes multiple concepts (`State`, `Bind`, `BindProper
 * No forced migration of existing scripts.
 
 ## Core Principle
-`Link` should be sugar, not a new binding engine.
+`Link` should be sugar over existing binding mechanisms, not a new general-purpose binding engine.
 
 ## Proposed Contract (v1)
 
-### State-style linking
+### Directional linking
 
-Delegates to `Bind`
-
-**Shape:**
-```
-Link <TargetProperty> -ToState <StatePropertyName> [-Invert] [-Converter <scriptblock>]
-```
-
-### Semantics
-* `-ToState` is resolved against current window/app state (equivalent source as existing `Bind` usage).
-* `-Invert` and `-Converter` preserve current `Bind` semantics.
-
-### WPF binding-style linking
-
-Delegates to `BindProperty`
+Directional linking resolves endpoint kinds (Property/State) and delegates to the
+appropriate primitive.
 
 **Shape:**
 ```
-Link <TargetProperty> -Property <SourcePropertyOrPath> [source selector params] [-ScriptBlock <scriptblock>]
+Link <Source> -To <Target> [-FromKind Property|State] [-ToKind Property|State]
 ```
 
-**Source selector params:**
-* `-Self`
-* `-TemplatedParent`
-* `-ElementName`
-* `-Source`
+### Endpoint scope and rationale
 
-**Alias:**
-* `-Path` is an alias of `-Property` (for WPF-familiar users).
+Canonical `Link` endpoints are exact top-level member names in two namespaces:
 
-**Semantics:**
-* No selector means inherited `DataContext` behavior, matching current `BindProperty` default.
+* `Property`: a property on the current control (or `-InputObject`)
+* `State`: a property on the root window State (`Window.Tag`)
 
-### Advanced binding object mode
+Resolution is eager. `Link` must classify both endpoint kinds before selecting
+a connector, and it reports missing or ambiguous endpoints before wiring any
+callbacks or WPF bindings.
 
-optional in v1; can defer
+This exact-member rule is a deliberate v1 contract boundary, not a WPF
+limitation. The target-first `Link` API that preceded canonical directional
+syntax forwarded WPF paths and `-Source`, `-ElementName`, `-Self`, and
+`-TemplatedParent` selectors to `BindProperty`. Those forms were removed when
+`Link <Source> -To <Target>` introduced symmetric endpoint inference.
 
-**Shape:**
+The boundary keeps inference deterministic across connector routes that do not
+share one underlying engine:
+
+| Route | Underlying mechanism |
+| --- | --- |
+| State -> Property | `Bind` callback rooted at `Window.Tag` |
+| Property -> Property | self-relative `BindProperty` |
+| Property -> State | `BindProperty` with State as the explicit source |
+| State -> State | observable State `AddBinding()` callback |
+
+WPF paths and inherited `DataContext` are late-bound: an intermediate object
+may be null or replaced after the UI is built, and a `DataContext` member may
+not exist when `Link` performs eager inference. The State-to-State callback
+route also has no WPF `Binding.Path` or source-selector concept to delegate to.
+Supporting those features uniformly would therefore require a larger endpoint
+model and nested subscription semantics, not only forwarding another parameter.
+
+This does not mean every richer case is technically difficult. Property-only
+paths and selectors could be forwarded to `BindProperty`, as the earlier API
+demonstrated. Doing so only for some routes would make identical endpoint syntax
+mean different things depending on inferred kinds and would reintroduce much of
+the `BindProperty` surface into `Link`. Canonical `Link` instead uses the common,
+eagerly validated subset; callers use `BindProperty` when they need WPF binding
+semantics.
+
+### Binding object construction
+
+`Link` does not construct or return binding objects. Advanced APIs such as
+triggers, templates, and data-grid columns use the existing `Binding` keyword
+directly:
+
+```powershell
+Binding 'IsEnabled' -TemplatedParent
 ```
-Link -AsBinding -Property <SourcePropertyOrPath> [source selector params] [-ScriptBlock <scriptblock>]
-```
-
-**Semantics:**
-* Returns a `System.Windows.Data.Binding` (delegates to `Binding`).
-* Intended for advanced APIs such as triggers/templates.
-
-**Parameter Naming Decision**
-* In `Link`, `-Property` is the canonical parameter name for the source side.
-* `-Path` is an alias only.
-
-**Rationale:**
-* `-Property` better communicates intent in common one-segment cases.
-* `-Path` reflects WPF internals and remains available for familiarity and compatibility.
 
 **Dispatch Rules (Deterministic)**
-1. If `-ToState` is supplied, dispatch to `Bind`.
-2. Else if `-AsBinding` is supplied, dispatch to `Binding`.
-3. Else dispatch to `BindProperty` using `-Property`/`-Path` and any source selector.
-4. Error on mixed-mode combinations (for example `-ToState` with `-Self`, or `-ToState` with `-AsBinding`).
+1. Resolve exact endpoint names against current-control Property and root-window State namespaces.
+2. Dispatch to the connector for the resolved Property/State pairing.
+3. Error on ambiguous endpoint resolution without explicit kinds.
 
 **Examples**
 
 ```powershell
-# State -> target property (Bind)
-Link Visibility -ToState IsFullScreen -Invert
+# Directional state -> property
+Link IsFileLoaded -To IsEnabled
 
-# DataContext binding (BindProperty with implicit DataContext)
-Link Text -Property Count
-
-# Explicit source binding (BindProperty)
-Link Text -Property ItemsSource.Count -Source (Reference 'ProcessList')
-
-# WPF terminology-compatible alias
-Link Text -Path CurrentFile.Name
+# Directional property -> state
+Link Text -To SearchQuery
 ```
 
 ### Error Contract
 * Preserve existing underlying error behavior where possible.
 * Add Link-specific validation messages for invalid mode combinations.
-* Forward warnings from delegated commands (for example unresolved DataContext warning behavior).
+* Fail endpoint inference before connector dispatch when a member is missing or ambiguous.
 
 ### Backward Compatibility
 * Existing scripts using `Bind`, `BindProperty`, and `Binding` continue unchanged.
@@ -112,14 +110,9 @@ Link Text -Path CurrentFile.Name
 
 ## Testing Requirements
 
-**Dispatch tests:**
-* `-ToState` routes to `Bind` behavior.
-* `-Property` with selector routes to `BindProperty` behavior.
-* `-AsBinding` returns `Binding` result (if included in v1).
-
-**Naming tests:**
-* `-Property` works as canonical source member parameter.
-* `-Path` alias produces identical behavior.
+**Directional tests:**
+* Endpoint resolution works for Property and State endpoints.
+* Ambiguous endpoint names require explicit `-FromKind`/`-ToKind`.
 
 **Validation tests:**
 * Mixed-mode combinations fail with clear messages.
@@ -132,6 +125,9 @@ Link Text -Path CurrentFile.Name
 3. Keep examples in both styles during transition.
 
 ## Open Decisions
-* Include `-AsBinding` in v1 or defer to v1.1.
-* Whether `-ToState` should accept full dotted path or state-member-only names in v1.
-* Whether to include convenience map operators (`-Map`, `-Invert`) in WPF mode or keep them state-only for clarity.
+* Whether to include convenience map operators (`-Map`, `-Invert`) in all directional pairings or only selected ones.
+* `-Sync` and update-trigger follow-on behavior is tracked in `RFC-004-Link-SourceTarget-Direction.md`.
+
+## Resolved Decisions
+* `-AsBinding` is excluded from `Link`. Binding-object construction has a
+	different return contract and remains the responsibility of `Binding`.

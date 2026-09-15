@@ -9,27 +9,36 @@ function Initialize-ModularPSProfile {
 
     $Parent = $PROFILE | Split-Path -Parent
     $ProfileName = $PROFILE | Split-Path -Leaf
-    $ProfileDirPath = "$Parent/Profile.d"
+    $ProfileDirPath = Join-Path -Path $Parent -ChildPath 'Profile.d'
+    $EscapedProfileDirPath = $ProfileDirPath.Replace("'", "''")
+
+    $ProfileBootstrapStart = '# >>> Initialize-ModularPSProfile >>>'
+    $ProfileBootstrapEnd = '# <<< Initialize-ModularPSProfile <<<'
+
     if (-not (Test-Path -Path $ProfileDirPath -PathType Container)) {
-        New-Item -Path $ProfileDirPath -ItemType Directory
+        New-Item -Path $ProfileDirPath -ItemType Directory | Out-Null
     }
 
     $ProfileTemplate = @"
-`$PROFILE_DOT_D=`"$ProfileDirPath`"
-foreach(`$Fragment in (Get-ChildItem `$PROFILE_DOT_D)) {
-    Write-Verbose "Sourcing: `$Fragment"
-    #. `$Fragment
+$ProfileBootstrapStart
+`$PROFILE_DOT_D = '$EscapedProfileDirPath'
+Get-ChildItem -Path `$PROFILE_DOT_D -File -Filter '*.ps1' | Sort-Object -Property Name | ForEach-Object {
+    Write-Verbose ("Sourcing: {0}" -f `$_.FullName)
+    . `$_.FullName
 }
+$ProfileBootstrapEnd
 "@
 
     if (-not (Test-Path -Path $PROFILE)) {
-        New-Item -Path $PROFILE -ItemType File
+        New-Item -Path $PROFILE -ItemType File | Out-Null
     }
 
-    if (Get-Variable 'PROFILE_DOT_D' -ErrorAction Ignore) {
+    $ProfileContent = Get-Content -Path $PROFILE -Raw -ErrorAction Ignore
+
+    if ($ProfileContent -match [regex]::Escape($ProfileBootstrapStart)) {
         Write-Host "Profile '$ProfileName' already configured."
     } else {
-        Write-Host "Updating profile '$Profilename'"
+        Write-Host "Updating profile '$ProfileName'"
         Add-Content -Value $ProfileTemplate -Path $PROFILE
     }
 }

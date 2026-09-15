@@ -83,14 +83,20 @@ FunctionsToExport = @(
     'New-WPFRelayCommand'
     'New-WPFValueConverter'
 
+    # Application Storage
+    'New-WPFAppStorage'
+    'Get-WPFStoredItem'
+    'Set-WPFStoredItem'
+    'Remove-WPFStoredItem'
+
     # Completers
     'Complete-WPFApplicationCommand'
+    'Complete-WPFColor'
     'Complete-WPFRegisteredObject'
     'Complete-WPFEvent'
     'Complete-WPFFileInfo'
     'Complete-WPFState'
     'Complete-WPFThis'
-    'TabExpansion2'
 
     # DSL
 
@@ -102,8 +108,11 @@ FunctionsToExport = @(
     'Border'
     'ContentPresenter'
     'Button'
+    'Canvas'
+    'ComboBox'
     'DataGrid'
     'DataGridTextColumn'
+    'Expander'
     'ListView'
     'GridView'
     'GridViewColumn'
@@ -118,12 +127,17 @@ FunctionsToExport = @(
     'Row'
     'Menu'
     'MenuItem'
+    'ProgressBar'
     'StatusBar'
     'StatusBarItem'
     'ScrollViewer'
     'StackPanel'
     'TextBlock'
     'TextBox'
+    'Thumb'
+    'TreeView'
+    'TreeViewItem'
+    'HierarchicalItemTemplate'
     'Window'
 
     # DSL/Helpers
@@ -132,12 +146,17 @@ FunctionsToExport = @(
     'BindProperty'
     'BoundTo'
     'Brush'
+    'BringToFront'
+    'SendToBack'
+    'CanvasPosition'
     'Chrome'
     'DataTrigger'
     'Dock'
+    'Draggable'
     'ExtendStyle'
     'Execute'
     'CanExecute'
+    'NotifyCanExecuteChanged'
     'Import'
     'Key'
     'Link'
@@ -167,7 +186,6 @@ FunctionsToExport = @(
     'UseStyle'
     'When'
 
-
     # DSL/Shapes
     'Path'
     'Rectangle'
@@ -186,6 +204,7 @@ FunctionsToExport = @(
     'Get-WPFFileSelection'
     'Get-WPFTextInput'
     'Get-WPFCompletionType'
+    'Limit-WPFNumber'
     'New-WPFObservableState'
     'New-WPFPoint'
     'New-WPFProject'
@@ -199,6 +218,7 @@ FunctionsToExport = @(
     'Set-WPFClipboard'
     'Set-WPFWindowFullScreen'
     'Show-WPFWindow'
+    'Start-WPFApplication'
     'Switch-WPFTheme'
     'Unregister-WPFCompletionType'
     'Unregister-WPFObject'
@@ -225,6 +245,13 @@ AliasesToExport = '*'
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
+
+    TabExpansion = @{
+        Completers = @(
+            'Complete-WPFThis'
+        )
+        Modifiers = @()
+    }
 
     PSData = @{
 

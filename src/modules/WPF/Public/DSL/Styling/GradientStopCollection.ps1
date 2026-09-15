@@ -29,6 +29,7 @@
 function GradientStopCollection {
     [CmdletBinding()]
     [OutputType([void], [System.Windows.Media.GradientStopCollection])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '', Justification='Suppressing because the function returns a collection in a single-element array to avoid unwrapping in the pipeline.')]
     param(
         [Parameter(Mandatory, ParameterSetName = 'Keyed', Position = 0)]
         [ValidateScript({ $_ -isnot [scriptblock] })]
@@ -51,7 +52,7 @@ function GradientStopCollection {
     $dictionary = $PSCmdlet.GetVariableValue('this')
     if ($dictionary -is [System.Windows.ResourceDictionary]) {
         if ($PSCmdlet.ParameterSetName -ne 'Keyed') {
-            Write-Error 'GradientStopCollection inside Theme requires a resource key.'
+            Write-Error 'GradientStopCollection inside a Resources/Theme block requires a resource key.'
             return
         }
 
@@ -60,7 +61,7 @@ function GradientStopCollection {
     }
 
     if ($PSCmdlet.ParameterSetName -eq 'Keyed') {
-        Write-Error "GradientStopCollection key '$Key' is only valid inside Theme. Use the scriptblock-only form when assigning directly to brush properties."
+        Write-Error "GradientStopCollection key '$Key' is only valid inside Resources/Theme dictionary scopes. Use the scriptblock-only form when assigning directly to brush properties."
         return
     }
 

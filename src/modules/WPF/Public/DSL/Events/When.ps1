@@ -84,7 +84,7 @@ function When {
 
     # Auto-attach self to parent if one exists
     if (-not $InputObject) {
-        $InputObject = $PSCmdlet.GetVariableValue('this')
+        $InputObject = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
         if (-not $InputObject) {
             Write-Warning "When: Parent not found for state handler on '$State'."
             return

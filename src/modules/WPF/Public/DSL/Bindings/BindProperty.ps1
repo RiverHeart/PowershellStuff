@@ -39,9 +39,21 @@
 .PARAMETER InputObject
     The target control. Accepts pipeline input. Defaults to $this in DSL context.
 
+.PARAMETER Mode
+    Controls when values flow from the source path to the target property.
+    OneWay is the default. TwoWay also updates the source when the target
+    changes. OneTime initializes the target once without observing changes.
+
+.PARAMETER Converter
+    Optional scriptblock used to convert source values before assigning them to
+    the target property.
+
 .PARAMETER ScriptBlock
     Optional scriptblock to configure the binding object (e.g., set Converter, Mode, etc.).
     The scriptblock receives the internally created Binding instance as $this.
+
+    Use FallbackValue when the binding path cannot be resolved. Use TargetNullValue
+    when the path resolves successfully but its value is null.
 
 .EXAMPLE
     # Bind TextBlock.Text to DataGrid.ItemsSource.Count
@@ -60,6 +72,29 @@
     }
 
 .EXAMPLE
+    # Initialize a nested binding source before its child controls are created.
+    Window 'MyApp' {
+        State @{ Detail = [pscustomobject] @{ Name = '' } }
+
+        Border {
+            BindProperty DataContext Detail
+
+            TextBlock {
+                BindProperty Text Name
+            }
+        }
+    }
+
+.EXAMPLE
+    # Supply display values for unresolved bindings and resolved null values.
+    Image {
+        BindProperty Source ImageUri -ScriptBlock {
+            $this.FallbackValue = $PlaceholderImage
+            $this.TargetNullValue = $PlaceholderImage
+        }
+    }
+
+.EXAMPLE
     # Bind visibility relative to the target control itself
     Rectangle 'Loading' {
         BindProperty Visibility IsLoading -Self
@@ -68,11 +103,9 @@
 .EXAMPLE
     # Configure the binding with a converter
     Label 'Status' {
-        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -ScriptBlock {
-            $this.Converter = New-WPFValueConverter {
-                param($File)
-                if ($File) { "File: $($File.Name)" } else { 'No file' }
-            }
+        BindProperty Content CurrentFile -Source (Reference 'Window').Tag -Converter {
+            param($File)
+            if ($File) { "File: $($File.Name)" } else { 'No file' }
         }
     }
 
@@ -109,6 +142,13 @@ function BindProperty {
         [object] $InputObject,
 
         [Parameter()]
+        [ValidateSet('OneWay', 'TwoWay', 'OneTime')]
+        [string] $Mode = 'OneWay',
+
+        [Parameter()]
+        [scriptblock] $Converter,
+
+        [Parameter()]
         [scriptblock] $ScriptBlock
     )
 
@@ -133,8 +173,10 @@ function BindProperty {
             return
         }
 
-        # Resolve the target dependency property
-        $TargetType = $Target.GetType()
+        # Resolve the target dependency property. Inside a template factory
+        # context, the factory's recipe Type is the real target type.
+        $IsFactoryTarget = $Target -is [System.Windows.FrameworkElementFactory]
+        $TargetType = if ($IsFactoryTarget) { $Target.Type } else { $Target.GetType() }
         $ResolvedProperty = Resolve-WPFDependencyProperty -Property $Property -TargetType $TargetType
 
         if (-not $ResolvedProperty) {
@@ -153,15 +195,23 @@ function BindProperty {
             $binding.ElementName = $ElementName
         } elseif ($PSBoundParameters.ContainsKey('Source')) {
             $binding.Source = $Source
+        } elseif ($IsFactoryTarget) {
+            Write-Verbose "BindProperty: No source selector specified inside a template factory context; using the generated element's inherited DataContext for path '$Path'."
         } else {
             $dataContextProperty = $Target.PSObject.Properties['DataContext']
             if ($null -eq $dataContextProperty) {
                 Write-Warning "BindProperty: Target type '$($TargetType.FullName)' does not expose DataContext. Specify -Self, -TemplatedParent, -ElementName, or -Source for path '$Path'."
             } elseif ($null -eq $Target.DataContext) {
-                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. The binding will remain unresolved until DataContext is assigned or inherited."
+                Write-Warning "BindProperty: No source selector specified for path '$Path', and DataContext is null on target type '$($TargetType.FullName)'. Initialize or inherit a non-null DataContext before calling BindProperty, or specify -Source. If deferred resolution is intentional, the binding will become active when DataContext is later assigned; configure FallbackValue in -ScriptBlock for a temporary display value."
             } else {
                 Write-Verbose "BindProperty: No source selector specified; using inherited DataContext for path '$Path'."
             }
+        }
+
+        $binding.Mode = [System.Windows.Data.BindingMode]::$Mode
+
+        if ($Converter) {
+            $binding.Converter = New-WPFValueConverter $Converter
         }
 
         # Allow custom configuration via scriptblock
@@ -170,8 +220,13 @@ function BindProperty {
             $null = $ScriptBlock.InvokeWithContext($null, $PSVars)
         }
 
-        # Apply the binding using BindingOperations
-        $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $ResolvedProperty.DependencyProperty, $binding)
+        # Apply the binding using BindingOperations, or FrameworkElementFactory's
+        # own SetBinding when targeting a template factory recipe.
+        if ($IsFactoryTarget) {
+            $Target.SetBinding($ResolvedProperty.DependencyProperty, $binding)
+        } else {
+            $null = [System.Windows.Data.BindingOperations]::SetBinding($Target, $ResolvedProperty.DependencyProperty, $binding)
+        }
         Write-Verbose "BindProperty: Successfully bound '$Property' on $($TargetType.Name) to '$Path'."
     }
 }

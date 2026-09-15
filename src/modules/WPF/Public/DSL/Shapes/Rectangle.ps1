@@ -75,7 +75,7 @@ function Rectangle {
         return
     }
 
-    $Parent = $PSCmdlet.GetVariableValue('this')
+    $Parent = $PSCmdlet.GetVariableValue('WPFAutoAttachContext')
     $IsParentedBefore = [bool] $Rectangle.Parent
     if ($Parent -and -not $IsParentedBefore) {
         Write-Debug "Beginning auto-attach for $Name (Rectangle)"
