@@ -47,7 +47,7 @@ Export-ModuleMember -Function @()
                 -ModulePath $script:ModulePath `
                 -EntryPoint '../outside.ps1' `
                 -Force
-        } | Should -Throw '*outside module root*'
+        } | Should -Throw '*outside the base path*'
     }
 
     It 'Reports a missing entry point' {
@@ -55,7 +55,8 @@ Export-ModuleMember -Function @()
             Start-WPFApplication `
                 -ModulePath $script:ModulePath `
                 -EntryPoint 'src/Views/missing.gui.ps1' `
-                -Force
+                -Force `
+                -ErrorAction Stop
         } | Should -Throw '*was not found*'
     }
 }
