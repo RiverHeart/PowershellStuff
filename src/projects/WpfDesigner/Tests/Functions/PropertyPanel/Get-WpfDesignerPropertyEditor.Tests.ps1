@@ -22,6 +22,23 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
         $Target.Text | Should -Be -ExpectedValue 'Updated'
     }
 
+    It 'Should build a read-only TextBox for uneditable Text content' {
+        $Target = [System.Windows.Controls.Label]::new()
+        $Target.Content = [System.Windows.Controls.StackPanel]::new()
+        $Descriptor = [pscustomobject] @{
+            Name         = 'Content'
+            PropertyType = [object]
+            EditorKind   = 'Text'
+            IsReadOnly   = $true
+        }
+
+        $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
+        $Binding = [System.Windows.Data.BindingOperations]::GetBinding($Editor.Input, [System.Windows.Controls.TextBox]::TextProperty)
+
+        $Editor.Input.IsReadOnly | Should -BeTrue
+        $Binding.Mode | Should -Be ([System.Windows.Data.BindingMode]::OneWay)
+    }
+
     It 'Should build a two-way bound TextBox for a Number property' {
         $Target = [System.Windows.Controls.TextBlock]::new()
         $Descriptor = [pscustomobject] @{ Name = 'Width'; PropertyType = [double]; EditorKind = 'Number' }
@@ -73,17 +90,18 @@ Describe 'Get-WpfDesignerPropertyEditor' -Tag 'WpfDesigner' {
 
     It 'Should build a two-way bound ComboBox for an Enum property' {
         $Target = [System.Windows.Controls.TextBlock]::new()
-        $Descriptor = [pscustomobject] @{ Name = 'HorizontalAlignment'; PropertyType = [System.Windows.HorizontalAlignment]; EditorKind = 'Enum' }
+        $Descriptor = [pscustomobject] @{ Name = 'TextWrapping'; PropertyType = [System.Windows.TextWrapping]; EditorKind = 'Enum' }
 
         $Editor = Get-WpfDesignerPropertyEditor -Descriptor $Descriptor -Target $Target
 
         $Editor.Input | Should -BeOfType [System.Windows.Controls.ComboBox]
-        $Editor.Input.ItemsSource | Should -Contain ([System.Windows.HorizontalAlignment]::Right)
-        $Editor.Input.SelectedItem | Should -Be ([System.Windows.HorizontalAlignment]::Stretch)
+        $Editor.Input.ItemTemplate | Should -BeNullOrEmpty
+        $Editor.Input.ItemsSource | Should -Contain ([System.Windows.TextWrapping]::WrapWithOverflow)
+        $Editor.Input.SelectedItem | Should -Be ([System.Windows.TextWrapping]::NoWrap)
 
-        $Editor.Input.SelectedItem = [System.Windows.HorizontalAlignment]::Right
+        $Editor.Input.SelectedItem = [System.Windows.TextWrapping]::WrapWithOverflow
 
-        $Target.HorizontalAlignment | Should -Be -ExpectedValue ([System.Windows.HorizontalAlignment]::Right)
+        $Target.TextWrapping | Should -Be -ExpectedValue ([System.Windows.TextWrapping]::WrapWithOverflow)
     }
 
     It 'Should label the row with the property name' {
