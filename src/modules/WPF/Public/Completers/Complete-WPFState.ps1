@@ -63,7 +63,7 @@ function Complete-WPFState {
     try {
         # Find all commands that contain the cursor, then inspect each command scope
         # for top-level State declarations.
-        $CursorPathCommandNodes = Find-AstNode -Type CommandAst -All -Recurse -ContainsCursor
+        $CursorPathCommandNodes = Find-WPFAstNode -Type CommandAst -All -Recurse -ContainsCursor
     } catch {
         Write-Debug "Failed to resolve AST context for state completion: $($_.Exception.Message)"
         return
@@ -90,7 +90,7 @@ function Complete-WPFState {
             continue
         }
 
-        $StateNodesInScope = Find-AstNode -Ast $ScopeScriptBlock -Type CommandAst -All -Query {
+        $StateNodesInScope = Find-WPFAstNode -Ast $ScopeScriptBlock -Type CommandAst -All -Query {
             $_.GetCommandName() -ieq 'State'
         }
 

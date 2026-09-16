@@ -87,7 +87,7 @@ function Get-WPFKeyword {
 
     $HasParentContext = $PSBoundParameters.ContainsKey('ParentContext') -and -not [string]::IsNullOrWhiteSpace($ParentContext)
 
-    $Matches = Find-AstNode -ScriptBlock $ScriptBlock -Type CommandAst -All -Query {
+    $Matches = Find-WPFAstNode -ScriptBlock $ScriptBlock -Type CommandAst -All -Query {
         $CommandName = $_.GetCommandName()
         if ([string]::IsNullOrWhiteSpace($CommandName)) {
             return $false

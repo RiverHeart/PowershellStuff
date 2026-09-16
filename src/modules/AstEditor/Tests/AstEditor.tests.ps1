@@ -4,6 +4,23 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
 
+Describe 'Find-AEAstNode' {
+    It 'is exported under the AstEditor-specific name' {
+        (Get-Command Find-AEAstNode).ModuleName | Should -Be 'AstEditor'
+        @(Get-Command -Module AstEditor).Name | Should -Contain 'Find-AEAstNode'
+        @(Get-Command -Module AstEditor).Name | Should -Not -Contain 'Find-AstNode'
+    }
+
+    It 'rejects Query scriptblocks that emit multiple values' {
+        {
+            Find-AEAstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -Query {
+                $_
+                $true
+            }
+        } | Should -Throw '*Find-AEAstNode query emitted 2 values*CommandAst*'
+    }
+}
+
 Describe 'New-AstDocument' {
     It 'parses string input via InputObject' {
         $Overlay = New-AstDocument -InputObject 'Window Main { }'

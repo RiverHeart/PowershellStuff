@@ -55,6 +55,21 @@ Describe 'Find-AstNode' {
         $Node | Should -Be $null
     }
 
+    It 'rejects Query scriptblocks that emit multiple values' {
+        {
+            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -Query {
+                $_
+                $true
+            }
+        } | Should -Throw '*query emitted 2 values*CommandAst*'
+    }
+
+    It 'treats Query scriptblocks that emit no values as false' {
+        $Node = Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -Query { return }
+
+        $Node | Should -Be $null
+    }
+
     It 'respects Recurse for nested command discovery' {
         $Source = {
             & {
@@ -117,13 +132,13 @@ Describe 'Find-AstNode' {
 
     It 'requires CursorOffset when ContainsCursor is specified and cannot be auto-resolved' {
         {
-            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -ContainsCursor
+            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -ContainsCursor -ErrorAction Stop
         } | Should -Throw '*CursorOffset is required when ContainsCursor is specified and could not be resolved from TabExpansion2 context.*'
     }
 
     It 'requires ContainsCursor when CursorOffset is specified' {
         {
-            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -CursorOffset 0
+            Find-AstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -CursorOffset 0 -ErrorAction Stop
         } | Should -Throw '*ContainsCursor is required when CursorOffset is specified.*'
     }
 

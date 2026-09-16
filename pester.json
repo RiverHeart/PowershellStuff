@@ -10,12 +10,20 @@
       "ConfigPath": "src/modules/WPF/pester.json"
     },
     {
+      "Name": "Rules",
+      "ConfigPath": "src/modules/WPF/Rules/pester.json"
+    },
+    {
       "Name": "PleaseWork",
       "ConfigPath": "src/modules/PleaseWork/pester.json"
     },
     {
       "Name": "AstEditor",
       "ConfigPath": "src/modules/AstEditor/pester.json"
+    },
+    {
+      "Name": "GrabBag",
+      "ConfigPath": "src/modules/GrabBag/pester.json"
     },
     {
       "Name": "TabCentral",

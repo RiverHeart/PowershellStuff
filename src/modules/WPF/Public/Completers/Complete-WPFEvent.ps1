@@ -47,7 +47,7 @@ function Complete-WPFEvent {
     $IgnoredCommandNames = @('on', '-on', 'add-wpfhandler')
 
     try {
-        $ParentNode = Find-AstNode -Type CommandAst -All -Recurse -ContainsCursor -Query {
+        $ParentNode = Find-WPFAstNode -Type CommandAst -All -Recurse -ContainsCursor -Query {
             $CandidateName = $_.GetCommandName()
             $CandidateName -and ($IgnoredCommandNames -notcontains $CandidateName.ToLowerInvariant())
         } |

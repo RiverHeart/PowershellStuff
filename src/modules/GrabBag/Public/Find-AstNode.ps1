@@ -26,6 +26,10 @@
 
 .EXAMPLE
     Find-AstNode -FilePath .\Public\DSL\Styling\Resources.ps1 -Type UnaryExpressionAst
+
+.PARAMETER Query
+    Filters candidate nodes. The query may emit zero or one value; zero is treated as false.
+    Emitting multiple values causes an error because it is ambiguous when converted to Boolean.
 #>
 function Find-AstNode {
     [CmdletBinding(DefaultParameterSetName='ByTabExpansion2Context')]
@@ -159,6 +163,8 @@ function Find-AstNode {
     $HasCallerQuery = $PSBoundParameters.ContainsKey('Query')
     $TypeNames = if ($Type) { $Type } else { @() }
 
+    # Wrap the user provided query so we can call it after running
+    # type and cursor checks have finished.
     if ($HasCallerQuery) {
         $OriginalQuery = $Query
 
@@ -168,11 +174,13 @@ function Find-AstNode {
             $OriginalQuery.Ast.ParamBlock.Parameters.Count -gt 0
 
         if ($HasParamBlockParameters) {
+            Write-Debug "Passing AST node to original query with parameters."
             $EvaluateQuery = {
                 param($AstNode)
                 & $OriginalQuery $AstNode
             }
         } else {
+            Write-Debug "Passing AST node to original query via pipeline."
             $EvaluateQuery = {
                 param($AstNode)
                 $AstNode | ForEach-Object $OriginalQuery
@@ -180,6 +188,7 @@ function Find-AstNode {
         }
     }
 
+    # Construct the query scriptblock that will be used to find AST nodes.
     $Query = {
         param($AstNode)
 
@@ -206,15 +215,40 @@ function Find-AstNode {
         }
 
         if ($HasCallerQuery) {
-            return (& $EvaluateQuery $AstNode)
+            $QueryOutput = @(& $EvaluateQuery $AstNode)
+            $QueryOutputTypes = if ($QueryOutput.Count -eq 0) {
+                '<none>'
+            } else {
+                ($QueryOutput | ForEach-Object { $_.GetType().FullName }) -join ', '
+            }
+
+            Write-Debug ("Query for AST node type '{0}' emitted {1} value(s): {2}" -f
+                $AstNode.GetType().Name,
+                $QueryOutput.Count,
+                $QueryOutputTypes)
+
+            if ($QueryOutput.Count -gt 1) {
+                throw "Find-AstNode query emitted $($QueryOutput.Count) values for '$($AstNode.GetType().Name)': $QueryOutputTypes. The query must emit at most one value."
+            }
+
+            if ($QueryOutput.Count -eq 0) {
+                return $false
+            }
+
+            return [bool] $QueryOutput[0]
         }
 
         return $true
     }
 
+    # Perform the actual AST search using the constructed query.
     if ($All) {
-        return $Ast.FindAll($Query, $Recurse)
+        $Result = $Ast.FindAll($Query, $Recurse)
+    } else {
+        $Result = $Ast.Find($Query, $Recurse)
     }
 
-    return $Ast.Find($Query, $Recurse)
+    if ($null -ne $Result) {
+        $Result
+    }
 }

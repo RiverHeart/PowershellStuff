@@ -2,31 +2,32 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    Custom PSScriptAnalyzer rule to detect improper usage of the -is operator.
+    PSScriptAnalyzer rule to detect instances of the '-not (<expression> -is <type>)' pattern.
 
 .DESCRIPTION
-    This rule scans the provided script block for instances where the -is operator
-    is used improperly. Specifically, instances where someone writes
-    `-not (<expression> -is <type>)` pattern.
+    PSScriptAnalyzer rule to detect instances of the '-not (<expression> -is <type>)' pattern.
+
+    The rule suggests using the '-isnot' operator instead of the '-not (<expression> -is <type>)'
+    pattern.
 
 .EXAMPLE
-    Test-ImproperIsUsage -ScriptBlockAst {
+    Test-UseIsNotOperator -ScriptBlockAst {
         if (-not ($x -is [int])) {
             Write-Output "Improper usage detected."
         }
     }.Ast
 
 .EXAMPLE
-    Test-ImproperIsUsage -FilePath .\Public\DSL\Styling\Resources.ps1
+    Test-UseIsNotOperator -FilePath .\Public\DSL\Styling\Resources.ps1
 
 .EXAMPLE
-    Use with PSScriptAnalyzer to enforce proper usage of the -is operator.
+    Combine with Invoke-ScriptAnalyzer.
 
     Invoke-ScriptAnalyzer `
         -Path 'path/to/script.ps1' `
         -CustomRulePath 'path/to/Rules.psm1'
 #>
-function Test-ImproperIsUsage {
+function Test-UseIsNotOperator {
     [CmdletBinding()]
     [OutputType([PSCustomObject[]])]
     param(
@@ -65,7 +66,7 @@ function Test-ImproperIsUsage {
                 return
             }
 
-            Find-AstNode @FindAstNodeParams | ForEach-Object {
+            Find-WPFAstNode @FindAstNodeParams | ForEach-Object {
                 [PSCustomObject]@{
                     Message = "Use '<expression> -isnot <type>' instead of '-not (<expression> -is <type>)'."
                     Extent = $_.Extent

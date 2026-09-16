@@ -10,21 +10,25 @@
 .EXAMPLE
     Find the CommandAst in the given scriptblock.
 
-    Find-AstNode { Write-Host 'Foobar' } -Type CommandAst
+    Find-WPFAstNode { Write-Host 'Foobar' } -Type CommandAst
 
 .EXAMPLE
     Find all CommandAsts in the given scriptblock.
 
-    Find-AstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -All
+    Find-WPFAstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -All
 
 .EXAMPLE
     Find a CommandAst with a specific command name using the Query parameter.
 
-    Find-AstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -Query {
+    Find-WPFAstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -Query {
         $_.GetCommandName() -eq 'Get-Date'
     }
+
+.PARAMETER Query
+    Filters candidate nodes. The query may emit zero or one value; zero is treated as false.
+    Emitting multiple values causes an error because it is ambiguous when converted to Boolean.
 #>
-function Find-AstNode {
+function Find-WPFAstNode {
     [CmdletBinding(DefaultParameterSetName='ByTabExpansion2Context')]
     param(
         [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=0)]
@@ -189,15 +193,39 @@ function Find-AstNode {
         }
 
         if ($HasCallerQuery) {
-            return (& $EvaluateQuery $AstNode)
+            $QueryOutput = @(& $EvaluateQuery $AstNode)
+            $QueryOutputTypes = if ($QueryOutput.Count -eq 0) {
+                '<none>'
+            } else {
+                ($QueryOutput | ForEach-Object { $_.GetType().FullName }) -join ', '
+            }
+
+            Write-Debug ("Query for AST node type '{0}' emitted {1} value(s): {2}" -f
+                $AstNode.GetType().Name,
+                $QueryOutput.Count,
+                $QueryOutputTypes)
+
+            if ($QueryOutput.Count -gt 1) {
+                throw "Find-WPFAstNode query emitted $($QueryOutput.Count) values for '$($AstNode.GetType().Name)': $QueryOutputTypes. The query must emit at most one value."
+            }
+
+            if ($QueryOutput.Count -eq 0) {
+                return $false
+            }
+
+            return [bool] $QueryOutput[0]
         }
 
         return $true
     }
 
-    if ($All) {
-        return $Ast.FindAll($Query, $Recurse)
+    $Result = if ($All) {
+        $Ast.FindAll($Query, $Recurse)
+    } else {
+        $Ast.Find($Query, $Recurse)
     }
 
-    return $Ast.Find($Query, $Recurse)
+    if ($null -ne $Result) {
+        $Result
+    }
 }
