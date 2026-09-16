@@ -24,6 +24,9 @@
         $_.GetCommandName() -eq 'Get-Date'
     }
 
+.EXAMPLE
+    Find-WPFAstNode -FilePath .\Public\DSL\Styling\Resources.ps1 -Type UnaryExpressionAst
+
 .PARAMETER Query
     Filters candidate nodes. The query may emit zero or one value; zero is treated as false.
     Emitting multiple values causes an error because it is ambiguous when converted to Boolean.
@@ -37,8 +40,14 @@ function Find-WPFAstNode {
         [Parameter(Mandatory,ParameterSetName='ByAst',Position=0)]
         [System.Management.Automation.Language.Ast] $Ast,
 
+        [Parameter(Mandatory,ParameterSetName='ByFilePath',Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
+        [string] $FilePath,
+
         [Parameter(ParameterSetName='ByScriptBlock',Position=1)]
         [Parameter(ParameterSetName='ByAst',Position=1)]
+        [Parameter(ParameterSetName='ByFilePath',Position=1)]
         [Parameter(ParameterSetName='ByTabExpansion2Context',Position=1)]
         [ArgumentCompleter({
             param(
@@ -76,32 +85,41 @@ function Find-WPFAstNode {
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [scriptblock] $Query,
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [switch] $All,
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [switch] $Recurse,
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(Mandatory,ParameterSetName='ByTabExpansion2Context')]
         [switch] $ContainsCursor,
 
         [Parameter(ParameterSetName='ByScriptBlock')]
         [Parameter(ParameterSetName='ByAst')]
+        [Parameter(ParameterSetName='ByFilePath')]
         [Parameter(ParameterSetName='ByTabExpansion2Context')]
         [int] $CursorOffset
     )
 
     if ($PSCmdlet.ParameterSetName -eq 'ByScriptBlock') {
         $Ast = $ScriptBlock.Ast
+    } elseif ($PSCmdlet.ParameterSetName -eq 'ByFilePath') {
+        $ResolvedFilePath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($FilePath)
+        $null = $tokens = $errors = $null
+        $Ast = [System.Management.Automation.Language.Parser]::ParseFile($ResolvedFilePath, [ref] $tokens, [ref] $errors)
     }
 
     $HasContainsCursor = $PSBoundParameters.ContainsKey('ContainsCursor')
@@ -118,8 +136,7 @@ function Find-WPFAstNode {
             $Ast = $TabExpansion2Params.Ast
         }
 
-        if (
-            $TabExpansion2Params -and
+        if ($TabExpansion2Params -and
             $TabExpansion2Params.PositionOfCursor -and
             $null -ne $TabExpansion2Params.PositionOfCursor.Offset
         ) {
@@ -149,7 +166,6 @@ function Find-WPFAstNode {
     if ($HasCallerQuery) {
         $OriginalQuery = $Query
 
-        # Pass to Foreach-Object so query scriptblocks can reference $_.
         $HasParamBlockParameters =
             $null -ne $OriginalQuery.Ast.ParamBlock -and
             $OriginalQuery.Ast.ParamBlock.Parameters.Count -gt 0
@@ -162,6 +178,8 @@ function Find-WPFAstNode {
         } else {
             $EvaluateQuery = {
                 param($AstNode)
+
+                # Pass to Foreach-Object so query scriptblocks can reference $_.
                 $AstNode | ForEach-Object $OriginalQuery
             }
         }

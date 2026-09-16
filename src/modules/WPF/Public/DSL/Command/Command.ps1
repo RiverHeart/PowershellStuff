@@ -204,7 +204,7 @@ function Command {
         # (e.g. opening dialogs) for plain scriptblocks that have no sub-keywords.
         $SubKeywords = 'Execute', 'CanExecute', 'BoundTo'
         $HasSubKeyword =
-        Find-AstNode $ScriptBlock -Type CommandAst -All -Query {
+        Find-WPFAstNode $ScriptBlock -Type CommandAst -All -Query {
             $_.GetCommandName() -in $SubKeywords
         }
 
