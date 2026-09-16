@@ -35,7 +35,7 @@ function Resolve-WPFControlCommandAstAtCursor {
 
     foreach ($EffectiveOffset in $OffsetCandidates) {
         try {
-            $CursorPathCommandNodes = Find-AstNode -Ast $Ast -Type CommandAst -All -Recurse -ContainsCursor -CursorOffset $EffectiveOffset
+            $CursorPathCommandNodes = Find-WPFAstNode -Ast $Ast -Type CommandAst -All -Recurse -ContainsCursor -CursorOffset $EffectiveOffset
         } catch {
             Write-Debug "Failed to resolve command path at cursor offset ${EffectiveOffset}: $($_.Exception.Message)"
             continue

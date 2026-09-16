@@ -12,7 +12,7 @@
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
         'Extract-AstFunction'
-        'Find-AstNode'
+        'Find-AEAstNode'
         'New-AstDocument'
         'Resolve-AstDocument'
         'Save-AstDocument'

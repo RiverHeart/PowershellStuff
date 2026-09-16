@@ -33,7 +33,7 @@ function Get-WPFPropertyDeclaration {
     )
 
     $propertyDeclarationMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $commandAsts = Find-AstNode `
+    $commandAsts = Find-WPFAstNode `
         -ScriptBlock $ScriptBlock `
         -Type CommandAst `
         -All `
