@@ -53,6 +53,10 @@ function Test-AvoidParameterAttributeBool {
                     return $false
                 }
 
+                if ($Ast.Argument.Extent.Text -notin '$true', '$false') {
+                    return $false
+                }
+
                 # Now that we've verified that we have expressionless NamedArgumentAst,
                 # we need to walk up the AST to check if it belongs to a [Parameter(...)] attribute
                 $AttributeAst = $Ast.Parent
@@ -68,35 +72,37 @@ function Test-AvoidParameterAttributeBool {
                 }
 
                 return $true
-            }, $true)
+            }, $false <# DO NOT RECURSE, you will get duplicate matches from Invoke-ScriptAnalyzer #>)
 
             $MatchingParameters | ForEach-Object {
                 $BadNode = $_
                 $ArgumentName = $BadNode.ArgumentName
                 $BadNodeIndex = $BadNode.Parent.NamedArguments.IndexOf($BadNode)
-                $HasTrailingComma = $BadNode.Parent.NamedArguments[$BadNodeIndex + 1] -ne $null
+                $HasTrailingComma = $null -ne $BadNode.Parent.NamedArguments[$BadNodeIndex + 1]
+                $BadNodeEndColumnNumber = $BadNode.Extent.EndColumnNumber
 
                 # The correction depends on what the boolean value is set to
                 # False: argument should be omitted
                 # True: argument should have no explicit value
-                if ($BadNode.Argument -eq $true) {
+                if ($BadNode.Argument.Extent.Text -eq '$true') {
                     $ReplacementText = $ArgumentName
                     $Description = "Use '[Parameter($ArgumentName)]' instead of assigning it `$true`."
-                } else {
+                } elseif ($BadNode.Argument.Extent.Text -eq '$false') {
                     # This is naive, assumes that the next token is a comma but could be
                     # malformed. Probably good enough 99% of the time.
-                    $BadNodeEndColumnNumber = $BadNode.Extent.EndColumnNumber
                     if ($HasTrailingComma) {
                         $BadNodeEndColumnNumber += 1
                     }
                     $ReplacementText = ''
-                    $Description = "Omit the '$ArgumentName' argument instead of assigning it `$False`."
+                    $Description = "Omit the '$ArgumentName' argument instead of assigning it `$false`."
+                } else {
+                    return  # Something went wrong, not a boolean literal
                 }
 
                 $FilePath = if ($BadNode.Extent.FileName) {
                     $BadNode.Extent.FileName
                 } else {
-                    Get-PSCallstack | Where-Object { $_.ScriptName } | Select-Object -Last 1 -ExpandProperty ScriptName
+                    Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1 -ExpandProperty ScriptName
                 }
                 if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
 
@@ -116,7 +122,7 @@ function Test-AvoidParameterAttributeBool {
                     Message = "Avoid assigning Boolean values to Parameter attribute arguments"
                     Extent = $BadNode.Extent
                     RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
-                    Severity = 'Warning'
+                    Severity = 'Information'
                     RuleSuppressionID = 'PSAvoidParameterAttributeBool'
                     SuggestedCorrections = $SuggestedCorrections
                 }
