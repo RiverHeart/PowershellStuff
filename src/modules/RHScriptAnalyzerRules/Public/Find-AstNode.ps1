@@ -31,7 +31,7 @@
     Filters candidate nodes. The query may emit zero or one value; zero is treated as false.
     Emitting multiple values causes an error because it is ambiguous when converted to Boolean.
 #>
-function Find-WPFAstNode {
+function Find-RHAstNode {
     [CmdletBinding(DefaultParameterSetName='ByTabExpansion2Context')]
     param(
         [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=0)]

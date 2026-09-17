@@ -10,8 +10,8 @@
       "ConfigPath": "src/modules/WPF/pester.json"
     },
     {
-      "Name": "Rules",
-      "ConfigPath": "src/modules/WPF/Rules/pester.json"
+      "Name": "RHScriptAnalyzerRules",
+      "ConfigPath": "src/modules/RHScriptAnalyzerRules/pester.json"
     },
     {
       "Name": "PleaseWork",
