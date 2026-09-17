@@ -30,7 +30,7 @@ Describe 'Test-AvoidParameterAttributeBool' {
 
         $Result.Count | Should -Be 1
         $Result[0].RuleName | Should -Be 'Test-AvoidParameterAttributeBool'
-        $Result[0].Severity | Should -Be 'Warning'
+        $Result[0].Severity | Should -Be 'Information'
         $Result[0].RuleSuppressionId | Should -Be 'PSAvoidParameterAttributeBool'
         $Result[0].Message | Should -Be 'Avoid assigning Boolean values to Parameter attribute arguments'
     }

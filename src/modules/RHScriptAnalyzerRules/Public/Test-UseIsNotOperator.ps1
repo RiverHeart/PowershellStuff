@@ -48,14 +48,39 @@ function Test-UseIsNotOperator {
                 )
             }, $false <# DO NOT RECURSE, you will get duplicate matches from Invoke-ScriptAnalyzer #>)
 
+            $FilePath = if ($BadNode.Extent.FileName) {
+                $BadNode.Extent.FileName
+            } else {
+                Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1 -ExpandProperty ScriptName
+            }
+            if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
+
             $MatchingExpressions | ForEach-Object {
-                [PSCustomObject]@{
-                    Message = "Use '<expression> -isnot <type>' instead of '-not (<expression> -is <type>)'."
-                    Extent = $_.Extent
+                $BadNode = $_
+                $ReplacementText = $BadNode.Child.Pipeline.Extent.Text -replace '-is', '-isnot'
+
+                $CorrectionExtent = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]::new(
+                    $BadNode.Extent.StartLineNumber,
+                    $BadNode.Extent.EndLineNumber,
+                    $BadNode.Extent.StartColumnNumber,
+                    $BadNode.Extent.EndColumnNumber,
+                    $ReplacementText,
+                    $FilePath,  # File Path or Context
+                    "Convert expression to '<expression> -isnot <type>'."  # Hover Text Description
+                )
+                $SuggestedCorrections = [System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]]::new()
+                $SuggestedCorrections.Add($CorrectionExtent)
+
+                $DiagnosticRecord = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord]@{
+                    Message = "Uses '-not (<expression> -is <type>)' instead of '<expression> -isnot <type>'."
+                    Extent = $BadNode.Extent
                     RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
-                    Severity = 'Warning'
+                    Severity = 'Information'
                     RuleSuppressionId = 'PSUseIsNotOperator'
+                    SuggestedCorrections = $SuggestedCorrections
                 }
+
+                Write-Output $DiagnosticRecord
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

@@ -122,7 +122,7 @@ function Test-AvoidParameterAttributeBool {
                     Message = "Avoid assigning Boolean values to Parameter attribute arguments"
                     Extent = $BadNode.Extent
                     RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
-                    Severity = 'Warning'
+                    Severity = 'Information'
                     RuleSuppressionID = 'PSAvoidParameterAttributeBool'
                     SuggestedCorrections = $SuggestedCorrections
                 }
