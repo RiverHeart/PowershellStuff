@@ -6,10 +6,12 @@ BeforeAll {
 Describe 'Test-UseIsNotOperator' {
     It 'Reports a negated is expression' {
         $Result = @(Test-UseIsNotOperator -ScriptBlockAst {
-            -not ($Value -is [string])
+            if (-not ($Value -is [string])) {}
+
+            if (-not ($Value -is [string])) {}
         }.Ast)
 
-        $Result.Count | Should -Be 1
+        $Result.Count | Should -Be 2
         $Result[0].RuleName | Should -Be 'Test-UseIsNotOperator'
         $Result[0].Severity | Should -Be 'Warning'
         $Result[0].RuleSuppressionId | Should -Be 'PSUseIsNotOperator'
