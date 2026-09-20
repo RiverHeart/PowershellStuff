@@ -1,13 +1,12 @@
 <#
 .SYNOPSIS
-    Removes one or more TabCentral hooks.
+    Removes one or more Nitpick rules.
 
 .DESCRIPTION
-    Removes registered tab completers and result modifiers from the module-level
-    tab central registry.
+    Removes registered rules from the module-level Nitpick registry.
 
 .EXAMPLE
-    Unregister-Nitpick -Name Complete-WPFThis -Type Completer
+    Unregister-Nitpick -Name Test-Formatting -Type Style
 
 .EXAMPLE
     Unregister-Nitpick -Name Test*
@@ -33,9 +32,17 @@ function Unregister-Nitpick {
 
     $Registry = Get-NitpickRegistry
 
+    if ($All) {
+        $Registry.Nitpicks.Clear()
+        return
+    }
+
     foreach ($RequestedName in $Name) {
         foreach ($Key in @($Registry.Nitpicks.Keys)) {
-            if ([string] $Key -like $RequestedName) {
+            $Nitpick = $Registry.Nitpicks[$Key]
+            if ([string] $Key -like $RequestedName -and
+                ([string]::IsNullOrEmpty($Type) -or $Nitpick.Type -eq $Type)
+            ) {
                 $null = $Registry.Nitpicks.Remove($Key)
             }
         }

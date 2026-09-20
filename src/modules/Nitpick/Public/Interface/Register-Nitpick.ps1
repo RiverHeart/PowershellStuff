@@ -73,29 +73,25 @@ function Register-Nitpick {
             return
         }
 
-        $HookParams = $PSBoundParameters
-        $null = $HookParams.Remove('PassThru')
-        $null = $HookParams.Remove('Force')
+        $NitpickParams = @{} + $PSBoundParameters
+        $null = $NitpickParams.Remove('PassThru')
+        $null = $NitpickParams.Remove('Force')
 
-        $Hook = New-TabCentralHook @HookParams
-        $Registry = Get-TabCentralRegistry
-        $TargetRegistry = switch ($Hook.Type) {
-            'Completer' { $Registry.TabCompleters }
-            'Modifier' { $Registry.ResultModifiers }
-        }
+        $Nitpick = New-Nitpick @NitpickParams
+        $Registry = Get-NitpickRegistry
 
-        if ($TargetRegistry.ContainsKey($Hook.Name)) {
+        if ($Registry.Nitpicks.ContainsKey($Nitpick.Name)) {
             if (-not $Force) {
-                Write-Error "Hook '$($Hook.Name)' already registered as '$($Hook.Type)'."
+                Write-Error "Nitpick '$($Nitpick.Name)' is already registered."
                 return
             }
         }
 
-        Write-Verbose "Registering hook '$($Hook.Name)' as '$($Hook.Type)'."
-        $TargetRegistry[$Hook.Name] = $Hook
+        Write-Verbose "Registering nitpick '$($Nitpick.Name)' as '$($Nitpick.Type)'."
+        $Registry.Nitpicks[$Nitpick.Name] = $Nitpick
 
         if ($PassThru) {
-            return $Hook
+            return $Nitpick
         }
     }
 }
