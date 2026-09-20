@@ -51,4 +51,20 @@ Describe 'New-NitpickFinding' {
         $Finding.RuleSuppressionID | Should -Be 'NPTestRule'
         $Finding.SuggestedCorrections.Count | Should -Be 1
     }
+
+    It 'converts a finding with a null rule suppression ID' {
+        $Finding = New-NitpickFinding `
+            -RuleName Test-Rule `
+            -Message 'A problem was found.' `
+            -ViolationExtent $Extent `
+            -Severity Warning `
+            -RuleSuppressionID NPTestRule `
+            -Corrections $Correction
+        $Finding.RuleSuppressionID = $null
+
+        $DiagnosticRecord = $Finding.ToDiagnosticRecord()
+
+        $DiagnosticRecord.RuleSuppressionID | Should -BeNullOrEmpty
+        $DiagnosticRecord.SuggestedCorrections.Count | Should -Be 1
+    }
 }

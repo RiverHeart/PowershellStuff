@@ -116,32 +116,15 @@ class NitpickFinding {
             $CorrectionExtents.Add($Correction.ToCorrectionExtent())
         }
 
-        $SeverityType = [AppDomain]::CurrentDomain.GetAssemblies() |
-            ForEach-Object {
-                $_.GetType(
-                    'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticSeverity',
-                    $false
-                )
-            } |
-            Where-Object { $null -ne $_ } |
-            Select-Object -First 1
-        $DiagnosticSeverity = [Enum]::Parse($SeverityType, $this.Severity, $true)
-        $DiagnosticRecordType = $SeverityType.Assembly.GetType(
-            'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord',
-            $true
+        $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord' -ArgumentList (
+            $this.Message,
+            $this.ViolationExtent,
+            $this.RuleName,
+            $this.Severity,
+            $this.ViolationExtent.File,
+            $this.RuleSuppressionID,
+            $CorrectionExtents.PSObject.BaseObject
         )
-        $Constructor = $DiagnosticRecordType.GetConstructors() |
-            Where-Object { $_.GetParameters().Count -eq 7 } |
-            Select-Object -First 1
-        $Arguments = [object[]]::new(7)
-        $Arguments[0] = $this.Message
-        $Arguments[1] = $this.ViolationExtent
-        $Arguments[2] = $this.RuleName
-        $Arguments[3] = $DiagnosticSeverity
-        $Arguments[4] = $this.ViolationExtent.File
-        $Arguments[5] = $this.RuleSuppressionID
-        $Arguments[6] = $CorrectionExtents.PSObject.BaseObject
-        $Result = $Constructor.Invoke($Arguments)
         return $Result
     }
 
