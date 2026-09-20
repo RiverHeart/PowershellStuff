@@ -1,7 +1,5 @@
 using namespace System
 using namespace System.Management.Automation.Language
-using namespace System.Management.Automation
-using namespace Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
@@ -75,42 +73,7 @@ class NitpickCorrection {
         return $Result
     }
 
-    hidden static [NitpickCorrection[]] op_Implicit([NitpickCorrection] $Correction) {
-        return ,$Correction
-    }
 }
-
-class NitpickCorrectionArrayConverter : PSTypeConverter {
-    [bool] CanConvertFrom([object] $SourceValue, [Type] $TargetType) {
-        return (
-            $SourceValue -is [NitpickCorrection] -and
-            $TargetType -eq [NitpickCorrection[]]
-        )
-    }
-
-    [bool] CanConvertTo([object] $SourceValue, [Type] $TargetType) {
-        return (
-            $SourceValue -is [NitpickCorrection[]] -and
-            $TargetType -eq [NitpickCorrection]
-        )
-    }
-
-    [object] ConvertFrom([object] $SourceValue, [Type] $TargetType, [IFormatProvider] $FormatProvider, [bool] $IgnoreCase) {
-        if ($SourceValue -is [NitpickCorrection]) {
-            return ,$SourceValue
-        }
-        throw [InvalidCastException] "Cannot convert $SourceValue to NitpickCorrection[]"
-    }
-
-    [object] ConvertTo([object] $SourceValue, [Type] $TargetType, [IFormatProvider] $FormatProvider, [bool] $IgnoreCase) {
-        if ($SourceValue -is [NitpickCorrection]) {
-            return $SourceValue
-        }
-        throw [InvalidCastException] "Cannot convert $SourceValue to NitpickCorrection"
-    }
-}
-
-Update-TypeData -TypeName 'NitpickCorrection[]' -TypeConverter 'NitpickCorrectionArrayConverter' -Force
 
 # MARK: NP_FINDING
 #------------------
@@ -153,20 +116,35 @@ class NitpickFinding {
             $CorrectionExtents.Add($Correction.ToCorrectionExtent())
         }
 
-        $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord' -ArgumentList (
-            $this.ViolationExtent,
-            $this.Message,
-            $this.RuleName,
-            $this.RuleSuppressionID,
-            $this.Severity,
-            $CorrectionExtents
+        $SeverityType = [AppDomain]::CurrentDomain.GetAssemblies() |
+            ForEach-Object {
+                $_.GetType(
+                    'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticSeverity',
+                    $false
+                )
+            } |
+            Where-Object { $null -ne $_ } |
+            Select-Object -First 1
+        $DiagnosticSeverity = [Enum]::Parse($SeverityType, $this.Severity, $true)
+        $DiagnosticRecordType = $SeverityType.Assembly.GetType(
+            'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord',
+            $true
         )
+        $Constructor = $DiagnosticRecordType.GetConstructors() |
+            Where-Object { $_.GetParameters().Count -eq 7 } |
+            Select-Object -First 1
+        $Arguments = [object[]]::new(7)
+        $Arguments[0] = $this.Message
+        $Arguments[1] = $this.ViolationExtent
+        $Arguments[2] = $this.RuleName
+        $Arguments[3] = $DiagnosticSeverity
+        $Arguments[4] = $this.ViolationExtent.File
+        $Arguments[5] = $this.RuleSuppressionID
+        $Arguments[6] = $CorrectionExtents.PSObject.BaseObject
+        $Result = $Constructor.Invoke($Arguments)
         return $Result
     }
 
-    hidden static [NitpickFinding[]] op_Implicit([NitpickFinding] $Finding) {
-        return ,$Finding
-    }
 }
 
 $Paths = @(

@@ -18,7 +18,7 @@
 #>
 function Test-AvoidParameterAttributeBool {
     [CmdletBinding()]
-    [OutputType([Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord[]])]
+    [OutputType([object[]])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -115,16 +115,21 @@ function Test-AvoidParameterAttributeBool {
                     -FilePathOrContext $FilePath `
                     -Description $Description
 
-                $DiagnosticRecord = New-NitpickFinding `
+                $OutputAs = if (Test-AssemblyLoaded -Name 'Microsoft.Windows.PowerShell.ScriptAnalyzer') {
+                    'DiagnosticRecord'
+                } else {
+                    'NitpickFinding'
+                }
+                $Finding = New-NitpickFinding `
                     -RuleName $PSCmdlet.MyInvocation.MyCommand.Name `
                     -Message "Avoid assigning Boolean values to Parameter attribute arguments" `
                     -ViolationExtent $BadNode.Extent `
                     -Severity 'Information' `
                     -RuleSuppressionID 'PSAvoidParameterAttributeBool' `
                     -Corrections $Correction `
-                    -OutputAs 'DiagnosticRecord'
+                    -OutputAs $OutputAs
 
-                Write-Output $DiagnosticRecord
+                Write-Output $Finding
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

@@ -38,8 +38,7 @@ function New-NitpickFinding {
         [Parameter(Mandatory)]
         [NitpickCorrection[]] $Corrections,
 
-        [Parameter(ParameterSetName='ByLineAndColumn', HelpMessage = "Specifies the output format for the Finding extent.")]
-        [Parameter(ParameterSetName='ByExtent', HelpMessage = "Specifies the output format for the Finding extent.")]
+        [Parameter(HelpMessage = "Specifies the output format for the finding.")]
         [ValidateSet('NitpickFinding', 'DiagnosticRecord')]
         [string] $OutputAs = 'NitpickFinding'
     )
