@@ -62,14 +62,14 @@ function New-Nitpick {
             CommandType = 'Function', 'Cmdlet'
         }
         try {
-            $Callable = Get-Command @GetParams
+            $Callable = Get-Command @GetParams -ErrorAction Stop
         } catch {
             Write-Error "Failed to resolve command: $Callable"
+            return
         }
     }
 
-    # Validate callable accepts TabExpansion2 parameters
-    Assert-NitpickRuleCallableSignature -TargetCallable $Callable
+    Assert-CallableSignature -TargetCallable $Callable -RequiredParams 'ScriptBlockAst'
 
     # Build nitpick
     if ($Callable -is [scriptblock]) {

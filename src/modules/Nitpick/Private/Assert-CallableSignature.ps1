@@ -12,12 +12,15 @@ function Assert-CallableSignature {
         [Parameter(Mandatory)]
         [object] $TargetCallable,
 
-        [hashtable] $RequiredParams = @{},
-        [hashtable] $OptionalParams = @{}
+        [string[]] $RequiredParams = @(),
+        [string[]] $OptionalParams = @()
     )
 
     $CallableParams = Get-CallableParameter -TargetCallable $TargetCallable -Name
-    $MissingParams = $RequiredParams | Where-Object { $CallableParams -notcontains $_ }
+    $MissingParams = @(
+        $RequiredParams |
+            Where-Object { $CallableParams -notcontains $_ }
+    )
 
     if ($MissingParams.Count -gt 0) {
         $CallableName =
@@ -26,11 +29,10 @@ function Assert-CallableSignature {
 
         $MissingParamDisplay = $MissingParams -join ', '
         $RequiredParamDisplay = $RequiredParams -join ', '
-        Write-Error (
+        throw (
             "Invalid callable '$CallableName'. " +
             "Missing required parameter(s): $MissingParamDisplay. " +
             "Expected parameter(s): $RequiredParamDisplay."
         )
-        return
     }
 }

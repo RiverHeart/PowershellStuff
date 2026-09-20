@@ -28,7 +28,11 @@ function Get-CallableParameter {
     }
 
     if ($Name) {
-        $Result = $Result | ForEach-Object { $_.ToString() }
+        if ($TargetCallable -is [scriptblock]) {
+            $Result = $Result | ForEach-Object { $_.Name.VariablePath.UserPath }
+        } else {
+            $Result = $Result | ForEach-Object { $_.ToString() }
+        }
     }
 
     return $Result
