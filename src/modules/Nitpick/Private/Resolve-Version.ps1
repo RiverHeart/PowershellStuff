@@ -35,10 +35,10 @@ function Resolve-Version {
             return
         }
         if ($Version.IndexOf('.') -eq -1) {
-            $Version = [Version]::new($Version, 0)
+            $ResolvedVersion = [Version]::new($Version, 0)
         } else {
-            $Version = [version]::new($Version)
+            $ResolvedVersion = [version]::new($Version)
         }
-        Write-Output $Version
+        Write-Output $ResolvedVersion
     }
 }
