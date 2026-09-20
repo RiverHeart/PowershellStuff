@@ -1,5 +1,5 @@
 {
-  "TestSuite": "RHScriptAnalyzerRules",
+  "TestSuite": "Nitpick",
   "Run": {
     "Path": [
       "Tests"

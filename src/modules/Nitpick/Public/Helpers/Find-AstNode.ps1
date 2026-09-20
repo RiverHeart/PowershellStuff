@@ -10,28 +10,28 @@
 .EXAMPLE
     Find the CommandAst in the given scriptblock.
 
-    Find-WPFAstNode { Write-Host 'Foobar' } -Type CommandAst
+    Find-NitpickAstNode { Write-Host 'Foobar' } -Type CommandAst
 
 .EXAMPLE
     Find all CommandAsts in the given scriptblock.
 
-    Find-WPFAstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -All
+    Find-NitpickAstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -All
 
 .EXAMPLE
     Find a CommandAst with a specific command name using the Query parameter.
 
-    Find-WPFAstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -Query {
+    Find-NitpickAstNode { Write-Host 'Foobar'; Get-Date } -Type CommandAst -Query {
         $_.GetCommandName() -eq 'Get-Date'
     }
 
 .EXAMPLE
-    Find-WPFAstNode -FilePath .\Public\DSL\Styling\Resources.ps1 -Type UnaryExpressionAst
+    Find-NitpickAstNode -FilePath .\Public\DSL\Styling\Resources.ps1 -Type UnaryExpressionAst
 
 .PARAMETER Query
     Filters candidate nodes. The query may emit zero or one value; zero is treated as false.
     Emitting multiple values causes an error because it is ambiguous when converted to Boolean.
 #>
-function Find-RHAstNode {
+function Find-NitpickAstNode {
     [CmdletBinding(DefaultParameterSetName='ByTabExpansion2Context')]
     param(
         [Parameter(Mandatory,ParameterSetName='ByScriptBlock',Position=0)]
@@ -224,7 +224,7 @@ function Find-RHAstNode {
                 $QueryOutputTypes)
 
             if ($QueryOutput.Count -gt 1) {
-                throw "Find-WPFAstNode query emitted $($QueryOutput.Count) values for '$($AstNode.GetType().Name)': $QueryOutputTypes. The query must emit at most one value."
+                throw "Find-NitpickAstNode query emitted $($QueryOutput.Count) values for '$($AstNode.GetType().Name)': $QueryOutputTypes. The query must emit at most one value."
             }
 
             if ($QueryOutput.Count -eq 0) {

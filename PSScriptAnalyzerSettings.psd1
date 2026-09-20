@@ -1,10 +1,6 @@
 @{
     IncludeDefaultRules = $true
 
-    CustomRulePath = @(
-        './src/modules/RHScriptAnalyzerRules/RHScriptAnalyzerRules.psm1'
-    )
-
     # Note: These rules are geared towards the WPF module and should probably be removed
     # if/when that module is migrated to a separate repository.
     Rules = @{

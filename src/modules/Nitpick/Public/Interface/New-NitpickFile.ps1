@@ -9,6 +9,10 @@ function New-Rule {
         [ValidateNotNullOrEmpty()]
         [string] $Name,
 
+        [Parameter(Mandatory,ParameterSetName='Default')]
+        [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
+        [string] $Type,
+
         [ValidateNotNullOrEmpty()]
         [string] $OutDirectory
     )
@@ -22,7 +26,7 @@ function New-Rule {
     $ResolvedOutDirectory = [System.IO.DirectoryInfo]::new($OutDirectory)  # Resolve to an absolute path
     if (-not $ResolvedOutDirectory.Exists) { $ResolvedOutDirectory.Create() | Out-Null }
 
-    $OutPath = Join-Path -Path $ResolvedOutDirectory.FullName -ChildPath "$Name.ps1"
+    $OutPath = Join-Path -Path $ResolvedOutDirectory.FullName -ChildPath "$Name.Rule.ps1"
 
     if (Test-Path -LiteralPath $OutPath -PathType Leaf) {
         Write-Error "The file '$OutPath' already exists." -Category ResourceExists

@@ -1,5 +1,5 @@
 BeforeAll {
-    $RulesPath = Join-Path $PSScriptRoot '../RHScriptAnalyzerRules.psd1'
+    $RulesPath = Join-Path $PSScriptRoot '../../Nitpick.psd1'
     Import-Module $RulesPath -Force
 }
 

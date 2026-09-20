@@ -1,17 +1,16 @@
 <#
 .SYNOPSIS
-    Imports a PowerShell file as an AST.
+    Imports a PowerShell file as a ScriptBlock AST.
 
 .DESCRIPTION
-    Parses the specified file and returns the resulting AST for downstream
-    analysis helpers.
+    Imports a PowerShell file as a ScriptBlock AST.
 
 .EXAMPLE
-    Import-Ast -FilePath .\Public\DSL\Styling\Resources.ps1
+    Import-ScriptBlockAst -FilePath .\Public\DSL\Styling\Resources.ps1
 #>
-function Import-Ast {
+function Import-ScriptBlockAst {
     [CmdletBinding()]
-    [OutputType([System.Management.Automation.Language.Ast])]
+    [OutputType([System.Management.Automation.Language.ScriptBlockAst])]
     param(
         [Parameter(Mandatory,Position=0)]
         [ValidateNotNullOrEmpty()]
