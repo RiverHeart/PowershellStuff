@@ -74,6 +74,8 @@ FunctionsToExport = @(
     'Get-Nitpick'
     'Import-ScriptBlockAst'
     'New-Nitpick'
+    'New-NitpickCorrection'
+    'New-NitpickFinding'
     'New-Rule'
     'Register-Nitpick'
     'Start-Nitpicking'

@@ -106,26 +106,23 @@ function Test-AvoidParameterAttributeBool {
                 }
                 if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
 
-                $CorrectionExtent = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]::new(
-                    $BadNode.Extent.StartLineNumber,
-                    $BadNode.Extent.EndLineNumber,
-                    $BadNode.Extent.StartColumnNumber,
-                    $BadNodeEndColumnNumber,
-                    $ReplacementText,
-                    $FilePath,  # File Path or Context
-                    $Description  # Hover Text Description
-                )
-                $SuggestedCorrections = [System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]]::new()
-                $SuggestedCorrections.Add($CorrectionExtent)
+                $Correction = New-NitpickCorrection `
+                    -StartLineNumber $BadNode.Extent.StartLineNumber `
+                    -EndLineNumber $BadNode.Extent.EndLineNumber `
+                    -StartColumnNumber $BadNode.Extent.StartColumnNumber `
+                    -EndColumnNumber $BadNodeEndColumnNumber `
+                    -ReplacementText $ReplacementText `
+                    -FilePathOrContext $FilePath `
+                    -Description $Description
 
-                $DiagnosticRecord = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord]@{
-                    Message = "Avoid assigning Boolean values to Parameter attribute arguments"
-                    Extent = $BadNode.Extent
-                    RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
-                    Severity = 'Information'
-                    RuleSuppressionID = 'PSAvoidParameterAttributeBool'
-                    SuggestedCorrections = $SuggestedCorrections
-                }
+                $DiagnosticRecord = New-NitpickFinding `
+                    -RuleName $PSCmdlet.MyInvocation.MyCommand.Name `
+                    -Message "Avoid assigning Boolean values to Parameter attribute arguments" `
+                    -ViolationExtent $BadNode.Extent `
+                    -Severity 'Information' `
+                    -RuleSuppressionID 'PSAvoidParameterAttributeBool' `
+                    -Corrections $Correction `
+                    -OutputAs 'DiagnosticRecord'
 
                 Write-Output $DiagnosticRecord
             }
