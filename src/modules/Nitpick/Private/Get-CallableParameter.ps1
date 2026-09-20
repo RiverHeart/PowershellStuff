@@ -35,5 +35,7 @@ function Get-CallableParameter {
         }
     }
 
-    return $Result
+    if ($Result.Count -gt 0) {
+        return $Result
+    }
 }
