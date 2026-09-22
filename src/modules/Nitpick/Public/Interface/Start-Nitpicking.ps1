@@ -1,3 +1,5 @@
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Powershell first replacement for PSScriptAnalyzer
@@ -10,19 +12,25 @@ function Start-Nitpicking {
         [string] $Path,
 
         [Parameter(Mandatory,ParameterSetName='Script')]
-        [string] $Script,
+        [ScriptBlockAstTransform()]
+        [ScriptBlockAst] $Script,
 
         [string[]] $CustomRulePath,
 
-        [string[]] $Include,
-        [string[]] $Exclude
+        [string[]] $IncludeRule,
+        [string[]] $ExcludeRule,
+
+        [string[]] $IncludePath,
+        [string[]] $ExcludePath
     )
 
     process {
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            # todo
+            #Get-ChildItem -Path $Path -Recurse | Import-ScriptBlockAst
         } else {
-            # todo
+            #
         }
+
+        Write-Host "Foo"
     }
 }

@@ -1,4 +1,6 @@
 using namespace System
+using namespace System.Collections.ObjectModel
+using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
@@ -128,6 +130,23 @@ class NitpickFinding {
         return $Result
     }
 
+}
+
+# NOTE: PowerShell's `Attribute` suffix omission happens during parse-time type resolution,
+# and because this class lives in a separately parsed file. Without colocating the class,
+# which is anti-DRY, the `Attribute` suffix must either be included or omitted so an exact
+# type lookup can be performed. In this case, I'm choosing to omit the suffix in favor of a
+# nicer decorator name.
+class ScriptBlockAstTransform : ArgumentTransformationAttribute {
+    [object] Transform([EngineIntrinsics] $EngineIntrinsics, [object] $Input) {
+        if ($Input -is [ScriptBlock]) {
+            return $Input.Ast
+        }
+        if ($Input -is [string]) {
+            return [System.Management.Automation.Language.Parser]::ParseInput($Input, [ref]$null, [ref]$null).Ast
+        }
+        return $Input
+    }
 }
 
 $Paths = @(
