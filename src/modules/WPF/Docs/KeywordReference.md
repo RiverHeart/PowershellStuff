@@ -1327,6 +1327,55 @@ Window 'Main' {
 Resource WindowBackground Background
 ```
 
+#### Raw WPF resource escape hatch
+
+When the DSL cannot express a complex WPF resource, such as a deeply nested
+`ControlTemplate`, create it with a native WPF API and insert it directly into
+the current dictionary. Inside `Resources`, `$this` is the active
+`ResourceDictionary`.
+
+```powershell
+Resources {
+    $ExpanderStyle = [System.Windows.Markup.XamlReader]::Parse(@'
+<Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+       TargetType="{x:Type Expander}">
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Expander}">
+                <!-- Native XAML template omitted for brevity. -->
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+'@)
+
+    $this['PropertyCategoryExpanderStyle'] = $ExpanderStyle
+}
+```
+
+Consume the inserted value normally from a DSL control:
+
+```powershell
+Expander 'Properties' {
+    Resource PropertyCategoryExpanderStyle Style
+}
+```
+
+For a control created programmatically, retain dynamic resource lookup with
+`SetResourceReference`:
+
+```powershell
+$Expander.SetResourceReference(
+    [System.Windows.FrameworkElement]::StyleProperty,
+    'PropertyCategoryExpanderStyle'
+)
+```
+
+Prefer the DSL's native resource and template keywords when they cover the
+required structure. This escape hatch is intended for unsupported WPF shapes,
+not as the default authoring model.
+
 ### Theme
 
 Defines a named theme dictionary.

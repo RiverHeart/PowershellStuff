@@ -7,62 +7,59 @@
     session state. The entry point can therefore call functions that the application
     module does not export.
 
-.PARAMETER ModulePath
-    Path to the application module manifest or script module.
-
-.PARAMETER EntryPoint
-    Path to the application entry point, relative to the application module root.
-
-.PARAMETER Force
-    Forces the application module to reload before running the entry point.
-
 .EXAMPLE
     Start-WPFApplication -ModulePath ./MyApp.psd1 -EntryPoint src/Views/main.gui.ps1 -Force
 #>
 function Start-WPFApplication {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName="ByPath")]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName="ByName")]
         [ValidateNotNullOrEmpty()]
-        [string] $ModulePath,
+        [string] $Name,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName="ByPath")]
         [ValidateNotNullOrEmpty()]
-        [string] $EntryPoint,
+        [System.IO.FileInfo] $ModulePath,
+
+        [ValidateNotNullOrEmpty()]
+        [System.IO.FileInfo] $EntryPoint,
 
         [switch] $Force
     )
 
-    if ([System.IO.Path]::IsPathRooted($EntryPoint)) {
-        throw "Entry point '$EntryPoint' must be relative to the application module root."
+    if ($PSCmdlet.ParameterSetName -eq "ByName") {
+        $Module = Get-Module -Name $Name -ListAvailable |
+            Where-Object { $_.Tags -contains "WPFApplication" }
+            Select-Object -First 1
+
+        if (-not $Module) {
+            Write-Error "Application module '$Name' was not found."
+            return
+        }
+    } else {
+        if (-not $ModulePath.Exists) {
+            Write-Error "Application module '$ModulePath' was not found."
+            return
+        }
+
+        $ResolvedModulePath = Resolve-Path -LiteralPath $ModulePath -ErrorAction Stop
+        $Module = Import-Module -Name $ResolvedModulePath.ProviderPath -PassThru -Force:$Force -ErrorAction Stop
     }
 
-    $ResolvedModulePath = Resolve-Path -LiteralPath $ModulePath -ErrorAction Stop
-    $ApplicationModules = @(
-        Import-Module -Name $ResolvedModulePath.ProviderPath -PassThru -Force:$Force -ErrorAction Stop
-    )
-
-    if ($ApplicationModules.Count -ne 1) {
-        throw "Application module '$ModulePath' resolved to $($ApplicationModules.Count) modules; expected exactly one."
+    if (-not $EntryPoint) {
+        $EntryPoint = $Module.PrivateData.Application.EntryPoint
     }
 
-    $ApplicationModule = $ApplicationModules[0]
-    $ModuleRoot = [System.IO.Path]::GetFullPath($ApplicationModule.ModuleBase).TrimEnd('\', '/')
-    $CandidateEntryPoint = [System.IO.Path]::GetFullPath((Join-Path $ModuleRoot $EntryPoint))
+    $EntryPoint = Resolve-BoundedPath -BasePath $Module.ModuleBase -BoundedPath $EntryPoint -ErrorAction Stop
 
-    if (-not (Test-Path -LiteralPath $CandidateEntryPoint -PathType Leaf)) {
-        throw "Application entry point '$CandidateEntryPoint' was not found."
+    if (-not $EntryPoint.Exists) {
+        Write-Error "Application entry point '$EntryPoint' was not found."
+        return
     }
 
-    $ResolvedEntryPoint = (Resolve-Path -LiteralPath $CandidateEntryPoint -ErrorAction Stop).ProviderPath
-    $ModuleRootPrefix = $ModuleRoot + [System.IO.Path]::DirectorySeparatorChar
-    if (-not $ResolvedEntryPoint.StartsWith($ModuleRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Application entry point '$ResolvedEntryPoint' is outside module root '$ModuleRoot'."
-    }
-
-    & $ApplicationModule {
+    & $Module {
         param($Path)
 
         . $Path
-    } $ResolvedEntryPoint
+    } $EntryPoint
 }

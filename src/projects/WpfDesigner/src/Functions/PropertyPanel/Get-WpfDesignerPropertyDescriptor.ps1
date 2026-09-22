@@ -11,7 +11,9 @@
 
     Only properties whose type maps to a known Get-WpfDesignerEditorKind
     value are returned; anything else (Brush, Thickness, etc.) is skipped
-    until a dedicated editor exists for it.
+    until a dedicated editor exists for it. ContentControl.Content is always
+    exposed as Text, but is marked read-only when its current value is neither
+    null nor a string because the text editor cannot represent rich content.
 #>
 function Get-WpfDesignerPropertyDescriptor {
     [CmdletBinding()]
@@ -23,10 +25,13 @@ function Get-WpfDesignerPropertyDescriptor {
 
     $Filter = [Attribute[]] @([System.ComponentModel.BrowsableAttribute]::Yes)
     $Properties = [System.ComponentModel.TypeDescriptor]::GetProperties($InputObject, $Filter)
+    Write-Debug "Retrieved $($Properties.Count) properties for object of type $($InputObject.GetType())"
 
     # Powershell fails to implicitly enumerate PropertyDescriptorCollection via foreach
     # so an explicit call to `GetEnumerator()` is necessary here
     foreach ($Property in $Properties.GetEnumerator()) {
+
+        Write-Debug "Processing property: $($Property.Name) of type $($Property.PropertyType)"
 
         # NOTE: Blank ComboBoxes correspond to attached-property descriptors such as
         # `Typography.Fraction` or `RenderOptions.EdgeMode`. Those names are being treated as
@@ -37,6 +42,13 @@ function Get-WpfDesignerPropertyDescriptor {
         }
 
         $EditorKind = Get-WpfDesignerEditorKind -PropertyType $Property.PropertyType
+        $IsEditorReadOnly = $false
+        if ($Property.Name -eq 'Content' -and $InputObject -is [System.Windows.Controls.ContentControl]) {
+            $Content = $Property.GetValue($InputObject)
+            $EditorKind = 'Text'
+            $IsEditorReadOnly = $null -ne $Content -and $Content -isnot [string]
+        }
+
         if (-not $EditorKind) {
             continue
         }
@@ -46,6 +58,7 @@ function Get-WpfDesignerPropertyDescriptor {
             PropertyType = $Property.PropertyType
             Category     = $Property.Category
             EditorKind   = $EditorKind
+            IsReadOnly   = $IsEditorReadOnly
         }
     }
 }
