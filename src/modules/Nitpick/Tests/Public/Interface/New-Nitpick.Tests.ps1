@@ -19,11 +19,11 @@ Describe 'New-Nitpick' {
             param (
                 [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst
             )
-        } -Type Style -Name TestRule -Source Tests
+        } -Category Style -Name TestRule -Source Tests
 
         $Rule.PSObject.TypeNames | Should -Contain 'Nitpick.Rule'
         $Rule.Name | Should -Be 'TestRule'
-        $Rule.Type | Should -Be 'Style'
+        $Rule.Category | Should -Be 'Style'
         $Rule.CallableType | Should -Be 'ScriptBlock'
         $Rule.Callable | Should -BeOfType [scriptblock]
         $Rule.Source | Should -Be 'Tests'
@@ -32,18 +32,18 @@ Describe 'New-Nitpick' {
     It 'creates a rule from a function info object' {
         $Rule = New-Nitpick `
             -Callable (Get-Command -Name Test-NitpickRule -CommandType Function) `
-            -Type Quality `
+            -Category Quality `
             -Source Tests
 
         $Rule.Name | Should -Be 'Test-NitpickRule'
-        $Rule.Type | Should -Be 'Quality'
+        $Rule.Category | Should -Be 'Quality'
         $Rule.CallableType | Should -Be 'Function'
         $Rule.Callable | Should -Be 'Test-NitpickRule'
         $Rule.Source | Should -Be 'Tests'
     }
 
     It 'creates a rule from a command name' {
-        $Rule = New-Nitpick -Callable 'Test-UseIsNotOperator' -Type Maintainability
+        $Rule = New-Nitpick -Callable 'Test-UseIsNotOperator' -Category Maintainability
 
         $Rule.Name | Should -Be 'Test-UseIsNotOperator'
         $Rule.Callable | Should -Be 'Test-UseIsNotOperator'
@@ -52,19 +52,19 @@ Describe 'New-Nitpick' {
 
     It 'rejects a callable missing ScriptBlockAst' {
         {
-            New-Nitpick -Callable { param ($FilePath) } -Type Style -Name BadRule -Source Tests -ErrorAction Stop
+            New-Nitpick -Callable { param ($FilePath) } -Category Style -Name BadRule -Source Tests -ErrorAction Stop
         } | Should -Throw '*ScriptBlockAst*'
     }
 
     It 'rejects an unknown command name' {
         {
-            New-Nitpick -Callable 'NoSuchNitpickRule' -Type Style -ErrorAction Stop
+            New-Nitpick -Callable 'NoSuchNitpickRule' -Category Style -ErrorAction Stop
         } | Should -Throw
     }
 
     It 'requires name and source for a scriptblock' {
         {
-            New-Nitpick -Callable { param ($ScriptBlockAst) } -Type Style -ErrorAction Stop
+            New-Nitpick -Callable { param ($ScriptBlockAst) } -Category Style -ErrorAction Stop
         } | Should -Throw '*Name and Source*'
     }
 
@@ -72,7 +72,7 @@ Describe 'New-Nitpick' {
         {
             New-Nitpick `
                 -Callable (Get-Command -Name Test-NitpickRule -CommandType Function) `
-                -Type Style `
+                -Category Style `
                 -ErrorAction Stop
         } | Should -Throw '*Source*'
     }

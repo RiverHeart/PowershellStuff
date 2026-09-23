@@ -40,7 +40,7 @@ function New-Nitpick {
 
         [Parameter(Mandatory,ParameterSetName='Default')]
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Type,
+        [string] $Category,
 
         [Parameter(HelpMessage='The name of the nitpick. Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
@@ -78,7 +78,7 @@ function New-Nitpick {
             return
         }
         $Nitpick.Name = $Name
-        $Nitpick.Type = $Type
+        $Nitpick.Category = $Category
         $Nitpick.CallableType = 'ScriptBlock'
         $Nitpick.Callable = $Callable
         $Nitpick.Source = $Source
@@ -92,7 +92,7 @@ function New-Nitpick {
         # the module might get reloaded which could either invalidate it,
         # make it stale, or cause unexpected behavior.
         $Nitpick.Name = $Callable.Name
-        $Nitpick.Type = $Type
+        $Nitpick.Category = $Category
         $Nitpick.CallableType = 'Function'
         $Nitpick.Callable = $Callable.Name
         $Nitpick.Source = if ($Callable.ModuleName) { $Callable.ModuleName } else { $Source }

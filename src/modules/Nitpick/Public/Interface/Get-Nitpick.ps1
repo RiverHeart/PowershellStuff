@@ -19,14 +19,14 @@ function Get-Nitpick {
         [string[]] $Name,
 
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Type
+        [string] $Category
     )
 
     $Registry = Get-NitpickRegistry
     $Registry.Nitpicks.Values |
         Where-Object {
             $NitpickName = $_.Name
-            ([string]::IsNullOrEmpty($Type) -or $_.Type -eq $Type) -and
+            ([string]::IsNullOrEmpty($Category) -or $_.Category -eq $Category) -and
             ([string]::IsNullOrEmpty($Name) -or [bool] ($Name | Where-Object { $NitpickName -like $_ }))
         }
 }

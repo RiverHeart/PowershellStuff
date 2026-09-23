@@ -13,15 +13,15 @@ Describe 'Get-Nitpick' {
             $Registry.Nitpicks.Clear()
             $Registry.Nitpicks['Style-Alpha'] = [pscustomobject] @{
                 Name = 'Style-Alpha'
-                Type = 'Style'
+                Category = 'Style'
             }
             $Registry.Nitpicks['Style-Beta'] = [pscustomobject] @{
                 Name = 'Style-Beta'
-                Type = 'Style'
+                Category = 'Style'
             }
             $Registry.Nitpicks['Quality-Alpha'] = [pscustomobject] @{
                 Name = 'Quality-Alpha'
-                Type = 'Quality'
+                Category = 'Quality'
             }
         }
     }
@@ -34,8 +34,8 @@ Describe 'Get-Nitpick' {
         $Rules.Name | Should -Contain 'Quality-Alpha'
     }
 
-    It 'filters rules by type' {
-        $Rules = @(Get-Nitpick -Type Quality)
+    It 'filters rules by category' {
+        $Rules = @(Get-Nitpick -Category Quality)
 
         $Rules.Count | Should -Be 1
         $Rules[0].Name | Should -Be 'Quality-Alpha'
@@ -55,8 +55,8 @@ Describe 'Get-Nitpick' {
         $Rules.Count | Should -Be 3
     }
 
-    It 'combines name and type filters' {
-        $Rules = @(Get-Nitpick -Name '*Alpha' -Type Style)
+    It 'combines name and Category filters' {
+        $Rules = @(Get-Nitpick -Name '*Alpha' -Category Style)
 
         $Rules.Count | Should -Be 1
         $Rules[0].Name | Should -Be 'Style-Alpha'

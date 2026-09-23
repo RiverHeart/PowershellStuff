@@ -13,15 +13,15 @@ Describe 'Unregister-Nitpick' {
             $Registry.Nitpicks.Clear()
             $Registry.Nitpicks['Style-Alpha'] = [pscustomobject] @{
                 Name = 'Style-Alpha'
-                Type = 'Style'
+                Category = 'Style'
             }
             $Registry.Nitpicks['Style-Beta'] = [pscustomobject] @{
                 Name = 'Style-Beta'
-                Type = 'Style'
+                Category = 'Style'
             }
             $Registry.Nitpicks['Quality-Alpha'] = [pscustomobject] @{
                 Name = 'Quality-Alpha'
-                Type = 'Quality'
+                Category = 'Quality'
             }
         }
     }
@@ -48,7 +48,7 @@ Describe 'Unregister-Nitpick' {
     }
 
     It 'limits removal to the requested type' {
-        Unregister-Nitpick -Name '*' -Type Style
+        Unregister-Nitpick -Name '*' -Category Style
 
         InModuleScope Nitpick {
             $Registry = Get-NitpickRegistry

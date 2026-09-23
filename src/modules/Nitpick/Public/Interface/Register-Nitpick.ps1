@@ -17,7 +17,7 @@ function Register-Nitpick {
 
         [Parameter(Mandatory,ParameterSetName='Default')]
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Type,
+        [string] $Category,
 
         [Parameter(HelpMessage='Mandatory only when using a scriptblock',ParameterSetName='Default')]
         [ValidateNotNullOrEmpty()]
@@ -62,7 +62,7 @@ function Register-Nitpick {
             foreach ($LintRule in $LintRules) {
                 $ChildParams = @{
                     Name = $LintRule
-                    Type = 'LintRule'
+                    Category = $Category
                     Callable = $LintRule
                     Force = $Force
                     PassThru = $PassThru

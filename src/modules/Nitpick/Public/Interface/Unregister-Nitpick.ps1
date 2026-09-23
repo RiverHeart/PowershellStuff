@@ -6,7 +6,7 @@
     Removes registered rules from the module-level Nitpick registry.
 
 .EXAMPLE
-    Unregister-Nitpick -Name Test-Formatting -Type Style
+    Unregister-Nitpick -Name Test-Formatting -Category Style
 
 .EXAMPLE
     Unregister-Nitpick -Name Test*
@@ -24,7 +24,7 @@ function Unregister-Nitpick {
 
         [Parameter(ParameterSetName = 'ByName')]
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Type,
+        [string] $Category,
 
         [Parameter(Mandatory, ParameterSetName = 'All')]
         [switch] $All
@@ -41,7 +41,7 @@ function Unregister-Nitpick {
         foreach ($Key in @($Registry.Nitpicks.Keys)) {
             $Nitpick = $Registry.Nitpicks[$Key]
             if ([string] $Key -like $RequestedName -and
-                ([string]::IsNullOrEmpty($Type) -or $Nitpick.Type -eq $Type)
+                ([string]::IsNullOrEmpty($Category) -or $Nitpick.Category -eq $Category)
             ) {
                 $null = $Registry.Nitpicks.Remove($Key)
             }

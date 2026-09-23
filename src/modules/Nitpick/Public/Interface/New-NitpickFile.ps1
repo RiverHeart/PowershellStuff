@@ -11,7 +11,7 @@ function New-Rule {
 
         [Parameter(Mandatory,ParameterSetName='Default')]
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Type,
+        [string] $Category,
 
         [ValidateNotNullOrEmpty()]
         [string] $OutDirectory
