@@ -16,15 +16,22 @@
     Resolve Pester version 5.3.0.
 
     Resolve-Module -Module "Pester" -Version "5.3.0"
+
+.EXAMPLE
+    Resolve the "Pester" module by its path.
+
+    Resolve-Module -Module ".\src\modules\Pester"
 #>
 function Resolve-Module {
     [CmdletBinding(DefaultParameterSetName='Default')]
     [OutputType([PSModuleInfo])]
     param(
+        # The name or path of the module(s) to resolve. Can be a string representing the module
+        # name or a path to the module.
         [Parameter(Mandatory,ParameterSetName='Default',Position=0)]
         [Parameter(Mandatory,ParameterSetName='RequiredVersion',Position=0)]
         [Parameter(Mandatory,ParameterSetName='BoundedVersion',Position=0)]
-        [string[]] $Name,
+        [string[]] $Module,
 
         [Parameter(ParameterSetName='RequiredVersion')]
         [string] $RequiredVersion,
@@ -47,9 +54,12 @@ function Resolve-Module {
     }
 
     process {
-        foreach ($ModuleName in $Name) {
+        foreach ($Entry in $Module) {
+            $IsPath = $Entry.IndexOf('\') -ne -1 -or $Entry.IndexOf('/') -ne -1
+            $ModuleName = if ($IsPath) { (Get-Item $Entry).BaseName } else { $Entry }
+
             # Attempt to find the module among the currently loaded modules.
-            $MatchingLoadedModules = $LoadedModules |
+            $MatchingLoadedModule = $LoadedModules |
                 Where-Object {
                     $_.Name -eq $ModuleName -and
                     ([string]::IsNullOrEmpty($RequiredVersion) -or $_.Version -eq $RequiredVersion) -and
@@ -59,8 +69,8 @@ function Resolve-Module {
                 Sort-Object Version -Descending
                 Select-Object -First 1
 
-            if ($MatchingLoadedModules) {
-                $MatchingLoadedModules |
+            if ($MatchingLoadedModule) {
+                $MatchingLoadedModule |
                     Add-Member -MemberType NoteProperty -Name IsLoaded -Value $true -PassThru |
                     Write-Output
                 continue
@@ -69,6 +79,7 @@ function Resolve-Module {
             # If no loaded matches were found, attempt to find the module among the available modules.
             $AvailableModule = $AvailableModules |
                 Where-Object {
+                    ($IsPath -and $_.ModuleBase -eq (Get-Item $Entry).DirectoryName) -or
                     $_.Name -eq $ModuleName -and
                     ([string]::IsNullOrEmpty($RequiredVersion) -or $_.Version -eq $RequiredVersion) -and
                     ([string]::IsNullOrEmpty($MinimumVersion) -or $_.Version -ge $MinimumVersion) -and
@@ -100,3 +111,4 @@ function Resolve-Module {
         }
     }
 }
+
