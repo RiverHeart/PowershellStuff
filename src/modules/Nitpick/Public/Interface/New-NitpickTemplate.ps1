@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Creates a new PSScriptAnalyzer rule template.
+    Creates a new Nitpick rule template.
 #>
-function New-Rule {
+function New-NitpickTemplate {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -38,7 +38,14 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    PSScriptAnalyzer rule.
+    Nitpick rule.
+
+.EXAMPLE
+    Basic usage
+
+    __Name__ -ScriptBlockAst {
+        # Code to analyze goes here
+    }.Ast
 #>
 function __Name__ {
     [CmdletBinding()]
@@ -61,7 +68,7 @@ function __Name__ {
 
                 # Matching nothing in case this rule is auto-detected by ScriptAnalyzer
                 return $false
-            }, $false <# DO NOT RECURSE, you will get duplicate matches from Invoke-ScriptAnalyzer #>)
+            }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
 
             $MatchingNodes | ForEach-Object {
                 $BadNode = $_
@@ -90,7 +97,7 @@ function __Name__ {
                     Extent = $BadNode.Extent
                     RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
                     Severity = 'Information'
-                    RuleSuppressionID = 'PSAvoidParameterAttributeBool'
+                    RuleSuppressionID = '__Name__'
                     #SuggestedCorrections = $SuggestedCorrections
                 }
 
