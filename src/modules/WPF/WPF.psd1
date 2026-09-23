@@ -253,6 +253,12 @@ PrivateData = @{
         Modifiers = @()
     }
 
+    Linting = @{
+        Rules = @(
+            'Test-AvoidBlockingUI'
+        )
+    }
+
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.

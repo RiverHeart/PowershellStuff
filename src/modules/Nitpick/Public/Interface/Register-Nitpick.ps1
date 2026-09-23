@@ -52,7 +52,7 @@ function Register-Nitpick {
                 return
             }
 
-            $LintRules = $ResolvedModule.PrivateData.LintRules
+            $LintRules = $ResolvedModule.PrivateData.Linting.Rules
 
             if ($LintRules.Count -eq 0) {
                 Write-Error "No lint rules found in module '$($ResolvedModule.Name)'." -Category InvalidData
