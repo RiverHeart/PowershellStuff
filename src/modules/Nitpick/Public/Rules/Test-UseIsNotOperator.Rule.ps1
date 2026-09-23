@@ -46,7 +46,7 @@ function Test-UseIsNotOperator {
                     $AstNode.Child.Pipeline.PipelineElements[0].Expression -is [BinaryExpressionAst] -and
                     $AstNode.Child.Pipeline.PipelineElements[0].Expression.Operator -eq 'Is'
                 )
-            }, $false <# DO NOT RECURSE, you will get duplicate matches from Invoke-ScriptAnalyzer #>)
+            }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
 
             $FilePath = if ($BadNode.Extent.FileName) {
                 $BadNode.Extent.FileName

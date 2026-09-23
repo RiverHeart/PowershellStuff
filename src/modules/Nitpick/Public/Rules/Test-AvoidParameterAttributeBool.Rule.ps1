@@ -72,7 +72,7 @@ function Test-AvoidParameterAttributeBool {
                 }
 
                 return $true
-            }, $false <# DO NOT RECURSE, you will get duplicate matches from Invoke-ScriptAnalyzer #>)
+            }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
 
             $MatchingParameters | ForEach-Object {
                 $BadNode = $_
