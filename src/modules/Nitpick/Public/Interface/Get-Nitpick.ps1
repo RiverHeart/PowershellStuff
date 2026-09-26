@@ -10,23 +10,44 @@
     Get-Nitpick
 
 .EXAMPLE
-    Get-Nitpick -Type Quality -Name Complete-Example
+    Get-Nitpick -Category Quality -Name Complete-Example
 #>
 function Get-Nitpick {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param(
-        [string[]] $Name,
+        [string] $Name,
 
-        [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Category
+        [ArgumentCompleter({ Complete-NitpickCategory })]
+        [string] $Category,
+
+        [string[]] $IncludeRule,
+        [string[]] $ExcludeRule
     )
 
     $Registry = Get-NitpickRegistry
-    $Registry.Nitpicks.Values |
+
+    $Nitpicks = if ($Name) {
+        $Registry.Nitpicks[$Name]
+    } else {
+        $Registry.Nitpicks.Values
+    }
+
+    $Nitpicks |
         Where-Object {
-            $NitpickName = $_.Name
-            ([string]::IsNullOrEmpty($Category) -or $_.Category -eq $Category) -and
-            ([string]::IsNullOrEmpty($Name) -or [bool] ($Name | Where-Object { $NitpickName -like $_ }))
+            $Nitpick = $_
+
+            if ($Name -and $_.Name -ne $Name) {
+                return $false
+            }
+
+            if ($Category -and $_.Category -ne $Category) {
+                return $false
+            }
+
+            [bool] $IsIncluded = -not $IncludeRule -or ($IncludeRule | Where-Object { $Nitpick.Name -like $_ })
+            [bool] $IsExcluded = $ExcludeRule -and ($ExcludeRule | Where-Object { $Nitpick.Name -like $_ })
+
+            return $IsIncluded -and -not $IsExcluded
         }
 }
