@@ -9,7 +9,7 @@
 @{
 
 # Script module or binary module file associated with this manifest.
-RootModule = 'WPF'
+RootModule = 'WPFRules'
 
 # Version number of this module.
 ModuleVersion = '1.0'
@@ -27,7 +27,7 @@ Author = 'Riverheart'
 CompanyName = 'None'
 
 # Copyright statement for this module
-Copyright = '(c) 2021 Riverheart. All rights reserved.'
+Copyright = '(c) 2026 Riverheart. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'Provides a set of functions and cmdlets for building WPF applications in PowerShell.'
@@ -63,12 +63,7 @@ RequiredAssemblies = @(
 # ScriptsToProcess = @()
 
 # Type files (.ps1xml) to be loaded when importing this module
-TypesToProcess = @(
-    'TypeData/Canvas.ps1xml'
-    'TypeData/DockPanel.ps1xml'
-    'TypeData/Menu.ps1xml'
-    'TypeData/StackPanel.ps1xml'
-)
+# TypesToProcess = @()
 
 # Format files (.ps1xml) to be loaded when importing this module
 # FormatsToProcess = @()
@@ -77,159 +72,13 @@ TypesToProcess = @(
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @(
-    # Class Helpers
-    'New-WPFFileNavigator'
-    'New-WPFRelayCommand'
-    'New-WPFValueConverter'
-
-    # Application Storage
-    'New-WPFAppStorage'
-    'Get-WPFStoredItem'
-    'Set-WPFStoredItem'
-    'Remove-WPFStoredItem'
-
-    # Completers
-    'Complete-WPFApplicationCommand'
-    'Complete-WPFColor'
-    'Complete-WPFRegisteredObject'
-    'Complete-WPFEvent'
-    'Complete-WPFFileInfo'
-    'Complete-WPFState'
-    'Complete-WPFThis'
-
-    # DSL
-
-    # DSL/Controls
-    'App'
-    'Content'
-    'Footer'
-    'Command'
-    'Border'
-    'ContentPresenter'
-    'Button'
-    'Canvas'
-    'ComboBox'
-    'DataGrid'
-    'DataGridTextColumn'
-    'Expander'
-    'ListView'
-    'GridView'
-    'GridViewColumn'
-    'GridViewColumnHeader'
-    'DatePicker'
-    'DockPanel'
-    'Image'
-    'Label'
-    'Grid'
-    'New-WPFGrid'
-    'Column'
-    'Row'
-    'Menu'
-    'MenuItem'
-    'ProgressBar'
-    'StatusBar'
-    'StatusBarItem'
-    'ScrollViewer'
-    'StackPanel'
-    'TextBlock'
-    'TextBox'
-    'Thumb'
-    'TreeView'
-    'TreeViewItem'
-    'HierarchicalItemTemplate'
-    'Window'
-
-    # DSL/Helpers
-    'Bind'
-    'Binding'
-    'BindProperty'
-    'BoundTo'
-    'Brush'
-    'BringToFront'
-    'SendToBack'
-    'CanvasPosition'
-    'Chrome'
-    'DataTrigger'
-    'Dock'
-    'Draggable'
-    'ExtendStyle'
-    'Execute'
-    'CanExecute'
-    'NotifyCanExecuteChanged'
-    'Import'
-    'Key'
-    'Link'
-    'On'
-    'GradientStop'
-    'GradientStopCollection'
-    'LinearGradientBrush'
-    'MultiTrigger'
-    'Reference'
-    'Resource'
-    'Resources'
-    'Setter'
-    'State'
-    'Style'
-    'Theme'
-    'Template'
-    'TemplateBinding'
-    'TimedEvent'
-    'Work'
-    'OnComplete'
-    'BeginStoryboard'
-    'DoubleAnimation'
-    'EventTrigger'
-    'Storyboard'
-    'StopStoryboard'
-    'Trigger'
-    'UseStyle'
-    'When'
-
-    # DSL/Shapes
-    'Path'
-    'Rectangle'
-
-    # Helpers
-    'Add-WPFType'
-    'Add-WPFObject'
-    'Convert-SvgToXaml'
-    'ConvertTo-KeyGesture'
-    'Convert-WPFObjectToXaml'
-    'Find-WPFChildNode'
-    'Get-WPFChromeAdapter'
-    'Get-WPFContextId'
-    'Get-WPFDarkModePreference'
-    'Get-WPFFileInfo'
-    'Get-WPFFileSelection'
-    'Get-WPFTextInput'
-    'Get-WPFCompletionType'
-    'Limit-WPFNumber'
-    'New-WPFObservableState'
-    'New-WPFPoint'
-    'New-WPFProject'
-    'New-WPFSize'
-    'New-WPFVariableList'
-    'Get-WPFMenu'
-    'Get-WPFWindow'
-    'Register-WPFCompletionType'
-    'Register-WPFChromeAdapter'
-    'Register-WPFObject'
-    'Set-WPFClipboard'
-    'Set-WPFWindowFullScreen'
-    'Show-WPFWindow'
-    'Start-WPFApplication'
-    'Switch-WPFTheme'
-    'Unregister-WPFCompletionType'
-    'Unregister-WPFObject'
-    'Use-WPFTheme'
-)
+FunctionsToExport = '*'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = '*'
 
 # Variables to export from this module
-VariablesToExport = @('LastDialogResult', 'LastDialogCloseReason')
+#VariablesToExport = @()
 
 # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
 AliasesToExport = '*'
@@ -245,22 +94,6 @@ AliasesToExport = '*'
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
-
-    # For TabCentral integration
-    TabExpansion = @{
-        Completers = @(
-            'Complete-WPFThis'
-        )
-        Modifiers = @()
-    }
-
-    # For Nitpick integration
-    Linting = @{
-        Rules = @(
-            'Test-AvoidBlockingUI'
-        )
-        RuleModules = @('SubModules/WPFRules/WPF.psd1')
-    }
 
     PSData = @{
 
