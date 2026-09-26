@@ -5,37 +5,65 @@
 .DESCRIPTION
     Returns the parameter names declared by a scriptblock, function,
     or cmdlet command info object.
+
+.EXAMPLE
+    Get all parameters from a callable.
+
+    Get-CallableParameter -Callable $MyFunction
+
+.EXAMPLE
+    Get all parameters from a callable as a list of names.
+
+    Get-CallableParameter -Callable $MyFunction -List
+
+.EXAMPLE
+    Get all parameters by name that match a wildcard pattern.
+
+    Get-CallableParameter -Callable $MyFunction -Name "PartialParamName*"
 #>
 function Get-CallableParameter {
     [CmdletBinding()]
-    [OutputType([string[]], [object[]])]
-    param (
-        [Parameter(Mandatory)]
-        [object] $TargetCallable,
+    [OutputType([pscustomobject[]])]
+    param(
+        [Parameter(Mandatory,ValueFromPipeline)]
+        [object] $Callable,
 
-        [switch] $Name
+        [Parameter(Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Name,
+
+        [Parameter(Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Type
     )
 
-    [object[]] $Result = @()
+    process {
+        $CallableParameters = @()
 
-    if ($TargetCallable -is [scriptblock]) {
-        $ParamBlock = $TargetCallable.Ast.ParamBlock
-        if ($ParamBlock) {
-            $Result = $ParamBlock.Parameters
-        }
-    } else {
-        $Result = $TargetCallable.Parameters.Keys
-    }
-
-    if ($Name) {
-        if ($TargetCallable -is [scriptblock]) {
-            $Result = $Result | ForEach-Object { $_.Name.VariablePath.UserPath }
+        if ($Callable -is [scriptblock]) {
+            $ParamBlock = $Callable.Ast.ParamBlock
+            if ($ParamBlock) {
+                $CallableParameters = $ParamBlock.Parameters | ForEach-Object {
+                    [pscustomobject] @{
+                        PSTypeName = 'Nitpick.CallableParameter'
+                        Name = $_.Name.VariablePath.UserPath
+                        ParameterType = $_.StaticType
+                    }
+                }
+            }
         } else {
-            $Result = $Result | ForEach-Object { $_.ToString() }
+            $CallableParameters = $Callable.Parameters.Values | ForEach-Object {
+                [pscustomobject] @{
+                    PSTypeName = 'Nitpick.CallableParameter'
+                    Name = $_.Name
+                    ParameterType = $_.ParameterType
+                }
+            }
         }
-    }
 
-    if ($Result.Count -gt 0) {
-        return $Result
+        $CallableParameters | Where-Object {
+            ([string]::IsNullOrEmpty($Name) -or $_.Name -like $Name) -and
+            ([string]::IsNullOrEmpty($Type) -or $_.ParameterType.Name -eq $Type)
+        }
     }
 }

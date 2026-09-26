@@ -7,40 +7,59 @@ AfterAll {
 }
 
 Describe 'Get-CallableParameter' {
-    It 'returns parameter AST objects for a scriptblock' {
+    It 'returns normalized parameters for a scriptblock' {
         $Parameters = @(InModuleScope Nitpick {
-            Get-CallableParameter -TargetCallable {
-                param ($ScriptBlockAst, $FilePath)
+            Get-CallableParameter -Callable {
+                param (
+                    [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+                    [string] $FilePath
+                )
             }
         })
 
         $Parameters.Count | Should -Be 2
-        $Parameters[0] | Should -BeOfType [System.Management.Automation.Language.ParameterAst]
+        $Parameters[0].PSObject.TypeNames | Should -Contain 'Nitpick.CallableParameter'
+        $Parameters[0].Name | Should -Be 'ScriptBlockAst'
+        $Parameters[0].ParameterType | Should -Be ([System.Management.Automation.Language.ScriptBlockAst])
     }
 
-    It 'returns scriptblock parameter names when Name is specified' {
-        $Names = @(InModuleScope Nitpick {
-            Get-CallableParameter -TargetCallable {
+    It 'filters scriptblock parameters by name' {
+        $Parameters = @(InModuleScope Nitpick {
+            Get-CallableParameter -Callable {
                 param ($ScriptBlockAst, $FilePath)
-            } -Name
+            } -Name 'Script*'
         })
 
-        $Names | Should -Be @('ScriptBlockAst', 'FilePath')
+        $Parameters.Count | Should -Be 1
+        $Parameters[0].Name | Should -Be 'ScriptBlockAst'
     }
 
-    It 'returns command parameter names' {
-        $Names = @(InModuleScope Nitpick {
+    It 'returns normalized parameters for a command' {
+        $Parameters = @(InModuleScope Nitpick {
             $Callable = Get-Command -Name Get-ChildItem -CommandType Cmdlet
-            Get-CallableParameter -TargetCallable $Callable -Name
+            Get-CallableParameter -Callable $Callable -Name 'Path'
         })
 
-        $Names | Should -Contain 'Path'
-        $Names | Should -Contain 'Recurse'
+        $Parameters.Count | Should -Be 1
+        $Parameters[0].PSObject.TypeNames | Should -Contain 'Nitpick.CallableParameter'
+        $Parameters[0].Name | Should -Be 'Path'
+        $Parameters[0].ParameterType | Should -Be ([string[]])
+    }
+
+    It 'filters parameters by type' {
+        $Parameters = @(InModuleScope Nitpick {
+            Get-CallableParameter -Callable {
+                param ($ScriptBlockAst, [switch] $Details)
+            } -Name 'Details' -Type 'SwitchParameter'
+        })
+
+        $Parameters.Count | Should -Be 1
+        $Parameters[0].Name | Should -Be 'Details'
     }
 
     It 'returns no parameters for a parameterless scriptblock' {
         $Parameters = @(InModuleScope Nitpick {
-            Get-CallableParameter -TargetCallable { 'value' } -Name
+            Get-CallableParameter -Callable { 'value' }
         })
 
         $Parameters.Count | Should -Be 0

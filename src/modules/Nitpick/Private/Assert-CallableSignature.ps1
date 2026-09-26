@@ -10,22 +10,25 @@ function Assert-CallableSignature {
     [OutputType([void])]
     param (
         [Parameter(Mandatory)]
-        [object] $TargetCallable,
+        [object] $Callable,
 
         [string[]] $RequiredParams = @(),
         [string[]] $OptionalParams = @()
     )
 
-    $CallableParams = Get-CallableParameter -TargetCallable $TargetCallable -Name
+    $CallableParamNames = @(
+        Get-CallableParameter -Callable $Callable |
+            Select-Object -ExpandProperty Name
+    )
     $MissingParams = @(
         $RequiredParams |
-            Where-Object { $CallableParams -notcontains $_ }
+            Where-Object { $CallableParamNames -notcontains $_ }
     )
 
     if ($MissingParams.Count -gt 0) {
         $CallableName =
-            if ($TargetCallable -is [scriptblock]) { '<scriptblock>'}
-            else { $TargetCallable.Name }
+            if ($Callable -is [scriptblock]) { '<scriptblock>'}
+            else { $Callable.Name }
 
         $MissingParamDisplay = $MissingParams -join ', '
         $RequiredParamDisplay = $RequiredParams -join ', '

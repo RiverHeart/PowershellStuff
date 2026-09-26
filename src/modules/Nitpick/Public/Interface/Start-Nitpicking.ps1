@@ -2,7 +2,7 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    Powershell first replacement for PSScriptAnalyzer
+    Starts applying Nitpick rules to the specified script or path.
 #>
 function Start-Nitpicking {
     [CmdletBinding(DefaultParameterSetName='Path')]
@@ -28,17 +28,28 @@ function Start-Nitpicking {
     )
 
     begin {
+        Find-Nitpick | ForEach-Object {
+            Register-Nitpick -Command $_
+        }
+
         foreach ($RuleModuleEntry in $RuleModule) {
             Register-Nitpick -Module $RuleModuleEntry
         }
 
-        foreach ($RulePathEntry in $RulePath) {
-            . $RulePathEntry
-        }
+        # TODO: Figure out how to register rules from a specified path
+        # foreach ($RulePathEntry in $RulePath) {
+        #     . $RulePathEntry
+        # }
 
         $Rules = Get-Nitpick | Where-Object {
             ($null -eq $IncludeRule -or $_ -in $IncludeRule) -and
             ($null -eq $ExcludeRule -or $_ -notin $ExcludeRule)
+        }
+
+        if ($null -eq $Rules) {
+            # TODO: Be more detailed about where we searched for rules
+            Write-Warning "No rules found to apply."
+            return
         }
     }
 
@@ -59,7 +70,9 @@ function Start-Nitpicking {
         }
 
         foreach ($Ast in $Asts) {
-            Invoke-Nitpick -Ast $Ast -Rules $Rules
+            foreach ($Rule in $Rules) {
+                $Rule.Invoke($Ast)
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ Describe 'New-Nitpick' {
             )
         } -Category Style -Name TestRule -Source Tests
 
-        $Rule.PSObject.TypeNames | Should -Contain 'Nitpick.Rule'
+        $Rule.GetType().Name | Should -Be 'NitpickRule'
         $Rule.Name | Should -Be 'TestRule'
         $Rule.Category | Should -Be 'Style'
         $Rule.CallableType | Should -Be 'ScriptBlock'
@@ -45,9 +45,20 @@ Describe 'New-Nitpick' {
     It 'creates a rule from a command name' {
         $Rule = New-Nitpick -Callable 'Test-UseIsNotOperator' -Category Maintainability
 
-        $Rule.Name | Should -Be 'Test-UseIsNotOperator'
+        $Rule.Name | Should -Be 'UseIsNotOperator'
+        $Rule.Category | Should -Be 'Maintainability'
         $Rule.Callable | Should -Be 'Test-UseIsNotOperator'
         $Rule.Source | Should -Be 'Nitpick'
+    }
+
+    It 'uses rule details when no explicit override is supplied' {
+        $Rule = New-Nitpick -Callable 'Test-UseIsNotOperator'
+
+        $Rule.Name | Should -Be 'UseIsNotOperator'
+        $Rule.Category | Should -Be 'Style'
+        $Rule.Description | Should -Not -BeNullOrEmpty
+        $Rule.Severity | Should -Be 'Information'
+        $Rule.Explanation | Should -Not -BeNullOrEmpty
     }
 
     It 'rejects a callable missing ScriptBlockAst' {

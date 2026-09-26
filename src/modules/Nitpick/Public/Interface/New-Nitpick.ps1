@@ -27,9 +27,9 @@ using namespace System.Management.Automation
 #>
 function New-Nitpick {
     [CmdletBinding()]
-    [OutputType([pscustomobject])]
+    [OutputType([object])]
     param (
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ValueFromPipeline)]
         [ValidateScript({
             $_ -is [string] -or
             $_ -is [scriptblock] -or
@@ -38,9 +38,8 @@ function New-Nitpick {
         })]
         [object] $Callable,
 
-        [Parameter(Mandatory,ParameterSetName='Default')]
-        [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
-        [string] $Category,
+        [ArgumentCompleter({ Complete-NitpickCategory $args })]
+        [string] $Category = 'Other',
 
         [Parameter(HelpMessage='The name of the nitpick. Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
@@ -51,52 +50,14 @@ function New-Nitpick {
         [string] $Source
     )
 
-    $Nitpick = @{
-        PSTypeName = 'Nitpick.Rule'
+    process {
+        $Overrides = @{}
+        foreach ($Property in 'Name', 'Category', 'Source') {
+            if ($PSBoundParameters.ContainsKey($Property)) {
+                $Overrides[$Property] = $PSBoundParameters[$Property]
+            }
+        }
+
+        Write-Output ([NitpickRule]::new($Callable, $Overrides))
     }
-
-    # Resolve strings to commands
-    if ($Callable -is [string]) {
-        $GetParams = @{
-            Name = $Callable
-            CommandType = 'Function', 'Cmdlet'
-        }
-        try {
-            $Callable = Get-Command @GetParams -ErrorAction Stop
-        } catch {
-            Write-Error "Failed to resolve command: $Callable"
-            return
-        }
-    }
-
-    Assert-CallableSignature -TargetCallable $Callable -RequiredParams 'ScriptBlockAst'
-
-    # Build nitpick
-    if ($Callable -is [scriptblock]) {
-        if (-not $Name -or -not $Source) {
-            Write-Error "Name and Source are mandatory when using a scriptblock"
-            return
-        }
-        $Nitpick.Name = $Name
-        $Nitpick.Category = $Category
-        $Nitpick.CallableType = 'ScriptBlock'
-        $Nitpick.Callable = $Callable
-        $Nitpick.Source = $Source
-    } else {
-        if (-not $Callable.ModuleName -and -not $Source) {
-            Write-Error "Source is mandatory for non-module functions/cmdlets."
-            return
-        }
-
-        # We don't want to hold onto references to the original object since
-        # the module might get reloaded which could either invalidate it,
-        # make it stale, or cause unexpected behavior.
-        $Nitpick.Name = $Callable.Name
-        $Nitpick.Category = $Category
-        $Nitpick.CallableType = 'Function'
-        $Nitpick.Callable = $Callable.Name
-        $Nitpick.Source = if ($Callable.ModuleName) { $Callable.ModuleName } else { $Source }
-    }
-
-    return [pscustomobject] $Nitpick
 }

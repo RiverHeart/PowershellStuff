@@ -129,8 +129,77 @@ class NitpickFinding {
         )
         return $Result
     }
-
 }
+
+class NitpickRule {
+    [string] $Name
+    [string] $Category
+    [string] $CallableType
+    [object] $Callable
+    [string] $Source
+    [string] $Description
+    [string] $Severity
+    [string] $Explanation
+
+    NitpickRule([object] $TargetCallable, [hashtable] $Overrides) {
+        if ($TargetCallable -is [string]) {
+            try {
+                $TargetCallable = Get-Command `
+                    -Name $TargetCallable `
+                    -CommandType Function, Cmdlet `
+                    -ErrorAction Stop
+            } catch {
+                throw "Failed to resolve command: $TargetCallable"
+            }
+        }
+
+        Assert-CallableSignature `
+            -Callable $TargetCallable `
+            -RequiredParams 'ScriptBlockAst' `
+            -ErrorAction Stop
+
+        $this.Category = 'Other'
+        if ($TargetCallable -is [scriptblock]) {
+            $this.CallableType = 'ScriptBlock'
+            $this.Callable = $TargetCallable
+        } else {
+            $this.Name = $TargetCallable.Name
+            $this.CallableType = 'Function'
+            $this.Callable = $TargetCallable.Name
+            $this.Source = $TargetCallable.ModuleName
+        }
+
+        $HasDetails = $TargetCallable |
+            Get-CallableParameter -Name 'Details' -Type 'SwitchParameter'
+        if ($HasDetails) {
+            $Details = & $TargetCallable -Details
+            foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation') {
+                if ($null -ne $Details.$Property) {
+                    $this.$Property = $Details.$Property
+                }
+            }
+        }
+
+        foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation') {
+            if ($Overrides.ContainsKey($Property)) {
+                $this.$Property = $Overrides[$Property]
+            }
+        }
+
+        if ($TargetCallable -is [scriptblock] -and (-not $this.Name -or -not $this.Source)) {
+            throw 'Name and Source are mandatory when using a scriptblock.'
+        }
+        if ($TargetCallable -isnot [scriptblock] -and -not $this.Source) {
+            throw 'Source is mandatory for non-module functions/cmdlets.'
+        }
+    }
+}
+Update-TypeData `
+    -TypeName 'NitpickRule' `
+    -DefaultDisplayPropertySet 'Name', 'Category', 'Severity', 'Description' `
+    -Force
+
+# MARK: TRANSFORM
 
 # NOTE: PowerShell's `Attribute` suffix omission happens during parse-time type resolution,
 # and because this class lives in a separately parsed file. Without colocating the class,
@@ -160,3 +229,10 @@ foreach ($Path in $Paths) {
             . $_.FullName
         }
 }
+
+
+# Register built-in rules
+# Get-ChildItem -Path "$ModuleRoot/Public/Rules" -Recurse -Filter '*.ps1' |
+#     ForEach-Object {
+#         Register-Nitpick -
+#     }

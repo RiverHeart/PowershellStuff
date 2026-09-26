@@ -52,6 +52,19 @@ function Register-Nitpick {
                 return
             }
 
+            if (-not $ResolvedModule.PrivateData.Linting) {
+                Write-Error "No linting information found in module '$($ResolvedModule.Name)'." -Category InvalidData
+                return
+            }
+
+            # Modules may separate their linting rules into submodules to avoid polluting
+            # the main module namespace.
+            if ($ResolvedModule.PrivateData.Linting.RuleModules) {
+                foreach ($RuleModule in $ResolvedModule.PrivateData.Linting.RuleModules) {
+                    Import-Module "$($ResolvedModule.ModuleBase)/$RuleModule" -Force
+                }
+            }
+
             $LintRules = $ResolvedModule.PrivateData.Linting.Rules
 
             if ($LintRules.Count -eq 0) {
@@ -60,18 +73,18 @@ function Register-Nitpick {
             }
 
             foreach ($LintRule in $LintRules) {
-                $ChildParams = @{
+                $RegistrationParams = @{
                     Name = $LintRule
                     Category = $Category
                     Callable = $LintRule
                     Force = $Force
                     PassThru = $PassThru
                 }
-                Register-Nitpick @ChildParams
+                Register-Nitpick @RegistrationParams
             }
 
             return
-        }
+        }  # End of 'Module' parameter set check
 
         $NitpickParams = @{} + $PSBoundParameters
         $null = $NitpickParams.Remove('PassThru')

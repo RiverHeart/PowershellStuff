@@ -30,7 +30,7 @@ Describe 'Register-Nitpick' {
             param ($ScriptBlockAst)
         } -Category Quality -Name TestRule -Source Tests -PassThru
 
-        $Rule.PSObject.TypeNames | Should -Contain 'Nitpick.Rule'
+        $Rule.GetType().Name | Should -Be 'NitpickRule'
         $Rule.Name | Should -Be 'TestRule'
         $Rule.Category | Should -Be 'Quality'
     }

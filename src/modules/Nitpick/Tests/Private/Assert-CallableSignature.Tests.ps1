@@ -11,7 +11,7 @@ Describe 'Assert-CallableSignature' {
         {
             InModuleScope Nitpick {
                 Assert-CallableSignature `
-                    -TargetCallable { param ($ScriptBlockAst, $FilePath) } `
+                    -Callable { param ($ScriptBlockAst, $FilePath) } `
                     -RequiredParams 'ScriptBlockAst', 'FilePath'
             }
         } | Should -Not -Throw
@@ -21,7 +21,7 @@ Describe 'Assert-CallableSignature' {
         {
             InModuleScope Nitpick {
                 Assert-CallableSignature `
-                    -TargetCallable (Get-Command -Name Get-ChildItem -CommandType Cmdlet) `
+                    -Callable (Get-Command -Name Get-ChildItem -CommandType Cmdlet) `
                     -RequiredParams 'Path'
             }
         } | Should -Not -Throw
@@ -31,7 +31,7 @@ Describe 'Assert-CallableSignature' {
         {
             InModuleScope Nitpick {
                 Assert-CallableSignature `
-                    -TargetCallable { param ($ScriptBlockAst) } `
+                    -Callable { param ($ScriptBlockAst) } `
                     -RequiredParams 'ScriptBlockAst', 'FilePath', 'Settings'
             }
         } | Should -Throw '*Missing required parameter(s): FilePath, Settings*'
