@@ -17,12 +17,15 @@
     }.Ast
 #>
 function Test-AvoidParameterAttributeBool {
-    [CmdletBinding()]
-    [OutputType([object[]])]
+    [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
+    [OutputType([object[]], [hashtable])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
-        [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst
+        [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+
+        [Parameter(ParameterSetName='Details')]
+        [switch] $Details
     )
 
     begin {
@@ -33,9 +36,19 @@ function Test-AvoidParameterAttributeBool {
             'ValueFromRemainingArguments'
             'DontShow'
         )
+        $Metadata = [pscustomobject]@{
+            Name = 'AvoidParameterAttributeBool'
+            CommandName = $PSCmdlet.MyInvocation.MyCommand.Name
+            Category = 'Style'
+            Description = 'Detects instances of the `[Parameter(<Attribute>=<Bool>)]` pattern.'
+            Severity = 'Information'
+            Explanation = 'Assigning Boolean values to Parameter attribute arguments is unnecessary and makes them harder to read.'
+        }
     }
 
     process {
+        if ($Details) { return $Metadata }
+
         try {
             $MatchingParameters = $ScriptBlockAst.FindAll({
                 param($Ast)
@@ -124,10 +137,12 @@ function Test-AvoidParameterAttributeBool {
                     -RuleName $PSCmdlet.MyInvocation.MyCommand.Name `
                     -Message "Avoid assigning Boolean values to Parameter attribute arguments" `
                     -ViolationExtent $BadNode.Extent `
-                    -Severity 'Information' `
-                    -RuleSuppressionID 'PSAvoidParameterAttributeBool' `
+                    -Severity $Metadata.Severity `
+                    -RuleSuppressionID $Metadata.Name `
                     -Corrections $Correction `
-                    -OutputAs $OutputAs
+                    -OutputAs $OutputAs `
+                    -ScriptPath $FilePath `
+                    -Explanation $Metadata.Explanation `
 
                 Write-Output $Finding
             }

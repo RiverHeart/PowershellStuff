@@ -25,15 +25,31 @@ using namespace System.Management.Automation.Language
         -CustomRulePath 'path/to/Rules.psm1'
 #>
 function Test-UseIsNotOperator {
-    [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
+    [OutputType([PSCustomObject[]], [pscustomobject])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
-        [ScriptBlockAst] $ScriptBlockAst
+        [ScriptBlockAst] $ScriptBlockAst,
+
+        [Parameter(ParameterSetName='Details')]
+        [switch] $Details
     )
 
+    begin {
+        $Metadata = [pscustomobject]@{
+            Name = 'UseIsNotOperator'
+            Command = $PSCmdlet.MyInvocation.MyCommand.Name
+            Category = 'Style'
+            Description = 'Detects instances of the `-not (<expression> -is <type>)` pattern and suggests using the `-isnot` operator instead.'
+            Severity = 'Information'
+            Explanation = 'Using the `-isnot` operator is preferred over the `-not (<expression> -is <type>)` pattern for readability.'
+        }
+    }
+
     process {
+        if ($Details) { return $Metadata }
+
         try {
             $MatchingExpressions = $ScriptBlockAst.FindAll({
                 param($AstNode)
@@ -74,9 +90,9 @@ function Test-UseIsNotOperator {
                 $DiagnosticRecord = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord]@{
                     Message = "Uses '-not (<expression> -is <type>)' instead of '<expression> -isnot <type>'."
                     Extent = $BadNode.Extent
-                    RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
-                    Severity = 'Information'
-                    RuleSuppressionId = 'PSUseIsNotOperator'
+                    RuleName = $Metadata.Name
+                    Severity = $Metadata.Severity
+                    RuleSuppressionId = $Metadata.Name
                     SuggestedCorrections = $SuggestedCorrections
                 }
 
