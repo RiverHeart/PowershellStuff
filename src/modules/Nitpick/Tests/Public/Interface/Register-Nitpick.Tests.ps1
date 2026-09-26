@@ -35,7 +35,7 @@ Describe 'Register-Nitpick' {
         $Rule.Category | Should -Be 'Quality'
     }
 
-    It 'rejects a duplicate rule without Force' {
+    It 'is idempotent when the same rule is already registered' {
         $Parameters = @{
             Callable = { param ($ScriptBlockAst) }
             Category = 'Style'
@@ -44,8 +44,26 @@ Describe 'Register-Nitpick' {
         }
         Register-Nitpick @Parameters
 
-        { Register-Nitpick @Parameters -ErrorAction Stop } |
-            Should -Throw '*already registered*'
+        $Rule = Register-Nitpick @Parameters -PassThru
+
+        $Rule.Name | Should -Be 'TestRule'
+        InModuleScope Nitpick {
+            (Get-NitpickRegistry).Nitpicks.Count | Should -Be 1
+        }
+    }
+
+    It 'rejects a different rule with the same name without Force' {
+        Register-Nitpick -Callable {
+            param ($ScriptBlockAst)
+            'old'
+        } -Category Style -Name TestRule -Source Tests
+
+        {
+            Register-Nitpick -Callable {
+                param ($ScriptBlockAst)
+                'new'
+            } -Category Style -Name TestRule -Source Tests -ErrorAction Stop
+        } | Should -Throw '*already registered*'
     }
 
     It 'replaces a duplicate rule when Force is specified' {
@@ -75,5 +93,35 @@ Describe 'Register-Nitpick' {
                 -Source Tests `
                 -ErrorAction Stop
         } | Should -Throw '*ScriptBlockAst*'
+    }
+
+    It 'registers only included discovered rule IDs' {
+        $Rules = @(Register-Nitpick `
+            -Module Nitpick `
+            -IncludeRule UseIsNotOperator `
+            -PassThru)
+
+        $Rules.Count | Should -Be 1
+        $Rules[0].Name | Should -Be 'UseIsNotOperator'
+    }
+
+    It 'does not register excluded discovered rule IDs' {
+        $Rules = @(Register-Nitpick `
+            -Module Nitpick `
+            -ExcludeRule UseIsNotOperator `
+            -PassThru)
+
+        $Rules.Name | Should -Not -Contain 'UseIsNotOperator'
+        $Rules.Name | Should -Contain 'AvoidParameterAttributeBool'
+    }
+
+    It 'registers an existing NitpickRule without reconstructing it' {
+        $Rule = New-Nitpick -Callable {
+            param ($ScriptBlockAst)
+        } -Category Style -Name ExistingRule -Source Tests
+
+        $RegisteredRule = $Rule | Register-Nitpick -PassThru
+
+        [object]::ReferenceEquals($Rule, $RegisteredRule) | Should -BeTrue
     }
 }

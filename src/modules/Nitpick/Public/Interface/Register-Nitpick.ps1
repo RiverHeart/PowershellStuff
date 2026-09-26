@@ -1,110 +1,136 @@
 <#
 .SYNOPSIS
+    Registers a given Nitpick rule or those that are discoverable via Find-Nitpick.
 
+.DESCRIPTION
+    Registers a given Nitpick rule or those that are discoverable via Find-Nitpick.
+
+    This function can be used to register rules explicitly by providing a callable,
+    or it can discover rules using the Find-Nitpick function when no callable is provided.
+
+    IncludeRule and ExcludeRule parameters can be used to filter which discovered rules
+    are registered.
+
+.EXAMPLE
+    Register all discoverable Nitpick rules.
+
+    Register-Nitpick
+
+.EXAMPLE
+    Register all discoverable Nitpick rules from a specific module.
+
+    Register-Nitpick -Module MyModule
+
+.EXAMPLE
+    Register a new Nitpick rule named 'TestRule' with the specified callable, category, and source.
+
+    Register-Nitpick `
+        -Name TestRule `
+        -Callable { param ($ScriptBlockAst) } `
+        -Category Style `
+        -Source Tests
 #>
 function Register-Nitpick {
     [CmdletBinding(DefaultParameterSetName='Default')]
-    [OutputType([void], [pscustomobject])]
+    # NOTE: NitpickRule won't be available at parse time to properly define it as an output type.
+    [OutputType([void], [object])]
     param (
-        [Parameter(Mandatory,ParameterSetName='Default')]
+        [Parameter(ValueFromPipeline)]
         [ValidateScript({
             $_ -is [string] -or
             $_ -is [scriptblock] -or
             $_ -is [FunctionInfo] -or
-            $_ -is [CmdletInfo]
+            $_ -is [CmdletInfo] -or
+            $_ -is [NitpickRule]
         })]
-        [object] $Callable,
+        [object[]] $Callable,
 
-        [Parameter(Mandatory,ParameterSetName='Default')]
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
         [string] $Category,
 
-        [Parameter(HelpMessage='Mandatory only when using a scriptblock',ParameterSetName='Default')]
+        [Parameter(HelpMessage='Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
 
-        [Parameter(HelpMessage='Mandatory only when using a scriptblock',ParameterSetName='Default')]
+        [Parameter(HelpMessage='Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Source,
 
-        [Parameter(Mandatory,ParameterSetName='Module')]
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [string] $Module,
 
-        [Parameter(ParameterSetName='Module')]
-        [ValidateNotNullOrEmpty()]
-        [string] $RequiredVersion,
+        [string[]] $IncludeRule,
+        [string[]] $ExcludeRule,
 
         [switch] $Force,
         [switch] $PassThru
     )
 
     process {
-        if ($PSCmdlet.ParameterSetName -eq 'Module') {
-            $ResolveParams = @{
-                Name = if ($Module -is [string]) { $Module } else { $Module.Name }
-            }
-            if ($RequiredVersion) { $ResolveParams.RequiredVersion = $RequiredVersion }
+        if (-not $Callable) {
+            Write-Verbose "No callable provided. Running discovery."
 
-            $ResolvedModule = Resolve-Module @ResolveParams
-            if (-not $ResolvedModule) {
-                Write-Error "Module '$($Module)' could not be resolved." -Category ObjectNotFound
-                return
-            }
+            $FindParams = @{}
+            if ($Module) { $FindParams.Module = $Module }
 
-            if (-not $ResolvedModule.PrivateData.Linting) {
-                Write-Error "No linting information found in module '$($ResolvedModule.Name)'." -Category InvalidData
-                return
-            }
-
-            # Modules may separate their linting rules into submodules to avoid polluting
-            # the main module namespace.
-            if ($ResolvedModule.PrivateData.Linting.RuleModules) {
-                foreach ($RuleModule in $ResolvedModule.PrivateData.Linting.RuleModules) {
-                    Import-Module "$($ResolvedModule.ModuleBase)/$RuleModule" -Force
-                }
-            }
-
-            $LintRules = $ResolvedModule.PrivateData.Linting.Rules
-
-            if ($LintRules.Count -eq 0) {
-                Write-Error "No lint rules found in module '$($ResolvedModule.Name)'." -Category InvalidData
-                return
-            }
-
-            foreach ($LintRule in $LintRules) {
-                $RegistrationParams = @{
-                    Name = $LintRule
-                    Category = $Category
-                    Callable = $LintRule
-                    Force = $Force
-                    PassThru = $PassThru
-                }
-                Register-Nitpick @RegistrationParams
-            }
-
-            return
-        }  # End of 'Module' parameter set check
-
-        $NitpickParams = @{} + $PSBoundParameters
-        $null = $NitpickParams.Remove('PassThru')
-        $null = $NitpickParams.Remove('Force')
-
-        $Nitpick = New-Nitpick @NitpickParams
-        $Registry = Get-NitpickRegistry
-
-        if ($Registry.Nitpicks.ContainsKey($Nitpick.Name)) {
-            if (-not $Force) {
-                Write-Error "Nitpick '$($Nitpick.Name)' is already registered."
-                return
-            }
+            # NOTE: Maybe filter after constructing Nitpick if user provides the
+            # rule id instead of the function name?
+            $Callable = Find-Nitpick @FindParams
         }
 
-        Write-Verbose "Registering nitpick '$($Nitpick.Name)' as '$($Nitpick.Type)'."
-        $Registry.Nitpicks[$Nitpick.Name] = $Nitpick
+        foreach($CallableEntry in $Callable) {
+            if ($CallableEntry -is [NitpickRule]) {
+                $Nitpick = $CallableEntry
+            } else {
+                $NitpickParams = @{}
+                if ($Name) { $NitpickParams.Name = $Name }
+                if ($Category) { $NitpickParams.Category = $Category }
+                if ($Source) { $NitpickParams.Source = $Source }
 
-        if ($PassThru) {
-            return $Nitpick
+                $Nitpick = $CallableEntry | New-Nitpick @NitpickParams
+            }
+
+            $IsIncluded =
+                ($null -eq $IncludeRule -or $Nitpick.Name -in $IncludeRule) -and
+                ($null -eq $ExcludeRule -or $Nitpick.Name -notin $ExcludeRule)
+
+            if (-not $IsIncluded) {
+                continue
+            }
+
+            $Registry = Get-NitpickRegistry
+
+            $Existing = $Registry.Nitpicks[$Nitpick.Name]
+            if ($Existing) {
+                $IsSame =
+                    $Existing.Source -eq $Nitpick.Source -and
+                    $Existing.Callable -eq $Nitpick.Callable
+
+                if ($IsSame) {
+                    Write-Verbose "Nitpick '$($Nitpick.Name)' is already registered."
+                    if ($PassThru) {
+                        Write-Output $Existing
+                    }
+                    continue
+                }
+
+                if (-not $Force) {
+                    Write-Error "A Nitpick with the name '$($Nitpick.Name)' is already registered."
+                    continue
+                }
+            }
+
+            if ($Existing) {
+                Write-Verbose "Overwriting existing Nitpick '$($Nitpick.Name)'."
+            } else {
+                Write-Verbose "Registering '$($Nitpick.Category)' rule '$($Nitpick.Name)'."
+            }
+            $Registry.Nitpicks[$Nitpick.Name] = $Nitpick
+
+            if ($PassThru) {
+                Write-Output $Nitpick
+            }
         }
     }
 }

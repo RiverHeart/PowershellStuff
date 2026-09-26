@@ -6,7 +6,7 @@ using namespace System.Management.Automation.Language
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
 # MARK: NP_CORRECTION
-#------------------
+#----------------------
 
 class NitpickCorrection {
     [int] $StartLineNumber
@@ -131,6 +131,9 @@ class NitpickFinding {
     }
 }
 
+# MARK: NP_RULE
+#------------------
+
 class NitpickRule {
     [string] $Name
     [string] $Category
@@ -194,6 +197,7 @@ class NitpickRule {
         }
     }
 }
+
 Update-TypeData `
     -TypeName 'NitpickRule' `
     -DefaultDisplayPropertySet 'Name', 'Category', 'Severity', 'Description' `

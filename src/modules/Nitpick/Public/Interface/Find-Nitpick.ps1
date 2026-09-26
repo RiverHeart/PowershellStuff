@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Finds exported Test and Measure commands with the required Nitpick callable
-    signature. Only modules already loaded in the current session are searched.
+    signature. Selected modules and their nested modules are searched. Only
+    modules already loaded in the current session are inspected.
 
 .EXAMPLE
     Returns all valid Nitpick rules from the currently loaded modules.
@@ -24,7 +25,8 @@
 function Find-Nitpick {
     [CmdletBinding()]
     [OutputType([System.Management.Automation.CommandInfo])]
-    param (
+    param(
+        [string[]] $Name,
         [string[]] $Module
     )
 
@@ -33,12 +35,55 @@ function Find-Nitpick {
         $GetModuleParams.Name = $Module
     }
 
-    Get-Module @GetModuleParams |
-        ForEach-Object {
-            $_.ExportedCommands.Values |
-                Where-Object {
-                    $_.Verb -in 'Test', 'Measure' -and
-                    $_.Parameters.Keys -contains 'ScriptBlockAst'
-                }
+    $PendingModules = [System.Collections.Generic.Queue[System.Management.Automation.PSModuleInfo]]::new()
+    Get-Module @GetModuleParams | ForEach-Object {
+        $PendingModules.Enqueue($_)
+    }
+
+    $VisitedModules = [System.Collections.Generic.HashSet[System.Management.Automation.PSModuleInfo]]::new()
+    $DiscoveredCommands = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+
+    while ($PendingModules.Count -gt 0) {
+        $CurrentModule = $PendingModules.Dequeue()
+        if (-not $VisitedModules.Add($CurrentModule)) {
+            continue
         }
+
+        $CurrentModule.NestedModules | ForEach-Object {
+            $PendingModules.Enqueue($_)
+        }
+
+        $CurrentModule.ExportedCommands.Values |
+            Where-Object {
+                $Command = $_
+
+                if ($Command.Verb -notin 'Test', 'Measure') {
+                    return $false
+                }
+
+                if ($Command.Parameters.Keys -notcontains 'ScriptBlockAst') {
+                    return $false
+                }
+
+                if (-not $Name) {
+                    return $true
+                }
+
+                return [bool] ($Name | Where-Object {
+                    $Command.Name -like $_
+                })
+            } |
+            Where-Object {
+                $CommandIdentity = '{0}|{1}|{2}|{3}' -f @(
+                    $_.Module.Guid
+                    $_.Module.Version
+                    $_.Module.Path
+                    $_.Name
+                )
+                # Returns true for new items, false for duplicates.
+                $DiscoveredCommands.Add($CommandIdentity)
+            }
+    }
 }
