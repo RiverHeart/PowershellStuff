@@ -14,3 +14,19 @@ Currently, I feel that ScriptAnalyzer is not flexible enough for what I'd like t
 The inability to limit tests to certain file names is problematic since rule suppression doesn't behave well in Pester where tests may run against purposefully incorrect code. More over, tests shouldn't be limited to files so much as scoped to them. There isn't a compelling reason why the ScriptAnalyzer should be limited to Powershell at this stage in its life. If ScriptAnalyzer runs against a Powershell file and is given a test which exposes a ScriptBlockAst parameter then the calling contract is obviously "get the Powershell AST and pass it to the test" but if given a SQL file why not just run the test and retrieve a DiagnosticRecord? Just because Powershell can't readily obtain an AST of say, SQL, doesn't mean it can't detect SQL issues by other means. The ScriptDom class from the SqlServer module can create SQL ASTs and supports vistors for analysis. Sure, there may be a better tool for the job, but it won't be PowerShell based.
 
 Another low hanging fruit problem is the inability to have ScriptAnalyzer throw an error for a given severity. This means that using it for CI tasks or from task runners (Psake, InvokeBuild, PleaseWork) requires manually parsing the results and throwing an error yourself. Clearly this is a bad developer experience as it's manual, unintuitive, and makes the code noisy. This friction should be easy to eliminate but because ScriptAnalyzer was designed as a C# project, the people most likely to use it are forced to become C# devs to contribute back and with C#, you must compile the entire project to test that change which is another source of friction.
+
+## Comparison
+
+Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick. As a show of good faith, I will give precedence to PSScriptAnalyzer's strengths over Nitpick in the table.
+
+| Criterion | PSScriptAnalyzer | Nitpick |
+| :---      | :------: | :--------: |
+| **Core Language** | C# | PowerShell |
+| **Built-In Ruleset** | 75 Rules | 2 Rules |
+| **VSCode Integration** | Yes | No |
+| **Configuration File** | Yes | No |
+| **Rule Categories** | No | Yes |
+| **Rule Scoping** | No | Yes |
+| **Nested Module Support** | No | Yes |
+| **Errors On Failures** | No | Yes |
+| **Works from VSCode PS Extension** | No | Yes |
