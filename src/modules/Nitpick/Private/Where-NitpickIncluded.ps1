@@ -59,6 +59,16 @@
     Use wildcard inclusion and exclusion (yields 'two')
 
     1, 'one', 2, 'two' | Where-NitpickIncluded -Include '*o*' -Exclude 'one' -Wildcard
+
+.EXAMPLE
+    Filter on a nested property of the input object
+
+    $Objects = @(
+        [pscustomobject]@{ Nested = [pscustomobject]@{ Value = 1 } }
+        [pscustomobject]@{ Nested = [pscustomobject]@{ Value = 2 } }
+    )
+
+    $Objects | Where-NitpickIncluded -Property 'Nested.Value' -Include 1
 #>
 function Get-NitpickIncluded {
     [CmdletBinding()]
@@ -68,8 +78,9 @@ function Get-NitpickIncluded {
         [Parameter(ValueFromPipeline)]
         [object] $InputObject,
 
+        [Parameter(HelpMessage = "The property or property path of the input object to filter on.")]
         [ValidateNotNullOrEmpty()]
-        [string] $Property,
+        [string] $PropertyPath,
 
         [string[]] $Include,
         [string[]] $Exclude,
@@ -78,18 +89,25 @@ function Get-NitpickIncluded {
     )
 
     process {
-        $Target = if ($Property) { $InputObject.$Property } else { $InputObject }
+        foreach($Object in $InputObject) {
+            if ($PropertyPath) {
+                # Traverse the property path to get the filterable property from the input object
+                foreach($Segment in $PropertyPath.Split('.')) {
+                    $FilterValue = $Object.$Segment
+                }
+            }
 
-        if ($Wildcard) {
-            $IsIncluded = $null -eq $Include -or ($Include | Where-Object { $Target -like $_ })
-            $IsExcluded = $null -ne $Exclude -and ($Exclude | Where-Object { $Target -like $_ })
-        } else {
-            $IsIncluded = if ($null -ne $Include) { $Target -in $Include } else { $True }
-            $IsExcluded = if ($null -ne $Exclude) { $Target -in $Exclude } else { $False }
-        }
+            if ($Wildcard) {
+                $IsIncluded = $null -eq $Include -or ($Include | Where-Object { $FilterValue -like $_ })
+                $IsExcluded = $null -ne $Exclude -and ($Exclude | Where-Object { $FilterValue -like $_ })
+            } else {
+                $IsIncluded = if ($null -ne $Include) { $FilterValue -in $Include } else { $True }
+                $IsExcluded = if ($null -ne $Exclude) { $FilterValue -in $Exclude } else { $False }
+            }
 
-        if ($IsIncluded -and -not $IsExcluded) {
-            Write-Output $InputObject
+            if ($IsIncluded -and -not $IsExcluded) {
+                Write-Output $Object
+            }
         }
     }
 }

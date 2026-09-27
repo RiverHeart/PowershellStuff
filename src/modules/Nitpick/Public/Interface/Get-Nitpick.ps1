@@ -54,12 +54,12 @@ function Get-Nitpick {
             return $true
         } |
         Where-NitpickIncluded `
-            -Property Category `
+            -PropertyPath Category `
             -Include $IncludeCategory `
             -Exclude $ExcludeCategory `
             -Wildcard |
         Where-NitpickIncluded `
-            -Property Name `
+            -PropertyPath Name `
             -Include $IncludeRule `
             -Exclude $ExcludeRule `
             -Wildcard
