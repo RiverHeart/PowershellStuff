@@ -6,6 +6,7 @@
 
 **TODO:**
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
+  - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
 
 ## Why Not Use PSScriptAnalyzer?
 
