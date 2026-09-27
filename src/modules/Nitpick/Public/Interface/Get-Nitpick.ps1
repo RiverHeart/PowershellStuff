@@ -21,6 +21,12 @@ function Get-Nitpick {
         [ArgumentCompleter({ Complete-NitpickCategory })]
         [string] $Category,
 
+        [ArgumentCompleter({ Complete-NitpickCategory })]
+        [string[]] $IncludeCategory,
+
+        [ArgumentCompleter({ Complete-NitpickCategory })]
+        [string[]] $ExcludeCategory,
+
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule
     )
@@ -35,19 +41,26 @@ function Get-Nitpick {
 
     $Nitpicks |
         Where-Object {
-            $Nitpick = $_
-
+            # Exact name match
             if ($Name -and $_.Name -ne $Name) {
                 return $false
             }
 
+            # Exact category match
             if ($Category -and $_.Category -ne $Category) {
                 return $false
             }
 
-            [bool] $IsIncluded = -not $IncludeRule -or ($IncludeRule | Where-Object { $Nitpick.Name -like $_ })
-            [bool] $IsExcluded = $ExcludeRule -and ($ExcludeRule | Where-Object { $Nitpick.Name -like $_ })
-
-            return $IsIncluded -and -not $IsExcluded
-        }
+            return $true
+        } |
+        Where-NitpickIncluded `
+            -Property Category `
+            -Include $IncludeCategory `
+            -Exclude $ExcludeCategory `
+            -Wildcard |
+        Where-NitpickIncluded `
+            -Property Name `
+            -Include $IncludeRule `
+            -Exclude $ExcludeRule `
+            -Wildcard
 }

@@ -25,7 +25,7 @@
     }
     ```
 
-    Contrast with `Where-Included`,
+    Contrast with `Where-NitpickIncluded`,
 
     ```
     param(
@@ -33,36 +33,36 @@
         $Exclude
     )
 
-    1, 'one', 2, 'two' | Where-Included -Include $Include -Exclude $Exclude
+    1, 'one', 2, 'two' | Where-NitpickIncluded -Include $Include -Exclude $Exclude
     ```
 
 .NOTES
-    `Get-Included` is the "official" name for the real name `Where-Included`
+    `Get-Included` is the "official" name for the real name `Where-NitpickIncluded`
     since Import-Module is whiny about allowed verbs.
 
 .EXAMPLE
     Filter basic values
 
-    1, 'one', 2, 'two' | Where-Included -Include 1, 'two'
+    1, 'one', 2, 'two' | Where-NitpickIncluded -Include 1, 'two'
 
 .EXAMPLE
     Include processes named 'powershell' by filtering on the 'ProcessName' property
 
-    Get-Process | Where-Included -Property 'ProcessName' -Include 'powershell'
+    Get-Process | Where-NitpickIncluded -Property 'ProcessName' -Include 'powershell'
 
 .EXAMPLE
     Exclude processes named 'notepad' by filtering on the 'ProcessName' property
 
-    Get-Process | Where-Included -Property 'ProcessName' -Exclude 'notepad'
+    Get-Process | Where-NitpickIncluded -Property 'ProcessName' -Exclude 'notepad'
 
 .EXAMPLE
     Use wildcard inclusion and exclusion (yields 'two')
 
-    1, 'one', 2, 'two' | Where-Included -Include '*o*' -Exclude 'one' -Wildcard
+    1, 'one', 2, 'two' | Where-NitpickIncluded -Include '*o*' -Exclude 'one' -Wildcard
 #>
-function Get-Included {
+function Get-NitpickIncluded {
     [CmdletBinding()]
-    [Alias('Where-Included')]
+    [Alias('Where-NitpickIncluded')]
     [OutputType([object])]
     param(
         [Parameter(ValueFromPipeline)]
