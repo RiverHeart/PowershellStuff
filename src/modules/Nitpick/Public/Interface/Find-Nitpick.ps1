@@ -39,7 +39,6 @@ function Find-Nitpick {
     )
 
     $DefaultInclude = @('Test-*', 'Measure-*')
-    $EffectiveIncludeRule = if ($IncludeRule) { $DefaultInclude + $IncludeRule } else { $DefaultInclude }
 
     $PendingModules = [Queue[PSModuleInfo]]::new()
     Get-Module |
@@ -68,13 +67,18 @@ function Find-Nitpick {
         }
 
         $CurrentModule.ExportedCommands.Values |
-            Where-NitpickIncluded `
-                -PropertyPath Name `
-                -Include $EffectiveIncludeRule `
-                -Exclude $ExcludeRule `
-                -Wildcard |
             Where-Object {
                 $Command = $_
+                $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+
+                $IncludePatterns = if ($IncludeRule) { $IncludeRule } else { $DefaultInclude }
+                $IncludeValue = if ($IncludeRule) { $RuleName } else { $Command.Name }
+                $IsIncluded = $IncludePatterns | Where-Object { $IncludeValue -like $_ }
+                $IsExcluded = $ExcludeRule | Where-Object { $RuleName -like $_ }
+
+                if (-not $IsIncluded -or $IsExcluded) {
+                    return $false
+                }
 
                 if ($Command.Parameters.Keys -notcontains 'ScriptBlockAst') {
                     return $false

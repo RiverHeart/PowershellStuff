@@ -1,8 +1,21 @@
 BeforeAll {
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
+
+    function Test-DriftedNitpickRule {
+        [CmdletBinding()]
+        param (
+            $ScriptBlockAst,
+            [switch] $Details
+        )
+
+        if ($Details) {
+            return @{ Name = 'DifferentRuleName' }
+        }
+    }
 }
 
 AfterAll {
+    Remove-Item -Path Function:\Test-DriftedNitpickRule -ErrorAction SilentlyContinue
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -93,6 +106,15 @@ Describe 'Register-Nitpick' {
                 -Source Tests `
                 -ErrorAction Stop
         } | Should -Throw '*ScriptBlockAst*'
+    }
+
+    It 'rejects a command-backed rule whose name differs from its callable noun' {
+        {
+            Register-Nitpick `
+                -Callable (Get-Command Test-DriftedNitpickRule) `
+                -Source Tests `
+                -ErrorAction Stop
+        } | Should -Throw "*must match callable name 'DriftedNitpickRule'*"
     }
 
     It 'registers only included discovered rule IDs' {

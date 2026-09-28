@@ -172,7 +172,11 @@ class NitpickRule {
             $this.CallableType = 'ScriptBlock'
             $this.Callable = $TargetCallable
         } else {
-            $this.Name = $TargetCallable.Name
+            $this.Name = if ($TargetCallable.Noun) {
+                $TargetCallable.Noun
+            } else {
+                $TargetCallable.Name
+            }
             $this.CallableType = 'Function'
             $this.Callable = $TargetCallable
             $this.Source = $TargetCallable.ModuleName
@@ -210,12 +214,13 @@ class NitpickRule {
             -Name NitpickInvocationContext `
             -Scope Script `
             -ErrorAction SilentlyContinue
+        $PreviousInvocationContextValue = $PreviousInvocationContext.Value
         try {
             $script:NitpickInvocationContext = 'Nitpick'
             return & $this.Callable -ScriptBlockAst $Ast
         } finally {
-            if ($PreviousInvocationContext) {
-                $script:NitpickInvocationContext = $PreviousInvocationContext.Value
+            if ($null -ne $PreviousInvocationContext) {
+                $script:NitpickInvocationContext = $PreviousInvocationContextValue
             } else {
                 Remove-Variable `
                     -Name NitpickInvocationContext `

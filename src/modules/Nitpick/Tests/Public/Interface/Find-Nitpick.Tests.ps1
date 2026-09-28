@@ -27,11 +27,16 @@ Describe 'Find-Nitpick' {
                 param ($ScriptBlockAst)
             }
 
+            function BareNitpick {
+                param ($ScriptBlockAst)
+            }
+
             Export-ModuleMember -Function @(
                 'Test-ValidNitpick'
                 'Measure-ValidNitpick'
                 'Test-InvalidNitpick'
                 'Get-UnrelatedCommand'
+                'BareNitpick'
             )
         }
         Import-Module -ModuleInfo $RuleModule -Force
@@ -56,6 +61,33 @@ Describe 'Find-Nitpick' {
 
         $Rules.Count | Should -Be 1
         $Rules[0].Name | Should -Be 'Test-ValidNitpick'
+    }
+
+    It 'filters rules by their noun-derived ID' {
+        [CommandInfo[]] $Rules = Find-Nitpick `
+            -IncludeModule NitpickDiscoveryRules `
+            -IncludeRule ValidNitpick
+
+        $Rules.Count | Should -Be 2
+        $Rules.Name | Should -Contain 'Test-ValidNitpick'
+        $Rules.Name | Should -Contain 'Measure-ValidNitpick'
+    }
+
+    It 'excludes rules by their noun-derived ID' {
+        [CommandInfo[]] $Rules = Find-Nitpick `
+            -IncludeModule NitpickDiscoveryRules `
+            -ExcludeRule ValidNitpick
+
+        $Rules.Count | Should -Be 0
+    }
+
+    It 'uses the command name as the rule ID when no noun is available' {
+        [CommandInfo[]] $Rules = Find-Nitpick `
+            -IncludeModule NitpickDiscoveryRules `
+            -IncludeRule BareNitpick
+
+        $Rules.Count | Should -Be 1
+        $Rules[0].Name | Should -Be 'BareNitpick'
     }
 
     It 'matches any of multiple name patterns' {

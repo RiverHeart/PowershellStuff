@@ -42,7 +42,7 @@ function Test-AvoidBlockingUI {
 
     begin {
         $Metadata = [pscustomobject]@{
-            Name = 'Test-AvoidBlockingUI'
+            Name = 'AvoidBlockingUI'
             Command = $PSCmdlet.MyInvocation.MyCommand.Name
             Category = 'Performance'
             Description = 'Detects usage of blocking commands (e.g., Start-Sleep, Wait-*) within UI event handlers.'

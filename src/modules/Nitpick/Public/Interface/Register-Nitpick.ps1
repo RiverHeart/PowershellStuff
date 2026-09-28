@@ -91,6 +91,18 @@ function Register-Nitpick {
                 $Nitpick = $CallableEntry | New-Nitpick @NitpickParams
             }
 
+            if ($Nitpick.CallableType -ne 'ScriptBlock') {
+                $ExpectedName = if ($Nitpick.Callable.Noun) {
+                    $Nitpick.Callable.Noun
+                } else {
+                    $Nitpick.Callable.Name
+                }
+                if ($Nitpick.Name -ne $ExpectedName) {
+                    Write-Error "Rule name '$($Nitpick.Name)' must match callable name '$ExpectedName'."
+                    continue
+                }
+            }
+
             $IsIncluded =
                 ($null -eq $IncludeRule -or $Nitpick.Name -in $IncludeRule) -and
                 ($null -eq $ExcludeRule -or $Nitpick.Name -notin $ExcludeRule)

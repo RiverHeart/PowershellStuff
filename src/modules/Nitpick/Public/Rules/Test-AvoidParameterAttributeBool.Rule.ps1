@@ -36,9 +36,11 @@ function Test-AvoidParameterAttributeBool {
             'ValueFromRemainingArguments'
             'DontShow'
         )
+        $Command = $PSCmdlet.MyInvocation.MyCommand
+        $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
         $Metadata = [pscustomobject]@{
-            Name = 'AvoidParameterAttributeBool'
-            CommandName = $PSCmdlet.MyInvocation.MyCommand.Name
+            Name = $RuleName
+            CommandName = $Command.Name
             Category = 'Style'
             Description = 'Detects instances of the `[Parameter(<Attribute>=<Bool>)]` pattern.'
             Severity = 'Information'
@@ -129,11 +131,11 @@ function Test-AvoidParameterAttributeBool {
                     -Description $Description
 
                 $Finding = New-NitpickFinding `
-                    -RuleName $PSCmdlet.MyInvocation.MyCommand.Name `
+                    -RuleName $RuleName `
                     -Message "Avoid assigning Boolean values to Parameter attribute arguments" `
                     -ViolationExtent $BadNode.Extent `
                     -Severity $Metadata.Severity `
-                    -RuleSuppressionID $Metadata.Name `
+                    -RuleSuppressionID $RuleName `
                     -Corrections $Correction `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `

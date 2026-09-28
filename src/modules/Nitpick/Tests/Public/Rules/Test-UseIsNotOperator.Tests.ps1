@@ -12,9 +12,9 @@ Describe 'Test-UseIsNotOperator' {
         }.Ast)
 
         $Result.Count | Should -Be 2
-        $Result[0].RuleName | Should -Be 'Test-UseIsNotOperator'
+        $Result[0].RuleName | Should -Be 'UseIsNotOperator'
         $Result[0].Severity | Should -Be 'Information'
-        $Result[0].RuleSuppressionId | Should -Be 'PSUseIsNotOperator'
+        $Result[0].RuleSuppressionId | Should -Be 'UseIsNotOperator'
         $Result[0].Message | Should -BeLike '*-isnot*'
     }
 

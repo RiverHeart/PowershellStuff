@@ -2,6 +2,14 @@ BeforeAll {
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 
     function Test-NitpickRule {
+        [CmdletBinding()]
+        param (
+            [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst
+        )
+    }
+
+    function BareNitpickRule {
+        [CmdletBinding()]
         param (
             [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst
         )
@@ -10,6 +18,7 @@ BeforeAll {
 
 AfterAll {
     Remove-Item -Path Function:\Test-NitpickRule -ErrorAction SilentlyContinue
+    Remove-Item -Path Function:\BareNitpickRule -ErrorAction SilentlyContinue
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -31,15 +40,22 @@ Describe 'New-Nitpick' {
 
     It 'creates a rule from a function info object' {
         $Rule = New-Nitpick `
-            -Callable (Get-Command -Name Test-NitpickRule -CommandType Function) `
-            -Category Quality `
-            -Source Tests
+            -Callable (Get-Command -Name Test-UseIsNotOperator -CommandType Function) `
+            -Category Quality
 
-        $Rule.Name | Should -Be 'Test-NitpickRule'
+        $Rule.Name | Should -Be 'UseIsNotOperator'
         $Rule.Category | Should -Be 'Quality'
         $Rule.CallableType | Should -Be 'Function'
-        $Rule.Callable | Should -Be 'Test-NitpickRule'
-        $Rule.Source | Should -Be 'Tests'
+        $Rule.Callable | Should -Be 'Test-UseIsNotOperator'
+        $Rule.Source | Should -Be 'Nitpick'
+    }
+
+    It 'uses the full command name when no noun is available' {
+        $Rule = New-Nitpick `
+            -Callable (Get-Command -Name BareNitpickRule -CommandType Function) `
+            -Source Tests
+
+        $Rule.Name | Should -Be 'BareNitpickRule'
     }
 
     It 'creates a rule from a command name' {
