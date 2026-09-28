@@ -18,16 +18,16 @@ Another low hanging fruit problem is the inability to have ScriptAnalyzer throw 
 
 ## Comparison
 
-Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick. As a show of good faith, I will give precedence to PSScriptAnalyzer's strengths over Nitpick in the table.
+Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick.
 
 | Criterion | PSScriptAnalyzer | Nitpick |
 | :---      | :------: | :--------: |
 | **Core Language** | C# | PowerShell |
 | **Built-In Ruleset** | 75 Rules | 2 Rules |
 | **VSCode Integration** | Yes | No |
+| **VSCode Debuggable** | No | Yes |
 | **Configuration File** | Yes | No |
 | **Rule Categories** | No | Yes |
 | **Rule Scoping** | No | Yes |
 | **Nested Module Support** | No | Yes |
 | **Errors On Failures** | No | Yes |
-| **Works from VSCode PS Extension** | No | Yes |
