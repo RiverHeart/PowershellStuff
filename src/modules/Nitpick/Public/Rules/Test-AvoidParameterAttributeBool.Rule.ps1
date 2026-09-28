@@ -128,11 +128,6 @@ function Test-AvoidParameterAttributeBool {
                     -FilePathOrContext $FilePath `
                     -Description $Description
 
-                $OutputAs = if (Test-AssemblyLoaded -Name 'Microsoft.Windows.PowerShell.ScriptAnalyzer') {
-                    'DiagnosticRecord'
-                } else {
-                    'NitpickFinding'
-                }
                 $Finding = New-NitpickFinding `
                     -RuleName $PSCmdlet.MyInvocation.MyCommand.Name `
                     -Message "Avoid assigning Boolean values to Parameter attribute arguments" `
@@ -140,7 +135,6 @@ function Test-AvoidParameterAttributeBool {
                     -Severity $Metadata.Severity `
                     -RuleSuppressionID $Metadata.Name `
                     -Corrections $Correction `
-                    -OutputAs $OutputAs `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `
 

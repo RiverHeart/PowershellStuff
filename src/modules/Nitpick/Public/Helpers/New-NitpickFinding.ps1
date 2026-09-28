@@ -3,7 +3,9 @@
     Creates a new Nitpick finding object.
 
 .DESCRIPTION
-    Creates a new Nitpick finding object with the specified properties.
+    Creates a new Nitpick finding object with the specified properties. When OutputAs is not
+    specified, native Nitpick rule invocations return NitpickFinding objects and direct rule
+    invocations from PSScriptAnalyzer return DiagnosticRecord objects.
 
 .EXAMPLE
     $Finding = New-NitpickFinding `
@@ -54,8 +56,18 @@ function New-NitpickFinding {
 
         [Parameter(HelpMessage = "Specifies the output format for the finding.")]
         [ValidateSet('NitpickFinding', 'DiagnosticRecord')]
-        [string] $OutputAs = 'NitpickFinding'
+        [string] $OutputAs
     )
+
+    if (-not $PSBoundParameters.ContainsKey('OutputAs')) {
+        $OutputAs = if ($script:NitpickInvocationContext -eq 'Nitpick') {
+            'NitpickFinding'
+        } elseif (Test-AssemblyLoaded -Name 'Microsoft.Windows.PowerShell.ScriptAnalyzer') {
+            'DiagnosticRecord'
+        } else {
+            'NitpickFinding'
+        }
+    }
 
     $Finding = $null
     $FindingParams = @{

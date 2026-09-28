@@ -131,6 +131,12 @@ class NitpickFinding {
     }
 }
 
+Update-TypeData `
+    -TypeName 'NitpickFinding' `
+    -DefaultDisplayPropertySet 'RuleName', 'Severity', 'Message' `
+    -Force
+
+
 # MARK: NP_RULE
 #------------------
 
@@ -168,12 +174,13 @@ class NitpickRule {
         } else {
             $this.Name = $TargetCallable.Name
             $this.CallableType = 'Function'
-            $this.Callable = $TargetCallable.Name
+            $this.Callable = $TargetCallable
             $this.Source = $TargetCallable.ModuleName
         }
 
         $HasDetails = $TargetCallable |
             Get-CallableParameter -Name 'Details' -Type 'SwitchParameter'
+
         if ($HasDetails) {
             $Details = & $TargetCallable -Details
             foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation') {
@@ -196,6 +203,27 @@ class NitpickRule {
             throw 'Source is mandatory for non-module functions/cmdlets.'
         }
     }
+
+    # This could return a NitpickFinding or a DiagnosticRecord
+    [object] Invoke([ScriptBlockAst] $Ast) {
+        $PreviousInvocationContext = Get-Variable `
+            -Name NitpickInvocationContext `
+            -Scope Script `
+            -ErrorAction SilentlyContinue
+        try {
+            $script:NitpickInvocationContext = 'Nitpick'
+            return & $this.Callable -ScriptBlockAst $Ast
+        } finally {
+            if ($PreviousInvocationContext) {
+                $script:NitpickInvocationContext = $PreviousInvocationContext.Value
+            } else {
+                Remove-Variable `
+                    -Name NitpickInvocationContext `
+                    -Scope Script `
+                    -ErrorAction SilentlyContinue
+            }
+        }
+    }
 }
 
 Update-TypeData `
@@ -216,7 +244,7 @@ class ScriptBlockAstTransform : ArgumentTransformationAttribute {
             return $Input.Ast
         }
         if ($Input -is [string]) {
-            return [System.Management.Automation.Language.Parser]::ParseInput($Input, [ref]$null, [ref]$null).Ast
+            return [System.Management.Automation.Language.Parser]::ParseInput($Input, [ref] $null, [ref] $null)
         }
         return $Input
     }

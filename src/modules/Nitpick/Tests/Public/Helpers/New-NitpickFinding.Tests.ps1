@@ -24,7 +24,10 @@ Describe 'New-NitpickFinding' {
             -ViolationExtent $Extent `
             -Severity Warning `
             -RuleSuppressionID NPTestRule `
-            -Corrections $Correction
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Test explanation.' `
+            -Corrections $Correction `
+            -OutputAs NitpickFinding
 
         $Finding.GetType().Name | Should -Be 'NitpickFinding'
         $Finding.RuleName | Should -Be 'Test-Rule'
@@ -40,6 +43,8 @@ Describe 'New-NitpickFinding' {
             -ViolationExtent $Extent `
             -Severity Information `
             -RuleSuppressionID NPTestRule `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Test explanation.' `
             -Corrections $Correction `
             -OutputAs DiagnosticRecord
 
@@ -52,6 +57,21 @@ Describe 'New-NitpickFinding' {
         $Finding.SuggestedCorrections.Count | Should -Be 1
     }
 
+    It 'defaults to a ScriptAnalyzer diagnostic outside a Nitpick invocation' {
+        $Finding = New-NitpickFinding `
+            -RuleName Test-Rule `
+            -Message 'A problem was found.' `
+            -ViolationExtent $Extent `
+            -Severity Information `
+            -RuleSuppressionID NPTestRule `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Test explanation.' `
+            -Corrections $Correction
+
+        $Finding.GetType().FullName |
+            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
+    }
+
     It 'converts a finding with a null rule suppression ID' {
         $Finding = New-NitpickFinding `
             -RuleName Test-Rule `
@@ -59,7 +79,10 @@ Describe 'New-NitpickFinding' {
             -ViolationExtent $Extent `
             -Severity Warning `
             -RuleSuppressionID NPTestRule `
-            -Corrections $Correction
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Test explanation.' `
+            -Corrections $Correction `
+            -OutputAs NitpickFinding
         $Finding.RuleSuppressionID = $null
 
         $DiagnosticRecord = $Finding.ToDiagnosticRecord()
