@@ -1,3 +1,5 @@
+using namespace System.Management.Automation
+
 BeforeAll {
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 }
@@ -42,7 +44,7 @@ Describe 'Find-Nitpick' {
     }
 
     It 'returns valid Test and Measure commands from the requested module' {
-        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules)
+        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules
 
         $Rules.Count | Should -Be 2
         $Rules.Name | Should -Contain 'Test-ValidNitpick'
@@ -50,31 +52,29 @@ Describe 'Find-Nitpick' {
     }
 
     It 'filters command names with wildcard patterns' {
-        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules -Name 'Test-*')
+        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules -Name 'Test-*'
 
         $Rules.Count | Should -Be 1
         $Rules[0].Name | Should -Be 'Test-ValidNitpick'
     }
 
     It 'matches any of multiple name patterns' {
-        $Rules = @(
-            Find-Nitpick `
-                -Module NitpickDiscoveryRules `
+        [CommandInfo[]] $Rules = Find-Nitpick `
+                -IncludeModule NitpickDiscoveryRules `
                 -Name 'Measure-*', 'Test-DoesNotExist'
-        )
 
         $Rules.Count | Should -Be 1
         $Rules[0].Name | Should -Be 'Measure-ValidNitpick'
     }
 
     It 'does not return an invalid command that matches the name filter' {
-        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules -Name 'Test-InvalidNitpick')
+        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules -Name 'Test-InvalidNitpick'
 
         $Rules.Count | Should -Be 0
     }
 
     It 'does not return commands from modules not requested' {
-        $Rules = @(Find-Nitpick -Module Nitpick)
+        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule Nitpick
 
         $Rules.Name | Should -Not -Contain 'Test-ValidNitpick'
         $Rules.Name | Should -Not -Contain 'Measure-ValidNitpick'
@@ -103,7 +103,7 @@ Export-ModuleMember -Function Test-NestedNitpick, Test-InvalidNestedNitpick
             -ModuleVersion '1.0.0'
         Import-Module -Name $ParentModulePath -Force
 
-        $Rules = @(Find-Nitpick -Module NitpickDiscoveryParent)
+        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryParent
 
         $Rules.Count | Should -Be 1
         $Rules[0].Name | Should -Be 'Test-NestedNitpick'

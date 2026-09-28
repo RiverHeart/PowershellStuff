@@ -72,7 +72,7 @@ function Register-Nitpick {
             Write-Verbose "No callable provided. Running discovery."
 
             $FindParams = @{}
-            if ($Module) { $FindParams.Module = $Module }
+            if ($Module) { $FindParams.IncludeModule = $Module }
 
             # NOTE: Maybe filter after constructing Nitpick if user provides the
             # rule id instead of the function name?

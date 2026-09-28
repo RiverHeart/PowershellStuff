@@ -1,3 +1,6 @@
+using namespace System.Collections.Generic
+using namespace System.Management.Automation
+
 <#
 .SYNOPSIS
     Finds valid Nitpick rules exported by loaded modules.
@@ -15,7 +18,7 @@
 .EXAMPLE
     Returns all valid Nitpick rules from the specified modules.
 
-    Find-Nitpick -Module Nitpick, MyNitpickRules
+    Find-Nitpick -IncludeModule Nitpick, MyNitpickRules
 
 .EXAMPLE
     Pipes the output of Find-Nitpick to Register-Nitpick.
@@ -27,21 +30,30 @@ function Find-Nitpick {
     [OutputType([System.Management.Automation.CommandInfo])]
     param(
         [string[]] $Name,
-        [string[]] $Module
+
+        [string[]] $IncludeRule,
+        [string[]] $ExcludeRule,
+
+        [string[]] $IncludeModule,
+        [string[]] $ExcludeModule
     )
 
-    $GetModuleParams = @{}
-    if ($Module) {
-        $GetModuleParams.Name = $Module
-    }
+    $DefaultInclude = @('Test-*', 'Measure-*')
+    $EffectiveIncludeRule = if ($IncludeRule) { $DefaultInclude + $IncludeRule } else { $DefaultInclude }
 
-    $PendingModules = [System.Collections.Generic.Queue[System.Management.Automation.PSModuleInfo]]::new()
-    Get-Module @GetModuleParams | ForEach-Object {
-        $PendingModules.Enqueue($_)
-    }
+    $PendingModules = [Queue[PSModuleInfo]]::new()
+    Get-Module |
+        Where-NitpickIncluded `
+            -PropertyPath Name `
+            -Include $IncludeModule `
+            -Exclude $ExcludeModule `
+            -Wildcard |
+        ForEach-Object {
+            $PendingModules.Enqueue($_)
+        }
 
-    $VisitedModules = [System.Collections.Generic.HashSet[System.Management.Automation.PSModuleInfo]]::new()
-    $DiscoveredCommands = [System.Collections.Generic.HashSet[string]]::new(
+    $VisitedModules = [HashSet[PSModuleInfo]]::new()
+    $DiscoveredCommands = [HashSet[string]]::new(
         [System.StringComparer]::OrdinalIgnoreCase
     )
 
@@ -56,12 +68,13 @@ function Find-Nitpick {
         }
 
         $CurrentModule.ExportedCommands.Values |
+            Where-NitpickIncluded `
+                -PropertyPath Name `
+                -Include $EffectiveIncludeRule `
+                -Exclude $ExcludeRule `
+                -Wildcard |
             Where-Object {
                 $Command = $_
-
-                if ($Command.Verb -notin 'Test', 'Measure') {
-                    return $false
-                }
 
                 if ($Command.Parameters.Keys -notcontains 'ScriptBlockAst') {
                     return $false
