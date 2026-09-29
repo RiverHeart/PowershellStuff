@@ -24,13 +24,16 @@ function Start-Nitpicking {
         [string[]] $ExcludeRule,
 
         [string[]] $IncludePath,
-        [string[]] $ExcludePath
+        [string[]] $ExcludePath,
+
+        [switch] $NoSummary
     )
 
     begin {
-        Find-Nitpick | ForEach-Object {
-            Register-Nitpick -Command $_
-        }
+        Find-Nitpick `
+            -IncludeRule $IncludeRule `
+            -ExcludeRule $ExcludeRule |
+        Register-Nitpick
 
         foreach ($RuleModuleEntry in $RuleModule) {
             Register-Nitpick -Module $RuleModuleEntry
@@ -41,12 +44,9 @@ function Start-Nitpicking {
         #     . $RulePathEntry
         # }
 
-        $Rules = Get-Nitpick | Where-Object {
-            ($null -eq $IncludeRule -or $_ -in $IncludeRule) -and
-            ($null -eq $ExcludeRule -or $_ -notin $ExcludeRule)
-        }
+        $Rules = Get-Nitpick -IncludeRule $IncludeRule -ExcludeRule $ExcludeRule
 
-        if ($null -eq $Rules) {
+        if (-not $Rules) {
             # TODO: Be more detailed about where we searched for rules
             Write-Warning "No rules found to apply."
             return
@@ -56,14 +56,13 @@ function Start-Nitpicking {
     process {
         $Asts = if ($PSCmdlet.ParameterSetName -eq 'Path') {
             Get-ChildItem -Path $Path -Recurse -Filter $Filter |
+                Where-NitpickIncluded `
+                    -PropertyPath FullName `
+                    -Include $IncludePath `
+                    -Exclude $ExcludePath `
+                    -Wildcard |
                 ForEach-Object {
-                    $FilePath = $_.FullName
-                    $FilePath |
-                    Where-Object {
-                        ($null -eq $IncludePath -or $_ -in $IncludePath) -and
-                        ($null -eq $ExcludePath -or $_ -notin $ExcludePath)
-                    } |
-                    Import-ScriptBlockAst $FilePath
+                    Import-ScriptBlockAst $_.FullName
                 }
         } else {
             $Script
