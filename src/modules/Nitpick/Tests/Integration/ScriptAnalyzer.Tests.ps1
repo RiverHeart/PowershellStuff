@@ -7,7 +7,9 @@ Describe 'PSScriptAnalyzer integration' {
         $Results = @(Invoke-ScriptAnalyzer `
             -ScriptDefinition 'param([Parameter(Mandatory=$true)] [string] $Name)' `
             -CustomRulePath (Join-Path $PSScriptRoot '../../Nitpick.psd1') `
-            -IncludeRule Test-AvoidParameterAttributeBool)
+            -IncludeRule Test-AvoidParameterAttributeBool
+            -Settings @{}
+        )
 
         $Results.Count | Should -Be 1
         $Results[0].RuleName | Should -Be 'AvoidParameterAttributeBool'

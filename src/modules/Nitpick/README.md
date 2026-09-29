@@ -1,5 +1,17 @@
+## Gotchas
+
+### Nested script blocks
+
 > [!WARNING]
 > Pass `$false` as the `searchNestedScriptBlocks` argument when using `Ast.Find()` or `Ast.FindAll()` in a ScriptAnalyzer rule. This still traverses the current script block, but it does not enter nested script-block scopes. ScriptAnalyzer may analyze those nested scopes separately, so including them in the outer search can report the same finding more than once.
+
+### Duplicate custom rule paths
+
+PSScriptAnalyzer combines custom rule paths from its discovered settings file with paths passed to `-CustomRulePath`. It compares the path strings rather than the modules they resolve to, so a module directory from settings and an explicit path to that module's manifest are treated as separate rule sources. The module is loaded twice and produces duplicate diagnostic records for the same AST and extent.
+
+For example, configuring `./src/modules/Nitpick` in `PSScriptAnalyzerSettings.psd1` while also passing `./src/modules/Nitpick/Nitpick.psd1` to `Invoke-ScriptAnalyzer` duplicates Nitpick findings. Use only one source, or pass `-Settings @{}` when an isolated invocation supplies its own custom rule path.
+
+Nitpick should not emulate this behavior. When Nitpick accepts rules from multiple configuration or command-line sources, it should deduplicate them by resolved module identity, not by the original path strings.
 
 
 **NOTE:** ScriptAnalyzer searches for functions named `Measure-*` and `Test-*` so we should be safe to export helper any helper functions from this module that do not use those verbs.
