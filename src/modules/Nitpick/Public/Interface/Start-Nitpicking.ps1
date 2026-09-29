@@ -7,6 +7,7 @@ using namespace System.Management.Automation.Language
 function Start-Nitpicking {
     [CmdletBinding(DefaultParameterSetName='Path')]
     [Alias('nitpick', 'np')]
+    [OutputType('NitpickFinding', 'NitpickSummary')]
     param(
         [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
         [string] $Path,
@@ -49,8 +50,11 @@ function Start-Nitpicking {
         if (-not $Rules) {
             # TODO: Be more detailed about where we searched for rules
             Write-Warning "No rules found to apply."
-            return
         }
+
+        $Summary = [NitpickSummary]::new()
+        $Summary.RuleCount = $Rules.Count
+        $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     }
 
     process {
@@ -69,9 +73,27 @@ function Start-Nitpicking {
         }
 
         foreach ($Ast in $Asts) {
+            $Summary.TargetCount++
             foreach ($Rule in $Rules) {
-                $Rule.Invoke($Ast)
+                foreach ($Finding in @($Rule.Invoke($Ast))) {
+                    $Summary.FindingCount++
+                    switch ($Finding.Severity) {
+                        'Error' { $Summary.ErrorCount++ }
+                        'Warning' { $Summary.WarningCount++ }
+                        'Information' { $Summary.InformationCount++ }
+                    }
+                    Write-Output $Finding
+                }
             }
+        }
+    }
+
+    end {
+        $Stopwatch.Stop()
+        $Summary.Duration = $Stopwatch.Elapsed
+
+        if (-not $NoSummary) {
+            Write-Output $Summary
         }
     }
 }

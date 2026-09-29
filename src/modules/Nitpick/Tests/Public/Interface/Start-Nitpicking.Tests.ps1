@@ -20,7 +20,7 @@ Describe 'Start-Nitpicking' {
         Set-Content -Path $IncludedPath -Value $RuleViolation
         Set-Content -Path $ExcludedPath -Value "$RuleViolation`n$RuleViolation"
 
-        $Findings = @(
+        $Results = @(
             Start-Nitpicking `
                 -Path $TestDrive `
                 -IncludePath '*.ps1' `
@@ -28,6 +28,25 @@ Describe 'Start-Nitpicking' {
                 -IncludeRule AvoidParameterAttributeBool
         )
 
+        $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
         $Findings.Count | Should -Be 1
+        $Summary.TargetCount | Should -Be 1
+        $Summary.RuleCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 1
+        $Summary.InformationCount | Should -Be 1
+    }
+
+    It 'returns only findings when NoSummary is specified' {
+        $Results = @(
+            Start-Nitpicking `
+                -Script { param([Parameter(Mandatory=$true)] [string] $Name) } `
+                -IncludeRule AvoidParameterAttributeBool `
+                -NoSummary
+        )
+
+        $Results.Count | Should -Be 1
+        $Results[0].GetType().Name | Should -Be 'NitpickFinding'
     }
 }

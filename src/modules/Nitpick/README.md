@@ -1,5 +1,13 @@
 ## Gotchas
 
+### Module-defined output types
+
+Public function files dot-sourced by a script module are parsed separately from classes declared in the root `.psm1`. Referencing one of those classes as a type literal in an `OutputType` attribute, such as `[OutputType([NitpickFinding])]`, can therefore fail with `Unable to find type` while the function file is being parsed.
+
+Use the string overload instead: `[OutputType('NitpickFinding')]`. `OutputTypeAttribute` accepts string type names, and PowerShell exposes each one through command metadata as a `PSTypeName`. The metadata retains the declared name even when its `Type` property cannot be resolved at parse time.
+
+This would be useful to enforce with a Nitpick rule, but an unresolved output type is not enough evidence by itself. It could represent a module-defined class, an optional assembly type, an extended type name, or simply a typo. A reliable rule would need additional evidence, such as locating a matching class declaration in the same module, before recommending the string form.
+
 ### Nested script blocks
 
 > [!WARNING]

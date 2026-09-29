@@ -137,6 +137,25 @@ Update-TypeData `
     -Force
 
 
+# MARK: NP_SUMMARY
+#------------------
+
+class NitpickSummary {
+    [int] $TargetCount
+    [int] $RuleCount
+    [int] $FindingCount
+    [int] $ErrorCount
+    [int] $WarningCount
+    [int] $InformationCount
+    [timespan] $Duration
+}
+
+Update-TypeData `
+    -TypeName 'NitpickSummary' `
+    -DefaultDisplayPropertySet 'TargetCount', 'RuleCount', 'FindingCount', 'ErrorCount', 'WarningCount', 'InformationCount', 'Duration' `
+    -Force
+
+
 # MARK: NP_RULE
 #------------------
 
