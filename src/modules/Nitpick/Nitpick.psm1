@@ -150,11 +150,6 @@ class NitpickSummary {
     [timespan] $Duration
 }
 
-Update-TypeData `
-    -TypeName 'NitpickSummary' `
-    -DefaultDisplayPropertySet 'TargetCount', 'RuleCount', 'FindingCount', 'ErrorCount', 'WarningCount', 'InformationCount', 'Duration' `
-    -Force
-
 
 # MARK: NP_RULE
 #------------------
