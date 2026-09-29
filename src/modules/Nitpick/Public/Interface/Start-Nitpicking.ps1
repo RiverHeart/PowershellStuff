@@ -27,6 +27,9 @@ function Start-Nitpicking {
         [string[]] $IncludePath,
         [string[]] $ExcludePath,
 
+        [ValidateSet('Error', 'Warning', 'Information')]
+        [string] $ErrorOn = 'Error',
+
         [switch] $NoSummary
     )
 
@@ -55,6 +58,12 @@ function Start-Nitpicking {
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
         $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $SeverityRank = @{
+            Information = 0
+            Warning = 1
+            Error = 2
+        }
+        $ThresholdFindingCount = 0
     }
 
     process {
@@ -75,12 +84,18 @@ function Start-Nitpicking {
         foreach ($Ast in $Asts) {
             $Summary.TargetCount++
             foreach ($Rule in $Rules) {
-                foreach ($Finding in @($Rule.Invoke($Ast))) {
+                foreach ($Finding in $Rule.Invoke($Ast)) {
                     $Summary.FindingCount++
                     switch ($Finding.Severity) {
                         'Error' { $Summary.ErrorCount++ }
                         'Warning' { $Summary.WarningCount++ }
                         'Information' { $Summary.InformationCount++ }
+                    }
+                    if ($ErrorOn -and
+                        $SeverityRank.ContainsKey($Finding.Severity) -and
+                        $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]
+                    ) {
+                        $ThresholdFindingCount++
                     }
                     Write-Output $Finding
                 }
@@ -94,6 +109,11 @@ function Start-Nitpicking {
 
         if (-not $NoSummary) {
             Write-Output $Summary
+        }
+
+        if ($ThresholdFindingCount -gt 0) {
+            Write-Error "Encountered $ThresholdFindingCount findings at or above the '$ErrorOn' severity threshold."
+            return
         }
     }
 }
