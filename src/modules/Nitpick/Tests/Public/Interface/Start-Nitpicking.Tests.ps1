@@ -81,9 +81,43 @@ Describe 'Start-Nitpicking' {
 
         $Results.Count | Should -Be 2
         $Results[0] | Should -BeOfType ([string])
-        $Results[0] | Should -Match '^<ScriptBlock>:\d+:\d+: Information AvoidParameterAttributeBool:'
+        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  AvoidParameterAttributeBool$'
         $Results[1] | Should -BeOfType ([string])
         $Results[1] | Should -Match '^1 finding \(0 errors, 0 warnings, 1 information\) across 1 target in [\d,]+ ms$'
+    }
+
+    It 'sorts text findings by source position within each target' {
+        $Rule = {
+            param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
+
+            $Variables = @($ScriptBlockAst.FindAll({
+                param($Node)
+                $Node -is [System.Management.Automation.Language.VariableExpressionAst]
+            }, $false))
+            foreach ($Variable in $Variables | Sort-Object { $_.Extent.StartLineNumber } -Descending) {
+                New-NitpickFinding `
+                    -RuleName OutOfOrder `
+                    -Message "$($Variable.VariablePath.UserPath) finding" `
+                    -ViolationExtent $Variable.Extent `
+                    -Severity Information `
+                    -RuleSuppressionID OutOfOrder `
+                    -ScriptPath '<ScriptBlock>' `
+                    -Explanation 'Returns findings out of order.' `
+                    -OutputAs NitpickFinding
+            }
+        }
+        Register-Nitpick -Callable $Rule -Name OutOfOrder -Source Tests
+        $Script = [scriptblock]::Create("`$First`n`$Second")
+
+        $RenderedOutput = Start-Nitpicking `
+            -Script $Script.Ast `
+            -IncludeRule OutOfOrder `
+            -NoSummary
+
+        $Lines = $RenderedOutput -split '\r?\n'
+        $Lines.Count | Should -Be 3
+        $Lines[1] | Should -Match '^  1:1\s+information\s+First finding\s+OutOfOrder$'
+        $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+OutOfOrder$'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {

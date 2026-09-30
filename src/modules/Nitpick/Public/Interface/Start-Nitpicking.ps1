@@ -87,6 +87,7 @@ function Start-Nitpicking {
 
         foreach ($Ast in $Asts) {
             $Summary.TargetCount++
+            $TargetFindings = [System.Collections.Generic.List[object]]::new()
             foreach ($Rule in $Rules) {
                 foreach ($Finding in $Rule.Invoke($Ast)) {
                     $Summary.FindingCount++
@@ -104,9 +105,16 @@ function Start-Nitpicking {
                     if ($Output -eq 'Object') {
                         Write-Output $Finding
                     } else {
-                        Write-Output $Finding.ToString()
+                        $TargetFindings.Add($Finding)
                     }
                 }
+            }
+
+            if ($Output -eq 'Text' -and $TargetFindings.Count -gt 0) {
+                $SortedFindings = $TargetFindings | Sort-Object `
+                    -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
+                              @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
+                ConvertTo-NitpickText -Ast $Ast -Finding $SortedFindings
             }
         }
     }
@@ -119,6 +127,7 @@ function Start-Nitpicking {
             if ($Output -eq 'Object') {
                 Write-Output $Summary
             } else {
+                Write-Output ''  # Line buffer for readability.
                 Write-Output $Summary.ToString()
             }
         }
