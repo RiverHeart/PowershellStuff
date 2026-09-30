@@ -87,6 +87,7 @@ class NitpickFinding {
     [string] $RuleSuppressionID
     [string] $Severity
     [NitpickCorrection[]] $Corrections
+    [string] $Location
 
     NitpickFinding(
         [IScriptExtent] $ViolationExtent,
@@ -100,6 +101,10 @@ class NitpickFinding {
         $this.RuleSuppressionID = $description
         $this.Severity = $description
         $this.Corrections = @()
+        $this.Location =
+            $this.ViolationExtent.File + ':' +
+            $this.ViolationExtent.StartLineNumber + ':' +
+            $this.ViolationExtent.StartColumnNumber
     }
 
     NitpickFinding([hashtable] $properties) {
@@ -109,6 +114,17 @@ class NitpickFinding {
         $this.RuleSuppressionID = $properties.RuleSuppressionID
         $this.Severity = $properties.Severity
         $this.Corrections = $properties.Corrections
+        $LocationPath = if ($this.ViolationExtent.File) {
+            $this.ViolationExtent.File
+        } elseif ($properties.ScriptPath) {
+            $properties.ScriptPath
+        } else {
+            '<ScriptBlock>'
+        }
+        $this.Location =
+            $LocationPath + ':' +
+            $this.ViolationExtent.StartLineNumber + ':' +
+            $this.ViolationExtent.StartColumnNumber
     }
 
     [object] ToDiagnosticRecord() {
@@ -129,11 +145,19 @@ class NitpickFinding {
         )
         return $Result
     }
+
+    [string] ToString() {
+        return '{0}: {1} {2}: {3}' -f `
+            $this.Location,
+            $this.Severity,
+            $this.RuleName,
+            $this.Message
+    }
 }
 
 Update-TypeData `
     -TypeName 'NitpickFinding' `
-    -DefaultDisplayPropertySet 'RuleName', 'Severity', 'Message' `
+    -DefaultDisplayPropertySet 'Location', 'RuleName', 'Message' `
     -Force
 
 
@@ -148,6 +172,21 @@ class NitpickSummary {
     [int] $WarningCount
     [int] $InformationCount
     [timespan] $Duration
+
+    [string] ToString() {
+        $FindingLabel = if ($this.FindingCount -eq 1) { 'finding' } else { 'findings' }
+        $TargetLabel = if ($this.TargetCount -eq 1) { 'target' } else { 'targets' }
+
+        return '{0} {1} ({2} errors, {3} warnings, {4} information) across {5} {6} in {7:N0} ms' -f `
+            $this.FindingCount,
+            $FindingLabel,
+            $this.ErrorCount,
+            $this.WarningCount,
+            $this.InformationCount,
+            $this.TargetCount,
+            $TargetLabel,
+            $this.Duration.TotalMilliseconds
+    }
 }
 
 

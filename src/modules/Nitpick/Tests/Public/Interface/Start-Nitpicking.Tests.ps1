@@ -42,7 +42,8 @@ Describe 'Start-Nitpicking' {
                 -Path $TestDrive `
                 -IncludePath '*.ps1' `
                 -ExcludePath '*excluded.ps1' `
-                -IncludeRule AvoidParameterAttributeBool
+                -IncludeRule AvoidParameterAttributeBool `
+                -Output Object
         )
 
         $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
@@ -60,6 +61,7 @@ Describe 'Start-Nitpicking' {
             Start-Nitpicking `
                 -Script { param([Parameter(Mandatory=$true)] [string] $Name) } `
                 -IncludeRule AvoidParameterAttributeBool `
+                -Output Object `
                 -NoSummary
         )
 
@@ -67,14 +69,21 @@ Describe 'Start-Nitpicking' {
         $Results[0].GetType().Name | Should -Be 'NitpickFinding'
     }
 
-    It 'renders the summary after finding output' {
-        $RenderedOutput = Start-Nitpicking `
-            -Script { param([Parameter(Mandatory=$true)] [string] $Name) } `
-            -IncludeRule AvoidParameterAttributeBool |
-            Out-String
+    It 'returns finding and summary text by default' {
+        $Script = [scriptblock]::Create(
+            'param([Parameter(Mandatory=$true)] [string] $Name)'
+        )
+        $Results = @(
+            Start-Nitpicking `
+                -Script $Script.Ast `
+                -IncludeRule AvoidParameterAttributeBool
+        )
 
-        $RenderedOutput | Should -Match 'AvoidParameterAttributeBool'
-        $RenderedOutput | Should -Match 'TargetCount\s+:\s+1'
+        $Results.Count | Should -Be 2
+        $Results[0] | Should -BeOfType ([string])
+        $Results[0] | Should -Match '^<ScriptBlock>:\d+:\d+: Information AvoidParameterAttributeBool:'
+        $Results[1] | Should -BeOfType ([string])
+        $Results[1] | Should -Match '^1 finding \(0 errors, 0 warnings, 1 information\) across 1 target in [\d,]+ ms$'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {

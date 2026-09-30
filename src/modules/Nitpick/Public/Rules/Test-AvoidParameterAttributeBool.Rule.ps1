@@ -117,9 +117,8 @@ function Test-AvoidParameterAttributeBool {
                 $FilePath = if ($BadNode.Extent.FileName) {
                     $BadNode.Extent.FileName
                 } else {
-                    Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1 -ExpandProperty ScriptName
+                    '<ScriptBlock>'
                 }
-                if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
 
                 $Correction = New-NitpickCorrection `
                     -StartLineNumber $BadNode.Extent.StartLineNumber `

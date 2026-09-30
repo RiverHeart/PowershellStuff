@@ -7,6 +7,7 @@ using namespace System.Management.Automation.Language
 function Start-Nitpicking {
     [CmdletBinding(DefaultParameterSetName='Path')]
     [Alias('nitpick', 'np')]
+    [OutputType([string])]
     [OutputType('NitpickFinding', 'NitpickSummary')]
     param(
         [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
@@ -29,6 +30,9 @@ function Start-Nitpicking {
 
         [ValidateSet('Error', 'Warning', 'Information')]
         [string] $ErrorOn = 'Error',
+
+        [ValidateSet('Text', 'Object')]
+        [string] $Output = 'Text',
 
         [switch] $NoSummary
     )
@@ -97,7 +101,11 @@ function Start-Nitpicking {
                     ) {
                         $ThresholdFindingCount++
                     }
-                    Write-Output $Finding
+                    if ($Output -eq 'Object') {
+                        Write-Output $Finding
+                    } else {
+                        Write-Output $Finding.ToString()
+                    }
                 }
             }
         }
@@ -108,7 +116,11 @@ function Start-Nitpicking {
         $Summary.Duration = $Stopwatch.Elapsed
 
         if (-not $NoSummary) {
-            Write-Output $Summary
+            if ($Output -eq 'Object') {
+                Write-Output $Summary
+            } else {
+                Write-Output $Summary.ToString()
+            }
         }
 
         if ($ThresholdFindingCount -gt 0) {
