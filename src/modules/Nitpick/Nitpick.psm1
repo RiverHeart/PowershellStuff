@@ -202,6 +202,8 @@ class NitpickRule {
     [string] $Description
     [string] $Severity
     [string] $Explanation
+    [string[]] $IncludePath
+    [string[]] $ExcludePath
 
     NitpickRule([object] $TargetCallable, [hashtable] $Overrides) {
         if ($TargetCallable -is [string]) {
@@ -240,7 +242,7 @@ class NitpickRule {
 
         if ($HasDetails) {
             $Details = & $TargetCallable -Details
-            foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation') {
+            foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation', 'IncludePath', 'ExcludePath') {
                 if ($null -ne $Details.$Property) {
                     $this.$Property = $Details.$Property
                 }
@@ -259,6 +261,33 @@ class NitpickRule {
         if ($TargetCallable -isnot [scriptblock] -and -not $this.Source) {
             throw 'Source is mandatory for non-module functions/cmdlets.'
         }
+    }
+
+    [bool] AppliesToPath([string] $FilePath) {
+        if ([string]::IsNullOrEmpty($FilePath)) {
+            return $true
+        }
+
+        $NormalizedPath = $FilePath.Replace('\', '/')
+        $IsIncluded = $this.IncludePath.Count -eq 0
+        foreach ($Pattern in $this.IncludePath) {
+            if ($NormalizedPath -like $Pattern) {
+                $IsIncluded = $true
+                break
+            }
+        }
+
+        if (-not $IsIncluded) {
+            return $false
+        }
+
+        foreach ($Pattern in $this.ExcludePath) {
+            if ($NormalizedPath -like $Pattern) {
+                return $false
+            }
+        }
+
+        return $true
     }
 
     # This could return a NitpickFinding or a DiagnosticRecord

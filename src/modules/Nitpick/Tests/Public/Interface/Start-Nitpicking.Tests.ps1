@@ -56,6 +56,67 @@ Describe 'Start-Nitpicking' {
         $Summary.InformationCount | Should -Be 1
     }
 
+    It 'applies rule path scopes only to file-backed targets' {
+        $RuleScript = {
+            [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
+            param(
+                [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
+                [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+
+                [Parameter(ParameterSetName='Details')]
+                [switch] $Details
+            )
+
+            if ($Details) {
+                return [pscustomobject]@{
+                    Name = 'ScopedRule'
+                    Source = 'Tests'
+                    IncludePath = @('*.dsl.ps1')
+                    ExcludePath = @('*/excluded/*')
+                }
+            }
+
+            New-NitpickFinding `
+                -RuleName ScopedRule `
+                -Message 'Scoped rule ran' `
+                -ViolationExtent $ScriptBlockAst.Extent `
+                -Severity Information `
+                -RuleSuppressionID ScopedRule `
+                -ScriptPath $ScriptBlockAst.Extent.File `
+                -Explanation 'Verifies scoped dispatch.' `
+                -OutputAs NitpickFinding
+        }
+
+        $ExcludedDirectory = New-Item -Path (Join-Path $TestDrive 'excluded') -ItemType Directory
+        Set-Content -Path (Join-Path $TestDrive 'included.dsl.ps1') -Value '$Included'
+        Set-Content -Path (Join-Path $TestDrive 'ordinary.ps1') -Value '$Ordinary'
+        Set-Content -Path (Join-Path $ExcludedDirectory 'excluded.dsl.ps1') -Value '$Excluded'
+        Register-Nitpick `
+            -Callable $RuleScript `
+            -Name ScopedRule `
+            -Source Tests
+
+        $PathResults = @(
+            Start-Nitpicking `
+                -Path $TestDrive `
+                -IncludeRule ScopedRule `
+                -Output Object `
+                -NoSummary
+        )
+        $ScriptResults = @(
+            Start-Nitpicking `
+                -Script { $Anonymous } `
+                -IncludeRule ScopedRule `
+                -Output Object `
+                -NoSummary
+        )
+
+        $PathResults.Count | Should -Be 1
+        $PathResults[0].Location | Should -Match 'included\.dsl\.ps1:'
+        $ScriptResults.Count | Should -Be 1
+        $ScriptResults[0].RuleName | Should -Be 'ScopedRule'
+    }
+
     It 'returns only findings when NoSummary is specified' {
         $Results = @(
             Start-Nitpicking `

@@ -89,6 +89,17 @@ function Start-Nitpicking {
             $Summary.TargetCount++
             $TargetFindings = [System.Collections.Generic.List[object]]::new()
             foreach ($Rule in $Rules) {
+                $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                    $Ast.Extent.File
+                } else {
+                    $null
+                }
+
+                if (-not $Rule.AppliesToPath($TargetPath)) {
+                    Write-Verbose "Rule '$($Rule.Name)' does not apply to path '$TargetPath'."
+                    continue
+                }
+
                 foreach ($Finding in $Rule.Invoke($Ast)) {
                     $Summary.FindingCount++
                     switch ($Finding.Severity) {
@@ -96,12 +107,14 @@ function Start-Nitpicking {
                         'Warning' { $Summary.WarningCount++ }
                         'Information' { $Summary.InformationCount++ }
                     }
+
                     if ($ErrorOn -and
                         $SeverityRank.ContainsKey($Finding.Severity) -and
                         $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]
                     ) {
                         $ThresholdFindingCount++
                     }
+
                     if ($Output -eq 'Object') {
                         Write-Output $Finding
                     } else {

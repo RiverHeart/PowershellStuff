@@ -77,6 +77,34 @@ Describe 'New-Nitpick' {
         $Rule.Explanation | Should -Not -BeNullOrEmpty
     }
 
+    It 'uses path scopes from rule details' {
+        $RuleScript = {
+            [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
+            param (
+                [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
+                [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+
+                [Parameter(ParameterSetName='Details')]
+                [switch] $Details
+            )
+
+            if ($Details) {
+                [pscustomobject]@{
+                    IncludePath = @('*.dsl.ps1')
+                    ExcludePath = @('*/Tests/*')
+                }
+            }
+        }
+
+        $Rule = New-Nitpick `
+            -Callable $RuleScript `
+            -Name ScopedNitpickRule `
+            -Source Tests
+
+        $Rule.IncludePath | Should -Be @('*.dsl.ps1')
+        $Rule.ExcludePath | Should -Be @('*/Tests/*')
+    }
+
     It 'rejects a callable missing ScriptBlockAst' {
         {
             New-Nitpick -Callable { param ($FilePath) } -Category Style -Name BadRule -Source Tests -ErrorAction Stop
