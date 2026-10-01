@@ -154,6 +154,7 @@ function Start-Nitpicking {
             if ($Output -eq 'Object') {
                 Write-Output $Summary
             } else {
+                Write-Host ""  # Line buffer. Host based to avoid polluting output.
                 Write-Output $Summary.ToString()
             }
         }
