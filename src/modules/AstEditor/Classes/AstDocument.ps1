@@ -64,8 +64,27 @@ class AstDocument {
 
     hidden [void] AddEdit([AstTextEdit] $Edit) {
         foreach ($Existing in $this.Edits) {
-            if ($Existing.Overlaps($Edit)) {
-                throw "Edit conflict detected between '$($Existing.Reason)' and '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
+            $HasSharedInsertionOffset =
+                $Existing.StartOffset -eq $Existing.EndOffset -and
+                $Edit.StartOffset -eq $Edit.EndOffset -and
+                $Existing.StartOffset -eq $Edit.StartOffset
+
+            if ($Existing.Overlaps($Edit) -or $HasSharedInsertionOffset) {
+                $Message = "Edit conflict detected between '$($Existing.Reason)' at offsets [$($Existing.StartOffset), $($Existing.EndOffset)) and '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
+                $Exception = [InvalidOperationException]::new($Message)
+                $Exception.Data['ExistingEdit'] = @{
+                    StartOffset = $Existing.StartOffset
+                    EndOffset = $Existing.EndOffset
+                    ReplacementText = $Existing.ReplacementText
+                    Reason = $Existing.Reason
+                }
+                $Exception.Data['IncomingEdit'] = @{
+                    StartOffset = $Edit.StartOffset
+                    EndOffset = $Edit.EndOffset
+                    ReplacementText = $Edit.ReplacementText
+                    Reason = $Edit.Reason
+                }
+                throw $Exception
             }
         }
 

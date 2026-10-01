@@ -9,6 +9,7 @@
     Description = 'Edits PowerShell source using immutable ASTs and validated text overlays.'
     PowerShellVersion = '5.1'
     FunctionsToExport = @(
+        'Add-AstTextEdit'
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
         'Extract-AstFunction'

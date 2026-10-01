@@ -40,6 +40,7 @@ documents through `New-AstDocument` and pass the returned objects to the other e
 - `AstTextEdit`: internal representation of a single replacement/insertion operation
 - `AstDocument`: internal immutable parse data plus a queued list of `AstTextEdit` edits
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
+- `Add-AstTextEdit`: validates and queues a generic offset- or extent-based edit
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits by index
 - `Save-AstDocument`: writes rendered output after parse validation
@@ -47,6 +48,31 @@ documents through `New-AstDocument` and pass the returned objects to the other e
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
 - `Extract-AstFunction`: queues removal of one function and returns its source text
 - `Split-PSFunction`: previews or applies extraction of top-level functions into individual files
+
+## Generic Text Edits
+
+`Add-AstTextEdit` is the public API for queuing generic corrections. Offset ranges are zero-based
+and end-exclusive. All edits refer to the immutable source snapshot stored in the document:
+
+```powershell
+$document = New-AstDocument -InputObject '$Value = 1'
+Add-AstTextEdit `
+	-Document $document `
+	-StartOffset 9 `
+	-EndOffset 10 `
+	-ReplacementText '2' `
+	-ExpectedText '1' `
+	-Reason 'Update the value'
+
+$result = Resolve-AstDocument -Document $document -PassThruText
+$result.RenderedText
+```
+
+Use `-Extent` instead of `-StartOffset` and `-EndOffset` when an `IScriptExtent` identifies the
+complete edit range. `ExpectedText` is optional and rejects the edit if the selected source text
+does not match exactly. Overlapping edits and multiple insertions at the same offset are rejected.
+Conflict exceptions expose the queued and incoming edits through the `ExistingEdit` and
+`IncomingEdit` entries in `Exception.Data`.
 
 ## Function Editing
 

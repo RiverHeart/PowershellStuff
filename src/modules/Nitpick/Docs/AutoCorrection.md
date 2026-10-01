@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 0 complete; later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 and 1 are complete; later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -59,7 +59,7 @@ Define correction semantics in tests and public help before changing either modu
 
 Focused contract tests define the behavior expected by both modules before production implementation begins. Public help also distinguishes current lint behavior from the reserved preview-first fix workflow.
 
-## Phase 1: Generic AstEditor Edit API
+## Phase 1: Generic AstEditor Edit API (Complete)
 
 ### Objective
 
@@ -91,6 +91,15 @@ Expose the smallest stable AstEditor surface needed to queue generic corrections
 ### Exit Criteria
 
 Nitpick can queue arbitrary non-overlapping corrections through exported AstEditor commands and obtain rendered text without accessing AstEditor implementation types directly.
+
+### Implemented Contract
+
+- `Add-AstTextEdit` queues edits by zero-based half-open offsets or `IScriptExtent`.
+- Optional expected text is matched case-sensitively against the immutable source snapshot.
+- The command returns an `AstEditor.TextEditResult` object describing the queued edit.
+- Adjacent ranges remain valid, while overlaps and same-offset insertions are rejected.
+- Conflict exceptions expose both participants as `ExistingEdit` and `IncomingEdit` entries in `Exception.Data`.
+- Rendering and parse validation remain the responsibility of `Resolve-AstDocument`.
 
 ## Phase 2: Native Nitpick Correction Model
 
