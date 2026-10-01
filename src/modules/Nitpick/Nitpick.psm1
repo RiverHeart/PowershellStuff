@@ -5,7 +5,7 @@ using namespace System.Management.Automation.Language
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
-# MARK: NP_CORRECTION
+# MARK: NP_CORRECT
 #----------------------
 
 class NitpickCorrection {
@@ -61,6 +61,12 @@ class NitpickCorrection {
         $this.Description = $properties.Description
     }
 
+    <#
+    .SYNOPSIS
+        Converts the NitpickCorrection instance to a CorrectionExtent object.
+    .OUTPUTS
+        [object] # Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent
+    #>
     [object] ToCorrectionExtent() {
         # Using `New-Object` to avoid type resolution issues at parse time
         $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent' -ArgumentList (
@@ -263,6 +269,14 @@ class NitpickRule {
         }
     }
 
+    <#
+    .SYNOPSIS
+        Determines if the rule applies to the specified file path.
+    .PARAMETER FilePath
+        The file path to check against the rule's include and exclude patterns.
+    .OUTPUTS
+        [bool]
+    #>
     [bool] AppliesToPath([string] $FilePath) {
         if ([string]::IsNullOrEmpty($FilePath)) {
             return $true
@@ -290,13 +304,22 @@ class NitpickRule {
         return $true
     }
 
-    # This could return a NitpickFinding or a DiagnosticRecord
+    <#
+    .SYNOPSIS
+        Invokes the rule against the specified ScriptBlockAst.
+    .PARAMETER Ast
+        The ScriptBlockAst to check against the rule.
+    .OUTPUTS
+        [object] # Could be a NitpickFinding or a DiagnosticRecord
+    #>
     [object] Invoke([ScriptBlockAst] $Ast) {
         $PreviousInvocationContext = Get-Variable `
             -Name NitpickInvocationContext `
             -Scope Script `
             -ErrorAction SilentlyContinue
+
         $PreviousInvocationContextValue = $PreviousInvocationContext.Value
+
         try {
             $script:NitpickInvocationContext = 'Nitpick'
             return & $this.Callable -ScriptBlockAst $Ast
