@@ -242,8 +242,46 @@ exit /b 0
                 -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1')
 
             $run.Text | Should -Match 'Test Suite: Fake'
+            $run.Text | Should -Match 'PowerShell: \d+\.\d+\.\d+'
+            $run.Text | Should -Match 'Pester: 5\.'
             $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
             $run.Text | Should -Not -Match 'Unselected test'
+        }
+
+        It 'does not exit the host for failed tests by default' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'default-failure-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Unselected.tests.ps1')
+
+            $run.ExitCode | Should -Be 0
+            $run.Text | Should -Match 'Tests Passed: 0, Failed: 1'
+        }
+
+        It 'exits with code 2 for failed test results when requested' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'exit-on-error-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Unselected.tests.ps1', '-ExitOnError')
+
+            $run.ExitCode | Should -Be 2
+            $run.Text | Should -Match 'Tests Passed: 0, Failed: 1'
+        }
+
+        It 'returns exit code 0 with ExitOnError when tests pass' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'exit-on-success-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1', '-ExitOnError')
+
+            $run.ExitCode | Should -Be 0
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
         }
 
         It 'enables detailed Pester console output when requested' {
