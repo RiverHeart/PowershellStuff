@@ -83,12 +83,43 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Correction.PSObject.Methods.Name | Should -Not -Contain 'Fix'
     }
 
-    It 'captures zero-based half-open offsets and expected text from an extent' -Skip {
-        throw 'Phase 2 must add native offset and expected-text metadata.'
+    It 'captures zero-based half-open offsets and expected text from an extent' {
+        $Source = '$First = 1; $Second = 2'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $Extent = $Ast.EndBlock.Statements[1].Extent
+
+        $Correction = New-NitpickCorrection `
+            -ViolationExtent $Extent `
+            -ReplacementText '$Second = 3' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the second assignment.' `
+            -RuleName 'SecondAssignment'
+
+        $Correction.HasOffsets | Should -BeTrue
+        $Correction.StartOffset | Should -Be $Extent.StartOffset
+        $Correction.EndOffset | Should -Be $Extent.EndOffset
+        $Correction.ExpectedText | Should -Be '$Second = 2'
+        $Correction.Applicability | Should -Be 'Safe'
+        $Correction.RuleName | Should -Be 'SecondAssignment'
     }
 
-    It 'applies only Safe corrections by default' -Skip {
-        throw 'Phase 2 must add applicability and Phase 3 must enforce it.'
+    It 'classifies corrections as Safe, Review, or Unsafe' -ForEach @(
+        @{ Applicability = 'Safe' }
+        @{ Applicability = 'Review' }
+        @{ Applicability = 'Unsafe' }
+    ) {
+        $Extent = { $Value }.Ast.EndBlock.Statements[0].Extent
+
+        $Correction = New-NitpickCorrection `
+            -ViolationExtent $Extent `
+            -ReplacementText '$Replacement' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the value.' `
+            -Applicability $Applicability
+
+        $Correction.Applicability | Should -Be $Applicability
     }
 
     It 'accepts or rejects every correction in an atomic group together' -Skip {

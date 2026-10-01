@@ -13,8 +13,14 @@ class NitpickCorrection {
     [int] $EndLineNumber
     [int] $StartColumnNumber
     [int] $EndColumnNumber
+    [int] $StartOffset = -1
+    [int] $EndOffset = -1
+    [bool] $HasOffsets
+    [string] $ExpectedText
+    [string] $Applicability = 'Safe'
+    [string] $GroupId
+    [string] $RuleName
     [string] $ReplacementText
-    [string[]] $Lines  # No idea WTH this is for, maybe replacements that span multiple lines?
     [string] $FilePathOrContext
     [string] $Description
 
@@ -28,9 +34,14 @@ class NitpickCorrection {
         $this.EndLineNumber = $ViolationExtent.EndLineNumber
         $this.StartColumnNumber = $ViolationExtent.StartColumnNumber
         $this.EndColumnNumber = $ViolationExtent.EndColumnNumber
+        $this.StartOffset = $ViolationExtent.StartOffset
+        $this.EndOffset = $ViolationExtent.EndOffset
+        $this.HasOffsets = $true
+        $this.ExpectedText = $ViolationExtent.Text
         $this.ReplacementText = $replacementText
         $this.FilePathOrContext = $filePathOrContext
         $this.Description = $description
+        $this.Validate()
     }
 
     NitpickCorrection(
@@ -49,6 +60,7 @@ class NitpickCorrection {
         $this.ReplacementText = $replacementText
         $this.FilePathOrContext = $filePathOrContext
         $this.Description = $description
+        $this.Validate()
     }
 
     NitpickCorrection([hashtable] $properties) {
@@ -56,9 +68,64 @@ class NitpickCorrection {
         $this.EndLineNumber = $properties.EndLineNumber
         $this.StartColumnNumber = $properties.StartColumnNumber
         $this.EndColumnNumber = $properties.EndColumnNumber
+        $HasStartOffset = $properties.ContainsKey('StartOffset')
+        $HasEndOffset = $properties.ContainsKey('EndOffset')
+        if ($HasStartOffset -ne $HasEndOffset) {
+            throw 'StartOffset and EndOffset must be supplied together.'
+        }
+        if ($HasStartOffset) {
+            $this.StartOffset = $properties.StartOffset
+            $this.EndOffset = $properties.EndOffset
+            $this.HasOffsets = $true
+        }
+        if ($properties.ContainsKey('ExpectedText')) {
+            $this.ExpectedText = $properties.ExpectedText
+        }
+        if ($properties.ContainsKey('Applicability')) {
+            $this.Applicability = $properties.Applicability
+        }
+        if ($properties.ContainsKey('GroupId')) {
+            $this.GroupId = $properties.GroupId
+        }
+        if ($properties.ContainsKey('RuleName')) {
+            $this.RuleName = $properties.RuleName
+        }
         $this.ReplacementText = $properties.ReplacementText
         $this.FilePathOrContext = $properties.FilePathOrContext
         $this.Description = $properties.Description
+        $this.Validate()
+    }
+
+    hidden [void] Validate() {
+        if ($this.StartLineNumber -lt 1 -or $this.EndLineNumber -lt 1) {
+            throw 'Line numbers must be greater than zero.'
+        }
+        if ($this.StartColumnNumber -lt 1 -or $this.EndColumnNumber -lt 1) {
+            throw 'Column numbers must be greater than zero.'
+        }
+        if ($this.EndLineNumber -lt $this.StartLineNumber -or
+            ($this.EndLineNumber -eq $this.StartLineNumber -and
+                $this.EndColumnNumber -lt $this.StartColumnNumber)
+        ) {
+            throw 'The correction end position must not precede its start position.'
+        }
+        if ($this.Applicability -notin 'Safe', 'Review', 'Unsafe') {
+            throw "Applicability must be Safe, Review, or Unsafe. Received '$($this.Applicability)'."
+        }
+        if ($this.HasOffsets) {
+            if ($this.StartOffset -lt 0) {
+                throw 'StartOffset must be non-negative.'
+            }
+            if ($this.EndOffset -lt $this.StartOffset) {
+                throw 'EndOffset must be greater than or equal to StartOffset.'
+            }
+            if ($null -eq $this.ExpectedText) {
+                throw 'ExpectedText is required when offsets are supplied.'
+            }
+            if ($this.ExpectedText.Length -ne ($this.EndOffset - $this.StartOffset)) {
+                throw 'ExpectedText length must match the offset range.'
+            }
+        }
     }
 
     <#

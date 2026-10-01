@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 and 1 are complete; later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 through 2 are complete; later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -101,7 +101,7 @@ Nitpick can queue arbitrary non-overlapping corrections through exported AstEdit
 - Conflict exceptions expose both participants as `ExistingEdit` and `IncomingEdit` entries in `Exception.Data`.
 - Rendering and parse validation remain the responsibility of `Resolve-AstDocument`.
 
-## Phase 2: Native Nitpick Correction Model
+## Phase 2: Native Nitpick Correction Model (Complete)
 
 ### Objective
 
@@ -132,6 +132,17 @@ Make `NitpickCorrection` a reliable native edit description while retaining conv
 ### Exit Criteria
 
 Every native correction contains enough information to validate and queue itself against the exact source snapshot that produced it.
+
+### Implemented Contract
+
+- Extent-based corrections capture zero-based half-open offsets and exact expected source text.
+- Explicit offset corrections require one-based ScriptAnalyzer coordinates and expected text.
+- `HasOffsets` distinguishes natively applicable corrections from compatibility-only line/column corrections.
+- Expected-text length must equal the offset range length; an empty range and empty expected text represent insertion.
+- Applicability is `Safe` by default and may be set to `Review` or `Unsafe`.
+- Optional `GroupId` and `RuleName` values preserve atomic-group and producer identity for later phases.
+- Line/column coordinates and `ToCorrectionExtent()` remain unchanged for PSScriptAnalyzer consumers.
+- Individual corrections describe edits only and expose no file mutation method.
 
 ## Phase 3: Preview MVP
 
