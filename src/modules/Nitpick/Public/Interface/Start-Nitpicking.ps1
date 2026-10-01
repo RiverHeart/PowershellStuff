@@ -3,6 +3,19 @@ using namespace System.Management.Automation.Language
 <#
 .SYNOPSIS
     Starts applying Nitpick rules to the specified script or path.
+
+.DESCRIPTION
+    Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
+    Ordinary lint behavior is unchanged unless Fix is specified.
+
+    Fix is reserved for Nitpick's preview-first autocorrection workflow. Until that
+    workflow is implemented, Fix does not change files or alter lint results.
+
+.PARAMETER Fix
+    Requests Nitpick's autocorrection workflow. Autocorrection is based on one immutable
+    source snapshot per target, and file writes require a separate explicit apply step.
+
+    This parameter is currently reserved and does not change files or lint results.
 #>
 function Start-Nitpicking {
     [CmdletBinding(DefaultParameterSetName='Path')]
@@ -34,7 +47,8 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
-        [switch] $NoSummary
+        [switch] $NoSummary,
+        [switch] $Fix
     )
 
     begin {
@@ -140,7 +154,6 @@ function Start-Nitpicking {
             if ($Output -eq 'Object') {
                 Write-Output $Summary
             } else {
-                Write-Output ''  # Line buffer for readability.
                 Write-Output $Summary.ToString()
             }
         }

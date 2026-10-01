@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed implementation outline. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phase 0 complete; later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+
+The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
 ## Goals
 
@@ -27,7 +29,7 @@ Each file is one correction transaction based on one immutable source snapshot:
 
 Offsets do not need adjustment within a batch because every edit refers to the original snapshot. Corrections discovered after rendering belong to a new pass and a new document.
 
-## Phase 0: Freeze the Contracts
+## Phase 0: Freeze the Contracts (Complete)
 
 ### Objective
 
@@ -55,7 +57,7 @@ Define correction semantics in tests and public help before changing either modu
 
 ### Exit Criteria
 
-Focused contract tests define the behavior expected by both modules before production implementation begins.
+Focused contract tests define the behavior expected by both modules before production implementation begins. Public help also distinguishes current lint behavior from the reserved preview-first fix workflow.
 
 ## Phase 1: Generic AstEditor Edit API
 
