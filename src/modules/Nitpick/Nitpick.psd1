@@ -81,6 +81,7 @@ FunctionsToExport = @(
     'New-NitpickFinding'
     'New-Rule'
     'Register-Nitpick'
+    'Resolve-NitpickCorrection'
     'Start-Nitpicking'
     'Test-AvoidParameterAttributeBool'
     'Test-UseIsNotOperator'

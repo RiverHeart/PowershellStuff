@@ -61,7 +61,7 @@ Describe 'New-NitpickCorrection' {
             -FilePathOrContext 'Test.ps1' `
             -Description 'Replace text.' `
             -Applicability Review `
-            -GroupId 'group-1' `
+            -ChangeSetId 'changeset-1' `
             -RuleName 'ExampleRule'
 
         $Correction.HasOffsets | Should -BeTrue
@@ -69,7 +69,7 @@ Describe 'New-NitpickCorrection' {
         $Correction.EndOffset | Should -Be 3
         $Correction.ExpectedText | Should -Be 'bc'
         $Correction.Applicability | Should -Be 'Review'
-        $Correction.GroupId | Should -Be 'group-1'
+        $Correction.ChangeSetId | Should -Be 'changeset-1'
         $Correction.RuleName | Should -Be 'ExampleRule'
     }
 

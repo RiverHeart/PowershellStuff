@@ -4,6 +4,8 @@ using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
+$AstEditorManifest = Join-Path -Path $ModuleRoot -ChildPath '../AstEditor/AstEditor.psd1'
+Import-Module -Name $AstEditorManifest -ErrorAction Stop
 
 # MARK: NP_CORRECT
 #----------------------
@@ -18,7 +20,7 @@ class NitpickCorrection {
     [bool] $HasOffsets
     [string] $ExpectedText
     [string] $Applicability = 'Safe'
-    [string] $GroupId
+    [string] $ChangeSetId
     [string] $RuleName
     [string] $ReplacementText
     [string] $FilePathOrContext
@@ -84,8 +86,8 @@ class NitpickCorrection {
         if ($properties.ContainsKey('Applicability')) {
             $this.Applicability = $properties.Applicability
         }
-        if ($properties.ContainsKey('GroupId')) {
-            $this.GroupId = $properties.GroupId
+        if ($properties.ContainsKey('ChangeSetId')) {
+            $this.ChangeSetId = $properties.ChangeSetId
         }
         if ($properties.ContainsKey('RuleName')) {
             $this.RuleName = $properties.RuleName

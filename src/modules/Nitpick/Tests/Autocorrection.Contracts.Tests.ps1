@@ -122,20 +122,173 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Correction.Applicability | Should -Be $Applicability
     }
 
-    It 'accepts or rejects every correction in an atomic group together' -Skip {
-        throw 'Phase 3 must implement correction-group transactions.'
+    It 'accepts or skips every correction in a change set together' {
+        $Source = '$First = 1; $Second = 2; $Third = 3'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $FirstExtent = $Ast.EndBlock.Statements[0].Extent
+        $SecondExtent = $Ast.EndBlock.Statements[1].Extent
+        $ThirdExtent = $Ast.EndBlock.Statements[2].Extent
+        $Corrections = @(
+            New-NitpickCorrection `
+                -ViolationExtent $FirstExtent `
+                -ReplacementText '$First = 2' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the first assignment.' `
+                -ChangeSetId 'CoupledAssignments'
+            New-NitpickCorrection `
+                -StartLineNumber $SecondExtent.StartLineNumber `
+                -EndLineNumber $SecondExtent.EndLineNumber `
+                -StartColumnNumber $SecondExtent.StartColumnNumber `
+                -EndColumnNumber $SecondExtent.EndColumnNumber `
+                -StartOffset $SecondExtent.StartOffset `
+                -EndOffset $SecondExtent.EndOffset `
+                -ExpectedText '$Second = 9' `
+                -ReplacementText '$Second = 3' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the second assignment.' `
+                -ChangeSetId 'CoupledAssignments'
+            New-NitpickCorrection `
+                -ViolationExtent $ThirdExtent `
+                -ReplacementText '$Third = 4' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the third assignment.'
+        )
+        $Finding = New-NitpickFinding `
+            -RuleName 'ReplaceAssignments' `
+            -Message 'Replace assignments.' `
+            -ViolationExtent $FirstExtent `
+            -Severity Information `
+            -RuleSuppressionID 'ReplaceAssignments' `
+            -Corrections $Corrections `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Exercises all-or-nothing correction change sets.' `
+            -OutputAs NitpickFinding
+
+        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+
+        $Result.RenderedText | Should -Be '$First = 1; $Second = 2; $Third = 4'
+        $Result.AcceptedCorrections | Should -HaveCount 1
+        $Result.SkippedCorrections | Should -HaveCount 2
     }
 
-    It 'rejects the complete target batch when independent groups overlap' -Skip {
-        throw 'Phase 3 must implement the initial target-level conflict policy.'
+    It 'previews independent corrections in one render pass' {
+        $Source = '$First = 1; $Second = 2'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $FirstExtent = $Ast.EndBlock.Statements[0].Extent
+        $SecondExtent = $Ast.EndBlock.Statements[1].Extent
+        $Corrections = @(
+            New-NitpickCorrection `
+                -ViolationExtent $FirstExtent `
+                -ReplacementText '$First = 100' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the first assignment.'
+            New-NitpickCorrection `
+                -ViolationExtent $SecondExtent `
+                -ReplacementText '$Second = 200' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the second assignment.'
+        )
+        $Finding = New-NitpickFinding `
+            -RuleName 'ReplaceAssignments' `
+            -Message 'Replace assignments.' `
+            -ViolationExtent $FirstExtent `
+            -Severity Information `
+            -RuleSuppressionID 'ReplaceAssignments' `
+            -Corrections $Corrections `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Exercises independent corrections.' `
+            -OutputAs NitpickFinding
+
+        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+
+        $Result.RenderedText | Should -Be '$First = 100; $Second = 200'
+        $Result.AcceptedCorrections | Should -HaveCount 2
+        $Result.SkippedCorrections | Should -HaveCount 0
+    }
+
+    It 'rejects the complete target batch when independent change sets overlap' {
+        $Source = '$Value = 123'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $Extent = $Ast.EndBlock.Statements[0].Extent
+        $Corrections = @(
+            New-NitpickCorrection `
+                -StartLineNumber 1 `
+                -EndLineNumber 1 `
+                -StartColumnNumber 1 `
+                -EndColumnNumber 7 `
+                -StartOffset 0 `
+                -EndOffset 6 `
+                -ExpectedText '$Value' `
+                -ReplacementText '$First' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Rename the variable.' `
+                -RuleName 'RenameVariable'
+            New-NitpickCorrection `
+                -ViolationExtent $Extent `
+                -ReplacementText '$Value = 456' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the assignment.' `
+                -RuleName 'ReplaceAssignment'
+        )
+        $Finding = New-NitpickFinding `
+            -RuleName 'OverlappingRules' `
+            -Message 'Exercise overlapping corrections.' `
+            -ViolationExtent $Extent `
+            -Severity Information `
+            -RuleSuppressionID 'OverlappingRules' `
+            -Corrections $Corrections `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Exercises target-level conflict rejection.' `
+            -OutputAs NitpickFinding
+
+        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+
+        $Result.RenderedText | Should -Be $Source
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 2
+        $Result.Conflicts | Should -HaveCount 1
+        $Result.Conflicts[0].ExistingCorrection.RuleName | Should -Be 'RenameVariable'
+        $Result.Conflicts[0].IncomingCorrection.RuleName | Should -Be 'ReplaceAssignment'
     }
 
     It 'keeps preview mode from changing file-backed targets' -Skip {
         throw 'Phase 3 must add the preview-only correction coordinator.'
     }
 
-    It 'returns rendered text instead of writing for in-memory targets' -Skip {
-        throw 'Phase 3 must define explicit in-memory preview output.'
+    It 'returns rendered text instead of writing for in-memory targets' {
+        $Source = '$Value = 1'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $Extent = $Ast.EndBlock.Statements[0].Extent
+        $Correction = New-NitpickCorrection `
+            -ViolationExtent $Extent `
+            -ReplacementText '$Value = 2' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the assignment.' `
+            -RuleName 'ReplaceAssignment'
+        $Finding = New-NitpickFinding `
+            -RuleName 'ReplaceAssignment' `
+            -Message 'Replace the assignment.' `
+            -ViolationExtent $Extent `
+            -Severity Information `
+            -RuleSuppressionID 'ReplaceAssignment' `
+            -Corrections $Correction `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Exercises in-memory correction preview.' `
+            -OutputAs NitpickFinding
+
+        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+
+        $Result.RenderedText | Should -Be '$Value = 2'
+        $Result.AcceptedCorrections | Should -HaveCount 1
+        $Result.WasWritten | Should -BeFalse
     }
 
     It 'reports findings and severity counts from final analysis after fixing' -Skip {

@@ -1,7 +1,7 @@
 
 <#
 .SYNOPSIS
-    Creates a new Nitpick correction extent for a given AST node.
+    Creates a native Nitpick correction or a PSScriptAnalyzer correction extent.
 
 .DESCRIPTION
     Creates an immutable description of a text correction. Line and column positions are
@@ -43,8 +43,9 @@
 .PARAMETER Applicability
     Classifies the correction as Safe, Review, or Unsafe. The default is Safe.
 
-.PARAMETER GroupId
-    An optional identifier shared by corrections that must later be applied atomically.
+.PARAMETER ChangeSetId
+    An optional identifier shared by corrections that form one change set. Every correction
+    in a change set is accepted or skipped together.
 
 .PARAMETER RuleName
     An optional stable identity for the rule that produced the correction.
@@ -62,6 +63,66 @@
 .PARAMETER OutputAs
     Returns a native NitpickCorrection by default, or a PSScriptAnalyzer CorrectionExtent
     when CorrectionExtent is selected.
+
+.EXAMPLE
+    $Extent = { $Value = 1 }.Ast.EndBlock.Statements[0].Extent
+    New-NitpickCorrection `
+        -ViolationExtent $Extent `
+        -ReplacementText '$Value = 2' `
+        -FilePathOrContext '<ScriptBlock>' `
+        -Description 'Replace the assignment.'
+
+    Creates a native correction whose offsets and expected text come from an AST extent.
+
+.EXAMPLE
+    New-NitpickCorrection `
+        -StartLineNumber 1 -EndLineNumber 1 `
+        -StartColumnNumber 10 -EndColumnNumber 11 `
+        -StartOffset 9 -EndOffset 10 `
+        -ExpectedText '1' -ReplacementText '2' `
+        -FilePathOrContext '<ScriptBlock>' `
+        -Description 'Replace the value.'
+
+    Creates a replacement from an explicit zero-based, end-exclusive offset range.
+
+.EXAMPLE
+    New-NitpickCorrection `
+        -StartLineNumber 1 -EndLineNumber 1 `
+        -StartColumnNumber 1 -EndColumnNumber 1 `
+        -StartOffset 0 -EndOffset 0 `
+        -ExpectedText '' -ReplacementText '# generated' `
+        -FilePathOrContext '<ScriptBlock>' `
+        -Description 'Insert a header.'
+
+    Creates a zero-width insertion. ExpectedText is empty because the range contains no text.
+
+.EXAMPLE
+    $First = New-NitpickCorrection `
+        -ViolationExtent $FirstExtent `
+        -ReplacementText '$First = 2' `
+        -FilePathOrContext '<ScriptBlock>' `
+        -Description 'Replace the first assignment.' `
+        -ChangeSetId 'CoupledAssignments'
+    $Second = New-NitpickCorrection `
+        -ViolationExtent $SecondExtent `
+        -ReplacementText '$Second = 3' `
+        -FilePathOrContext '<ScriptBlock>' `
+        -Description 'Replace the second assignment.' `
+        -ChangeSetId 'CoupledAssignments'
+
+    Creates two corrections in one change set. A coordinator accepts or skips both together.
+
+.EXAMPLE
+    New-NitpickCorrection `
+        -StartLineNumber 1 -EndLineNumber 1 `
+        -StartColumnNumber 1 -EndColumnNumber 11 `
+        -ReplacementText '$Value = 2' `
+        -FilePathOrContext 'Example.ps1' `
+        -Description 'Replace the assignment.' `
+        -OutputAs CorrectionExtent
+
+    Creates a line-and-column-only PSScriptAnalyzer CorrectionExtent. Without native offsets,
+    this form cannot be applied by the Nitpick correction coordinator.
 #>
 function New-NitpickCorrection {
     [CmdletBinding(DefaultParameterSetName = 'ByExtent')]
@@ -117,7 +178,7 @@ function New-NitpickCorrection {
         [string] $Applicability = 'Safe',
 
         [ValidateNotNullOrEmpty()]
-        [string] $GroupId,
+        [string] $ChangeSetId,
 
         [ValidateNotNullOrEmpty()]
         [string] $RuleName,
@@ -149,8 +210,8 @@ function New-NitpickCorrection {
         $CorrectionParams.EndOffset = $EndOffset
         $CorrectionParams.ExpectedText = $ExpectedText
     }
-    if ($PSBoundParameters.ContainsKey('GroupId')) {
-        $CorrectionParams.GroupId = $GroupId
+    if ($PSBoundParameters.ContainsKey('ChangeSetId')) {
+        $CorrectionParams.ChangeSetId = $ChangeSetId
     }
     if ($PSBoundParameters.ContainsKey('RuleName')) {
         $CorrectionParams.RuleName = $RuleName

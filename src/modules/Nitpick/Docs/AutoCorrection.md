@@ -40,11 +40,11 @@ Define correction semantics in tests and public help before changing either modu
 - Offsets are zero-based half-open ranges: `[StartOffset, EndOffset)`.
 - Line and column positions remain one-based for PSScriptAnalyzer compatibility.
 - Offsets are relative to the exact source snapshot analyzed by Nitpick.
-- A correction may contain one edit or an atomic group of edits.
+- A correction may stand alone or belong to a change set containing coordinated edits.
 - File-backed and in-memory correction behavior are distinct and explicit.
 - Preview is the default until an explicit apply operation is requested.
 - Only `Safe` corrections participate in the initial automatic mode.
-- The initial conflict policy rejects the complete target batch when correction groups overlap.
+- The initial conflict policy rejects the complete target batch when change sets overlap.
 - Findings and severity counts emitted after fixing come from final analysis.
 - Same-offset insertions are rejected until ordering is explicitly modeled.
 
@@ -112,7 +112,7 @@ Make `NitpickCorrection` a reliable native edit description while retaining conv
 - Add `StartOffset` and `EndOffset` to corrections created from an `IScriptExtent`.
 - Add `ExpectedText` so stale or incorrectly calculated ranges can be rejected.
 - Add an applicability classification, initially `Safe`, `Review`, and `Unsafe`.
-- Add an optional `GroupId` for corrections that must be applied atomically.
+- Add an optional `ChangeSetId` for corrections that must be accepted or skipped together.
 - Add `RuleName` or another stable producer identity for conflict diagnostics.
 - Preserve line and column coordinates for display and `CorrectionExtent` conversion.
 - Add an explicit offset-based construction path for token-adjusted corrections.
@@ -127,7 +127,7 @@ Make `NitpickCorrection` a reliable native edit description while retaining conv
 - Converts to an equivalent `CorrectionExtent`.
 - Rejects invalid ranges and inconsistent coordinates.
 - Covers insertion and multiline ranges.
-- Preserves applicability, group, and producer metadata.
+- Preserves applicability, change-set, and producer metadata.
 
 ### Exit Criteria
 
@@ -140,7 +140,7 @@ Every native correction contains enough information to validate and queue itself
 - `HasOffsets` distinguishes natively applicable corrections from compatibility-only line/column corrections.
 - Expected-text length must equal the offset range length; an empty range and empty expected text represent insertion.
 - Applicability is `Safe` by default and may be set to `Review` or `Unsafe`.
-- Optional `GroupId` and `RuleName` values preserve atomic-group and producer identity for later phases.
+- Optional `ChangeSetId` and `RuleName` values preserve change-set and producer identity for later phases.
 - Line/column coordinates and `ToCorrectionExtent()` remain unchanged for PSScriptAnalyzer consumers.
 - Individual corrections describe edits only and expose no file mutation method.
 
@@ -158,8 +158,8 @@ Implement useful autocorrection without writing files or first coupling the comp
 - Normalize native and PSScriptAnalyzer corrections into validated offset ranges.
 - Select only corrections marked `Safe` by default.
 - Queue corrections through the generic AstEditor API.
-- Treat each `GroupId` as atomic: queue every member or none.
-- Reject or skip a file when independent correction groups overlap, and report the responsible rules.
+- Accept or skip every correction sharing a `ChangeSetId` together.
+- Reject or skip a file when independent change sets overlap, and report the responsible rules.
 - Render the accepted batch and reparse it.
 - Rerun the enabled rules against rendered text.
 - Return a structured fix result containing accepted corrections, skipped corrections, conflicts, parse diagnostics, remaining findings, rendered text, and a diff.
@@ -246,7 +246,7 @@ Allow the previewed correction transaction to be committed safely.
 
 `Start-Nitpicking -Fix` can safely update file-backed targets using the same observable transaction produced by preview.
 
-## Phase 6: Structural and Grouped Fix Providers
+## Phase 6: Structural and Change-Set Fix Providers
 
 ### Objective
 
@@ -257,15 +257,15 @@ Support corrections that require token awareness, sibling inspection, or coordin
 - Define a fix-provider contract that receives the current `AstDocument`, finding, and rule context.
 - Require providers to queue edits through the same AstEditor API.
 - Keep providers declarative: they plan edits but do not write files.
-- Use correction groups for coordinated multi-edit transforms.
-- Accept every edit in a group or reject the complete group.
-- Detect and report conflicts at the group level.
+- Use change sets for coordinated multi-edit transforms.
+- Accept every edit in a change set or skip the complete change set.
+- Detect and report conflicts at the change-set level.
 - Migrate a rule with punctuation or trivia concerns as the first proof, such as removal of a `$false` parameter attribute argument and its adjacent comma.
 - Continue emitting ordinary `CorrectionExtent` objects when a structural fix can be represented as a simple replacement for PSScriptAnalyzer.
 
 ### Exit Criteria
 
-At least one token-aware rule applies a grouped structural fix through the same preview, validation, conflict, and commit pipeline.
+At least one token-aware rule applies a structural change set through the same preview, validation, conflict, and commit pipeline.
 
 ## Phase 7: Optional Multiple Passes
 
@@ -291,7 +291,7 @@ Multiple passes converge predictably or stop with a clear pass-limit or cycle di
 
 AstEditor unit tests own generic range validation, ordering, conflict detection, rendering, parse validation, stale-source checks, and durable writes.
 
-Nitpick unit tests own correction metadata, coordinate conversion, expected-text validation, applicability, grouping, and PSScriptAnalyzer conversion.
+Nitpick unit tests own correction metadata, coordinate conversion, expected-text validation, applicability, change sets, and PSScriptAnalyzer conversion.
 
 Nitpick integration tests own rule collection, multi-rule conflicts, final reanalysis, summary behavior, preview output, file application, and compatibility with native and PSScriptAnalyzer-style corrections.
 
@@ -301,12 +301,12 @@ PowerShell 5.1 and PowerShell 7 must both exercise the correction path because p
 
 The preview MVP ends after Phase 4. It supports safe non-overlapping corrections, immutable-snapshot rendering, parse validation, final reanalysis, diffs, and corrected in-memory output without modifying files.
 
-The first file-writing release ends after Phase 5. Structural providers, grouped multi-edit transforms, and multiple correction passes remain follow-up capabilities.
+The first file-writing release ends after Phase 5. Structural providers, multi-edit change sets, and multiple correction passes remain follow-up capabilities.
 
 ## Conflict and Failure Policy
 
-- Never silently choose between overlapping correction groups.
-- Apply all members of a correction group or none of them.
+- Never silently choose between overlapping change sets.
+- Accept all members of a change set or skip all of them.
 - Treat an expected-text mismatch as stale analysis, not as an ordinary overlap.
 - Do not write output that introduces parse errors.
 - Do not write when the source file differs from the analyzed snapshot.
@@ -340,11 +340,11 @@ The exact type can be introduced after the preview workflow demonstrates which f
 
 1. Freeze correction, coordinate, and conflict semantics.
 2. Export and test the generic AstEditor edit API.
-3. Extend `NitpickCorrection` with offsets, expected text, applicability, grouping, and producer identity.
+3. Extend `NitpickCorrection` with offsets, expected text, applicability, change sets, and producer identity.
 4. Convert one existing Nitpick rule and implement the standalone preview engine.
 5. Integrate preview and final-analysis reporting with `Start-Nitpicking`.
 6. Harden AstEditor persistence and implement transactional apply.
-7. Introduce grouped structural fix providers using one token-aware rule as proof.
+7. Introduce structural change-set providers using one token-aware rule as proof.
 8. Add bounded multi-pass correction.
 
 This order keeps AstEditor work demand-driven. Generic edit queuing blocks the preview MVP; encoding preservation, concurrent-change detection, and atomic replacement block file application but do not need to delay preview.
@@ -352,7 +352,7 @@ This order keeps AstEditor work demand-driven. Generic edit queuing blocks the p
 ## Open Decisions
 
 - Whether preview should be `Start-Nitpicking -Fix -WhatIf`, a `-PreviewFix` switch, or a separate command.
-- Whether a conflict skips only the involved groups or the entire file transaction.
+- Whether a conflict skips only the involved change sets or the entire file transaction.
 - Whether line-and-column-only third-party corrections can be resolved safely or must remain PSScriptAnalyzer-only.
 - Whether final validation requires only successful parsing or also zero newly introduced findings.
 - Whether changed severity or message identity is sufficient to match findings across passes.
