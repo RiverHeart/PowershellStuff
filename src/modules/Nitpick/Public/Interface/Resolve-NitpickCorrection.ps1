@@ -36,6 +36,7 @@
             -FilePathOrContext '<ScriptBlock>' `
             -Description 'Replace the first assignment.' `
             -ChangeSetId 'CoupledAssignments'
+
         New-NitpickCorrection `
             -ViolationExtent $SecondExtent `
             -ReplacementText '$Second = 3' `
@@ -55,6 +56,17 @@
 
     Inspects conflicts when independent change sets overlap. Under the target-level conflict
     policy, an overlap rejects the complete preview batch and leaves RenderedText unchanged.
+
+.EXAMPLE
+    $Result = Resolve-NitpickCorrection `
+        -Script $Source `
+        -Finding $Finding `
+        -Rule $SelectedRules
+    $Result.FinalFindings
+
+    Passes the rules that produced the original findings when the preview must verify that
+    corrected findings disappear and report findings that remain after rendering. Omit Rule
+    when only correction selection, validation, and rendered text are needed.
 #>
 function Resolve-NitpickCorrection {
     [CmdletBinding()]
