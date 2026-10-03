@@ -326,11 +326,13 @@ SkippedCorrections
 Conflicts
 ParseErrors
 OriginalFindings
+FinalFindings
 RemainingFindings
 IntroducedFindings
 Diff
 CandidateText
 RenderedText
+WasReanalyzed
 WasWritten
 WriteStatus
 ```

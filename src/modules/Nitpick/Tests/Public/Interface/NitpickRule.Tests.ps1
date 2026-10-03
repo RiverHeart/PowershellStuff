@@ -8,15 +8,30 @@ AfterAll {
 }
 
 Describe 'NitpickRule invocation' {
+    It 'returns no findings when the callable emits no output' {
+        InModuleScope Nitpick {
+            $Rule = New-Nitpick `
+                -Name Test-NoFindingsRule `
+                -Source Tests `
+                -Callable {
+                    param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
+                }
+
+            $Findings = $Rule.Invoke({}.Ast)
+
+            $Findings.Count | Should -Be 0
+        }
+    }
+
     It 'returns native findings and restores the previous invocation context' {
         InModuleScope Nitpick {
             $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
             $script:NitpickInvocationContext = 'ExistingContext'
 
             try {
-                $Findings = @($Rule.Invoke(
+                $Findings = $Rule.Invoke(
                     { param([Parameter(Mandatory=$true)] [string] $Name) }.Ast
-                ))
+                )
 
                 $Findings.Count | Should -Be 1
                 $Findings[0].GetType().Name | Should -Be 'NitpickFinding'

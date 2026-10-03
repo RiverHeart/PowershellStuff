@@ -16,6 +16,10 @@
 .PARAMETER Finding
     Native Nitpick findings containing corrections produced from the source snapshot.
 
+.PARAMETER Rule
+    Selected Nitpick rules to rerun against valid rendered text. When omitted, the
+    correction preview is returned without final reanalysis.
+
 .EXAMPLE
     $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
     $Result.RenderedText
@@ -61,7 +65,9 @@ function Resolve-NitpickCorrection {
         [string] $Script,
 
         [Parameter(Mandatory)]
-        [NitpickFinding[]] $Finding
+        [NitpickFinding[]] $Finding,
+
+        [NitpickRule[]] $Rule
     )
 
     $Document = New-AstDocument -InputObject $Script
@@ -69,6 +75,7 @@ function Resolve-NitpickCorrection {
     $SkippedCorrections = [System.Collections.Generic.List[object]]::new()
     $ValidatedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
     $Conflicts = [System.Collections.Generic.List[object]]::new()
+    $FinalFindings = [System.Collections.Generic.List[object]]::new()
     $ChangeSets = [ordered]@{}
     $StandaloneCorrectionId = 0
 
@@ -200,15 +207,31 @@ function Resolve-NitpickCorrection {
         $RenderedText = $Script
     }
 
+    # MARK: FINAL REANALYSIS
+    # Rerun only the caller-selected rules, and only after rendered text passes validation.
+    $WasReanalyzed = $false
+    if ($Rule.Count -gt 0 -and $Resolution.ParseErrorCount -eq 0) {
+        $RenderedDocument = New-AstDocument -InputObject $RenderedText
+        foreach ($SelectedRule in $Rule) {
+            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument.Ast)) {
+                $FinalFindings.Add($FinalFinding)
+            }
+        }
+        $WasReanalyzed = $true
+    }
+
     return [pscustomobject]@{
         PSTypeName = 'Nitpick.CorrectionPreviewResult'
         Path = '<ScriptBlock>'
+        OriginalFindings = @($Finding)
+        FinalFindings = @($FinalFindings)
         AcceptedCorrections = @($AcceptedCorrections)
         SkippedCorrections = @($SkippedCorrections)
         Conflicts = @($Conflicts)
         ParseErrors = @($Resolution.ParseErrors)
         CandidateText = $CandidateText
         RenderedText = $RenderedText
+        WasReanalyzed = $WasReanalyzed
         WasWritten = $false
     }
 }

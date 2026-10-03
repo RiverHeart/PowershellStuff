@@ -291,6 +291,54 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result.WasWritten | Should -BeFalse
     }
 
+    It 'reruns selected rules against valid rendered text' {
+        $Source = '$Value = 1'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $Rule = New-Nitpick `
+            -Name 'ReplaceValue' `
+            -Source 'AutocorrectionContract' `
+            -Callable {
+                param ([ScriptBlockAst] $ScriptBlockAst)
+
+                $Assignment = $ScriptBlockAst.EndBlock.Statements | Select-Object -First 1
+                if ($null -eq $Assignment -or $Assignment.Extent.Text -ne '$Value = 1') {
+                    return
+                }
+
+                $Correction = New-NitpickCorrection `
+                    -ViolationExtent $Assignment.Extent `
+                    -ReplacementText '$Value = 2' `
+                    -FilePathOrContext '<ScriptBlock>' `
+                    -Description 'Replace the value.' `
+                    -RuleName 'ReplaceValue'
+
+                New-NitpickFinding `
+                    -RuleName 'ReplaceValue' `
+                    -Message 'Replace the value.' `
+                    -ViolationExtent $Assignment.Extent `
+                    -Severity Information `
+                    -RuleSuppressionID 'ReplaceValue' `
+                    -Corrections $Correction `
+                    -ScriptPath '<ScriptBlock>' `
+                    -Explanation 'Exercises final reanalysis.' `
+                    -OutputAs NitpickFinding
+            }
+        $InitialFindings = @($Rule.Invoke($Ast))
+
+        $Result = Resolve-NitpickCorrection `
+            -Script $Source `
+            -Finding $InitialFindings `
+            -Rule $Rule
+
+        $InitialFindings | Should -HaveCount 1
+        $Result.RenderedText | Should -Be '$Value = 2'
+        $Result.OriginalFindings | Should -HaveCount 1
+        $Result.FinalFindings | Should -HaveCount 0
+        $Result.WasReanalyzed | Should -BeTrue
+    }
+
     It 'rejects candidate text that introduces parse errors' {
         $Source = '$Value = 1'
         $Tokens = $null

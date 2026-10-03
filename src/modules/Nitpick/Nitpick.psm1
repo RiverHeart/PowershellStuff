@@ -379,9 +379,9 @@ class NitpickRule {
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .OUTPUTS
-        [object] # Could be a NitpickFinding or a DiagnosticRecord
+        [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
-    [object] Invoke([ScriptBlockAst] $Ast) {
+    [object[]] Invoke([ScriptBlockAst] $Ast) {
         $PreviousInvocationContext = Get-Variable `
             -Name NitpickInvocationContext `
             -Scope Script `
@@ -391,7 +391,8 @@ class NitpickRule {
 
         try {
             $script:NitpickInvocationContext = 'Nitpick'
-            return & $this.Callable -ScriptBlockAst $Ast
+            [object[]] $Results = @(& $this.Callable -ScriptBlockAst $Ast)
+            return $Results
         } finally {
             if ($null -ne $PreviousInvocationContext) {
                 $script:NitpickInvocationContext = $PreviousInvocationContextValue
