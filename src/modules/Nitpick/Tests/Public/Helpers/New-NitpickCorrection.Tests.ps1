@@ -1,5 +1,6 @@
 BeforeAll {
     Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
+    Import-Module -Name "$PSScriptRoot/../../../../AstEditor/AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 }
 
@@ -71,6 +72,31 @@ Describe 'New-NitpickCorrection' {
         $Correction.Applicability | Should -Be 'Review'
         $Correction.ChangeSetId | Should -Be 'changeset-1'
         $Correction.RuleName | Should -Be 'ExampleRule'
+    }
+
+    It 'creates a correction from an AstEditor collection edit' {
+        $Document = New-AstDocument `
+            -InputObject 'param([Parameter(Position=0,Mandatory=$false)] [string] $Name)'
+        $ParameterAttribute = $Document.Ast.Find({
+            param ($Node)
+
+            $Node -is [System.Management.Automation.Language.AttributeAst]
+        }, $false)
+        $Argument = $ParameterAttribute.NamedArguments | Where-Object ArgumentName -eq 'Mandatory'
+        $TextEdit = New-AstCollectionEdit `
+            -Remove $Argument `
+            -From $ParameterAttribute.NamedArguments `
+            -Within $ParameterAttribute
+
+        $Correction = New-NitpickCorrection `
+            -TextEdit $TextEdit `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Remove the argument.'
+
+        $Correction.StartOffset | Should -Be $TextEdit.StartOffset
+        $Correction.EndOffset | Should -Be $TextEdit.EndOffset
+        $Correction.ExpectedText | Should -Be ',Mandatory=$false'
+        $Correction.ReplacementText | Should -Be ''
     }
 
     It 'supports insertion and multiline offset ranges' {

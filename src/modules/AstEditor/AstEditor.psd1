@@ -15,6 +15,7 @@
         'Extract-AstFunction'
         'Find-AEAstNode'
         'New-AstDocument'
+        'New-AstCollectionEdit'
         'Resolve-AstDocument'
         'Save-AstDocument'
         'Set-AstFunction'

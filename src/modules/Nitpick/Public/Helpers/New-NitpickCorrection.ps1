@@ -18,6 +18,10 @@
     The source extent to describe. Its one-based line and column coordinates are copied to
     the correction.
 
+.PARAMETER TextEdit
+    A detached AstEditor edit whose coordinates, expected text, and replacement text are
+    copied to the correction.
+
 .PARAMETER StartLineNumber
     The one-based line on which the correction begins.
 
@@ -131,6 +135,10 @@ function New-NitpickCorrection {
         [Parameter(Mandatory,ParameterSetName='ByExtent')]
         [System.Management.Automation.Language.IScriptExtent] $ViolationExtent,
 
+        [Parameter(Mandatory, ParameterSetName = 'ByTextEdit')]
+        [ValidateScript({ $_.PSTypeNames -contains 'AstEditor.CollectionEdit' })]
+        [psobject] $TextEdit,
+
         [Parameter(Mandatory, ParameterSetName = 'ByLineAndColumn')]
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
         [int] $StartLineNumber,
@@ -166,11 +174,13 @@ function New-NitpickCorrection {
         [Parameter(Mandatory,ParameterSetName='ByLineAndColumn', HelpMessage = "File path or context for the correction extent.")]
         [Parameter(Mandatory,ParameterSetName='ByExtent', HelpMessage = "File path or context for the correction extent.")]
         [Parameter(Mandatory, ParameterSetName = 'ByOffset', HelpMessage = "File path or context for the correction extent.")]
+        [Parameter(Mandatory, ParameterSetName = 'ByTextEdit', HelpMessage = "File path or context for the correction extent.")]
         [string] $FilePathOrContext,
 
         [Parameter(Mandatory,ParameterSetName='ByLineAndColumn', HelpMessage = "Description of the correction extent. Appears as hover text in the editor.")]
         [Parameter(Mandatory,ParameterSetName='ByExtent', HelpMessage = "Description of the correction extent. Appears as hover text in the editor.")]
         [Parameter(Mandatory, ParameterSetName = 'ByOffset', HelpMessage = "Description of the correction extent. Appears as hover text in the editor.")]
+        [Parameter(Mandatory, ParameterSetName = 'ByTextEdit', HelpMessage = "Description of the correction extent. Appears as hover text in the editor.")]
         [ValidateNotNullOrEmpty()]
         [string] $Description,
 
@@ -186,17 +196,18 @@ function New-NitpickCorrection {
         [Parameter(ParameterSetName='ByLineAndColumn', HelpMessage = "Specifies the output format for the correction extent.")]
         [Parameter(ParameterSetName='ByExtent', HelpMessage = "Specifies the output format for the correction extent.")]
         [Parameter(ParameterSetName = 'ByOffset', HelpMessage = "Specifies the output format for the correction extent.")]
+        [Parameter(ParameterSetName = 'ByTextEdit', HelpMessage = "Specifies the output format for the correction extent.")]
         [ValidateSet('NitpickCorrection', 'CorrectionExtent')]
         [string] $OutputAs = 'NitpickCorrection'
     )
 
     $Correction = $null
     $CorrectionParams = @{
-        StartLineNumber = if ($ViolationExtent) { $ViolationExtent.StartLineNumber } else { $StartLineNumber }
-        EndLineNumber = if ($ViolationExtent) { $ViolationExtent.EndLineNumber } else { $EndLineNumber }
-        StartColumnNumber = if ($ViolationExtent) { $ViolationExtent.StartColumnNumber } else { $StartColumnNumber }
-        EndColumnNumber = if ($ViolationExtent) { $ViolationExtent.EndColumnNumber } else { $EndColumnNumber }
-        ReplacementText = $ReplacementText
+        StartLineNumber = if ($ViolationExtent) { $ViolationExtent.StartLineNumber } elseif ($TextEdit) { $TextEdit.StartLineNumber } else { $StartLineNumber }
+        EndLineNumber = if ($ViolationExtent) { $ViolationExtent.EndLineNumber } elseif ($TextEdit) { $TextEdit.EndLineNumber } else { $EndLineNumber }
+        StartColumnNumber = if ($ViolationExtent) { $ViolationExtent.StartColumnNumber } elseif ($TextEdit) { $TextEdit.StartColumnNumber } else { $StartColumnNumber }
+        EndColumnNumber = if ($ViolationExtent) { $ViolationExtent.EndColumnNumber } elseif ($TextEdit) { $TextEdit.EndColumnNumber } else { $EndColumnNumber }
+        ReplacementText = if ($TextEdit) { $TextEdit.ReplacementText } else { $ReplacementText }
         FilePathOrContext = $FilePathOrContext
         Description = $Description
         Applicability = $Applicability
@@ -209,6 +220,10 @@ function New-NitpickCorrection {
         $CorrectionParams.StartOffset = $StartOffset
         $CorrectionParams.EndOffset = $EndOffset
         $CorrectionParams.ExpectedText = $ExpectedText
+    } elseif ($PSCmdlet.ParameterSetName -eq 'ByTextEdit') {
+        $CorrectionParams.StartOffset = $TextEdit.StartOffset
+        $CorrectionParams.EndOffset = $TextEdit.EndOffset
+        $CorrectionParams.ExpectedText = $TextEdit.ExpectedText
     }
     if ($PSBoundParameters.ContainsKey('ChangeSetId')) {
         $CorrectionParams.ChangeSetId = $ChangeSetId
