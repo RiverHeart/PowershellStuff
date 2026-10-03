@@ -6,7 +6,9 @@
     Evaluates safe, offset-based corrections against immutable in-memory source and
     returns rendered text and parse diagnostics without writing files. Corrections
     sharing a ChangeSetId are accepted or skipped together. A correction without a
-    ChangeSetId forms its own independent change set.
+    ChangeSetId forms its own independent change set. If a candidate introduces parse
+    errors, RenderedText remains the original source and CandidateText contains the
+    rejected output for diagnostics.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -184,6 +186,19 @@ function Resolve-NitpickCorrection {
     # MARK: RENDERING
     # Render and parse the selected batch without changing the source file.
     $Resolution = Resolve-AstDocument -Document $Document -PassThruText
+    $CandidateText = $Resolution.RenderedText
+    $RenderedText = $CandidateText
+
+    if ($AcceptedCorrections.Count -gt 0 -and $Resolution.ParseErrorCount -gt 0) {
+        foreach ($Correction in $AcceptedCorrections) {
+            $SkippedCorrections.Add([pscustomobject]@{
+                Correction = $Correction
+                Reason = 'The rendered correction batch contains parse errors.'
+            })
+        }
+        $AcceptedCorrections.Clear()
+        $RenderedText = $Script
+    }
 
     return [pscustomobject]@{
         PSTypeName = 'Nitpick.CorrectionPreviewResult'
@@ -192,7 +207,8 @@ function Resolve-NitpickCorrection {
         SkippedCorrections = @($SkippedCorrections)
         Conflicts = @($Conflicts)
         ParseErrors = @($Resolution.ParseErrors)
-        RenderedText = $Resolution.RenderedText
+        CandidateText = $CandidateText
+        RenderedText = $RenderedText
         WasWritten = $false
     }
 }

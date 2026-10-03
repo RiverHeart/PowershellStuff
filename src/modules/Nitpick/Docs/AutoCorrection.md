@@ -329,6 +329,7 @@ OriginalFindings
 RemainingFindings
 IntroducedFindings
 Diff
+CandidateText
 RenderedText
 WasWritten
 WriteStatus

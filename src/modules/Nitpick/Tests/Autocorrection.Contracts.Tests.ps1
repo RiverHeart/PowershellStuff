@@ -291,6 +291,41 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result.WasWritten | Should -BeFalse
     }
 
+    It 'rejects candidate text that introduces parse errors' {
+        $Source = '$Value = 1'
+        $Tokens = $null
+        $Errors = $null
+        $Ast = [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $Errors)
+        $Extent = $Ast.EndBlock.Statements[0].Extent
+
+        $Correction = New-NitpickCorrection `
+            -ViolationExtent $Extent `
+            -ReplacementText 'if (' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Introduce invalid syntax for validation.' `
+            -RuleName 'InvalidReplacement'
+
+        $Finding = New-NitpickFinding `
+            -RuleName 'InvalidReplacement' `
+            -Message 'Exercise parse validation.' `
+            -ViolationExtent $Extent `
+            -Severity Information `
+            -RuleSuppressionID 'InvalidReplacement' `
+            -Corrections $Correction `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Exercises rejected candidate text.' `
+            -OutputAs NitpickFinding
+
+        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+
+        $Result.RenderedText | Should -Be $Source
+        $Result.CandidateText | Should -Be 'if ('
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 1
+        $Result.ParseErrors | Should -Not -BeNullOrEmpty
+        $Result.WasWritten | Should -BeFalse
+    }
+
     It 'reports findings and severity counts from final analysis after fixing' -Skip {
         throw 'Phase 4 must integrate final analysis with Start-Nitpicking.'
     }
