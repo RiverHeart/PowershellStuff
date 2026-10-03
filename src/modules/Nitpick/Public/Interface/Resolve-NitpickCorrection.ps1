@@ -65,9 +65,13 @@ function Resolve-NitpickCorrection {
     $Document = New-AstDocument -InputObject $Script
     $AcceptedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
     $SkippedCorrections = [System.Collections.Generic.List[object]]::new()
+    $ValidatedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
+    $Conflicts = [System.Collections.Generic.List[object]]::new()
     $ChangeSets = [ordered]@{}
     $StandaloneCorrectionId = 0
 
+    # MARK: CHANGE SET GROUPING
+    # Build all-or-nothing change sets while keeping ungrouped corrections independent.
     foreach ($Correction in $Finding.Corrections) {
         $ChangeSetKey = if ($Correction.ChangeSetId) {
             "ChangeSet:$($Correction.ChangeSetId)"
@@ -81,6 +85,8 @@ function Resolve-NitpickCorrection {
         $StandaloneCorrectionId++
     }
 
+    # MARK: CHANGE SET VALIDATION
+    # Admit a change set only when every member is safe for this source snapshot.
     foreach ($ChangeSetKey in $ChangeSets.Keys) {
         $ChangeSet = $ChangeSets[$ChangeSetKey]
         $RejectionReason = $null
@@ -121,6 +127,49 @@ function Resolve-NitpickCorrection {
         }
 
         foreach ($Correction in $ChangeSet) {
+            $ValidatedCorrections.Add($Correction)
+        }
+    }
+
+    # MARK: CONFLICT PRECHECK
+    # Preflight every pair before queuing edits so a conflict never requires rollback.
+    for ($ExistingIndex = 0; $ExistingIndex -lt $ValidatedCorrections.Count; $ExistingIndex++) {
+        $ExistingCorrection = $ValidatedCorrections[$ExistingIndex]
+        for (
+            $IncomingIndex = $ExistingIndex + 1
+            $IncomingIndex -lt $ValidatedCorrections.Count
+            $IncomingIndex++
+        ) {
+            $IncomingCorrection = $ValidatedCorrections[$IncomingIndex]
+            $HasSharedInsertionOffset =
+                $ExistingCorrection.StartOffset -eq $ExistingCorrection.EndOffset -and
+                $IncomingCorrection.StartOffset -eq $IncomingCorrection.EndOffset -and
+                $ExistingCorrection.StartOffset -eq $IncomingCorrection.StartOffset
+            $Overlaps =
+                $ExistingCorrection.StartOffset -lt $IncomingCorrection.EndOffset -and
+                $IncomingCorrection.StartOffset -lt $ExistingCorrection.EndOffset
+
+            if ($Overlaps -or $HasSharedInsertionOffset) {
+                $Conflicts.Add([pscustomobject]@{
+                    ExistingCorrection = $ExistingCorrection
+                    IncomingCorrection = $IncomingCorrection
+                    Reason = 'Correction ranges overlap.'
+                })
+            }
+        }
+    }
+
+    # MARK: QUEUE SELECTION
+    # A conflict rejects the target batch; otherwise AstEditor receives it in one pass.
+    if ($Conflicts.Count -gt 0) {
+        foreach ($Correction in $ValidatedCorrections) {
+            $SkippedCorrections.Add([pscustomobject]@{
+                Correction = $Correction
+                Reason = 'The target contains conflicting correction change sets.'
+            })
+        }
+    } else {
+        foreach ($Correction in $ValidatedCorrections) {
             $null = Add-AstTextEdit `
                 -Document $Document `
                 -StartOffset $Correction.StartOffset `
@@ -132,6 +181,8 @@ function Resolve-NitpickCorrection {
         }
     }
 
+    # MARK: RENDERING
+    # Render and parse the selected batch without changing the source file.
     $Resolution = Resolve-AstDocument -Document $Document -PassThruText
 
     return [pscustomobject]@{
@@ -139,7 +190,7 @@ function Resolve-NitpickCorrection {
         Path = '<ScriptBlock>'
         AcceptedCorrections = @($AcceptedCorrections)
         SkippedCorrections = @($SkippedCorrections)
-        Conflicts = @()
+        Conflicts = @($Conflicts)
         ParseErrors = @($Resolution.ParseErrors)
         RenderedText = $Resolution.RenderedText
         WasWritten = $false
