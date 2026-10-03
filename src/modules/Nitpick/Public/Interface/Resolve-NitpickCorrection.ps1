@@ -223,12 +223,12 @@ function Resolve-NitpickCorrection {
     return [pscustomobject]@{
         PSTypeName = 'Nitpick.CorrectionPreviewResult'
         Path = '<ScriptBlock>'
-        OriginalFindings = @($Finding)
-        FinalFindings = @($FinalFindings)
-        AcceptedCorrections = @($AcceptedCorrections)
-        SkippedCorrections = @($SkippedCorrections)
-        Conflicts = @($Conflicts)
-        ParseErrors = @($Resolution.ParseErrors)
+        OriginalFindings = $Finding
+        FinalFindings = $FinalFindings.ToArray()
+        AcceptedCorrections = $AcceptedCorrections.ToArray()
+        SkippedCorrections = $SkippedCorrections.ToArray()
+        Conflicts = $Conflicts.ToArray()
+        ParseErrors = $Resolution.ParseErrors
         CandidateText = $CandidateText
         RenderedText = $RenderedText
         WasReanalyzed = $WasReanalyzed
