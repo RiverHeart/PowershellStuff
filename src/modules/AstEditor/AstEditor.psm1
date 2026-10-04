@@ -283,13 +283,13 @@ class AstDocument {
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 
-$Folders = @(
+$Paths = @(
     'Private'
     'Public'
 )
 
-foreach ($Path in $Folders) {
-    Get-ChildItem -LiteralPath (Join-Path $ModuleRoot $Path) -Filter '*.ps1' |
+foreach ($Path in $Paths) {
+    Get-ChildItem -Path "$ModuleRoot/$Path" -Recurse -Filter '*.ps1' |
         ForEach-Object {
             . $_.FullName
         }
