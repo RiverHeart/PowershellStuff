@@ -16,6 +16,7 @@
         'Find-AEAstNode'
         'New-AstDocument'
         'New-AstCollectionEdit'
+        'New-AstTextEdit'
         'Resolve-AstDocument'
         'Save-AstDocument'
         'Set-AstFunction'

@@ -61,7 +61,8 @@ Describe 'New-AstCollectionEdit' {
             $Edit.EndOffset - $Edit.StartOffset
         ).Insert($Edit.StartOffset, $Edit.ReplacementText)
 
-        $Edit.PSTypeNames | Should -Contain 'AstEditor.CollectionEdit'
+        $Edit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
+        $Edit.Reason | Should -Not -BeNullOrEmpty
         $Edit.ExpectedText | Should -Be $DocumentSource.Substring(
             $Edit.StartOffset,
             $Edit.EndOffset - $Edit.StartOffset

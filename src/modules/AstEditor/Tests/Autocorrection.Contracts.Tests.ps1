@@ -5,6 +5,29 @@ $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
 
 Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
+    It 'constructs one detached edit contract from extents and validated offsets' {
+        $Document = New-AstDocument -InputObject "`$First = 1`n`$Second = 2"
+        $Extent = $Document.Ast.EndBlock.Statements[1].Extent
+
+        $ExtentEdit = New-AstTextEdit `
+            -Extent $Extent `
+            -ReplacementText '$Second = 3' `
+            -Reason 'Replace the second assignment'
+        $OffsetEdit = New-AstTextEdit `
+            -Document $Document `
+            -StartOffset $Extent.StartOffset `
+            -EndOffset $Extent.EndOffset `
+            -ExpectedText '$Second = 2' `
+            -ReplacementText '$Second = 3' `
+            -Reason 'Replace the second assignment'
+
+        $ExtentEdit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
+        $OffsetEdit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
+        $OffsetEdit.StartLineNumber | Should -Be 2
+        $OffsetEdit.StartColumnNumber | Should -Be 1
+        $OffsetEdit.ExpectedText | Should -Be $ExtentEdit.ExpectedText
+    }
+
     It 'treats edit ranges as zero-based and end-exclusive' {
         $Document = New-AstDocument -InputObject '0123456789'
 
@@ -30,6 +53,56 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result = Resolve-AstDocument -Document $Document -PassThruText
 
         $Result.RenderedText | Should -Be '>aBCFGHIJhij'
+    }
+
+    It 'atomically queues a detached edit batch' {
+        $Document = New-AstDocument -InputObject 'abcdefghij'
+        $Edits = @(
+            New-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 3 -ReplacementText 'BC' -Reason 'First edit'
+            New-AstTextEdit -Document $Document -StartOffset 5 -EndOffset 7 -ReplacementText 'FG' -Reason 'Second edit'
+        )
+
+        $Queued = @(Add-AstTextEdit -Document $Document -TextEdit $Edits)
+        $Result = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Queued | Should -HaveCount 2
+        $Document.Edits | Should -HaveCount 2
+        $Result.RenderedText | Should -Be 'aBCdeFGhij'
+    }
+
+    It 'rejects a stale detached batch without queueing any member' {
+        $Document = New-AstDocument -InputObject 'abcdef'
+        $ValidEdit = New-AstTextEdit -Document $Document -StartOffset 0 -EndOffset 1 -ReplacementText 'A' -Reason 'Valid edit'
+        $StaleEdit = [pscustomobject] @{
+            PSTypeName = 'AstEditor.TextEdit'
+            StartLineNumber = 1
+            EndLineNumber = 1
+            StartColumnNumber = 3
+            EndColumnNumber = 4
+            StartOffset = 2
+            EndOffset = 3
+            ExpectedText = 'x'
+            ReplacementText = 'C'
+            Reason = 'Stale edit'
+        }
+
+        { Add-AstTextEdit -Document $Document -TextEdit @($ValidEdit, $StaleEdit) } |
+            Should -Throw '*Expected source text mismatch*'
+
+        $Document.Edits | Should -HaveCount 0
+    }
+
+    It 'rejects a conflicting detached batch without queueing any member' {
+        $Document = New-AstDocument -InputObject 'abcdef'
+        $Edits = @(
+            New-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 4 -ReplacementText 'first' -Reason 'First edit'
+            New-AstTextEdit -Document $Document -StartOffset 3 -EndOffset 5 -ReplacementText 'second' -Reason 'Second edit'
+        )
+
+        { Add-AstTextEdit -Document $Document -TextEdit $Edits } |
+            Should -Throw '*First edit*Second edit*'
+
+        $Document.Edits | Should -HaveCount 0
     }
 
     It 'accepts ranges that meet at an end-exclusive boundary' {

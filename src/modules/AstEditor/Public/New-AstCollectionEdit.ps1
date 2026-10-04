@@ -22,6 +22,9 @@ using namespace System.Management.Automation.Language
 .PARAMETER Delimiter
     The token kind separating collection elements. The default is Comma.
 
+.PARAMETER Reason
+    A description identifying the structural edit in previews and diagnostics.
+
 .EXAMPLE
     $Document = New-AstDocument -InputObject @'
     param([Parameter(Position=0,Mandatory=$false)] [string] $Name)
@@ -55,7 +58,10 @@ function New-AstCollectionEdit {
         [Parameter(Mandatory)]
         [Ast] $Within,
 
-        [TokenKind] $Delimiter = [TokenKind]::Comma
+        [TokenKind] $Delimiter = [TokenKind]::Comma,
+
+        [ValidateNotNullOrEmpty()]
+        [string] $Reason = 'Remove an element from a delimited collection'
     )
 
     $ElementIndex = [array]::IndexOf($From, $Remove)
@@ -116,8 +122,7 @@ function New-AstCollectionEdit {
     $EndOffset = $EndPosition.Offset
 
     return [pscustomobject]@{
-        PSTypeName = 'AstEditor.CollectionEdit'
-        Operation = 'Remove'
+        PSTypeName = 'AstEditor.TextEdit'
         StartLineNumber = $StartPosition.LineNumber
         EndLineNumber = $EndPosition.LineNumber
         StartColumnNumber = $StartPosition.ColumnNumber
@@ -126,5 +131,6 @@ function New-AstCollectionEdit {
         EndOffset = $EndOffset
         ExpectedText = $SourceText.Substring($StartOffset, $EndOffset - $StartOffset)
         ReplacementText = $ReplacementText
+        Reason = $Reason
     }
 }

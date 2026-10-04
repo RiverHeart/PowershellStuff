@@ -5,9 +5,10 @@ using namespace System.Management.Automation.Language
     Queues a validated text edit against an AstDocument source snapshot.
 
 .DESCRIPTION
-    Adds one zero-based, end-exclusive text edit to an AstDocument. The edit is
-    validated against the document's immutable OriginalText and conflicts with
-    previously queued edits are rejected.
+    Atomically validates and queues one or more detached edits against an
+    AstDocument. Every edit is checked against the document's immutable
+    OriginalText before any edit is queued. Conflicts with previously queued
+    edits or other members of the supplied batch reject the complete batch.
 
     ExpectedText can be supplied as a stale-source guard. Its value must exactly
     match the source text in the requested range before the edit is queued.
@@ -23,6 +24,9 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER Extent
     A script extent whose offsets define the edit range.
+
+.PARAMETER TextEdit
+    One or more detached AstEditor.TextEdit objects to validate and queue atomically.
 
 .PARAMETER ReplacementText
     Text that replaces the selected range. Use an empty string for deletion.
@@ -62,66 +66,116 @@ function Add-AstTextEdit {
         [Parameter(Mandatory, ParameterSetName = 'ByExtent')]
         [IScriptExtent] $Extent,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'ByTextEdit', ValueFromPipeline)]
+        [ValidateScript({ $_.PSTypeNames -contains 'AstEditor.TextEdit' })]
+        [psobject[]] $TextEdit,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
+        [Parameter(Mandatory, ParameterSetName = 'ByExtent')]
         [AllowEmptyString()]
         [string] $ReplacementText,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
+        [Parameter(Mandatory, ParameterSetName = 'ByExtent')]
         [ValidateNotNullOrEmpty()]
         [string] $Reason,
 
+        [Parameter(ParameterSetName = 'ByOffset')]
+        [Parameter(ParameterSetName = 'ByExtent')]
         [AllowEmptyString()]
         [string] $ExpectedText
     )
 
-    $ResolvedStartOffset = if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
-        $Extent.StartOffset
+    $Edits = if ($PSCmdlet.ParameterSetName -eq 'ByTextEdit') {
+        @($TextEdit)
     } else {
-        $StartOffset
-    }
-    $ResolvedEndOffset = if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
-        $Extent.EndOffset
-    } else {
-        $EndOffset
-    }
-
-    if ($ResolvedStartOffset -lt 0) {
-        throw 'StartOffset must be non-negative.'
-    }
-    if ($ResolvedEndOffset -lt $ResolvedStartOffset) {
-        throw 'EndOffset must be greater than or equal to StartOffset.'
-    }
-    if ($ResolvedEndOffset -gt $Document.OriginalText.Length) {
-        throw "EndOffset $ResolvedEndOffset exceeds document length $($Document.OriginalText.Length)."
-    }
-
-    $ActualText = $Document.OriginalText.Substring(
-        $ResolvedStartOffset,
-        $ResolvedEndOffset - $ResolvedStartOffset
-    )
-    if ($PSBoundParameters.ContainsKey('ExpectedText') -and $ActualText -cne $ExpectedText) {
-        throw "Expected source text mismatch at offsets [$ResolvedStartOffset, $ResolvedEndOffset)."
-    }
-
-    $Document.ReplaceRange(
-        $ResolvedStartOffset,
-        $ResolvedEndOffset,
-        $ReplacementText,
-        $Reason
-    )
-
-    return [pscustomobject] @{
-        PSTypeName = 'AstEditor.TextEditResult'
-        Status = 'Queued'
-        Path = $Document.Path
-        StartOffset = $ResolvedStartOffset
-        EndOffset = $ResolvedEndOffset
-        ReplacementText = $ReplacementText
-        Reason = $Reason
-        ExpectedText = if ($PSBoundParameters.ContainsKey('ExpectedText')) {
-            $ExpectedText
+        $NewEditParameters = @{
+            ReplacementText = $ReplacementText
+            Reason = $Reason
+        }
+        if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
+            $NewEditParameters.Extent = $Extent
+            if ($PSBoundParameters.ContainsKey('ExpectedText') -and $Extent.Text -cne $ExpectedText) {
+                throw "Expected source text mismatch at offsets [$($Extent.StartOffset), $($Extent.EndOffset))."
+            }
         } else {
-            $null
+            $NewEditParameters.Document = $Document
+            $NewEditParameters.StartOffset = $StartOffset
+            $NewEditParameters.EndOffset = $EndOffset
+            if ($PSBoundParameters.ContainsKey('ExpectedText')) {
+                $NewEditParameters.ExpectedText = $ExpectedText
+            }
+        }
+
+        @(New-AstTextEdit @NewEditParameters)
+    }
+
+    $ValidatedEdits = [System.Collections.Generic.List[psobject]]::new()
+    foreach ($Edit in $Edits) {
+        if ($Edit.StartOffset -lt 0) {
+            throw 'StartOffset must be non-negative.'
+        }
+        if ($Edit.EndOffset -lt $Edit.StartOffset) {
+            throw 'EndOffset must be greater than or equal to StartOffset.'
+        }
+        if ($Edit.EndOffset -gt $Document.OriginalText.Length) {
+            throw "EndOffset $($Edit.EndOffset) exceeds document length $($Document.OriginalText.Length)."
+        }
+
+        $ActualText = $Document.OriginalText.Substring(
+            $Edit.StartOffset,
+            $Edit.EndOffset - $Edit.StartOffset
+        )
+        if ($ActualText -cne $Edit.ExpectedText) {
+            $Message = "Expected source text mismatch at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
+            $Exception = [InvalidOperationException]::new($Message)
+            $Exception.Data['FailureKind'] = 'ExpectedTextMismatch'
+            $Exception.Data['IncomingEdit'] = $Edit
+            throw $Exception
+        }
+
+        foreach ($ExistingEdit in @($Document.Edits) + $ValidatedEdits.ToArray()) {
+            $HasSharedInsertionOffset =
+                $ExistingEdit.StartOffset -eq $ExistingEdit.EndOffset -and
+                $Edit.StartOffset -eq $Edit.EndOffset -and
+                $ExistingEdit.StartOffset -eq $Edit.StartOffset
+            $Overlaps =
+                $ExistingEdit.StartOffset -lt $Edit.EndOffset -and
+                $Edit.StartOffset -lt $ExistingEdit.EndOffset
+
+            if ($Overlaps -or $HasSharedInsertionOffset) {
+                $Message = "Edit conflict detected between '$($ExistingEdit.Reason)' at offsets [$($ExistingEdit.StartOffset), $($ExistingEdit.EndOffset)) and '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
+                $Exception = [InvalidOperationException]::new($Message)
+                $Exception.Data['FailureKind'] = 'Conflict'
+                $Exception.Data['ExistingEdit'] = $ExistingEdit
+                $Exception.Data['IncomingEdit'] = $Edit
+                throw $Exception
+            }
+        }
+
+        $ValidatedEdits.Add($Edit)
+    }
+
+    foreach ($Edit in $ValidatedEdits) {
+        $Document.ReplaceRange(
+            $Edit.StartOffset,
+            $Edit.EndOffset,
+            $Edit.ReplacementText,
+            $Edit.Reason
+        )
+    }
+
+    foreach ($Edit in $ValidatedEdits) {
+        [pscustomobject] @{
+            PSTypeName = 'AstEditor.TextEditResult'
+            Status = 'Queued'
+            Path = $Document.Path
+            TextEdit = $Edit
+            StartOffset = $Edit.StartOffset
+            EndOffset = $Edit.EndOffset
+            ReplacementText = $Edit.ReplacementText
+            Reason = $Edit.Reason
+            ExpectedText = $Edit.ExpectedText
         }
     }
 }
