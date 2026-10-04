@@ -3,7 +3,7 @@ using namespace System.Management.Automation.Language
 $ErrorActionPreference = 'Stop'
 
 BeforeAll {
-    Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+    Import-Module "$PSScriptRoot/../../AstEditor.psd1" -Force
 }
 
 AfterAll {
