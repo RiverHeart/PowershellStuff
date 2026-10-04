@@ -258,8 +258,28 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result.Conflicts[0].IncomingCorrection.RuleName | Should -Be 'ReplaceAssignment'
     }
 
-    It 'keeps preview mode from changing file-backed targets' -Skip {
-        throw 'Phase 3 must add the preview-only correction coordinator.'
+    It 'keeps preview mode from changing file-backed targets' {
+        $Path = Join-Path $TestDrive 'Preview.ps1'
+        $Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
+        [System.IO.File]::WriteAllText($Path, $Source)
+
+        $Results = @(
+            Start-Nitpicking `
+                -Path $Path `
+                -IncludeRule AvoidParameterAttributeBool `
+                -Fix `
+                -Preview `
+                -Output Object `
+                -NoSummary
+        )
+        $Preview = $Results | Where-Object {
+            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+        }
+
+        $Preview.Path | Should -Be (Resolve-Path -LiteralPath $Path).Path
+        $Preview.RenderedText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
+        [System.IO.File]::ReadAllText($Path) | Should -Be $Source
+        $Preview.WasWritten | Should -BeFalse
     }
 
     It 'returns rendered text instead of writing for in-memory targets' {
@@ -375,11 +395,156 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result.WasWritten | Should -BeFalse
     }
 
-    It 'reports findings and severity counts from final analysis after fixing' -Skip {
-        throw 'Phase 4 must integrate final analysis with Start-Nitpicking.'
+    It 'reports findings and severity counts from final analysis after fixing' {
+        $Rule = {
+            param([ScriptBlockAst] $ScriptBlockAst)
+
+            $Assignment = $ScriptBlockAst.EndBlock.Statements | Select-Object -First 1
+            if ($null -eq $Assignment) {
+                return
+            }
+
+            $Corrections = @()
+            if ($Assignment.Extent.Text -eq '$Value = 1') {
+                $Severity = 'Error'
+                $Corrections = @(
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText '$Value = 2' `
+                        -FilePathOrContext '<ScriptBlock>' `
+                        -Description 'Replace the value.' `
+                        -RuleName 'FinalSeverityRule'
+                )
+            } elseif ($Assignment.Extent.Text -eq '$Value = 2') {
+                $Severity = 'Warning'
+            } else {
+                return
+            }
+
+            $FindingParameters = @{
+                RuleName = 'FinalSeverityRule'
+                Message = 'Final analysis finding.'
+                ViolationExtent = $Assignment.Extent
+                Severity = $Severity
+                RuleSuppressionID = 'FinalSeverityRule'
+                ScriptPath = '<ScriptBlock>'
+                Explanation = 'Verifies final analysis severity counts.'
+                OutputAs = 'NitpickFinding'
+            }
+            if ($Corrections.Count -gt 0) {
+                $FindingParameters.Corrections = $Corrections
+            }
+            New-NitpickFinding @FindingParameters
+        }
+        Register-Nitpick -Callable $Rule -Name FinalSeverityRule -Source Tests
+        $Errors = @()
+
+        $Results = @(
+            Start-Nitpicking `
+                -Script '$Value = 1' `
+                -IncludeRule FinalSeverityRule `
+                -Fix `
+                -ErrorOn Error `
+                -Output Object `
+                -ErrorAction SilentlyContinue `
+                -ErrorVariable Errors
+        )
+        $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
+        $Preview = $Results | Where-Object {
+            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+        }
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+        $Findings | Should -HaveCount 1
+        $Findings[0].Severity | Should -Be 'Warning'
+        $Preview.FinalFindings | Should -HaveCount 1
+        $Preview.FinalFindings[0].Severity | Should -Be 'Warning'
+        $Preview.AcceptedCorrections | Should -HaveCount 1
+        $Summary.FindingCount | Should -Be 1
+        $Summary.ErrorCount | Should -Be 0
+        $Summary.WarningCount | Should -Be 1
+        $Errors | Should -BeNullOrEmpty
     }
 
-    It 'isolates a failed target without partially applying other target transactions' -Skip {
-        throw 'Phase 4 must implement multi-target failure isolation.'
+    It 'isolates a failed target without partially applying other target transactions' {
+        $ConflictPath = Join-Path $TestDrive 'Conflict.ps1'
+        $ValidPath = Join-Path $TestDrive 'Valid.ps1'
+        $ConflictSource = '$Value = 123'
+        $ValidSource = '$Value = 1'
+        [System.IO.File]::WriteAllText($ConflictPath, $ConflictSource)
+        [System.IO.File]::WriteAllText($ValidPath, $ValidSource)
+
+        $Rule = {
+            param([ScriptBlockAst] $ScriptBlockAst)
+
+            $Assignment = $ScriptBlockAst.EndBlock.Statements | Select-Object -First 1
+            if ($null -eq $Assignment) {
+                return
+            }
+
+            $Corrections = if ($Assignment.Extent.Text -eq '$Value = 123') {
+                @(
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText '$Value = 456' `
+                        -FilePathOrContext $Assignment.Extent.File `
+                        -Description 'First conflicting replacement.' `
+                        -RuleName 'PerTargetRule'
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText '$Value = 789' `
+                        -FilePathOrContext $Assignment.Extent.File `
+                        -Description 'Second conflicting replacement.' `
+                        -RuleName 'PerTargetRule'
+                )
+            } elseif ($Assignment.Extent.Text -eq '$Value = 1') {
+                @(
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText '$Value = 2' `
+                        -FilePathOrContext $Assignment.Extent.File `
+                        -Description 'Valid replacement.' `
+                        -RuleName 'PerTargetRule'
+                )
+            } else {
+                return
+            }
+
+            New-NitpickFinding `
+                -RuleName 'PerTargetRule' `
+                -Message 'Per-target correction test.' `
+                -ViolationExtent $Assignment.Extent `
+                -Severity Information `
+                -RuleSuppressionID 'PerTargetRule' `
+                -Corrections $Corrections `
+                -ScriptPath $Assignment.Extent.File `
+                -Explanation 'Verifies target preview failure isolation.' `
+                -OutputAs NitpickFinding
+        }
+        Register-Nitpick -Callable $Rule -Name PerTargetRule -Source Tests
+
+        $Results = @(
+            Start-Nitpicking `
+                -Path $TestDrive `
+                -IncludeRule PerTargetRule `
+                -Fix `
+                -Output Object `
+                -NoSummary
+        )
+        $Previews = @($Results | Where-Object {
+            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+        })
+        $ConflictPreview = $Previews | Where-Object Path -eq $ConflictPath
+        $ValidPreview = $Previews | Where-Object Path -eq $ValidPath
+
+        $ConflictPreview.AcceptedCorrections | Should -HaveCount 0
+        $ConflictPreview.SkippedCorrections | Should -HaveCount 2
+        $ConflictPreview.Conflicts | Should -HaveCount 1
+        $ConflictPreview.RenderedText | Should -Be $ConflictSource
+        $ValidPreview.AcceptedCorrections | Should -HaveCount 1
+        $ValidPreview.SkippedCorrections | Should -HaveCount 0
+        $ValidPreview.RenderedText | Should -Be '$Value = 2'
+        [System.IO.File]::ReadAllText($ConflictPath) | Should -Be $ConflictSource
+        [System.IO.File]::ReadAllText($ValidPath) | Should -Be $ValidSource
     }
 }

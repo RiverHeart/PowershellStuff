@@ -207,6 +207,93 @@ Describe 'Start-Nitpicking' {
         $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+OutOfOrder$'
     }
 
+    It 'previews corrections and summarizes final findings for in-memory input' {
+        $Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
+        $Results = @(
+            Start-Nitpicking `
+                -Script $Source `
+                -IncludeRule AvoidParameterAttributeBool `
+                -Fix `
+                -Preview `
+                -Output Object
+        )
+        $Preview = $Results | Where-Object {
+            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+        }
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+        $Preview | Should -Not -BeNullOrEmpty
+        $Preview.RenderedText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
+        $Preview.Diff | Should -Match 'Mandatory=\$true'
+        $Preview.Diff | Should -Match 'Mandatory'
+        $Preview.AcceptedCorrections | Should -HaveCount 1
+        $Preview.WasWritten | Should -BeFalse
+        $Summary.FindingCount | Should -Be 0
+        $Summary.InformationCount | Should -Be 0
+    }
+
+    It 'requires Fix when Preview is specified' {
+        {
+            Start-Nitpicking `
+                -Script '$Value = 1' `
+                -Preview `
+                -NoSummary
+        } | Should -Throw 'The Preview switch requires Fix.'
+    }
+
+    It 'exposes rejected corrections and conflicts in object output' {
+        $Rule = {
+            param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
+
+            $Extent = $ScriptBlockAst.EndBlock.Statements[0].Extent
+            $Corrections = @(
+                New-NitpickCorrection `
+                    -ViolationExtent $Extent `
+                    -ReplacementText '$Value = 456' `
+                    -FilePathOrContext '<ScriptBlock>' `
+                    -Description 'First replacement.' `
+                    -RuleName 'ConflictingRule'
+
+                New-NitpickCorrection `
+                    -ViolationExtent $Extent `
+                    -ReplacementText '$Value = 789' `
+                    -FilePathOrContext '<ScriptBlock>' `
+                    -Description 'Second replacement.' `
+                    -RuleName 'ConflictingRule'
+            )
+
+            New-NitpickFinding `
+                -RuleName 'ConflictingRule' `
+                -Message 'Conflicting correction test.' `
+                -ViolationExtent $Extent `
+                -Severity Information `
+                -RuleSuppressionID 'ConflictingRule' `
+                -Corrections $Corrections `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
+                -OutputAs NitpickFinding
+        }
+        Register-Nitpick -Callable $Rule -Name ConflictingRule -Source Tests
+
+        $Results = @(
+            Start-Nitpicking `
+                -Script '$Value = 123' `
+                -IncludeRule ConflictingRule `
+                -Fix `
+                -Preview `
+                -Output Object `
+                -NoSummary
+        )
+        $Preview = $Results | Where-Object {
+            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+        }
+
+        $Preview.SkippedCorrections | Should -HaveCount 2
+        $Preview.Conflicts | Should -HaveCount 1
+        $Preview.RenderedText | Should -Be '$Value = 123'
+        $Preview.Diff | Should -Be 'No queued edits.'
+    }
+
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {
         $RuleName = "Threshold$FindingSeverity"
         $RuleSeverity = $FindingSeverity

@@ -6,25 +6,36 @@ using namespace System.Management.Automation.Language
 
 .DESCRIPTION
     Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
-    Ordinary lint behavior is unchanged unless Fix is specified.
-
-    Fix is reserved for Nitpick's preview-first autocorrection workflow. Until that
-    workflow is implemented, Fix does not change files or alter lint results.
+    Ordinary lint behavior is unchanged unless Fix is specified. In this phase Fix previews
+    safe corrections and reanalyzes the rendered source; it never writes files.
 
 .PARAMETER Fix
-    Requests Nitpick's autocorrection workflow. Autocorrection is based on one immutable
-    source snapshot per target, and file writes require a separate explicit apply step.
+    Requests Nitpick's autocorrection workflow. In this phase, Fix previews safe corrections
+    against one immutable source snapshot per target. File-backed and in-memory inputs are
+    never modified.
 
-    This parameter is currently reserved and does not change files or lint results.
+.PARAMETER Preview
+    Previews safe corrections against one immutable source snapshot per target. Final
+    findings and severity counts reflect reanalysis when the rendered source parses. Use
+    with Fix to explicitly request preview-only behavior; Preview without Fix is invalid.
 
 .PARAMETER EditorMode
     Runs only rules whose EditorEnabled metadata is true.
+
+.EXAMPLE
+    Run Start-Nitpicking against a script and preview safe corrections.
+
+    Start-Nitpicking `
+        -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+        -IncludeRule AvoidParameterAttributeBool `
+        -Fix `
+        -Preview
 #>
 function Start-Nitpicking {
     [CmdletBinding(DefaultParameterSetName='Path')]
     [Alias('nitpick', 'np')]
     [OutputType([string])]
-    [OutputType('NitpickFinding', 'NitpickSummary')]
+    [OutputType('NitpickFinding', 'NitpickSummary', 'Nitpick.CorrectionPreviewResult')]
     param(
         [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
         [string] $Path,
@@ -52,10 +63,15 @@ function Start-Nitpicking {
 
         [switch] $EditorMode,
         [switch] $NoSummary,
-        [switch] $Fix
+        [switch] $Fix,
+        [switch] $Preview
     )
 
     begin {
+        if ($Preview -and -not $Fix) {
+            throw 'The Preview switch requires Fix.'
+        }
+
         Find-Nitpick `
             -IncludeRule $IncludeRule `
             -ExcludeRule $ExcludeRule |
@@ -109,6 +125,7 @@ function Start-Nitpicking {
         foreach ($Ast in $Asts) {
             $Summary.TargetCount++
             $TargetFindings = [System.Collections.Generic.List[object]]::new()
+            $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                     $Ast.Extent.File
@@ -121,31 +138,82 @@ function Start-Nitpicking {
                     continue
                 }
 
+                $ApplicableRules.Add($Rule)
                 foreach ($Finding in $Rule.Invoke($Ast)) {
-                    $Summary.FindingCount++
-                    switch ($Finding.Severity) {
-                        'Error' { $Summary.ErrorCount++ }
-                        'Warning' { $Summary.WarningCount++ }
-                        'Information' { $Summary.InformationCount++ }
-                    }
-
-                    if ($ErrorOn -and
-                        $SeverityRank.ContainsKey($Finding.Severity) -and
-                        $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]
-                    ) {
-                        $ThresholdFindingCount++
-                    }
-
-                    if ($Output -eq 'Object') {
-                        Write-Output $Finding
-                    } else {
-                        $TargetFindings.Add($Finding)
-                    }
+                    $TargetFindings.Add($Finding)
                 }
             }
 
-            if ($Output -eq 'Text' -and $TargetFindings.Count -gt 0) {
-                $SortedFindings = $TargetFindings | Sort-Object `
+            $FinalFindings = $TargetFindings.ToArray()
+            $CorrectionPreview = $null
+            if ($Fix) {
+                $ResolveParameters = @{
+                    Script = $Ast.Extent.Text
+                    Finding = $TargetFindings.ToArray()
+                    Rule = $ApplicableRules.ToArray()
+                }
+                if ($Ast.Extent.File) {
+                    $ResolveParameters.Path = $Ast.Extent.File
+                }
+
+                $CorrectionPreview = Resolve-NitpickCorrection @ResolveParameters
+                $FinalFindings = if ($CorrectionPreview.WasReanalyzed) {
+                    $CorrectionPreview.FinalFindings
+                } else {
+                    $TargetFindings.ToArray()
+                }
+
+                Write-Verbose (
+                    "Correction preview for '{0}': {1} accepted, {2} skipped." -f
+                    $CorrectionPreview.Path,
+                    $CorrectionPreview.AcceptedCorrections.Count,
+                    $CorrectionPreview.SkippedCorrections.Count
+                )
+                foreach ($SkippedCorrection in $CorrectionPreview.SkippedCorrections) {
+                    Write-Verbose (
+                        "Skipped correction from '{0}': {1}" -f
+                        $SkippedCorrection.Correction.RuleName,
+                        $SkippedCorrection.Reason
+                    )
+                }
+            }
+
+            foreach ($Finding in $FinalFindings) {
+                $Summary.FindingCount++
+                switch ($Finding.Severity) {
+                    'Error' { $Summary.ErrorCount++ }
+                    'Warning' { $Summary.WarningCount++ }
+                    'Information' { $Summary.InformationCount++ }
+                }
+
+                if ($ErrorOn -and
+                    $SeverityRank.ContainsKey($Finding.Severity) -and
+                    $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]
+                ) {
+                    $ThresholdFindingCount++
+                }
+
+                if ($Output -eq 'Object') {
+                    Write-Output $Finding
+                }
+            }
+
+            if ($Output -eq 'Object' -and $CorrectionPreview) {
+                Write-Output $CorrectionPreview
+            }
+
+            if ($Output -eq 'Text' -and $CorrectionPreview) {
+                Write-Output "Correction preview:`n"
+                Write-Output $CorrectionPreview.Diff
+                Write-Output (
+                    "`n{0} accepted, {1} skipped; files were not changed." -f
+                    $CorrectionPreview.AcceptedCorrections.Count,
+                    $CorrectionPreview.SkippedCorrections.Count
+                )
+            }
+
+            if ($Output -eq 'Text' -and $FinalFindings.Count -gt 0) {
+                $SortedFindings = $FinalFindings | Sort-Object `
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
                 ConvertTo-NitpickText -Ast $Ast -Finding $SortedFindings

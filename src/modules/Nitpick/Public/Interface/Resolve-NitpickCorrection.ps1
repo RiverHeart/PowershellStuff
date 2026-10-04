@@ -8,7 +8,8 @@
     correction without a ChangeSetId forms its own independent change set. If the
     selected batch is stale or conflicting, AstEditor rejects it without queueing any
     member. If a candidate introduces parse errors, RenderedText remains the original
-    source and CandidateText contains the rejected output for diagnostics.
+    source and CandidateText contains the rejected output for diagnostics. The result
+    includes the edit diff and final findings when rules are supplied.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -19,6 +20,9 @@
 .PARAMETER Rule
     Selected Nitpick rules to rerun against valid rendered text. When omitted, the
     correction preview is returned without final reanalysis.
+
+.PARAMETER Path
+    Optional source path used to retain file identity during final rule analysis.
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
@@ -77,9 +81,13 @@ function Resolve-NitpickCorrection {
         [string] $Script,
 
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [NitpickFinding[]] $Finding,
 
-        [NitpickRule[]] $Rule
+        [NitpickRule[]] $Rule,
+
+        [AllowNull()]
+        [string] $Path
     )
 
     $Document = New-AstDocument -InputObject $Script
@@ -211,9 +219,20 @@ function Resolve-NitpickCorrection {
     # Rerun only the caller-selected rules, and only after rendered text passes validation.
     $WasReanalyzed = $false
     if ($Rule.Count -gt 0 -and $Resolution.ParseErrorCount -eq 0) {
-        $RenderedDocument = New-AstDocument -InputObject $RenderedText
+        $RenderedAst = if ($Path) {
+            $Tokens = $null
+            $ParseErrors = $null
+            [Parser]::ParseInput(
+                $RenderedText,
+                $Path,
+                [ref] $Tokens,
+                [ref] $ParseErrors
+            )
+        } else {
+            (New-AstDocument -InputObject $RenderedText).Ast
+        }
         foreach ($SelectedRule in $Rule) {
-            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument.Ast)) {
+            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedAst)) {
                 $FinalFindings.Add($FinalFinding)
             }
         }
@@ -222,7 +241,7 @@ function Resolve-NitpickCorrection {
 
     return [pscustomobject]@{
         PSTypeName = 'Nitpick.CorrectionPreviewResult'
-        Path = '<ScriptBlock>'
+        Path = if ($Path) { $Path } else { '<ScriptBlock>' }
         OriginalFindings = $Finding
         FinalFindings = $FinalFindings.ToArray()
         AcceptedCorrections = $AcceptedCorrections.ToArray()
@@ -231,6 +250,7 @@ function Resolve-NitpickCorrection {
         ParseErrors = $Resolution.ParseErrors
         CandidateText = $CandidateText
         RenderedText = $RenderedText
+        Diff = Show-AstDiff -Document $Document
         WasReanalyzed = $WasReanalyzed
         WasWritten = $false
     }

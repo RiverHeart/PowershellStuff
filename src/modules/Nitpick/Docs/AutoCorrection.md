@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 3A are implemented. Phase 4, integrating preview with `Start-Nitpicking`, is next. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 through 4 are implemented. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -260,6 +260,8 @@ Every native correction has one authoritative AstEditor edit, AstEditor exclusiv
 
 ## Phase 4: Integrate Preview with `Start-Nitpicking`
 
+**Status: Complete**
+
 ### Objective
 
 Connect the proven preview engine to Nitpick's user-facing command without changing ordinary lint behavior.
@@ -269,10 +271,10 @@ Connect the proven preview engine to Nitpick's user-facing command without chang
 - Refactor `Start-Nitpicking` to collect all findings for a target before emitting output or calculating summaries.
 - Route fix mode through `Resolve-NitpickCorrection`.
 - Submit the selected target batch through AstEditor's atomic batch API rather than prevalidating edits in Nitpick.
-- Expose preview through `Start-Nitpicking -Fix -WhatIf` or the command surface selected in Phase 0.
+- Expose preview through `Start-Nitpicking -Fix -Preview`; during Phase 4, `-Fix` alone also remains preview-only.
 - Emit and count final findings after correction and reanalysis.
-- Include rejected and conflicting corrections in object output.
-- Return rendered text for in-memory inputs.
+- Include rejected corrections, conflicts, rendered text, and the diff in object output.
+- Return rendered text for in-memory inputs without modifying files.
 - Keep text output concise and direct detailed consumers to object or verbose output.
 - Preserve existing behavior when `-Fix` is absent.
 
@@ -432,7 +434,6 @@ This order keeps AstEditor work demand-driven while preventing Nitpick from beco
 
 ## Open Decisions
 
-- Whether preview should be `Start-Nitpicking -Fix -WhatIf`, a `-PreviewFix` switch, or a separate command.
 - Whether line-and-column-only third-party corrections can be resolved safely or must remain PSScriptAnalyzer-only.
 - Whether final validation requires only successful parsing or also zero newly introduced findings.
 - Whether changed severity or message identity is sufficient to match findings across passes.
