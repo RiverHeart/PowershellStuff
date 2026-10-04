@@ -66,8 +66,11 @@ function Edit-PSFunction {
         }
 
         if ($PSCmdlet.ShouldProcess($Document.Path, "Replace function '$Name'")) {
-            Save-AstDocument -Document $Document -Confirm:$false
-            $Applied = $true
+            $WriteResult = Save-AstDocument -Document $Document -Confirm:$false
+            if ($WriteResult.ErrorRecord) {
+                $PSCmdlet.WriteError($WriteResult.ErrorRecord)
+            }
+            $Applied = $WriteResult.WasWritten
         }
     }
 

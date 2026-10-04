@@ -1,3 +1,32 @@
+## Autocorrection
+
+Preview safe corrections and view the diff without modifying files:
+
+```powershell
+Start-Nitpicking -Path .\Example.ps1 -Fix -Preview
+```
+
+Apply the same validated transaction, or preview using standard PowerShell confirmation semantics:
+
+```powershell
+Start-Nitpicking -Path .\Example.ps1 -Fix -Confirm
+Start-Nitpicking -Path .\Example.ps1 -Fix -WhatIf
+```
+
+`-Fix` now writes file-backed `-Path` targets unless `-Preview`, `-WhatIf`, or a declined
+confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
+for rendered text, candidate/final findings, skipped corrections, conflicts, and write diagnostics.
+Only `WasWritten` and `FixedCorrections` indicate committed edits; accepted corrections can
+still be previews or rejected at commit. Final severity counts and `-ErrorOn` use candidate
+analysis for previews and committed analysis for successful writes. Failed/declined writes
+retain the original findings and report no fixed corrections.
+
+Files retain encoding, BOM, and existing newline characters through AstEditor's transactional
+save. BOM-less input must be valid UTF-8; BOM-marked UTF-8, UTF-16, and UTF-32 are supported.
+Byte fingerprints reject changed sources before replacement. Transactions are per target,
+so a failed target does not roll back successful changes to another target. Use
+`-ErrorAction Stop` to stop on a reported error.
+
 ## Gotchas
 
 ### Module-defined output types
@@ -22,7 +51,7 @@ For example, configuring `./src/modules/Nitpick` in `PSScriptAnalyzerSettings.ps
 Nitpick should not emulate this behavior. When Nitpick accepts rules from multiple configuration or command-line sources, it should deduplicate them by resolved module identity, not by the original path strings.
 
 
-**NOTE:** ScriptAnalyzer searches for functions named `Measure-*` and `Test-*` so we should be safe to export helper any helper functions from this module that do not use those verbs.
+**NOTE:** ScriptAnalyzer searches for functions named `Measure-*` and `Test-*` so we should be safe to export any helper functions from this module that do not use those verbs.
 
 **TODO:**
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.

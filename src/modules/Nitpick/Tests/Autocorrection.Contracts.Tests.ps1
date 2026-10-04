@@ -545,6 +545,8 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $ValidPreview.SkippedCorrections | Should -HaveCount 0
         $ValidPreview.RenderedText | Should -Be '$Value = 2'
         [System.IO.File]::ReadAllText($ConflictPath) | Should -Be $ConflictSource
-        [System.IO.File]::ReadAllText($ValidPath) | Should -Be $ValidSource
+        $ValidPreview.WasWritten | Should -BeTrue
+        $ValidPreview.WriteStatus | Should -Be 'Written'
+        [System.IO.File]::ReadAllText($ValidPath) | Should -Be '$Value = 2'
     }
 }

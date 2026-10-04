@@ -10,7 +10,9 @@ using namespace System.Management.Automation.Language
     parsed Ast via the InputObject parameter. The returned object keeps the original
     source text, parse tokens, parse errors, and an edit list that can collect
     text edits without mutating AST nodes. This is the entry point for the
-    immutable-AST + overlay workflow.
+    immutable-AST + overlay workflow. File inputs capture a byte fingerprint and
+    source encoding for transactional saves. BOM-less input must be valid UTF-8;
+    BOM-marked UTF-8, UTF-16, and UTF-32 are also supported.
 
 .EXAMPLE
     $doc = New-AstDocument -Path '.\ImageViewer.DSL.ps1'
@@ -56,12 +58,16 @@ function New-AstDocument {
         }
 
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            $ResolvedPath = (Resolve-Path -LiteralPath $Path).Path
-            $FileText = [File]::ReadAllText($ResolvedPath)
-            $Ast = [Parser]::ParseInput($FileText, [ref] $Tokens, [ref] $Errors)
+            $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+            $Snapshot = Get-AstFileSnapshot -Path $ResolvedPath
+            $FileText = $Snapshot.Text
+            $Ast = [Parser]::ParseInput($FileText, $ResolvedPath, [ref] $Tokens, [ref] $Errors)
             $NewLineSequence = if ($FileText.Contains("`r`n")) { "`r`n" } else { "`n" }
             $Document = [AstDocument]::new($ResolvedPath, $FileText, $Ast, $Tokens, $Errors)
             $Document.NewLineSequence = $NewLineSequence
+            $Document.IsFileBacked = $true
+            $Document.SourceEncoding = $Snapshot.Encoding
+            $Document.OriginalFingerprint = $Snapshot.Fingerprint
             return $Document
         }
 
