@@ -6,9 +6,14 @@
     Structurally selects one top-level function by name, captures its complete source
     text, and queues its removal from the document. Contiguous comment-based help
     immediately above the function is included unless ExcludeHelp is specified.
+
+.NOTES
+    `Get-AstExtractedFunction` is the canonical name to satisfy PowerShell's naming conventions.
+    `Extract-AstFunction` is the intended public interface.
 #>
-function Extract-AstFunction {
+function Get-AstExtractedFunction {
     [CmdletBinding()]
+    [Alias('Extract-AstFunction')]
     [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]

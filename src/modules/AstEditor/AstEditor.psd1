@@ -12,8 +12,8 @@
         'Add-AstTextEdit'
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
-        'Extract-AstFunction'
         'Find-AEAstNode'
+        'Get-AstExtractedFunction'
         'New-AstDocument'
         'New-AstCollectionEdit'
         'New-AstTextEdit'
@@ -25,7 +25,7 @@
     )
     CmdletsToExport = @()
     VariablesToExport = @()
-    AliasesToExport = @()
+    AliasesToExport = '*'
     PrivateData = @{
         PSData = @{
             Tags = @('AST', 'Editor', 'PowerShell')
