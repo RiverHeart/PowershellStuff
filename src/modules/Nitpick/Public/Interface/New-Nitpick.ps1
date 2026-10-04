@@ -41,6 +41,8 @@ function New-Nitpick {
         [ArgumentCompleter({ Complete-NitpickCategory $args })]
         [string] $Category = 'Other',
 
+        [bool] $EditorEnabled = $true,
+
         [Parameter(HelpMessage='The name of the nitpick. Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
@@ -52,7 +54,7 @@ function New-Nitpick {
 
     process {
         $Overrides = @{}
-        foreach ($Property in 'Name', 'Category', 'Source') {
+        foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source') {
             if ($PSBoundParameters.ContainsKey($Property)) {
                 $Overrides[$Property] = $PSBoundParameters[$Property]
             }

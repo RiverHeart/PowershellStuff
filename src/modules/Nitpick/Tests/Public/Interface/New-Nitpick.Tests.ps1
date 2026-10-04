@@ -36,6 +36,7 @@ Describe 'New-Nitpick' {
         $Rule.CallableType | Should -Be 'ScriptBlock'
         $Rule.Callable | Should -BeOfType [scriptblock]
         $Rule.Source | Should -Be 'Tests'
+        $Rule.EditorEnabled | Should -BeTrue
     }
 
     It 'creates a rule from a function info object' {
@@ -103,6 +104,46 @@ Describe 'New-Nitpick' {
 
         $Rule.IncludePath | Should -Be @('*.dsl.ps1')
         $Rule.ExcludePath | Should -Be @('*/Tests/*')
+    }
+
+    It 'uses editor availability from rule details' {
+        $RuleScript = {
+            [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
+            param (
+                [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
+                [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+
+                [Parameter(ParameterSetName='Details')]
+                [switch] $Details
+            )
+
+            if ($Details) {
+                [pscustomobject]@{
+                    EditorEnabled = $false
+                }
+            }
+        }
+
+        $Rule = New-Nitpick `
+            -Callable $RuleScript `
+            -Name SlowNitpickRule `
+            -Source Tests
+
+        $Rule.EditorEnabled | Should -BeFalse
+    }
+
+    It 'allows editor availability to be explicitly overridden' {
+        $Rule = New-Nitpick `
+            -Callable {
+                param (
+                    [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst
+                )
+            } `
+            -Name SlowNitpickRule `
+            -Source Tests `
+            -EditorEnabled:$false
+
+        $Rule.EditorEnabled | Should -BeFalse
     }
 
     It 'rejects a callable missing ScriptBlockAst' {

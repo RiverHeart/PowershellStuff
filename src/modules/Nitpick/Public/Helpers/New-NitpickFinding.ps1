@@ -48,12 +48,6 @@ function New-NitpickFinding {
         [Parameter(HelpMessage = "Determines whether the rule should be executed based on this condition.")]
         [scriptblock] $RunCondition,
 
-        # Rules with heavy processing or that may impact the editor's performance
-        # can be controlled with this flag. When set to $false, the rule will still
-        # be evaluated when running outside the editor.
-        [Parameter(HelpMessage = "Indicates whether the rule is enabled in the editor.")]
-        [bool] $EditorEnabled = $true,
-
         [Parameter(HelpMessage = "Specifies the output format for the finding.")]
         [ValidateSet('NitpickFinding', 'DiagnosticRecord')]
         [string] $OutputAs
@@ -78,7 +72,6 @@ function New-NitpickFinding {
         Severity = $Severity
         ScriptPath = $ScriptPath
         Explanation = $Explanation
-        EditorEnabled = $EditorEnabled
     }
     if ($Corrections) { $FindingParams.Corrections = $Corrections }
     if ($RunCondition) { $FindingParams.RunCondition = $RunCondition }

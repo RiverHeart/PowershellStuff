@@ -271,6 +271,7 @@ class NitpickSummary {
 class NitpickRule {
     [string] $Name
     [string] $Category
+    [bool] $EditorEnabled
     [string] $CallableType
     [object] $Callable
     [string] $Source
@@ -298,6 +299,7 @@ class NitpickRule {
             -ErrorAction Stop
 
         $this.Category = 'Other'
+        $this.EditorEnabled = $true
         if ($TargetCallable -is [scriptblock]) {
             $this.CallableType = 'ScriptBlock'
             $this.Callable = $TargetCallable
@@ -317,14 +319,14 @@ class NitpickRule {
 
         if ($HasDetails) {
             $Details = & $TargetCallable -Details
-            foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation', 'IncludePath', 'ExcludePath') {
+            foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source', 'Description', 'Severity', 'Explanation', 'IncludePath', 'ExcludePath') {
                 if ($null -ne $Details.$Property) {
                     $this.$Property = $Details.$Property
                 }
             }
         }
 
-        foreach ($Property in 'Name', 'Category', 'Source', 'Description', 'Severity', 'Explanation') {
+        foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source', 'Description', 'Severity', 'Explanation') {
             if ($Overrides.ContainsKey($Property)) {
                 $this.$Property = $Overrides[$Property]
             }

@@ -16,6 +16,9 @@ using namespace System.Management.Automation.Language
     source snapshot per target, and file writes require a separate explicit apply step.
 
     This parameter is currently reserved and does not change files or lint results.
+
+.PARAMETER EditorMode
+    Runs only rules whose EditorEnabled metadata is true.
 #>
 function Start-Nitpicking {
     [CmdletBinding(DefaultParameterSetName='Path')]
@@ -47,6 +50,7 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
+        [switch] $EditorMode,
         [switch] $NoSummary,
         [switch] $Fix
     )
@@ -66,7 +70,10 @@ function Start-Nitpicking {
         #     . $RulePathEntry
         # }
 
-        $Rules = Get-Nitpick -IncludeRule $IncludeRule -ExcludeRule $ExcludeRule
+        [object[]] $Rules = Get-Nitpick `
+            -IncludeRule $IncludeRule `
+            -ExcludeRule $ExcludeRule |
+            Where-Object { -not $EditorMode -or $_.EditorEnabled }
 
         if (-not $Rules) {
             # TODO: Be more detailed about where we searched for rules

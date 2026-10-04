@@ -48,6 +48,8 @@ function Register-Nitpick {
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
         [string] $Category,
 
+        [bool] $EditorEnabled,
+
         [Parameter(HelpMessage='Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
@@ -86,6 +88,9 @@ function Register-Nitpick {
                 $NitpickParams = @{}
                 if ($Name) { $NitpickParams.Name = $Name }
                 if ($Category) { $NitpickParams.Category = $Category }
+                if ($PSBoundParameters.ContainsKey('EditorEnabled')) {
+                    $NitpickParams.EditorEnabled = $EditorEnabled
+                }
                 if ($Source) { $NitpickParams.Source = $Source }
 
                 $Nitpick = $CallableEntry | New-Nitpick @NitpickParams

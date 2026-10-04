@@ -130,6 +130,32 @@ Describe 'Start-Nitpicking' {
         $Results[0].GetType().Name | Should -Be 'NitpickFinding'
     }
 
+    It 'does not invoke editor-disabled rules in editor mode' {
+        $Rule = {
+            param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
+
+            throw 'Editor-disabled rule was invoked.'
+        }
+        Register-Nitpick `
+            -Callable $Rule `
+            -Name EditorDisabledRule `
+            -Source Tests `
+            -EditorEnabled:$false
+
+        $Results = @(
+            Start-Nitpicking `
+                -Script {} `
+                -IncludeRule EditorDisabledRule `
+                -EditorMode `
+                -Output Object `
+                -WarningAction SilentlyContinue
+        )
+
+        $Results.Count | Should -Be 1
+        $Results[0].GetType().Name | Should -Be 'NitpickSummary'
+        $Results[0].RuleCount | Should -Be 0
+    }
+
     It 'returns finding and summary text by default' {
         $Script = [scriptblock]::Create(
             'param([Parameter(Mandatory=$true)] [string] $Name)'
