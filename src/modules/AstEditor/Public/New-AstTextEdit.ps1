@@ -90,13 +90,11 @@ function New-AstTextEdit {
     }
 
     $Positions = foreach ($Offset in $StartOffset, $EndOffset) {
-        $LineStartOffset = $Document.OriginalText.LastIndexOf("`n", [Math]::Max(0, $Offset - 1))
-        if ($Offset -eq 0 -or $LineStartOffset -lt 0) {
-            $LineStartOffset = -1
-        }
+        $SourcePrefix = $Document.OriginalText.Substring(0, $Offset)
+        $LineStartOffset = $SourcePrefix.LastIndexOf("`n")
 
         [pscustomobject] @{
-            LineNumber = ([regex]::Matches($Document.OriginalText.Substring(0, $Offset), "`n")).Count + 1
+            LineNumber = ([regex]::Matches($SourcePrefix, "`n")).Count + 1
             ColumnNumber = $Offset - $LineStartOffset
         }
     }

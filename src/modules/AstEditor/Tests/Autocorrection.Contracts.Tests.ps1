@@ -28,6 +28,21 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
         $OffsetEdit.ExpectedText | Should -Be $ExtentEdit.ExpectedText
     }
 
+    It 'constructs an insertion edit for an empty document' {
+        $Document = New-AstDocument -InputObject ''
+
+        $Edit = New-AstTextEdit `
+            -Document $Document `
+            -StartOffset 0 `
+            -EndOffset 0 `
+            -ReplacementText '# header' `
+            -Reason 'Insert a header'
+
+        $Edit.StartLineNumber | Should -Be 1
+        $Edit.StartColumnNumber | Should -Be 1
+        $Edit.ExpectedText | Should -Be ''
+    }
+
     It 'treats edit ranges as zero-based and end-exclusive' {
         $Document = New-AstDocument -InputObject '0123456789'
 

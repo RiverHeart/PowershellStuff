@@ -168,9 +168,10 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
 
         $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
 
-        $Result.RenderedText | Should -Be '$First = 1; $Second = 2; $Third = 4'
-        $Result.AcceptedCorrections | Should -HaveCount 1
-        $Result.SkippedCorrections | Should -HaveCount 2
+        $Result.RenderedText | Should -Be $Source
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 3
+        $Result.SkippedCorrections.Reason | Should -Contain 'AstEditor rejected the target because an edit is stale.'
     }
 
     It 'previews independent corrections in one render pass' {

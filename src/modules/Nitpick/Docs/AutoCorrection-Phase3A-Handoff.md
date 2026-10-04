@@ -3,11 +3,9 @@
 ## Current State
 
 - Branch: `AutoCorrectPhase3A`
-- HEAD at handoff: `8025e49 Fix EditorEnabled usage`
-- Worktree was clean before this handoff file was created.
 - Phase 3 is complete.
-- Phase 3A is planned but not complete.
-- Phase 4 should not begin until Phase 3A satisfies its exit criteria in `AutoCorrection.md`.
+- Phase 3A is complete.
+- Phase 4 may begin from the detached edit and atomic batch contracts recorded in `AutoCorrection.md`.
 
 Relevant commits:
 
@@ -69,16 +67,16 @@ Nitpick owns:
 - Phase 3A as a required phase before Phase 4.
 - Updated test ownership, delivery order, and later-phase dependencies.
 
-## Transitional Design That Must Change
+## Resolved Transitional Design
 
-The current implementation is an intermediate state, not the Phase 3A target:
+Phase 3A resolved the handoff issues as follows:
 
-1. `AstTextEdit` is still an internal AstEditor class with only offsets, replacement text, and reason.
-2. `Add-AstTextEdit` constructs and queues an edit immediately instead of accepting a common detached edit object.
-3. `New-AstCollectionEdit` returns an `AstEditor.CollectionEdit` custom object rather than the same contract used by generic text edits.
-4. `New-NitpickCorrection -TextEdit` copies edit properties into a separate `NitpickCorrection`; it does not retain the AstEditor edit as the authoritative object.
-5. `Resolve-NitpickCorrection` independently validates ranges and expected text, preflights overlaps, and then calls AstEditor, duplicating AstEditor responsibilities.
-6. Direct offset construction remains exposed through Nitpick rather than being an AstEditor escape hatch.
+1. `New-AstTextEdit` exposes the detached `AstEditor.TextEdit` contract with coordinates, expected text, replacement text, and reason.
+2. `Add-AstTextEdit -TextEdit` accepts and atomically queues complete detached edit batches.
+3. `New-AstCollectionEdit` returns `AstEditor.TextEdit`.
+4. `New-NitpickCorrection -TextEdit` retains the supplied edit as `NitpickCorrection.TextEdit` and projects compatibility properties from it.
+5. `Resolve-NitpickCorrection` delegates range, expected-text, and conflict validation to AstEditor.
+6. Direct Nitpick offset construction is retained only for compatibility and documented as deprecated.
 
 ## Recommended Implementation Order
 

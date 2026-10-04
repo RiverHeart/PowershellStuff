@@ -130,7 +130,13 @@ function Add-AstTextEdit {
             $Message = "Expected source text mismatch at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
             $Exception = [InvalidOperationException]::new($Message)
             $Exception.Data['FailureKind'] = 'ExpectedTextMismatch'
-            $Exception.Data['IncomingEdit'] = $Edit
+            $Exception.Data['IncomingEdit'] = @{
+                StartOffset = $Edit.StartOffset
+                EndOffset = $Edit.EndOffset
+                ReplacementText = $Edit.ReplacementText
+                ExpectedText = $Edit.ExpectedText
+                Reason = $Edit.Reason
+            }
             throw $Exception
         }
 
@@ -147,8 +153,18 @@ function Add-AstTextEdit {
                 $Message = "Edit conflict detected between '$($ExistingEdit.Reason)' at offsets [$($ExistingEdit.StartOffset), $($ExistingEdit.EndOffset)) and '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
                 $Exception = [InvalidOperationException]::new($Message)
                 $Exception.Data['FailureKind'] = 'Conflict'
-                $Exception.Data['ExistingEdit'] = $ExistingEdit
-                $Exception.Data['IncomingEdit'] = $Edit
+                $Exception.Data['ExistingEdit'] = @{
+                    StartOffset = $ExistingEdit.StartOffset
+                    EndOffset = $ExistingEdit.EndOffset
+                    ReplacementText = $ExistingEdit.ReplacementText
+                    Reason = $ExistingEdit.Reason
+                }
+                $Exception.Data['IncomingEdit'] = @{
+                    StartOffset = $Edit.StartOffset
+                    EndOffset = $Edit.EndOffset
+                    ReplacementText = $Edit.ReplacementText
+                    Reason = $Edit.Reason
+                }
                 throw $Exception
             }
         }

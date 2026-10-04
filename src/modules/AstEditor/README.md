@@ -32,15 +32,17 @@ $document = New-AstDocument -InputObject 'function Get-Greeting {}'
 Resolve-AstDocument -Document $document
 ```
 
-`AstDocument` and `AstTextEdit` are internal implementation types. Consumers should instantiate
-documents through `New-AstDocument` and pass the returned objects to the other exported commands.
+`AstDocument` remains an internal implementation type. Consumers create documents through
+`New-AstDocument` and detached edits through `New-AstTextEdit` or structural edit commands.
 
 ## Core Model
 
-- `AstTextEdit`: internal representation of a single replacement/insertion operation
-- `AstDocument`: internal immutable parse data plus a queued list of `AstTextEdit` edits
+- `AstEditor.TextEdit`: public detached edit contract with source coordinates, expected text, replacement text, and reason
+- `AstDocument`: internal immutable parse data plus a queued edit list
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
-- `Add-AstTextEdit`: validates and queues a generic offset- or extent-based edit
+- `New-AstTextEdit`: creates a detached edit from an extent or document-bound offset range
+- `New-AstCollectionEdit`: creates the same detached edit contract for a structural collection removal
+- `Add-AstTextEdit`: atomically validates and queues one or more detached edits
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits by index
 - `Save-AstDocument`: writes rendered output after parse validation
@@ -51,28 +53,30 @@ documents through `New-AstDocument` and pass the returned objects to the other e
 
 ## Generic Text Edits
 
-`Add-AstTextEdit` is the public API for queuing generic corrections. Offset ranges are zero-based
-and end-exclusive. All edits refer to the immutable source snapshot stored in the document:
+Offset ranges are zero-based and end-exclusive. Construct edits without side effects, then submit
+the selected target batch to `Add-AstTextEdit`:
 
 ```powershell
 $document = New-AstDocument -InputObject '$Value = 1'
-Add-AstTextEdit `
+$edit = New-AstTextEdit `
 	-Document $document `
 	-StartOffset 9 `
 	-EndOffset 10 `
 	-ReplacementText '2' `
 	-ExpectedText '1' `
 	-Reason 'Update the value'
+Add-AstTextEdit -Document $document -TextEdit $edit
 
 $result = Resolve-AstDocument -Document $document -PassThruText
 $result.RenderedText
 ```
 
-Use `-Extent` instead of `-StartOffset` and `-EndOffset` when an `IScriptExtent` identifies the
-complete edit range. `ExpectedText` is optional and rejects the edit if the selected source text
-does not match exactly. Overlapping edits and multiple insertions at the same offset are rejected.
-Conflict exceptions expose the queued and incoming edits through the `ExistingEdit` and
-`IncomingEdit` entries in `Exception.Data`.
+Use `New-AstTextEdit -Extent` when an `IScriptExtent` identifies the complete edit range.
+`New-AstCollectionEdit` returns the same contract for token-aware collection removal. Batch
+queueing validates expected text, ranges, overlaps, and same-offset insertions before queueing any
+member. Conflict exceptions expose the existing and incoming edits through `ExistingEdit` and
+`IncomingEdit` entries in `Exception.Data`. The offset and extent parameter sets on
+`Add-AstTextEdit` remain convenience surfaces for one edit.
 
 ## Function Editing
 

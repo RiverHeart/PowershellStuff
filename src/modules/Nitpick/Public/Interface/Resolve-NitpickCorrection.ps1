@@ -3,12 +3,12 @@
     Previews native Nitpick corrections against one source snapshot.
 
 .DESCRIPTION
-    Evaluates safe, offset-based corrections against immutable in-memory source and
-    returns rendered text and parse diagnostics without writing files. Corrections
-    sharing a ChangeSetId are accepted or skipped together. A correction without a
-    ChangeSetId forms its own independent change set. If a candidate introduces parse
-    errors, RenderedText remains the original source and CandidateText contains the
-    rejected output for diagnostics.
+    Selects safe corrections and delegates atomic source validation and queueing to
+    AstEditor. Corrections sharing a ChangeSetId are selected or skipped together. A
+    correction without a ChangeSetId forms its own independent change set. If the
+    selected batch is stale or conflicting, AstEditor rejects it without queueing any
+    member. If a candidate introduces parse errors, RenderedText remains the original
+    source and CandidateText contains the rejected output for diagnostics.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -85,7 +85,7 @@ function Resolve-NitpickCorrection {
     $Document = New-AstDocument -InputObject $Script
     $AcceptedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
     $SkippedCorrections = [System.Collections.Generic.List[object]]::new()
-    $ValidatedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
+    $SelectedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
     $Conflicts = [System.Collections.Generic.List[object]]::new()
     $FinalFindings = [System.Collections.Generic.List[object]]::new()
     $ChangeSets = [ordered]@{}
@@ -106,8 +106,8 @@ function Resolve-NitpickCorrection {
         $StandaloneCorrectionId++
     }
 
-    # MARK: CHANGE SET VALIDATION
-    # Admit a change set only when every member is safe for this source snapshot.
+    # MARK: CHANGE SET SELECTION
+    # Select only complete change sets that satisfy Nitpick correction policy.
     foreach ($ChangeSetKey in $ChangeSets.Keys) {
         $ChangeSet = $ChangeSets[$ChangeSetKey]
         $RejectionReason = $null
@@ -116,23 +116,8 @@ function Resolve-NitpickCorrection {
                 $RejectionReason = "Applicability '$($Correction.Applicability)' is not selected."
                 break
             }
-            if (-not $Correction.HasOffsets) {
-                $RejectionReason = 'Correction does not contain snapshot offsets.'
-                break
-            }
-            if ($Correction.StartOffset -lt 0 -or
-                $Correction.EndOffset -lt $Correction.StartOffset -or
-                $Correction.EndOffset -gt $Script.Length
-            ) {
-                $RejectionReason = 'Correction offsets are outside the source snapshot.'
-                break
-            }
-            $ActualText = $Script.Substring(
-                $Correction.StartOffset,
-                $Correction.EndOffset - $Correction.StartOffset
-            )
-            if ($ActualText -cne $Correction.ExpectedText) {
-                $RejectionReason = 'Expected source text does not match the source snapshot.'
+            if (-not $Correction.TextEdit) {
+                $RejectionReason = 'Correction does not contain an AstEditor text edit.'
                 break
             }
         }
@@ -148,57 +133,60 @@ function Resolve-NitpickCorrection {
         }
 
         foreach ($Correction in $ChangeSet) {
-            $ValidatedCorrections.Add($Correction)
+            $SelectedCorrections.Add($Correction)
         }
     }
 
-    # MARK: CONFLICT PRECHECK
-    # Preflight every pair before queuing edits so a conflict never requires rollback.
-    for ($ExistingIndex = 0; $ExistingIndex -lt $ValidatedCorrections.Count; $ExistingIndex++) {
-        $ExistingCorrection = $ValidatedCorrections[$ExistingIndex]
-        for (
-            $IncomingIndex = $ExistingIndex + 1
-            $IncomingIndex -lt $ValidatedCorrections.Count
-            $IncomingIndex++
-        ) {
-            $IncomingCorrection = $ValidatedCorrections[$IncomingIndex]
-            $HasSharedInsertionOffset =
-                $ExistingCorrection.StartOffset -eq $ExistingCorrection.EndOffset -and
-                $IncomingCorrection.StartOffset -eq $IncomingCorrection.EndOffset -and
-                $ExistingCorrection.StartOffset -eq $IncomingCorrection.StartOffset
-            $Overlaps =
-                $ExistingCorrection.StartOffset -lt $IncomingCorrection.EndOffset -and
-                $IncomingCorrection.StartOffset -lt $ExistingCorrection.EndOffset
+    # MARK: ATOMIC QUEUEING
+    # AstEditor exclusively validates source ranges, stale text, and conflicts.
+    if ($SelectedCorrections.Count -gt 0) {
+        try {
+            $null = Add-AstTextEdit `
+                -Document $Document `
+                -TextEdit @($SelectedCorrections.TextEdit)
 
-            if ($Overlaps -or $HasSharedInsertionOffset) {
+            foreach ($Correction in $SelectedCorrections) {
+                $AcceptedCorrections.Add($Correction)
+            }
+        } catch {
+            $FailureKind = $_.Exception.Data['FailureKind']
+            if ($FailureKind -eq 'Conflict') {
+                $ExistingEdit = $_.Exception.Data['ExistingEdit']
+                $IncomingEdit = $_.Exception.Data['IncomingEdit']
+                $ExistingCorrection = $SelectedCorrections |
+                    Where-Object {
+                        $_.TextEdit.StartOffset -eq $ExistingEdit.StartOffset -and
+                            $_.TextEdit.EndOffset -eq $ExistingEdit.EndOffset -and
+                            $_.TextEdit.Reason -eq $ExistingEdit.Reason
+                    } |
+                    Select-Object -First 1
+                $IncomingCorrection = $SelectedCorrections |
+                    Where-Object {
+                        $_.TextEdit.StartOffset -eq $IncomingEdit.StartOffset -and
+                            $_.TextEdit.EndOffset -eq $IncomingEdit.EndOffset -and
+                            $_.TextEdit.Reason -eq $IncomingEdit.Reason
+                    } |
+                    Select-Object -First 1
                 $Conflicts.Add([pscustomobject]@{
                     ExistingCorrection = $ExistingCorrection
                     IncomingCorrection = $IncomingCorrection
-                    Reason = 'Correction ranges overlap.'
+                    Reason = $_.Exception.Message
                 })
             }
-        }
-    }
 
-    # MARK: QUEUE SELECTION
-    # A conflict rejects the target batch; otherwise AstEditor receives it in one pass.
-    if ($Conflicts.Count -gt 0) {
-        foreach ($Correction in $ValidatedCorrections) {
-            $SkippedCorrections.Add([pscustomobject]@{
-                Correction = $Correction
-                Reason = 'The target contains conflicting correction change sets.'
-            })
-        }
-    } else {
-        foreach ($Correction in $ValidatedCorrections) {
-            $null = Add-AstTextEdit `
-                -Document $Document `
-                -StartOffset $Correction.StartOffset `
-                -EndOffset $Correction.EndOffset `
-                -ReplacementText $Correction.ReplacementText `
-                -Reason $Correction.Description `
-                -ExpectedText $Correction.ExpectedText
-            $AcceptedCorrections.Add($Correction)
+            $RejectionReason = if ($FailureKind -eq 'Conflict') {
+                'AstEditor rejected the target because the selected edits conflict.'
+            } elseif ($FailureKind -eq 'ExpectedTextMismatch') {
+                'AstEditor rejected the target because an edit is stale.'
+            } else {
+                "AstEditor rejected the target batch: $($_.Exception.Message)"
+            }
+            foreach ($Correction in $SelectedCorrections) {
+                $SkippedCorrections.Add([pscustomobject]@{
+                    Correction = $Correction
+                    Reason = $RejectionReason
+                })
+            }
         }
     }
 

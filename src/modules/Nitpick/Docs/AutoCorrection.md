@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 3 are implemented. Phase 3 exposed duplicated edit ownership between Nitpick and AstEditor, so Phase 3A is the next required phase before `Start-Nitpicking` integration. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 through 3A are implemented. Phase 4, integrating preview with `Start-Nitpicking`, is next. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -204,7 +204,7 @@ A caller can use one correction engine to obtain a validated diff, final finding
 
 The preview proved the workflow but also made Nitpick duplicate AstEditor's range, stale-text, and conflict responsibilities. `Test-AvoidParameterAttributeBool` further demonstrated that structural edit construction belongs in AstEditor. Phase 3A corrects this boundary before the preview workflow becomes part of `Start-Nitpicking`.
 
-## Phase 3A: Realign Edit Ownership
+## Phase 3A: Realign Edit Ownership (Complete)
 
 ### Objective
 
@@ -246,6 +246,17 @@ Establish one authoritative AstEditor edit model and reduce Nitpick corrections 
 ### Exit Criteria
 
 Every native correction has one authoritative AstEditor edit, AstEditor exclusively enforces source-edit integrity, and Nitpick exclusively decides correction eligibility and reports rule-aware outcomes.
+
+### Implemented Contract
+
+- `New-AstTextEdit` creates detached `AstEditor.TextEdit` objects from extents or document-bound offset ranges without queueing them.
+- `New-AstCollectionEdit` returns the same detached contract for token-aware structural removal.
+- `Add-AstTextEdit -TextEdit` validates a complete batch against one immutable document and queues every edit or none.
+- Range, expected-text, overlap, and same-offset insertion validation live in AstEditor.
+- `NitpickCorrection.TextEdit` retains the authoritative edit while existing coordinate and text properties remain compatibility projections.
+- Nitpick selects complete safe change sets, delegates the target batch to AstEditor, and translates structured AstEditor failures into rule-aware results.
+- Extent-based correction construction creates an AstEditor edit internally. Direct Nitpick offset construction remains only as a deprecated compatibility surface.
+- The realigned correction path is covered in PowerShell 5.1 and PowerShell 7.
 
 ## Phase 4: Integrate Preview with `Start-Nitpicking`
 

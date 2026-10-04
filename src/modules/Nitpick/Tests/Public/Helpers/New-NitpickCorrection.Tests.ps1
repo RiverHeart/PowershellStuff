@@ -21,6 +21,7 @@ Describe 'New-NitpickCorrection' {
             -Description 'Replace the value.'
 
         $Correction.GetType().Name | Should -Be 'NitpickCorrection'
+        $Correction.TextEdit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
         $Correction.StartLineNumber | Should -Be $Extent.StartLineNumber
         $Correction.StartOffset | Should -Be $Extent.StartOffset
         $Correction.EndOffset | Should -Be $Extent.EndOffset
@@ -93,6 +94,7 @@ Describe 'New-NitpickCorrection' {
             -FilePathOrContext '<ScriptBlock>' `
             -Description 'Remove the argument.'
 
+        $Correction.TextEdit | Should -Be $TextEdit
         $Correction.StartOffset | Should -Be $TextEdit.StartOffset
         $Correction.EndOffset | Should -Be $TextEdit.EndOffset
         $Correction.ExpectedText | Should -Be ',Mandatory=$false'

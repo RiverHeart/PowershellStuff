@@ -10,7 +10,8 @@
     mutate a file; application belongs to a target-level correction coordinator.
 
     Extent-based corrections capture offsets and expected source text automatically.
-    Explicit offset corrections require expected source text. Corrections created only
+    Direct offset construction is retained for compatibility but is deprecated; new callers
+    should create a validated AstEditor edit and pass it through TextEdit. Corrections created only
     from line and column positions remain suitable for PSScriptAnalyzer interoperability
     but are not natively applicable until a later coordinator resolves them against source.
 
@@ -20,7 +21,7 @@
 
 .PARAMETER TextEdit
     A detached AstEditor edit whose coordinates, expected text, and replacement text are
-    copied to the correction.
+    projected by the correction. The edit remains the authoritative source-edit object.
 
 .PARAMETER StartLineNumber
     The one-based line on which the correction begins.
@@ -136,7 +137,7 @@ function New-NitpickCorrection {
         [System.Management.Automation.Language.IScriptExtent] $ViolationExtent,
 
         [Parameter(Mandatory, ParameterSetName = 'ByTextEdit')]
-        [ValidateScript({ $_.PSTypeNames -contains 'AstEditor.CollectionEdit' })]
+        [ValidateScript({ $_.PSTypeNames -contains 'AstEditor.TextEdit' })]
         [psobject] $TextEdit,
 
         [Parameter(Mandatory, ParameterSetName = 'ByLineAndColumn')]
@@ -203,27 +204,45 @@ function New-NitpickCorrection {
 
     $Correction = $null
     $CorrectionParams = @{
-        StartLineNumber = if ($ViolationExtent) { $ViolationExtent.StartLineNumber } elseif ($TextEdit) { $TextEdit.StartLineNumber } else { $StartLineNumber }
-        EndLineNumber = if ($ViolationExtent) { $ViolationExtent.EndLineNumber } elseif ($TextEdit) { $TextEdit.EndLineNumber } else { $EndLineNumber }
-        StartColumnNumber = if ($ViolationExtent) { $ViolationExtent.StartColumnNumber } elseif ($TextEdit) { $TextEdit.StartColumnNumber } else { $StartColumnNumber }
-        EndColumnNumber = if ($ViolationExtent) { $ViolationExtent.EndColumnNumber } elseif ($TextEdit) { $TextEdit.EndColumnNumber } else { $EndColumnNumber }
-        ReplacementText = if ($TextEdit) { $TextEdit.ReplacementText } else { $ReplacementText }
         FilePathOrContext = $FilePathOrContext
         Description = $Description
         Applicability = $Applicability
     }
     if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
-        $CorrectionParams.StartOffset = $ViolationExtent.StartOffset
-        $CorrectionParams.EndOffset = $ViolationExtent.EndOffset
-        $CorrectionParams.ExpectedText = $ViolationExtent.Text
+        $CorrectionParams.TextEdit = New-AstTextEdit `
+            -Extent $ViolationExtent `
+            -ReplacementText $ReplacementText `
+            -Reason $Description
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByOffset') {
-        $CorrectionParams.StartOffset = $StartOffset
-        $CorrectionParams.EndOffset = $EndOffset
-        $CorrectionParams.ExpectedText = $ExpectedText
+        if ($StartOffset -lt 0) {
+            throw 'StartOffset must be non-negative.'
+        }
+        if ($EndOffset -lt $StartOffset) {
+            throw 'EndOffset must be greater than or equal to StartOffset.'
+        }
+        if ($ExpectedText.Length -ne ($EndOffset - $StartOffset)) {
+            throw 'ExpectedText length must match the offset range.'
+        }
+        $CorrectionParams.TextEdit = [pscustomobject] @{
+            PSTypeName = 'AstEditor.TextEdit'
+            StartLineNumber = $StartLineNumber
+            EndLineNumber = $EndLineNumber
+            StartColumnNumber = $StartColumnNumber
+            EndColumnNumber = $EndColumnNumber
+            StartOffset = $StartOffset
+            EndOffset = $EndOffset
+            ExpectedText = $ExpectedText
+            ReplacementText = $ReplacementText
+            Reason = $Description
+        }
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByTextEdit') {
-        $CorrectionParams.StartOffset = $TextEdit.StartOffset
-        $CorrectionParams.EndOffset = $TextEdit.EndOffset
-        $CorrectionParams.ExpectedText = $TextEdit.ExpectedText
+        $CorrectionParams.TextEdit = $TextEdit
+    } else {
+        $CorrectionParams.StartLineNumber = $StartLineNumber
+        $CorrectionParams.EndLineNumber = $EndLineNumber
+        $CorrectionParams.StartColumnNumber = $StartColumnNumber
+        $CorrectionParams.EndColumnNumber = $EndColumnNumber
+        $CorrectionParams.ReplacementText = $ReplacementText
     }
     if ($PSBoundParameters.ContainsKey('ChangeSetId')) {
         $CorrectionParams.ChangeSetId = $ChangeSetId

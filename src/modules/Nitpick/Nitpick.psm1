@@ -11,6 +11,7 @@ Import-Module -Name $AstEditorManifest -ErrorAction Stop
 #----------------------
 
 class NitpickCorrection {
+    [psobject] $TextEdit
     [int] $StartLineNumber
     [int] $EndLineNumber
     [int] $StartColumnNumber
@@ -32,14 +33,19 @@ class NitpickCorrection {
         [string] $filePathOrContext,
         [string] $description
     ) {
-        $this.StartLineNumber = $ViolationExtent.StartLineNumber
-        $this.EndLineNumber = $ViolationExtent.EndLineNumber
-        $this.StartColumnNumber = $ViolationExtent.StartColumnNumber
-        $this.EndColumnNumber = $ViolationExtent.EndColumnNumber
-        $this.StartOffset = $ViolationExtent.StartOffset
-        $this.EndOffset = $ViolationExtent.EndOffset
-        $this.HasOffsets = $true
-        $this.ExpectedText = $ViolationExtent.Text
+        $this.TextEdit = [pscustomobject] @{
+            PSTypeName = 'AstEditor.TextEdit'
+            StartLineNumber = $ViolationExtent.StartLineNumber
+            EndLineNumber = $ViolationExtent.EndLineNumber
+            StartColumnNumber = $ViolationExtent.StartColumnNumber
+            EndColumnNumber = $ViolationExtent.EndColumnNumber
+            StartOffset = $ViolationExtent.StartOffset
+            EndOffset = $ViolationExtent.EndOffset
+            ExpectedText = $ViolationExtent.Text
+            ReplacementText = $replacementText
+            Reason = $description
+        }
+        $this.SetTextEditProjections()
         $this.ReplacementText = $replacementText
         $this.FilePathOrContext = $filePathOrContext
         $this.Description = $description
@@ -66,22 +72,14 @@ class NitpickCorrection {
     }
 
     NitpickCorrection([hashtable] $properties) {
-        $this.StartLineNumber = $properties.StartLineNumber
-        $this.EndLineNumber = $properties.EndLineNumber
-        $this.StartColumnNumber = $properties.StartColumnNumber
-        $this.EndColumnNumber = $properties.EndColumnNumber
-        $HasStartOffset = $properties.ContainsKey('StartOffset')
-        $HasEndOffset = $properties.ContainsKey('EndOffset')
-        if ($HasStartOffset -ne $HasEndOffset) {
-            throw 'StartOffset and EndOffset must be supplied together.'
-        }
-        if ($HasStartOffset) {
-            $this.StartOffset = $properties.StartOffset
-            $this.EndOffset = $properties.EndOffset
-            $this.HasOffsets = $true
-        }
-        if ($properties.ContainsKey('ExpectedText')) {
-            $this.ExpectedText = $properties.ExpectedText
+        if ($properties.ContainsKey('TextEdit')) {
+            $this.TextEdit = $properties.TextEdit
+            $this.SetTextEditProjections()
+        } else {
+            $this.StartLineNumber = $properties.StartLineNumber
+            $this.EndLineNumber = $properties.EndLineNumber
+            $this.StartColumnNumber = $properties.StartColumnNumber
+            $this.EndColumnNumber = $properties.EndColumnNumber
         }
         if ($properties.ContainsKey('Applicability')) {
             $this.Applicability = $properties.Applicability
@@ -92,10 +90,24 @@ class NitpickCorrection {
         if ($properties.ContainsKey('RuleName')) {
             $this.RuleName = $properties.RuleName
         }
-        $this.ReplacementText = $properties.ReplacementText
+        if (-not $this.TextEdit) {
+            $this.ReplacementText = $properties.ReplacementText
+        }
         $this.FilePathOrContext = $properties.FilePathOrContext
         $this.Description = $properties.Description
         $this.Validate()
+    }
+
+    hidden [void] SetTextEditProjections() {
+        $this.StartLineNumber = $this.TextEdit.StartLineNumber
+        $this.EndLineNumber = $this.TextEdit.EndLineNumber
+        $this.StartColumnNumber = $this.TextEdit.StartColumnNumber
+        $this.EndColumnNumber = $this.TextEdit.EndColumnNumber
+        $this.StartOffset = $this.TextEdit.StartOffset
+        $this.EndOffset = $this.TextEdit.EndOffset
+        $this.HasOffsets = $true
+        $this.ExpectedText = $this.TextEdit.ExpectedText
+        $this.ReplacementText = $this.TextEdit.ReplacementText
     }
 
     hidden [void] Validate() {
@@ -113,20 +125,6 @@ class NitpickCorrection {
         }
         if ($this.Applicability -notin 'Safe', 'Review', 'Unsafe') {
             throw "Applicability must be Safe, Review, or Unsafe. Received '$($this.Applicability)'."
-        }
-        if ($this.HasOffsets) {
-            if ($this.StartOffset -lt 0) {
-                throw 'StartOffset must be non-negative.'
-            }
-            if ($this.EndOffset -lt $this.StartOffset) {
-                throw 'EndOffset must be greater than or equal to StartOffset.'
-            }
-            if ($null -eq $this.ExpectedText) {
-                throw 'ExpectedText is required when offsets are supplied.'
-            }
-            if ($this.ExpectedText.Length -ne ($this.EndOffset - $this.StartOffset)) {
-                throw 'ExpectedText length must match the offset range.'
-            }
         }
     }
 
