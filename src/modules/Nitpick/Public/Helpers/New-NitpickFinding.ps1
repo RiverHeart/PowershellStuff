@@ -54,7 +54,8 @@ function New-NitpickFinding {
     )
 
     if (-not $PSBoundParameters.ContainsKey('OutputAs')) {
-        $OutputAs = if ($script:NitpickInvocationContext -eq 'Nitpick') {
+        # Must match NitpickRule.Invoke()'s global (not script) scope; see its comment.
+        $OutputAs = if ($global:NitpickInvocationContext -eq 'Nitpick') {
             'NitpickFinding'
         } elseif (Test-AssemblyLoaded -Name 'Microsoft.Windows.PowerShell.ScriptAnalyzer') {
             'DiagnosticRecord'

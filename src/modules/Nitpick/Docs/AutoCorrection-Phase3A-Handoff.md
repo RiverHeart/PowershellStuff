@@ -185,7 +185,13 @@ Before the latest branch-only follow-up commit, the relevant validation complete
 - PowerShell 5.1 targeted Nitpick correction tests: 8 passed.
 - PowerShell 5.1 targeted Boolean parameter rule tests: 22 passed.
 
-Run the full suites again from current HEAD before declaring Phase 3A complete.
+Re-validated from current HEAD, including the detached-edit construction fix
+and the `NitpickInvocationContext` global-scope fix:
+
+- PowerShell 7 AstEditor: 63 passed.
+- PowerShell 7 Nitpick: 128 passed, 3 planned skips.
+- PowerShell 5.1 AstEditor (full suite): 61 passed.
+- PowerShell 5.1 Nitpick (full suite): 128 passed, 3 planned skips.
 
 ## Phase 3A Exit Criteria
 
@@ -197,3 +203,5 @@ Phase 3A is complete when:
 - Nitpick no longer independently validates ranges, stale text, or overlaps.
 - Compatibility projections and PSScriptAnalyzer conversion remain covered.
 - The realigned path passes in PowerShell 5.1 and PowerShell 7.
+
+All criteria above are met and validated as of the counts recorded in this section.

@@ -26,7 +26,7 @@ Describe 'NitpickRule invocation' {
     It 'returns native findings and restores the previous invocation context' {
         InModuleScope Nitpick {
             $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
-            $script:NitpickInvocationContext = 'ExistingContext'
+            $global:NitpickInvocationContext = 'ExistingContext'
 
             try {
                 $Findings = $Rule.Invoke(
@@ -35,9 +35,9 @@ Describe 'NitpickRule invocation' {
 
                 $Findings.Count | Should -Be 1
                 $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
-                $script:NitpickInvocationContext | Should -Be 'ExistingContext'
+                $global:NitpickInvocationContext | Should -Be 'ExistingContext'
             } finally {
-                Remove-Variable -Name NitpickInvocationContext -Scope Script
+                Remove-Variable -Name NitpickInvocationContext -Scope Global
             }
         }
     }
@@ -52,13 +52,13 @@ Describe 'NitpickRule invocation' {
 
                     throw 'Rule failed.'
                 }
-            $script:NitpickInvocationContext = 'ExistingContext'
+            $global:NitpickInvocationContext = 'ExistingContext'
 
             try {
                 { $Rule.Invoke({}.Ast) } | Should -Throw 'Rule failed.'
-                $script:NitpickInvocationContext | Should -Be 'ExistingContext'
+                $global:NitpickInvocationContext | Should -Be 'ExistingContext'
             } finally {
-                Remove-Variable -Name NitpickInvocationContext -Scope Script
+                Remove-Variable -Name NitpickInvocationContext -Scope Global
             }
         }
     }

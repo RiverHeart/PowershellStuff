@@ -376,24 +376,28 @@ class NitpickRule {
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
     [object[]] Invoke([ScriptBlockAst] $Ast) {
+        # Global, not script: a class method's $script: scope and a dot-sourced function's
+        # $script: scope can drift apart on PS5.1 Desktop after repeated module -Force
+        # reloads (e.g. across Pester test files), silently breaking New-NitpickFinding's
+        # read of this flag. Global scope is one fixed scope immune to that drift.
         $PreviousInvocationContext = Get-Variable `
             -Name NitpickInvocationContext `
-            -Scope Script `
+            -Scope Global `
             -ErrorAction SilentlyContinue
 
         $PreviousInvocationContextValue = $PreviousInvocationContext.Value
 
         try {
-            $script:NitpickInvocationContext = 'Nitpick'
+            $global:NitpickInvocationContext = 'Nitpick'
             [object[]] $Results = @(& $this.Callable -ScriptBlockAst $Ast)
             return $Results
         } finally {
             if ($null -ne $PreviousInvocationContext) {
-                $script:NitpickInvocationContext = $PreviousInvocationContextValue
+                $global:NitpickInvocationContext = $PreviousInvocationContextValue
             } else {
                 Remove-Variable `
                     -Name NitpickInvocationContext `
-                    -Scope Script `
+                    -Scope Global `
                     -ErrorAction SilentlyContinue
             }
         }
