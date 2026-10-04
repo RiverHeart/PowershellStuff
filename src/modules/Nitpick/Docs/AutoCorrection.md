@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 2 are complete; later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 through 3 are implemented. Phase 3 exposed duplicated edit ownership between Nitpick and AstEditor, so Phase 3A is the next required phase before `Start-Nitpicking` integration. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -21,13 +21,29 @@ Each file is one correction transaction based on one immutable source snapshot:
 
 1. Parse the source once into an `AstDocument`.
 2. Run enabled rules against that snapshot.
-3. Collect corrections using coordinates from the same snapshot.
-4. Validate and queue a non-conflicting correction batch.
+3. Collect Nitpick correction metadata around detached AstEditor edits from that snapshot.
+4. Let Nitpick select eligible change sets, then let AstEditor atomically validate and queue the target batch.
 5. Render all edits in one pass.
 6. Reparse and rerun the enabled rules against the rendered text.
 7. Write only when validation and stale-source checks succeed.
 
 Offsets do not need adjustment within a batch because every edit refers to the original snapshot. Corrections discovered after rendering belong to a new pass and a new document.
+
+## Ownership Boundary
+
+AstEditor owns source-edit mechanics:
+
+- The authoritative detached text-edit model, including source coordinates, expected text, and replacement text.
+- Construction from extents, validated offsets, and structural AST operations.
+- Immutable source snapshots, stale-text validation, conflict detection, atomic edit batches, rendering, reparsing, diffs, and durable writes.
+
+Nitpick owns lint and correction policy:
+
+- Rule execution, findings, applicability, rule identity, user-facing descriptions, and PSScriptAnalyzer interoperability.
+- `ChangeSetId` as the declaration that corrections produced by a rule must be selected or skipped together.
+- Selection of eligible change sets, final reanalysis, summaries, and translation of AstEditor validation results into rule-aware outcomes.
+
+`NitpickCorrection` is a metadata envelope around one AstEditor text edit. Existing edit properties may remain as compatibility projections, but the wrapped AstEditor edit is authoritative. Nitpick does not independently validate ranges, stale text, or overlaps.
 
 ## Phase 0: Freeze the Contracts (Complete)
 
@@ -144,6 +160,8 @@ Every native correction contains enough information to validate and queue itself
 - Line/column coordinates and `ToCorrectionExtent()` remain unchanged for PSScriptAnalyzer consumers.
 - Individual corrections describe edits only and expose no file mutation method.
 
+This contract records the implemented Phase 2 shape. Phase 3A preserves its observable metadata and PSScriptAnalyzer conversion while moving authoritative edit data and validation into AstEditor.
+
 ## Phase 3: Preview MVP
 
 ### Objective
@@ -182,6 +200,53 @@ Implement useful autocorrection without writing files or first coupling the comp
 
 A caller can use one correction engine to obtain a validated diff, final findings, and corrected in-memory text without changing disk state.
 
+### Architectural Finding
+
+The preview proved the workflow but also made Nitpick duplicate AstEditor's range, stale-text, and conflict responsibilities. `Test-AvoidParameterAttributeBool` further demonstrated that structural edit construction belongs in AstEditor. Phase 3A corrects this boundary before the preview workflow becomes part of `Start-Nitpicking`.
+
+## Phase 3A: Realign Edit Ownership
+
+### Objective
+
+Establish one authoritative AstEditor edit model and reduce Nitpick corrections to policy metadata around that model before expanding the public fix workflow.
+
+### AstEditor Work
+
+- Introduce a public detached text-edit contract containing source coordinates, expected text, replacement text, and a reason.
+- Add `New-AstTextEdit` with extent and validated offset parameter sets.
+- Keep offsets available as an escape hatch for insertions, token boundaries, and source not represented by one AST extent.
+- Make structural operations such as `New-AstCollectionEdit` return the same detached text-edit contract.
+- Add an atomic batch operation that validates every supplied edit against one `AstDocument` and queues all edits or none.
+- Make the batch operation own range validation, stale expected-text checks, overlap detection, and same-offset insertion conflicts.
+- Return structured validation and conflict information without introducing Nitpick concepts such as rules or applicability.
+
+### Nitpick Work
+
+- Make every native `NitpickCorrection` wrap one AstEditor text edit.
+- Retain `Applicability`, `ChangeSetId`, `RuleName`, `FilePathOrContext`, and the user-facing description as Nitpick metadata.
+- Preserve existing coordinate, expected-text, and replacement-text properties as compatibility projections when practical.
+- Preserve conversion to PSScriptAnalyzer `CorrectionExtent` by projecting from the wrapped edit.
+- Keep extent-based correction construction as a convenience that creates an AstEditor edit internally.
+- Deprecate direct offset construction in Nitpick; callers needing offsets create a validated AstEditor edit first.
+- Remove duplicate range, stale-text, and overlap validation from `Resolve-NitpickCorrection`.
+- Select complete eligible change sets in Nitpick, then submit the selected target batch to AstEditor atomically.
+- Translate AstEditor batch failures into skipped corrections and conflicts with rule-aware diagnostics.
+
+### Tests
+
+- Constructs detached AstEditor edits from extents and validated offsets.
+- Returns the same edit contract from generic and structural AstEditor operations.
+- Accepts a valid atomic batch and queues every edit.
+- Rejects a stale or conflicting batch without queueing any member.
+- Wraps an AstEditor edit in `NitpickCorrection` and preserves Nitpick metadata.
+- Preserves compatibility property reads and PSScriptAnalyzer conversion.
+- Demonstrates that Nitpick no longer performs independent range or overlap validation.
+- Exercises the realigned correction path in PowerShell 5.1 and PowerShell 7.
+
+### Exit Criteria
+
+Every native correction has one authoritative AstEditor edit, AstEditor exclusively enforces source-edit integrity, and Nitpick exclusively decides correction eligibility and reports rule-aware outcomes.
+
 ## Phase 4: Integrate Preview with `Start-Nitpicking`
 
 ### Objective
@@ -192,6 +257,7 @@ Connect the proven preview engine to Nitpick's user-facing command without chang
 
 - Refactor `Start-Nitpicking` to collect all findings for a target before emitting output or calculating summaries.
 - Route fix mode through `Resolve-NitpickCorrection`.
+- Submit the selected target batch through AstEditor's atomic batch API rather than prevalidating edits in Nitpick.
 - Expose preview through `Start-Nitpicking -Fix -WhatIf` or the command surface selected in Phase 0.
 - Emit and count final findings after correction and reanalysis.
 - Include rejected and conflicting corrections in object output.
@@ -255,12 +321,12 @@ Support corrections that require token awareness, sibling inspection, or coordin
 ### Work
 
 - Define a fix-provider contract that receives the current `AstDocument`, finding, and rule context.
-- Require providers to queue edits through the same AstEditor API.
+- Require providers to return detached edits through the same AstEditor API.
 - Keep providers declarative: they plan edits but do not write files.
 - Use change sets for coordinated multi-edit transforms.
 - Accept every edit in a change set or skip the complete change set.
 - Detect and report conflicts at the change-set level.
-- Migrate a rule with punctuation or trivia concerns as the first proof, such as removal of a `$false` parameter attribute argument and its adjacent comma.
+- Build on the Phase 3A collection-removal proof by migrating a rule that requires multiple coordinated structural edits.
 - Continue emitting ordinary `CorrectionExtent` objects when a structural fix can be represented as a simple replacement for PSScriptAnalyzer.
 
 ### Exit Criteria
@@ -289,9 +355,9 @@ Multiple passes converge predictably or stop with a clear pass-limit or cycle di
 
 ## Test Ownership
 
-AstEditor unit tests own generic range validation, ordering, conflict detection, rendering, parse validation, stale-source checks, and durable writes.
+AstEditor unit tests own detached edit construction, generic range validation, atomic batch behavior, ordering, conflict detection, rendering, parse validation, stale-source checks, and durable writes.
 
-Nitpick unit tests own correction metadata, coordinate conversion, expected-text validation, applicability, change sets, and PSScriptAnalyzer conversion.
+Nitpick unit tests own correction metadata, compatibility projections, applicability, change-set selection, rule-aware diagnostics, and PSScriptAnalyzer conversion.
 
 Nitpick integration tests own rule collection, multi-rule conflicts, final reanalysis, summary behavior, preview output, file application, and compatibility with native and PSScriptAnalyzer-style corrections.
 
@@ -299,7 +365,7 @@ PowerShell 5.1 and PowerShell 7 must both exercise the correction path because p
 
 ## MVP Boundary
 
-The preview MVP ends after Phase 4. It supports safe non-overlapping corrections, immutable-snapshot rendering, parse validation, final reanalysis, diffs, and corrected in-memory output without modifying files.
+The preview MVP ends after Phase 4, with Phase 3A as a prerequisite. It supports safe non-overlapping corrections, immutable-snapshot rendering, parse validation, final reanalysis, diffs, and corrected in-memory output without modifying files.
 
 The first file-writing release ends after Phase 5. Structural providers, multi-edit change sets, and multiple correction passes remain follow-up capabilities.
 
@@ -343,22 +409,21 @@ The exact type can be introduced after the preview workflow demonstrates which f
 
 1. Freeze correction, coordinate, and conflict semantics.
 2. Export and test the generic AstEditor edit API.
-3. Extend `NitpickCorrection` with offsets, expected text, applicability, change sets, and producer identity.
-4. Convert one existing Nitpick rule and implement the standalone preview engine.
-5. Integrate preview and final-analysis reporting with `Start-Nitpicking`.
-6. Harden AstEditor persistence and implement transactional apply.
-7. Introduce structural change-set providers using one token-aware rule as proof.
-8. Add bounded multi-pass correction.
+3. Implement the initial coordinate-bearing `NitpickCorrection` and its policy metadata.
+4. Convert one existing Nitpick rule and implement the standalone preview engine, exposing the duplicated ownership boundary.
+5. Realign ownership around detached AstEditor edits and atomic batches.
+6. Integrate preview and final-analysis reporting with `Start-Nitpicking`.
+7. Harden AstEditor persistence and implement transactional apply.
+8. Introduce coordinated structural fix providers.
+9. Add bounded multi-pass correction.
 
-This order keeps AstEditor work demand-driven. Generic edit queuing blocks the preview MVP; encoding preservation, concurrent-change detection, and atomic replacement block file application but do not need to delay preview.
+This order keeps AstEditor work demand-driven while preventing Nitpick from becoming a second source editor. Detached edits and atomic in-memory batches block public preview integration; encoding preservation, concurrent-change detection, and atomic file replacement block file application but do not need to delay preview.
 
 ## Open Decisions
 
 - Whether preview should be `Start-Nitpicking -Fix -WhatIf`, a `-PreviewFix` switch, or a separate command.
-- Whether a conflict skips only the involved change sets or the entire file transaction.
 - Whether line-and-column-only third-party corrections can be resolved safely or must remain PSScriptAnalyzer-only.
 - Whether final validation requires only successful parsing or also zero newly introduced findings.
 - Whether changed severity or message identity is sufficient to match findings across passes.
 - Whether final output shows resolved findings by default or only remaining findings plus a fix summary.
 - Whether `Review` corrections may be selected interactively or only through explicit rule and applicability filters.
-- Whether AstEditor becomes a required Nitpick dependency or its generic edit engine is extracted into a smaller shared module.
