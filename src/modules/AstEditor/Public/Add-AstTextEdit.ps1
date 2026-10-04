@@ -26,7 +26,7 @@ using namespace System.Management.Automation.Language
     A script extent whose offsets define the edit range.
 
 .PARAMETER TextEdit
-    One or more detached AstEditor.TextEdit objects to validate and queue atomically.
+    One or more detached AstTextEdit instances to validate and queue atomically.
 
 .PARAMETER ReplacementText
     Text that replaces the selected range. Use an empty string for deletion.
@@ -67,8 +67,8 @@ function Add-AstTextEdit {
         [IScriptExtent] $Extent,
 
         [Parameter(Mandatory, ParameterSetName = 'ByTextEdit', ValueFromPipeline)]
-        [ValidateScript({ $_.PSTypeNames -contains 'AstEditor.TextEdit' })]
-        [psobject[]] $TextEdit,
+        [ValidateScript({ $_ -is [AstTextEdit] })]
+        [object[]] $TextEdit,
 
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
         [Parameter(Mandatory, ParameterSetName = 'ByExtent')]
@@ -87,7 +87,7 @@ function Add-AstTextEdit {
     )
 
     $Edits = if ($PSCmdlet.ParameterSetName -eq 'ByTextEdit') {
-        @($TextEdit)
+        $TextEdit
     } else {
         $NewEditParameters = @{
             ReplacementText = $ReplacementText
@@ -107,10 +107,10 @@ function Add-AstTextEdit {
             }
         }
 
-        @(New-AstTextEdit @NewEditParameters)
+        New-AstTextEdit @NewEditParameters
     }
 
-    $ValidatedEdits = [System.Collections.Generic.List[psobject]]::new()
+    $ValidatedEdits = [System.Collections.Generic.List[AstTextEdit]]::new()
     foreach ($Edit in $Edits) {
         if ($Edit.StartOffset -lt 0) {
             throw 'StartOffset must be non-negative.'

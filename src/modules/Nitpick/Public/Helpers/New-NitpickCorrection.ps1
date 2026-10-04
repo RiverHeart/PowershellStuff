@@ -137,7 +137,7 @@ function New-NitpickCorrection {
         [System.Management.Automation.Language.IScriptExtent] $ViolationExtent,
 
         [Parameter(Mandatory, ParameterSetName = 'ByTextEdit')]
-        [ValidateScript({ $_.PSTypeNames -contains 'AstEditor.TextEdit' })]
+        [ValidateScript({ $_.GetType().Name -eq 'AstTextEdit' })]
         [psobject] $TextEdit,
 
         [Parameter(Mandatory, ParameterSetName = 'ByLineAndColumn')]
@@ -214,27 +214,16 @@ function New-NitpickCorrection {
             -ReplacementText $ReplacementText `
             -Reason $Description
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByOffset') {
-        if ($StartOffset -lt 0) {
-            throw 'StartOffset must be non-negative.'
-        }
-        if ($EndOffset -lt $StartOffset) {
-            throw 'EndOffset must be greater than or equal to StartOffset.'
-        }
-        if ($ExpectedText.Length -ne ($EndOffset - $StartOffset)) {
-            throw 'ExpectedText length must match the offset range.'
-        }
-        $CorrectionParams.TextEdit = [pscustomobject] @{
-            PSTypeName = 'AstEditor.TextEdit'
-            StartLineNumber = $StartLineNumber
-            EndLineNumber = $EndLineNumber
-            StartColumnNumber = $StartColumnNumber
-            EndColumnNumber = $EndColumnNumber
-            StartOffset = $StartOffset
-            EndOffset = $EndOffset
-            ExpectedText = $ExpectedText
-            ReplacementText = $ReplacementText
-            Reason = $Description
-        }
+        $CorrectionParams.TextEdit = New-AstTextEdit `
+            -StartLineNumber $StartLineNumber `
+            -EndLineNumber $EndLineNumber `
+            -StartColumnNumber $StartColumnNumber `
+            -EndColumnNumber $EndColumnNumber `
+            -StartOffset $StartOffset `
+            -EndOffset $EndOffset `
+            -ExpectedText $ExpectedText `
+            -ReplacementText $ReplacementText `
+            -Reason $Description
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByTextEdit') {
         $CorrectionParams.TextEdit = $TextEdit
     } else {

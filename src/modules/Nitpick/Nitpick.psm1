@@ -5,7 +5,9 @@ using namespace System.Management.Automation.Language
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 $AstEditorManifest = Join-Path -Path $ModuleRoot -ChildPath '../AstEditor/AstEditor.psd1'
-Import-Module -Name $AstEditorManifest -ErrorAction Stop
+if (-not (Get-Module -Name AstEditor)) {
+    Import-Module -Name $AstEditorManifest -ErrorAction Stop
+}
 
 # MARK: NP_CORRECT
 #----------------------
@@ -33,18 +35,10 @@ class NitpickCorrection {
         [string] $filePathOrContext,
         [string] $description
     ) {
-        $this.TextEdit = [pscustomobject] @{
-            PSTypeName = 'AstEditor.TextEdit'
-            StartLineNumber = $ViolationExtent.StartLineNumber
-            EndLineNumber = $ViolationExtent.EndLineNumber
-            StartColumnNumber = $ViolationExtent.StartColumnNumber
-            EndColumnNumber = $ViolationExtent.EndColumnNumber
-            StartOffset = $ViolationExtent.StartOffset
-            EndOffset = $ViolationExtent.EndOffset
-            ExpectedText = $ViolationExtent.Text
-            ReplacementText = $replacementText
-            Reason = $description
-        }
+        $this.TextEdit = New-AstTextEdit `
+            -Extent $ViolationExtent `
+            -ReplacementText $replacementText `
+            -Reason $description
         $this.SetTextEditProjections()
         $this.ReplacementText = $replacementText
         $this.FilePathOrContext = $filePathOrContext

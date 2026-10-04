@@ -249,7 +249,7 @@ Every native correction has one authoritative AstEditor edit, AstEditor exclusiv
 
 ### Implemented Contract
 
-- `New-AstTextEdit` creates detached `AstEditor.TextEdit` objects from extents or document-bound offset ranges without queueing them.
+- `New-AstTextEdit` creates detached `AstTextEdit` instances from extents or document-bound offset ranges without queueing them.
 - `New-AstCollectionEdit` returns the same detached contract for token-aware structural removal.
 - `Add-AstTextEdit -TextEdit` validates a complete batch against one immutable document and queues every edit or none.
 - Range, expected-text, overlap, and same-offset insertion validation live in AstEditor.

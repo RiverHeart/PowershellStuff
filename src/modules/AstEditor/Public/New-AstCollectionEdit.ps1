@@ -47,7 +47,7 @@ using namespace System.Management.Automation.Language
 #>
 function New-AstCollectionEdit {
     [CmdletBinding()]
-    [OutputType([pscustomobject])]
+    [OutputType('AstTextEdit')]
     param (
         [Parameter(Mandatory)]
         [Ast] $Remove,
@@ -121,8 +121,7 @@ function New-AstCollectionEdit {
     $StartOffset = $StartPosition.Offset
     $EndOffset = $EndPosition.Offset
 
-    return [pscustomobject]@{
-        PSTypeName = 'AstEditor.TextEdit'
+    return [AstTextEdit]::new(@{
         StartLineNumber = $StartPosition.LineNumber
         EndLineNumber = $EndPosition.LineNumber
         StartColumnNumber = $StartPosition.ColumnNumber
@@ -132,5 +131,5 @@ function New-AstCollectionEdit {
         ExpectedText = $SourceText.Substring($StartOffset, $EndOffset - $StartOffset)
         ReplacementText = $ReplacementText
         Reason = $Reason
-    }
+    })
 }

@@ -71,9 +71,9 @@ Nitpick owns:
 
 Phase 3A resolved the handoff issues as follows:
 
-1. `New-AstTextEdit` exposes the detached `AstEditor.TextEdit` contract with coordinates, expected text, replacement text, and reason.
+1. `New-AstTextEdit` exposes the detached `AstTextEdit` contract with coordinates, expected text, replacement text, and reason.
 2. `Add-AstTextEdit -TextEdit` accepts and atomically queues complete detached edit batches.
-3. `New-AstCollectionEdit` returns `AstEditor.TextEdit`.
+3. `New-AstCollectionEdit` returns `AstTextEdit`.
 4. `New-NitpickCorrection -TextEdit` retains the supplied edit as `NitpickCorrection.TextEdit` and projects compatibility properties from it.
 5. `Resolve-NitpickCorrection` delegates range, expected-text, and conflict validation to AstEditor.
 6. Direct Nitpick offset construction is retained only for compatibility and documented as deprecated.

@@ -2,7 +2,13 @@ using namespace System.Management.Automation.Language
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+BeforeAll {
+    Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+}
+
+AfterAll {
+    Remove-Module -Name AstEditor -Force -ErrorAction SilentlyContinue
+}
 
 Describe 'New-AstCollectionEdit' {
     BeforeDiscovery {
@@ -61,7 +67,7 @@ Describe 'New-AstCollectionEdit' {
             $Edit.EndOffset - $Edit.StartOffset
         ).Insert($Edit.StartOffset, $Edit.ReplacementText)
 
-        $Edit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
+        $Edit.GetType().Name | Should -Be 'AstTextEdit'
         $Edit.Reason | Should -Not -BeNullOrEmpty
         $Edit.ExpectedText | Should -Be $DocumentSource.Substring(
             $Edit.StartOffset,

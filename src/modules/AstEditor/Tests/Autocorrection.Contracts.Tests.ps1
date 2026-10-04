@@ -2,7 +2,13 @@ using namespace System.Management.Automation.Language
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+BeforeAll {
+    Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+}
+
+AfterAll {
+    Remove-Module -Name AstEditor -Force -ErrorAction SilentlyContinue
+}
 
 Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'constructs one detached edit contract from extents and validated offsets' {
@@ -21,8 +27,8 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
             -ReplacementText '$Second = 3' `
             -Reason 'Replace the second assignment'
 
-        $ExtentEdit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
-        $OffsetEdit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
+        $ExtentEdit.GetType().Name | Should -Be 'AstTextEdit'
+        $OffsetEdit.GetType().Name | Should -Be 'AstTextEdit'
         $OffsetEdit.StartLineNumber | Should -Be 2
         $OffsetEdit.StartColumnNumber | Should -Be 1
         $OffsetEdit.ExpectedText | Should -Be $ExtentEdit.ExpectedText
@@ -88,18 +94,9 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'rejects a stale detached batch without queueing any member' {
         $Document = New-AstDocument -InputObject 'abcdef'
         $ValidEdit = New-AstTextEdit -Document $Document -StartOffset 0 -EndOffset 1 -ReplacementText 'A' -Reason 'Valid edit'
-        $StaleEdit = [pscustomobject] @{
-            PSTypeName = 'AstEditor.TextEdit'
-            StartLineNumber = 1
-            EndLineNumber = 1
-            StartColumnNumber = 3
-            EndColumnNumber = 4
-            StartOffset = 2
-            EndOffset = 3
-            ExpectedText = 'x'
-            ReplacementText = 'C'
-            Reason = 'Stale edit'
-        }
+
+        $StaleDocument = New-AstDocument -InputObject 'abxdef'
+        $StaleEdit = New-AstTextEdit -Document $StaleDocument -StartOffset 2 -EndOffset 3 -ReplacementText 'C' -Reason 'Stale edit' -ExpectedText 'x'
 
         { Add-AstTextEdit -Document $Document -TextEdit @($ValidEdit, $StaleEdit) } |
             Should -Throw '*Expected source text mismatch*'

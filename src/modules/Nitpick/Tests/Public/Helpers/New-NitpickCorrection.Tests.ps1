@@ -21,7 +21,7 @@ Describe 'New-NitpickCorrection' {
             -Description 'Replace the value.'
 
         $Correction.GetType().Name | Should -Be 'NitpickCorrection'
-        $Correction.TextEdit.PSTypeNames | Should -Contain 'AstEditor.TextEdit'
+        $Correction.TextEdit.GetType().Name | Should -Be 'AstTextEdit'
         $Correction.StartLineNumber | Should -Be $Extent.StartLineNumber
         $Correction.StartOffset | Should -Be $Extent.StartOffset
         $Correction.EndOffset | Should -Be $Extent.EndOffset

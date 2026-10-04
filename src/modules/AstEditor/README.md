@@ -37,7 +37,7 @@ Resolve-AstDocument -Document $document
 
 ## Core Model
 
-- `AstEditor.TextEdit`: public detached edit contract with source coordinates, expected text, replacement text, and reason
+- `AstTextEdit`: class-based detached edit contract with source coordinates, expected text, replacement text, and reason
 - `AstDocument`: internal immutable parse data plus a queued edit list
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
 - `New-AstTextEdit`: creates a detached edit from an extent or document-bound offset range

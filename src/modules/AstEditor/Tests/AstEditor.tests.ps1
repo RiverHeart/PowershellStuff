@@ -2,7 +2,13 @@ using namespace System.Management.Automation.Language
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+BeforeAll {
+    Import-Module "$PSScriptRoot/../AstEditor.psd1" -Force
+}
+
+AfterAll {
+    Remove-Module -Name AstEditor -Force -ErrorAction SilentlyContinue
+}
 
 Describe 'Find-AEAstNode' {
     It 'is exported under the AstEditor-specific name' {

@@ -21,6 +21,18 @@ using namespace System.Management.Automation.Language
 .PARAMETER Extent
     The script extent that defines an extent-based edit.
 
+.PARAMETER StartLineNumber
+    The one-based start line of an explicit-coordinate edit with no backing AstDocument.
+
+.PARAMETER EndLineNumber
+    The one-based end line of an explicit-coordinate edit.
+
+.PARAMETER StartColumnNumber
+    The one-based start column of an explicit-coordinate edit.
+
+.PARAMETER EndColumnNumber
+    The one-based, end-exclusive end column of an explicit-coordinate edit.
+
 .PARAMETER ReplacementText
     Text that replaces the selected range. Use an empty string for deletion.
 
@@ -29,22 +41,37 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER ExpectedText
     Optional source text guard for an offset-based edit. Matching is case-sensitive.
+    Mandatory for an explicit-coordinate edit, since no document is available to derive it.
 #>
 function New-AstTextEdit {
     [CmdletBinding(DefaultParameterSetName = 'ByExtent')]
-    [OutputType([pscustomobject])]
+    [OutputType('AstTextEdit')]
     param (
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
         [AstDocument] $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
         [int] $StartOffset,
 
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
         [int] $EndOffset,
 
         [Parameter(Mandatory, ParameterSetName = 'ByExtent')]
         [IScriptExtent] $Extent,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
+        [int] $StartLineNumber,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
+        [int] $EndLineNumber,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
+        [int] $StartColumnNumber,
+
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
+        [int] $EndColumnNumber,
 
         [Parameter(Mandatory)]
         [AllowEmptyString()]
@@ -55,13 +82,27 @@ function New-AstTextEdit {
         [string] $Reason,
 
         [Parameter(ParameterSetName = 'ByOffset')]
+        [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
         [AllowEmptyString()]
         [string] $ExpectedText
     )
 
+    if ($PSCmdlet.ParameterSetName -eq 'ByExplicitRange') {
+        return [AstTextEdit]::new(@{
+            StartLineNumber = $StartLineNumber
+            EndLineNumber = $EndLineNumber
+            StartColumnNumber = $StartColumnNumber
+            EndColumnNumber = $EndColumnNumber
+            StartOffset = $StartOffset
+            EndOffset = $EndOffset
+            ExpectedText = $ExpectedText
+            ReplacementText = $ReplacementText
+            Reason = $Reason
+        })
+    }
+
     if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
-        return [pscustomobject] @{
-            PSTypeName = 'AstEditor.TextEdit'
+        return [AstTextEdit]::new(@{
             StartLineNumber = $Extent.StartLineNumber
             EndLineNumber = $Extent.EndLineNumber
             StartColumnNumber = $Extent.StartColumnNumber
@@ -71,7 +112,7 @@ function New-AstTextEdit {
             ExpectedText = $Extent.Text
             ReplacementText = $ReplacementText
             Reason = $Reason
-        }
+        })
     }
 
     if ($StartOffset -lt 0) {
@@ -99,8 +140,7 @@ function New-AstTextEdit {
         }
     }
 
-    return [pscustomobject] @{
-        PSTypeName = 'AstEditor.TextEdit'
+    return [AstTextEdit]::new(@{
         StartLineNumber = $Positions[0].LineNumber
         EndLineNumber = $Positions[1].LineNumber
         StartColumnNumber = $Positions[0].ColumnNumber
@@ -110,5 +150,5 @@ function New-AstTextEdit {
         ExpectedText = $ActualText
         ReplacementText = $ReplacementText
         Reason = $Reason
-    }
+    })
 }
