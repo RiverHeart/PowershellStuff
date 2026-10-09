@@ -47,6 +47,7 @@ function New-AstDocument {
         [string] $Path,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullOrEmpty()]
         [object] $InputObject
     )
 
@@ -74,32 +75,18 @@ function New-AstDocument {
 
         if ($InputObject -is [string]) {
             $Text = [string] $InputObject
-            $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
-            return $Document
-        }
-
-        if ($InputObject -is [ScriptBlock]) {
+        } elseif ($InputObject -is [ScriptBlock]) {
             $Text = $InputObject.Ast.Extent.Text
-            $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
-            return $Document
-        }
-
-        if ($InputObject -is [Ast]) {
+        } elseif ($InputObject -is [Ast]) {
             $Text = ([Ast] $InputObject).Extent.Text
-            $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
-            return $Document
+        } else {
+            throw [System.ArgumentException]::new("Unsupported InputObject type '$($InputObject.GetType().FullName)'. Expected String, ScriptBlock, or Ast.")
         }
 
-        Write-Error "Unsupported InputObject type '$($InputObject.GetType().FullName)'. Expected String, ScriptBlock, or Ast."
-        return
+        $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
+        $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
+        $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
+        $Document.NewLineSequence = $NewLineSequence
+        return $Document
     }
 }
