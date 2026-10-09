@@ -212,5 +212,5 @@ Output is written to:
 
 ## Notes
 
-AstEditor intentionally avoids mutating PowerShell AST objects in-place.
-It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+- AstEditor intentionally avoids mutating PowerShell AST objects in-place.
+- It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
