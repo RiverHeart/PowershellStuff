@@ -349,7 +349,11 @@ Allow the previewed correction transaction to be committed safely.
   `WriteStatus`, `ParseErrors`, and `ErrorRecord`. Expected validation/I/O failures
   are explicit structured outcomes, not success. Callers must inspect the result.
 - Nitpick returns the existing `Nitpick.CorrectionPreviewResult` type for both
-  previews and applications. `AcceptedCorrections` describes validated selection;
+  previews and applications. `New-NitpickCorrectionPreviewResult` constructs this
+  shared schema, including read-failure results. Omitted collections are empty
+  arrays, optional diagnostics are null, and write/reanalysis flags are false.
+  The helper constructs results only; it does not analyze or apply corrections.
+  `AcceptedCorrections` describes validated selection;
   only `FixedCorrections` and `WasWritten` describe committed edits. `FixedFindings`
   contains original findings with committed corrections, not a claim that every
   such finding is fully resolved; `RemainingFindings` holds the effective final

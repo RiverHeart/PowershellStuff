@@ -254,8 +254,7 @@ function Resolve-NitpickCorrection {
         $WasReanalyzed = $true
     }
 
-    return [pscustomobject]@{
-        PSTypeName = 'Nitpick.CorrectionPreviewResult'
+    $ResultParameters = @{
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
         OriginalFindings = $Finding
         FinalFindings = $FinalFindings.ToArray()
@@ -270,7 +269,6 @@ function Resolve-NitpickCorrection {
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint
         WasReanalyzed = $WasReanalyzed
-        WasWritten = $false
         WriteStatus = if ($Resolution.ParseErrorCount -gt 0) {
             'FailedValidation'
         } elseif ($SelectedCorrections.Count -gt 0 -and $AcceptedCorrections.Count -eq 0) {
@@ -280,13 +278,7 @@ function Resolve-NitpickCorrection {
         } else {
             'Preview'
         }
-        WriteResult = $null
-        ErrorRecord = $null
-        FixedCorrections = @()
-        FixedFindings = @()
-        SkippedFindings = @()
-        ConflictedFindings = @()
-        FailedValidationFindings = @()
         RemainingFindings = @(if ($WasReanalyzed) { $FinalFindings.ToArray() } else { $Finding })
     }
+    New-NitpickCorrectionPreviewResult @ResultParameters
 }

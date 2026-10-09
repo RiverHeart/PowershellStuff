@@ -146,33 +146,10 @@ function Start-Nitpicking {
                 $Summary.TargetCount++
                 $Summary.FailedTargetCount++
                 if ($Fix) {
-                    $ReadFailure = [pscustomobject]@{
-                        PSTypeName = 'Nitpick.CorrectionPreviewResult'
-                        Path = $TargetPath
-                        WriteStatus = 'FailedRead'
-                        OriginalFingerprint = $null
-                        Document = $null
-                        WriteResult = $null
-                        WasWritten = $false
-                        WasReanalyzed = $false
-                        OriginalFindings = @()
-                        FinalFindings = @()
-                        CandidateFindings = @()
-                        RemainingFindings = @()
-                        AcceptedCorrections = @()
-                        FixedCorrections = @()
-                        FixedFindings = @()
-                        SkippedFindings = @()
-                        ConflictedFindings = @()
-                        FailedValidationFindings = @()
-                        SkippedCorrections = @()
-                        Conflicts = @()
-                        ParseErrors = @()
-                        CandidateText = $null
-                        RenderedText = $null
-                        Diff = $null
-                        ErrorRecord = $_
-                    }
+                    $ReadFailure = New-NitpickCorrectionPreviewResult `
+                        -Path $TargetPath `
+                        -WriteStatus FailedRead `
+                        -ErrorRecord $_
                     if ($Output -eq 'Object') {
                         Write-Output $ReadFailure
                     } else {
