@@ -113,6 +113,7 @@ Describe 'Save-AstDocument transactions' {
         $Document = New-AstDocument -Path $Path
         $null = Add-AstTextEdit -Document $Document -StartOffset 9 -EndOffset 10 `
             -ReplacementText '2' -Reason 'Replace value'
+
         Mock Invoke-AstFileReplacement -ModuleName AstEditor {
             throw [System.IO.IOException]::new('Simulated replacement failure.')
         }

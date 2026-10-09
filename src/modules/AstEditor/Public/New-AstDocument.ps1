@@ -39,8 +39,9 @@ using namespace System.Management.Automation.Language
 #>
 function New-AstDocument {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
-    [OutputType([void], [object])]
-    param (
+    [OutputType('AstDocument')]
+    [OutputType([void])]
+    param(
         [Parameter(Mandatory, ParameterSetName = 'Path')]
         [ValidateNotNullOrEmpty()]
         [string] $Path,

@@ -5,6 +5,8 @@ using namespace System.IO
     Commits validated document output using a staged, atomic file replacement.
 
 .DESCRIPTION
+    Commits validated document output using a staged, atomic file replacement.
+
     Preserves source encoding, BOM, and existing newline characters. The source
     fingerprint is checked after confirmation and immediately before committing.
     No destructive overwrite fallback is used if atomic replacement is unavailable.
@@ -15,6 +17,8 @@ using namespace System.IO
     In-memory documents require OutPath and default to UTF-8 without a BOM.
 
 .EXAMPLE
+    Save the document to the specified output path, performing an atomic replacement if possible.
+
     $Result = Save-AstDocument -Document $Document -WhatIf
     $Result.WriteStatus
 #>
@@ -25,6 +29,7 @@ function Save-AstDocument {
         [Parameter(Mandatory)]
         [AstDocument] $Document,
 
+        [ValidateNotNullOrEmpty()]
         [string] $OutPath
     )
 
@@ -40,30 +45,34 @@ function Save-AstDocument {
     }
     $TemporaryPath = $null
     $OwnsTemporaryFile = $false
+
     try {
         if (-not $OutPath -and -not $Document.IsFileBacked) {
             $Result.WriteStatus = 'InvalidTarget'
-            throw [ArgumentException]::new('An in-memory document requires OutPath to save.')
+            throw [InvalidOperationException]::new('An in-memory document requires OutPath to save.')
         }
+
         $TargetPath = if ($OutPath) {
             $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutPath)
         } else {
             $Document.Path
         }
+
         $Result.Path = $TargetPath
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
         $Result.ParseErrors = @($Validation.ParseErrors)
         if ($Validation.ParseErrorCount -gt 0) {
             $Result.WriteStatus = 'FailedValidation'
-            throw [ArgumentException]::new(
+            throw [InvalidDataException]::new(
                 "Cannot save rendered output. Parse errors detected: $($Validation.ParseErrorCount)."
             )
         }
 
         $TargetExists = [File]::Exists($TargetPath)
         $TargetFingerprint = if ($TargetExists) {
-            Get-AstSourceFingerprint -Bytes ([File]::ReadAllBytes($TargetPath))
+            Get-AstSourceFingerprint -Path $TargetPath
         }
+
         if (-not $PSCmdlet.ShouldProcess($TargetPath, 'Write rendered AST overlay output')) {
             $Result.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
             return $Result
@@ -88,16 +97,15 @@ function Save-AstDocument {
 
         if ($Document.IsFileBacked -and
             (-not [File]::Exists($Document.Path) -or
-                (Get-AstSourceFingerprint -Bytes ([File]::ReadAllBytes($Document.Path))) -cne
-                    $Document.OriginalFingerprint)
+            (Get-AstSourceFingerprint -Path $Document.Path) -cne $Document.OriginalFingerprint)
         ) {
             $Result.WriteStatus = 'StaleSource'
             throw [IOException]::new('The source file changed after the document snapshot was created.')
         }
+
         if ([File]::Exists($TargetPath) -ne $TargetExists -or
             ($TargetExists -and
-                (Get-AstSourceFingerprint -Bytes ([File]::ReadAllBytes($TargetPath))) -cne
-                    $TargetFingerprint)
+            (Get-AstSourceFingerprint -Path $TargetPath) -cne $TargetFingerprint)
         ) {
             $Result.WriteStatus = 'StaleTarget'
             throw [IOException]::new('The destination file changed before the transaction could commit.')
@@ -107,9 +115,10 @@ function Save-AstDocument {
             -TemporaryPath $TemporaryPath `
             -TargetPath $TargetPath `
             -TargetExists:$TargetExists
+
         $Result.WasWritten = $true
         $Result.WriteStatus = 'Written'
-    } catch [IOException], [UnauthorizedAccessException], [ArgumentException], [NotSupportedException] {
+    } catch [IOException], [UnauthorizedAccessException], [InvalidOperationException], [InvalidDataException], [NotSupportedException] {
         if ($Result.WriteStatus -eq 'NotAttempted') {
             $Result.WriteStatus = 'FailedWrite'
         }
