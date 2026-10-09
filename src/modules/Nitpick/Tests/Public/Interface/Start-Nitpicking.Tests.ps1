@@ -289,7 +289,7 @@ Describe 'Start-Nitpicking' {
                 -Output Object
         )
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
@@ -297,7 +297,7 @@ Describe 'Start-Nitpicking' {
         $Preview.RenderedText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
         $Preview.Diff | Should -Match 'Mandatory=\$true'
         $Preview.Diff | Should -Match 'Mandatory'
-        $Preview.AcceptedCorrections | Should -HaveCount 1
+        $Preview.Corrections.Accepted | Should -HaveCount 1
         $Preview.WasWritten | Should -BeFalse
         $Summary.FindingCount | Should -Be 0
         $Summary.InformationCount | Should -Be 0
@@ -356,11 +356,11 @@ Describe 'Start-Nitpicking' {
                 -NoSummary
         )
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
 
-        $Preview.SkippedCorrections | Should -HaveCount 2
-        $Preview.Conflicts | Should -HaveCount 1
+        $Preview.Corrections.Skipped | Should -HaveCount 2
+        $Preview.Corrections.Conflicts | Should -HaveCount 1
         $Preview.RenderedText | Should -Be '$Value = 123'
         $Preview.Diff | Should -Be 'No queued edits.'
     }

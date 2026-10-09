@@ -59,7 +59,7 @@
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
-    $Result.Conflicts
+    $Result.Corrections.Conflicts
     $Result.RenderedText -eq $Source
 
     Inspects conflicts when independent change sets overlap. Under the target-level conflict
@@ -70,7 +70,7 @@
         -Script $Source `
         -Finding $Finding `
         -Rule $SelectedRules
-    $Result.FinalFindings
+    $Result.Findings.Final
 
     Passes the rules that produced the original findings when the preview must verify that
     corrected findings disappear and report findings that remain after rendering. Omit Rule
@@ -256,16 +256,6 @@ function Resolve-NitpickCorrection {
 
     $ResultParameters = @{
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
-        OriginalFindings = $Finding
-        FinalFindings = $FinalFindings.ToArray()
-        CandidateFindings = $FinalFindings.ToArray()
-        AcceptedCorrections = $AcceptedCorrections.ToArray()
-        SkippedCorrections = $SkippedCorrections.ToArray()
-        Conflicts = $Conflicts.ToArray()
-        ParseErrors = $Resolution.ParseErrors
-        CandidateText = $CandidateText
-        RenderedText = $RenderedText
-        Diff = Show-AstDiff -Document $Document
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint
         WasReanalyzed = $WasReanalyzed
@@ -278,7 +268,21 @@ function Resolve-NitpickCorrection {
         } else {
             'Preview'
         }
-        RemainingFindings = @(if ($WasReanalyzed) { $FinalFindings.ToArray() } else { $Finding })
+        Findings = @{
+            Original = $Finding
+            Final = $FinalFindings.ToArray()
+            Candidate = $FinalFindings.ToArray()
+            Remaining = @(if ($WasReanalyzed) { $FinalFindings.ToArray() } else { $Finding })
+        }
+        Corrections = @{
+            Accepted = $AcceptedCorrections.ToArray()
+            Skipped = $SkippedCorrections.ToArray()
+            Conflicts = $Conflicts.ToArray()
+        }
+        ParseErrors = $Resolution.ParseErrors
+        CandidateText = $CandidateText
+        RenderedText = $RenderedText
+        Diff = Show-AstDiff -Document $Document
     }
-    New-NitpickCorrectionPreviewResult @ResultParameters
+    New-NitpickCorrectionResult @ResultParameters
 }

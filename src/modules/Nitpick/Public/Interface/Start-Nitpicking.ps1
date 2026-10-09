@@ -37,7 +37,7 @@ function Start-Nitpicking {
     [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
     [Alias('nitpick', 'np')]
     [OutputType([string])]
-    [OutputType('NitpickFinding', 'NitpickSummary', 'Nitpick.CorrectionPreviewResult')]
+    [OutputType('NitpickFinding', 'NitpickSummary', 'Nitpick.CorrectionResult')]
     param(
         [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
         [string] $Path,
@@ -146,7 +146,7 @@ function Start-Nitpicking {
                 $Summary.TargetCount++
                 $Summary.FailedTargetCount++
                 if ($Fix) {
-                    $ReadFailure = New-NitpickCorrectionPreviewResult `
+                    $ReadFailure = New-NitpickCorrectionResult `
                         -Path $TargetPath `
                         -WriteStatus FailedRead `
                         -ErrorRecord $_
@@ -207,9 +207,9 @@ function Start-Nitpicking {
 
                 $CorrectionPreview = Resolve-NitpickCorrection @ResolveParameters
                 if (-not $CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.FinalFindings = $TargetFindings.ToArray()
+                    $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
                 }
-                if ($CorrectionPreview.AcceptedCorrections.Count -gt 0) {
+                if ($CorrectionPreview.Corrections.Accepted.Count -gt 0) {
                     if (-not $Document.IsFileBacked) {
                         $CorrectionPreview.WriteStatus = 'InMemory'
                     } elseif (-not $Preview) {
@@ -223,26 +223,26 @@ function Start-Nitpicking {
                             $CorrectionPreview.WriteStatus = $WriteResult.WriteStatus
                             $CorrectionPreview.WasWritten = $WriteResult.WasWritten
                             if ($WriteResult.WasWritten) {
-                                $CorrectionPreview.FixedCorrections = $CorrectionPreview.AcceptedCorrections
+                                $CorrectionPreview.Corrections.Fixed = $CorrectionPreview.Corrections.Accepted
                             } else {
-                                $CorrectionPreview.SkippedCorrections = @($CorrectionPreview.SkippedCorrections) + @(
-                                    foreach ($Correction in $CorrectionPreview.AcceptedCorrections) {
+                                $CorrectionPreview.Corrections.Skipped = @($CorrectionPreview.Corrections.Skipped) + @(
+                                    foreach ($Correction in $CorrectionPreview.Corrections.Accepted) {
                                         [pscustomobject]@{
                                             Correction = $Correction
                                             Reason = "Commit failed ($($WriteResult.WriteStatus)): $($WriteResult.ErrorRecord.Exception.Message)"
                                         }
                                     }
                                 )
-                                $CorrectionPreview.FinalFindings = $TargetFindings.ToArray()
-                                $CorrectionPreview.RemainingFindings = $TargetFindings.ToArray()
+                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
+                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
                                 $CorrectionPreview.RenderedText = $Document.OriginalText
                                 $CorrectionPreview.WasReanalyzed = $false
                             }
                         } else {
                             $CorrectionPreview.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
                             if (-not $WhatIfPreference) {
-                                $CorrectionPreview.FinalFindings = $TargetFindings.ToArray()
-                                $CorrectionPreview.RemainingFindings = $TargetFindings.ToArray()
+                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
+                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
                                 $CorrectionPreview.RenderedText = $Document.OriginalText
                                 $CorrectionPreview.WasReanalyzed = $false
                             }
@@ -250,18 +250,18 @@ function Start-Nitpicking {
                     }
                 }
                 $FinalFindings = if ($CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.FinalFindings
+                    $CorrectionPreview.Findings.Final
                 } else {
                     $TargetFindings.ToArray()
                 }
-                $SkippedEdits = @($CorrectionPreview.SkippedCorrections.Correction)
+                $SkippedEdits = @($CorrectionPreview.Corrections.Skipped.Correction)
                 $ConflictingEdits = @(
-                    $CorrectionPreview.Conflicts.ExistingCorrection
-                    $CorrectionPreview.Conflicts.IncomingCorrection
+                    $CorrectionPreview.Corrections.Conflicts.ExistingCorrection
+                    $CorrectionPreview.Corrections.Conflicts.IncomingCorrection
                 )
                 $FixedFindings = @($TargetFindings | Where-Object {
                     $Committed = @($_.Corrections | Where-Object {
-                        $_ -in $CorrectionPreview.FixedCorrections
+                        $_ -in $CorrectionPreview.Corrections.Fixed
                     })
                     $Committed.Count -gt 0
                 })
@@ -276,15 +276,13 @@ function Start-Nitpicking {
                 } else {
                     @()
                 }
-                $CorrectionPreview | Add-Member -Force -NotePropertyMembers @{
-                    FixedFindings = $FixedFindings
-                    SkippedFindings = $SkippedFindings
-                    ConflictedFindings = $ConflictedFindings
-                    FailedValidationFindings = @($FailedValidationFindings)
-                }
+                $CorrectionPreview.Findings.Fixed = $FixedFindings
+                $CorrectionPreview.Findings.Skipped = $SkippedFindings
+                $CorrectionPreview.Findings.Conflicted = $ConflictedFindings
+                $CorrectionPreview.Findings.FailedValidation = @($FailedValidationFindings)
                 $Summary.FixedFindingCount += $FixedFindings.Count
-                $Summary.SkippedCorrectionCount += $CorrectionPreview.SkippedCorrections.Count
-                if ($CorrectionPreview.Conflicts.Count -gt 0) {
+                $Summary.SkippedCorrectionCount += $CorrectionPreview.Corrections.Skipped.Count
+                if ($CorrectionPreview.Corrections.Conflicts.Count -gt 0) {
                     $Summary.ConflictedTargetCount++
                 }
                 if ($CorrectionPreview.WriteStatus -in 'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
@@ -294,10 +292,10 @@ function Start-Nitpicking {
                 Write-Verbose (
                     "Correction preview for '{0}': {1} accepted, {2} skipped." -f
                     $CorrectionPreview.Path,
-                    $CorrectionPreview.AcceptedCorrections.Count,
-                    $CorrectionPreview.SkippedCorrections.Count
+                    $CorrectionPreview.Corrections.Accepted.Count,
+                    $CorrectionPreview.Corrections.Skipped.Count
                 )
-                foreach ($SkippedCorrection in $CorrectionPreview.SkippedCorrections) {
+                foreach ($SkippedCorrection in $CorrectionPreview.Corrections.Skipped) {
                     Write-Verbose (
                         "Skipped correction from '{0}': {1}" -f
                         $SkippedCorrection.Correction.RuleName,
@@ -335,9 +333,9 @@ function Start-Nitpicking {
                 Write-Output $CorrectionPreview.Diff
                 Write-Output (
                     "`n{0} fixed, {1} accepted, {2} skipped; write status: {3}." -f
-                    $CorrectionPreview.FixedCorrections.Count,
-                    $CorrectionPreview.AcceptedCorrections.Count,
-                    $CorrectionPreview.SkippedCorrections.Count,
+                    $CorrectionPreview.Corrections.Fixed.Count,
+                    $CorrectionPreview.Corrections.Accepted.Count,
+                    $CorrectionPreview.Corrections.Skipped.Count,
                     $CorrectionPreview.WriteStatus
                 )
             }

@@ -348,17 +348,23 @@ Allow the previewed correction transaction to be committed safely.
 - `Save-AstDocument` returns `AstEditor.WriteResult` with `WasWritten`,
   `WriteStatus`, `ParseErrors`, and `ErrorRecord`. Expected validation/I/O failures
   are explicit structured outcomes, not success. Callers must inspect the result.
-- Nitpick returns the existing `Nitpick.CorrectionPreviewResult` type for both
-  previews and applications. `New-NitpickCorrectionPreviewResult` constructs this
-  shared schema, including read-failure results. Omitted collections are empty
-  arrays, optional diagnostics are null, and write/reanalysis flags are false.
-  The helper constructs results only; it does not analyze or apply corrections.
-  `AcceptedCorrections` describes validated selection;
-  only `FixedCorrections` and `WasWritten` describe committed edits. `FixedFindings`
-  contains original findings with committed corrections, not a claim that every
-  such finding is fully resolved; `RemainingFindings` holds the effective final
-  analysis. Skipped, conflicting, and failed-validation findings are separate lists.
-- `CandidateText` and `CandidateFindings` retain preview diagnostics. On failed
+- Nitpick returns the existing `Nitpick.CorrectionResult` type for both
+  previews and applications. `New-NitpickCorrectionResult` constructs this
+  shared schema, including read-failure results. Outcomes are grouped under
+  `Findings` (`Original`, `Candidate`, `Final`, `Remaining`, `Fixed`, `Skipped`,
+  `Conflicted`, `FailedValidation`) and `Corrections` (`Accepted`, `Fixed`,
+  `Skipped`, `Conflicts`) so identically named outcomes for findings and
+  corrections, such as `Findings.Skipped` versus `Corrections.Skipped`, stay
+  unambiguous. Omitted group properties are empty arrays, optional diagnostics
+  are null, and write/reanalysis flags are false. The helper constructs results
+  only; it does not analyze or apply corrections.
+  `Corrections.Accepted` describes validated selection;
+  only `Corrections.Fixed` and `WasWritten` describe committed edits.
+  `Findings.Fixed` contains original findings with committed corrections, not
+  a claim that every such finding is fully resolved; `Findings.Remaining` holds
+  the effective final analysis. Skipped, conflicting, and failed-validation
+  findings are separate lists under `Findings`.
+- `CandidateText` and `Findings.Candidate` retain preview diagnostics. On failed
   or declined writes, effective findings and threshold counts revert to the
   original analysis; `WasReanalyzed` is false and no correction is reported fixed.
   A stale file is not overwritten or represented as freshly analyzed.

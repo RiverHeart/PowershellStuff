@@ -169,9 +169,9 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
 
         $Result.RenderedText | Should -Be $Source
-        $Result.AcceptedCorrections | Should -HaveCount 0
-        $Result.SkippedCorrections | Should -HaveCount 3
-        $Result.SkippedCorrections.Reason | Should -Contain 'AstEditor rejected the target because an edit is stale.'
+        $Result.Corrections.Accepted | Should -HaveCount 0
+        $Result.Corrections.Skipped | Should -HaveCount 3
+        $Result.Corrections.Skipped.Reason | Should -Contain 'AstEditor rejected the target because an edit is stale.'
     }
 
     It 'previews independent corrections in one render pass' {
@@ -207,8 +207,8 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
 
         $Result.RenderedText | Should -Be '$First = 100; $Second = 200'
-        $Result.AcceptedCorrections | Should -HaveCount 2
-        $Result.SkippedCorrections | Should -HaveCount 0
+        $Result.Corrections.Accepted | Should -HaveCount 2
+        $Result.Corrections.Skipped | Should -HaveCount 0
     }
 
     It 'rejects the complete target batch when independent change sets overlap' {
@@ -251,11 +251,11 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
 
         $Result.RenderedText | Should -Be $Source
-        $Result.AcceptedCorrections | Should -HaveCount 0
-        $Result.SkippedCorrections | Should -HaveCount 2
-        $Result.Conflicts | Should -HaveCount 1
-        $Result.Conflicts[0].ExistingCorrection.RuleName | Should -Be 'RenameVariable'
-        $Result.Conflicts[0].IncomingCorrection.RuleName | Should -Be 'ReplaceAssignment'
+        $Result.Corrections.Accepted | Should -HaveCount 0
+        $Result.Corrections.Skipped | Should -HaveCount 2
+        $Result.Corrections.Conflicts | Should -HaveCount 1
+        $Result.Corrections.Conflicts[0].ExistingCorrection.RuleName | Should -Be 'RenameVariable'
+        $Result.Corrections.Conflicts[0].IncomingCorrection.RuleName | Should -Be 'ReplaceAssignment'
     }
 
     It 'keeps preview mode from changing file-backed targets' {
@@ -273,7 +273,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -NoSummary
         )
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
 
         $Preview.Path | Should -Be (Resolve-Path -LiteralPath $Path).Path
@@ -308,7 +308,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
 
         $Result.RenderedText | Should -Be '$Value = 2'
-        $Result.AcceptedCorrections | Should -HaveCount 1
+        $Result.Corrections.Accepted | Should -HaveCount 1
         $Result.WasWritten | Should -BeFalse
     }
 
@@ -355,8 +355,8 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
 
         $InitialFindings | Should -HaveCount 1
         $Result.RenderedText | Should -Be '$Value = 2'
-        $Result.OriginalFindings | Should -HaveCount 1
-        $Result.FinalFindings | Should -HaveCount 0
+        $Result.Findings.Original | Should -HaveCount 1
+        $Result.Findings.Final | Should -HaveCount 0
         $Result.WasReanalyzed | Should -BeTrue
     }
 
@@ -389,8 +389,8 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
 
         $Result.RenderedText | Should -Be $Source
         $Result.CandidateText | Should -Be 'if ('
-        $Result.AcceptedCorrections | Should -HaveCount 0
-        $Result.SkippedCorrections | Should -HaveCount 1
+        $Result.Corrections.Accepted | Should -HaveCount 0
+        $Result.Corrections.Skipped | Should -HaveCount 1
         $Result.ParseErrors | Should -Not -BeNullOrEmpty
         $Result.WasWritten | Should -BeFalse
     }
@@ -451,15 +451,15 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         )
         $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Findings | Should -HaveCount 1
         $Findings[0].Severity | Should -Be 'Warning'
-        $Preview.FinalFindings | Should -HaveCount 1
-        $Preview.FinalFindings[0].Severity | Should -Be 'Warning'
-        $Preview.AcceptedCorrections | Should -HaveCount 1
+        $Preview.Findings.Final | Should -HaveCount 1
+        $Preview.Findings.Final[0].Severity | Should -Be 'Warning'
+        $Preview.Corrections.Accepted | Should -HaveCount 1
         $Summary.FindingCount | Should -Be 1
         $Summary.ErrorCount | Should -Be 0
         $Summary.WarningCount | Should -Be 1
@@ -532,17 +532,17 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -NoSummary
         )
         $Previews = @($Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         })
         $ConflictPreview = $Previews | Where-Object Path -eq $ConflictPath
         $ValidPreview = $Previews | Where-Object Path -eq $ValidPath
 
-        $ConflictPreview.AcceptedCorrections | Should -HaveCount 0
-        $ConflictPreview.SkippedCorrections | Should -HaveCount 2
-        $ConflictPreview.Conflicts | Should -HaveCount 1
+        $ConflictPreview.Corrections.Accepted | Should -HaveCount 0
+        $ConflictPreview.Corrections.Skipped | Should -HaveCount 2
+        $ConflictPreview.Corrections.Conflicts | Should -HaveCount 1
         $ConflictPreview.RenderedText | Should -Be $ConflictSource
-        $ValidPreview.AcceptedCorrections | Should -HaveCount 1
-        $ValidPreview.SkippedCorrections | Should -HaveCount 0
+        $ValidPreview.Corrections.Accepted | Should -HaveCount 1
+        $ValidPreview.Corrections.Skipped | Should -HaveCount 0
         $ValidPreview.RenderedText | Should -Be '$Value = 2'
         [System.IO.File]::ReadAllText($ConflictPath) | Should -Be $ConflictSource
         $ValidPreview.WasWritten | Should -BeTrue
