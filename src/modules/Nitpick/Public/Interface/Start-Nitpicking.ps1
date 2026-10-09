@@ -8,7 +8,8 @@ using namespace System.Management.Automation.Language
     Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
     Ordinary lint behavior is unchanged unless Fix is specified. Fix applies safe,
     validated corrections to file-backed targets using transactional AstEditor saves.
-    In-memory inputs return rendered text without writing.
+    In-memory inputs return rendered text without writing. PowerShell parser errors are
+    reported as Error findings.
 
 .PARAMETER Fix
     Applies safe corrections against one immutable source snapshot per file. Use Preview
@@ -109,40 +110,45 @@ function Start-Nitpicking {
     }
 
     process {
-        $Asts = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+        $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
             Get-ChildItem -Path $Path -Recurse -Filter $Filter |
                 Where-NitpickIncluded `
                     -PropertyPath FullName `
                     -Include $IncludePath `
                     -Exclude $ExcludePath `
-                    -Wildcard |
-                ForEach-Object {
-                    if ($Fix) {
-                        $_
-                    } else {
-                        Import-ScriptBlockAst $_.FullName
-                    }
-                }
+                    -Wildcard
         } else {
             $Script
         }
 
-        foreach ($Target in $Asts) {
+        foreach ($Target in $Targets) {
             $Document = $null
-            $Ast = $Target
-            if ($Fix) {
-                try {
-                    $Document = if ($PSCmdlet.ParameterSetName -eq 'Path') {
-                        New-AstDocument -Path $Target.FullName
-                    } else {
-                        New-AstDocument -InputObject $Script
-                    }
-                } catch [System.IO.IOException], [System.IO.InvalidDataException], [UnauthorizedAccessException] {
-                    $Summary.TargetCount++
-                    $Summary.FailedTargetCount++
+            $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                $Target.FullName
+            } else {
+                '<ScriptBlock>'
+            }
+            try {
+                $Document = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                    New-AstDocument -Path $Target.FullName
+                } else {
+                    New-AstDocument -InputObject $Target
+                }
+
+                # WARNING: Keep original extent context for rules; reparsing memory input resets it.
+                $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and -not $Fix) {
+                    $Target
+                } else {
+                    $Document.Ast
+                }
+                $ParseErrors = $Document.ParseErrors
+            } catch [System.IO.IOException], [System.IO.InvalidDataException], [System.Security.SecurityException], [System.Management.Automation.ItemNotFoundException], [UnauthorizedAccessException] {
+                $Summary.TargetCount++
+                $Summary.FailedTargetCount++
+                if ($Fix) {
                     $ReadFailure = [pscustomobject]@{
                         PSTypeName = 'Nitpick.CorrectionPreviewResult'
-                        Path = $Target.FullName
+                        Path = $TargetPath
                         WriteStatus = 'FailedRead'
                         OriginalFingerprint = $null
                         Document = $null
@@ -172,13 +178,25 @@ function Start-Nitpicking {
                     } else {
                         Write-Output "Corrections (FailedRead): $($ReadFailure.Path)"
                     }
-                    $PSCmdlet.WriteError($ReadFailure.ErrorRecord)
-                    continue
                 }
-                $Ast = $Document.Ast
+                $PSCmdlet.WriteError($_)
+                continue
             }
+
             $Summary.TargetCount++
             $TargetFindings = [System.Collections.Generic.List[object]]::new()
+            foreach ($ParseError in $ParseErrors) {
+                $TargetFindings.Add((New-NitpickFinding `
+                    -RuleName 'PowerShellParseError' `
+                    -Message $ParseError.Message `
+                    -ViolationExtent $ParseError.Extent `
+                    -Severity Error `
+                    -RuleSuppressionID 'PowerShellParseError' `
+                    -ScriptPath $TargetPath `
+                    -Explanation 'The PowerShell parser could not parse this source.' `
+                    -OutputAs NitpickFinding))
+            }
+
             $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
