@@ -5,7 +5,9 @@
 .DESCRIPTION
     Selects safe corrections and delegates atomic source validation and queueing to
     AstEditor. Corrections sharing a ChangeSetId are selected or skipped together. A
-    correction without a ChangeSetId forms its own independent change set. If the
+    correction without a ChangeSetId forms its own independent change set. IDs are
+    target-wide; producers should include their rule identity and occurrence in IDs
+    unless they intentionally coordinate across findings or rules. If the
     selected batch is stale or conflicting, AstEditor rejects it without queueing any
     member. If a candidate introduces parse errors, RenderedText remains the original
     source and CandidateText contains the rejected output for diagnostics. The result
@@ -180,20 +182,30 @@ function Resolve-NitpickCorrection {
                     Where-Object {
                         $_.TextEdit.StartOffset -eq $ExistingEdit.StartOffset -and
                             $_.TextEdit.EndOffset -eq $ExistingEdit.EndOffset -and
-                            $_.TextEdit.Reason -eq $ExistingEdit.Reason
+                            $_.TextEdit.Reason -ceq $ExistingEdit.Reason -and
+                            $_.TextEdit.ReplacementText -ceq $ExistingEdit.ReplacementText
                     } |
                     Select-Object -First 1
                 $IncomingCorrection = $SelectedCorrections |
                     Where-Object {
                         $_.TextEdit.StartOffset -eq $IncomingEdit.StartOffset -and
                             $_.TextEdit.EndOffset -eq $IncomingEdit.EndOffset -and
-                            $_.TextEdit.Reason -eq $IncomingEdit.Reason
+                            $_.TextEdit.Reason -ceq $IncomingEdit.Reason -and
+                            $_.TextEdit.ReplacementText -ceq $IncomingEdit.ReplacementText -and
+                            -not [object]::ReferenceEquals($_, $ExistingCorrection)
                     } |
                     Select-Object -First 1
                 $Conflicts.Add([pscustomobject]@{
                     ExistingCorrection = $ExistingCorrection
                     IncomingCorrection = $IncomingCorrection
-                    Reason = $_.Exception.Message
+                    Reason = (
+                        "{0} Existing rule '{1}', change set '{2}'; incoming rule '{3}', change set '{4}'." -f
+                            $_.Exception.Message,
+                            $ExistingCorrection.RuleName,
+                            $ExistingCorrection.ChangeSetId,
+                            $IncomingCorrection.RuleName,
+                            $IncomingCorrection.ChangeSetId
+                    )
                 })
             }
 

@@ -10,6 +10,11 @@ using namespace System.Management.Automation.Language
     The rule suggests using the '-isnot' operator instead of the '-not (<expression> -is <type>)'
     pattern.
 
+    Native Nitpick findings contain two coordinated detached edits: remove the unary
+    negation token and replace the type-test operator. Parentheses and trivia are retained.
+    Redirected and background pipelines are diagnostic-only. ScriptAnalyzer receives
+    diagnostics without suggested corrections because it cannot preserve change-set atomicity.
+
 .EXAMPLE
     Test-UseIsNotOperator -ScriptBlockAst {
         if (-not ($x -is [int])) {
@@ -26,7 +31,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-UseIsNotOperator {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType([PSCustomObject[]], [pscustomobject])]
+    [OutputType('NitpickFinding', 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord', 'PSCustomObject')]
     param(
         [Parameter(Mandatory, ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -57,46 +62,97 @@ function Test-UseIsNotOperator {
                 $AstNode -is [UnaryExpressionAst] -and
                 $AstNode.TokenKind -eq 'Not' -and
                 $AstNode.Child -is [ParenExpressionAst] -and
+                $AstNode.Child.Pipeline -is [PipelineAst] -and
                 $AstNode.Child.Pipeline.PipelineElements.Count -eq 1 -and
+                $AstNode.Child.Pipeline.PipelineElements[0] -is [CommandExpressionAst] -and
                 (
                     $AstNode.Child.Pipeline.PipelineElements[0].Expression -is [BinaryExpressionAst] -and
                     $AstNode.Child.Pipeline.PipelineElements[0].Expression.Operator -eq 'Is'
                 )
             }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
 
-            $FilePath = if ($BadNode.Extent.FileName) {
-                $BadNode.Extent.FileName
-            } else {
-                Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1 -ExpandProperty ScriptName
+            $Tokens = $null
+            if ($MatchingExpressions.Count -gt 0) {
+                $Source = $ScriptBlockAst.Extent.StartScriptPosition.GetFullScript()
+                $ParseErrors = $null
+                [void] [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $ParseErrors)
+                # Interpolated-string subexpressions store their tokens separately.
+                $PendingTokens = [System.Collections.Generic.Queue[Token]]::new()
+                $AllTokens = [System.Collections.Generic.List[Token]]::new()
+                foreach ($Token in $Tokens) {
+                    $PendingTokens.Enqueue($Token)
+                }
+                while ($PendingTokens.Count -gt 0) {
+                    $Token = $PendingTokens.Dequeue()
+                    $AllTokens.Add($Token)
+                    if ($Token -is [StringExpandableToken]) {
+                        foreach ($NestedToken in $Token.NestedTokens) {
+                            $PendingTokens.Enqueue($NestedToken)
+                        }
+                    }
+                }
+                $Tokens = $AllTokens.ToArray()
             }
-            if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
 
             $MatchingExpressions | ForEach-Object {
                 $BadNode = $_
-                $ReplacementText = $BadNode.Child.Pipeline.Extent.Text -replace '-is', '-isnot'
+                $Pipeline = $BadNode.Child.Pipeline
+                $CommandExpression = $Pipeline.PipelineElements[0]
+                $Binary = $CommandExpression.Expression
+                $FilePath = if ($BadNode.Extent.File) { $BadNode.Extent.File } else { '<ScriptBlock>' }
+                $Corrections = @()
 
-                $CorrectionExtent = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]::new(
-                    $BadNode.Extent.StartLineNumber,
-                    $BadNode.Extent.EndLineNumber,
-                    $BadNode.Extent.StartColumnNumber,
-                    $BadNode.Extent.EndColumnNumber,
-                    $ReplacementText,
-                    $FilePath,  # File Path or Context
-                    "Convert expression to '<expression> -isnot <type>'."  # Hover Text Description
-                )
-                $SuggestedCorrections = [System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]]::new()
-                $SuggestedCorrections.Add($CorrectionExtent)
+                # Outer -not observes redirected output or a job, not the Boolean type
+                # test result, so moving negation inside those pipelines is unsafe.
+                $IsBackground = $Pipeline.PSObject.Properties['Background'] -and $Pipeline.Background
+                if ($CommandExpression.Redirections.Count -eq 0 -and -not $IsBackground) {
+                    $Negation = @($Tokens | Where-Object {
+                        $_.Kind -eq [TokenKind]::Not -and
+                            $_.Extent.StartOffset -eq $BadNode.Extent.StartOffset -and
+                            $_.Extent.EndOffset -le $BadNode.Child.Extent.StartOffset
+                    })
+                    $Operator = @($Tokens | Where-Object {
+                        $_.Kind -eq [TokenKind]::Is -and
+                            $_.Extent.StartOffset -ge $Binary.Left.Extent.EndOffset -and
+                            $_.Extent.EndOffset -le $Binary.Right.Extent.StartOffset
+                    })
+                    if ($Negation.Count -ne 1 -or $Operator.Count -ne 1) {
+                        throw "Rule '$($Metadata.Name)' could not uniquely locate the negation and type-test tokens at offsets [$($BadNode.Extent.StartOffset), $($BadNode.Extent.EndOffset))."
+                    }
 
-                $DiagnosticRecord = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord]@{
-                    Message = "Uses '-not (<expression> -is <type>)' instead of '<expression> -isnot <type>'."
-                    Extent = $BadNode.Extent
-                    RuleName = $Metadata.Name
-                    Severity = $Metadata.Severity
-                    RuleSuppressionId = $Metadata.Name
-                    SuggestedCorrections = $SuggestedCorrections
+                    $ChangeSetId = '{0}:{1}:{2}' -f $Metadata.Name, $BadNode.Extent.StartOffset, $BadNode.Extent.EndOffset
+                    $Edits = @(
+                        New-AstTextEdit `
+                            -Extent $Negation[0].Extent `
+                            -ReplacementText '' `
+                            -Reason 'Remove unary negation from the type test.'
+                        New-AstTextEdit `
+                            -Extent $Operator[0].Extent `
+                            -ReplacementText '-isnot' `
+                            -Reason "Use '-isnot' to negate the type test."
+                    )
+                    $Corrections = @(
+                        foreach ($Edit in $Edits) {
+                            New-NitpickCorrection `
+                                -TextEdit $Edit `
+                                -FilePathOrContext $FilePath `
+                                -Description $Edit.Reason `
+                                -RuleName $Metadata.Name `
+                                -Applicability Safe `
+                                -ChangeSetId $ChangeSetId
+                        }
+                    )
                 }
 
-                Write-Output $DiagnosticRecord
+                New-NitpickFinding `
+                    -RuleName $Metadata.Name `
+                    -Message "Uses '-not (<expression> -is <type>)' instead of '<expression> -isnot <type>'." `
+                    -ViolationExtent $BadNode.Extent `
+                    -Severity $Metadata.Severity `
+                    -RuleSuppressionID $Metadata.Name `
+                    -Corrections $Corrections `
+                    -ScriptPath $FilePath `
+                    -Explanation $Metadata.Explanation
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

@@ -6,6 +6,8 @@
     Creates a new Nitpick finding object with the specified properties. When OutputAs is not
     specified, native Nitpick rule invocations return NitpickFinding objects and direct rule
     invocations from PSScriptAnalyzer return DiagnosticRecord objects.
+    Diagnostic conversion omits corrections with a ChangeSetId because ScriptAnalyzer
+    cannot preserve their all-or-nothing selection. Ungrouped suggestions remain available.
 
 .EXAMPLE
     $Finding = New-NitpickFinding `

@@ -198,6 +198,10 @@ class NitpickFinding {
         # Using `New-Object` to avoid type resolution issues at parse time
         $CorrectionExtents = New-Object 'System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]'
         foreach ($Correction in $this.Corrections) {
+            # ScriptAnalyzer cannot enforce all-or-nothing selection of a change set.
+            if ($Correction.ChangeSetId) {
+                continue
+            }
             $CorrectionExtents.Add($Correction.ToCorrectionExtent())
         }
 
