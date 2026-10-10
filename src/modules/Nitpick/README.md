@@ -45,6 +45,39 @@ result schema, safety boundaries, and remaining work.
 
 ## Gotchas
 
+### Rule selection must succeed before execution
+
+`Start-Nitpicking -IncludeRule` accepts canonical rule names such as
+`UseIsNotOperator`, not callable names such as `Test-UseIsNotOperator`.
+Matching is case-insensitive and supports wildcards. Every literal include selector must
+match at least one discovered or registered rule; a valid selector alongside a typo
+does not permit a partial run. Unmatched selectors cause a terminating error before
+targets are read, findings or summaries are emitted, or fixes are applied.
+Unmatched wildcard selectors are allowed if at least one eligible rule remains.
+
+Include selectors are validated before exclusions and editor-mode filtering.
+Unmatched exclusions are allowed, but if exclusions or `-EditorMode` leave no eligible
+rules, execution terminates with a distinct error. Running with no discoverable or
+registered rules also terminates. These selection errors stop execution even without
+`-ErrorAction Stop`; `-ErrorOn` remains the separate threshold for emitted findings.
+
+Discovery remains permissive: `Find-Nitpick` may return no matches without error.
+Use `Find-Nitpick` to discover callable commands and `Get-Nitpick` to inspect
+registered rules and their canonical names.
+
+File targets are resolved across all piped `-Path` values before analysis or fixing.
+Literal paths must exist; wildcard paths can match nothing. Only files count as targets,
+and the complete invocation must retain at least one file after `-Filter`, `-IncludePath`,
+and `-ExcludePath`. An empty directory alongside a valid target is allowed.
+
+Literal `-IncludePath` selectors must match a resolved file's full path before exclusions
+are applied; unmatched wildcard include filters and unmatched exclusions are allowed.
+Relative literal `-Path` values are supported, but `-IncludePath` retains its existing
+full-path matching semantics. Path selection errors terminate before findings or summaries
+are emitted and before fixes are applied. `-Script` provides an in-memory target and
+is not subject to file-path filtering or the file-target requirement. Rule-specific path
+scopes remain unchanged; applicability of every rule-target pair is not validated.
+
 ### Explicit rule context
 
 Rules can opt into an optional `[System.Collections.IDictionary] $Context` parameter.

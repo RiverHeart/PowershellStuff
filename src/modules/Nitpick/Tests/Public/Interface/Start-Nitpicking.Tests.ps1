@@ -28,6 +28,221 @@ Describe 'Start-Nitpicking' {
         InModuleScope Nitpick {
             (Get-NitpickRegistry).Nitpicks.Clear()
         }
+        $SelectionFixture = $null
+    }
+
+    AfterEach {
+        if ($SelectionFixture) {
+            Remove-Item -LiteralPath $SelectionFixture -Recurse -Force
+        }
+    }
+
+    It 'terminates before reading targets for an unmatched selector: <Selector>, Fix: <Fix>' -ForEach @(
+        @{ Selector = 'Test-UseIsNotOperator'; Fix = $false }
+        @{ Selector = 'MissingRule'; Fix = $false }
+        @{ Selector = 'MissingRule'; Fix = $true }
+    ) {
+        Mock Get-ChildItem -ModuleName Nitpick { throw 'Targets must not be enumerated.' }
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be parsed.' }
+        Mock Save-AstDocument -ModuleName Nitpick { throw 'Targets must not be written.' }
+
+        {
+            Start-Nitpicking -Path $TestDrive -IncludeRule $Selector -Fix:$Fix -Output Object -ErrorAction Continue
+        } | Should -Throw "*No Nitpick rules match the IncludeRule selector(s): $Selector.*"
+
+        Should -Invoke Get-ChildItem -ModuleName Nitpick -Times 0 -Exactly -Scope It
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+        Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'reports every unmatched selector rather than executing a partial rule set' {
+        Mock Test-UseIsNotOperator -ModuleName Nitpick { throw 'The valid rule must not run.' }
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be parsed.' }
+        $Output = [System.Collections.Generic.List[object]]::new()
+
+        {
+            Start-Nitpicking -Script '-not ($Value -is [int])' `
+                -IncludeRule UseIsNotOperator,MissingRule,AnotherMissingRule,'Missing*' -Output Object |
+                ForEach-Object { $Output.Add($_) }
+        } | Should -Throw '*No Nitpick rules match the IncludeRule selector(s): MissingRule, AnotherMissingRule.*'
+
+        $Output | Should -HaveCount 0
+        Should -Invoke Test-UseIsNotOperator -ModuleName Nitpick -Times 0 -Exactly -Scope It
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'accepts matching wildcard, case-insensitive, and overlapping selectors' {
+        $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
+            -IncludeRule 'useisnotoperator','*IsNot*','Missing*' -Output Object -ErrorAction Stop)
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+        $Summary.RuleCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 1
+    }
+
+    It 'terminates when wildcard rule selection leaves no eligible rules' {
+        {
+            Start-Nitpicking -Script {} -IncludeRule 'Missing*' -ErrorAction Continue
+        } | Should -Throw 'No Nitpick rules were discovered or registered.*'
+    }
+
+    It 'allows an unmatched rule wildcard alongside a matching rule wildcard' {
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule '*IsNot*','Missing*' -Output Object)
+        $Results | Should -HaveCount 1
+        $Results[0].RuleCount | Should -Be 1
+    }
+
+    It 'terminates for a missing literal path before processing valid piped paths' {
+        $TestDrive = (New-Item -Path (Join-Path $TestDrive ([guid]::NewGuid().ToString())) -ItemType Directory).FullName
+        $SelectionFixture = $TestDrive
+        $Valid = Join-Path $TestDrive 'Valid.ps1'
+        Set-Content -LiteralPath $Valid -Value '$Value = 1'
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
+        Mock Save-AstDocument -ModuleName Nitpick { throw 'Fixes must not start.' }
+        {
+            @($Valid, (Join-Path $TestDrive 'Missing.ps1')) |
+                Start-Nitpicking -IncludeRule UseIsNotOperator -Fix -Output Object -ErrorAction Continue
+        } | Should -Throw
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+        Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'allows empty directories and wildcard paths alongside valid piped paths' {
+        $TestDrive = (New-Item -Path (Join-Path $TestDrive ([guid]::NewGuid().ToString())) -ItemType Directory).FullName
+        $SelectionFixture = $TestDrive
+        $Empty = New-Item -Path (Join-Path $TestDrive 'Empty') -ItemType Directory
+        $Valid = Join-Path $TestDrive 'Valid.ps1'
+        Set-Content -LiteralPath $Valid -Value '$Value = 1'
+        $Results = @(
+            @($Empty.FullName, (Join-Path $TestDrive 'Missing*.ps1'), $Valid) |
+                Start-Nitpicking -IncludeRule UseIsNotOperator -Output Object -ErrorAction Stop
+        )
+        $Results | Should -HaveCount 1
+        $Results[0].TargetCount | Should -Be 1
+    }
+
+    It 'terminates without a summary when no files remain: <Mode>' -ForEach @(
+        @{ Mode = 'empty directory' }
+        @{ Mode = 'unmatched wildcard' }
+        @{ Mode = 'filter' }
+        @{ Mode = 'include' }
+        @{ Mode = 'exclude' }
+        @{ Mode = 'directory named like a script' }
+    ) {
+        $TestDrive = (New-Item -Path (Join-Path $TestDrive ([guid]::NewGuid().ToString())) -ItemType Directory).FullName
+        $SelectionFixture = $TestDrive
+        $Parameters = @{ Path = $TestDrive; IncludeRule = 'UseIsNotOperator'; Output = 'Object' }
+        if ($Mode -eq 'directory named like a script') {
+            $null = New-Item -Path (Join-Path $TestDrive 'Fake.ps1') -ItemType Directory
+        } elseif ($Mode -ne 'empty directory' -and $Mode -ne 'unmatched wildcard') {
+            Set-Content -LiteralPath (Join-Path $TestDrive 'Valid.ps1') -Value '$Value = 1'
+        }
+        switch ($Mode) {
+            'unmatched wildcard' { $Parameters.Path = Join-Path $TestDrive 'Missing*.ps1' }
+            'filter' { $Parameters.Filter = '*.psm1' }
+            'include' { $Parameters.IncludePath = '*Missing*' }
+            'exclude' { $Parameters.ExcludePath = '*' }
+        }
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
+        $Output = [System.Collections.Generic.List[object]]::new()
+        {
+            Start-Nitpicking @Parameters | ForEach-Object { $Output.Add($_) }
+        } | Should -Throw 'No file targets remain*'
+        $Output | Should -HaveCount 0
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'validates literal include paths across the invocation before exclusions' {
+        $TestDrive = (New-Item -Path (Join-Path $TestDrive ([guid]::NewGuid().ToString())) -ItemType Directory).FullName
+        $SelectionFixture = $TestDrive
+        $First = Join-Path $TestDrive 'First.ps1'
+        $Second = Join-Path $TestDrive 'Second.ps1'
+        Set-Content -LiteralPath $First -Value '$Value = 1'
+        Set-Content -LiteralPath $Second -Value '$Value = 2'
+        $Results = @(
+            @($First, $Second) | Start-Nitpicking -IncludeRule UseIsNotOperator `
+                -IncludePath $First,$Second,'*Missing*' -ExcludePath $First,'*Absent*' -Output Object
+        )
+        $Results | Should -HaveCount 1
+        $Results[0].TargetCount | Should -Be 1
+    }
+
+    It 'rejects unmatched literal include paths even when other files match' {
+        $TestDrive = (New-Item -Path (Join-Path $TestDrive ([guid]::NewGuid().ToString())) -ItemType Directory).FullName
+        $SelectionFixture = $TestDrive
+        $Valid = Join-Path $TestDrive 'Valid.ps1'
+        $Missing = Join-Path $TestDrive 'Missing.ps1'
+        Set-Content -LiteralPath $Valid -Value '$Value = 1'
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
+        {
+            Start-Nitpicking -Path $TestDrive -IncludeRule UseIsNotOperator `
+                -IncludePath $Valid,$Missing -Output Object
+        } | Should -Throw '*No file targets match the literal IncludePath selector(s):*Missing.ps1*'
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'does not apply file-target requirements to in-memory scripts' {
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator `
+            -IncludePath 'Missing.ps1' -ExcludePath '*' -Output Object)
+        $Results | Should -HaveCount 1
+        $Results[0].TargetCount | Should -Be 1
+    }
+
+    It 'validates known include selectors before applying exclusions' {
+        $Results = @(Start-Nitpicking -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+            -IncludeRule UseIsNotOperator,AvoidParameterAttributeBool `
+            -ExcludeRule '*IsNot*','Missing*' -Output Object -ErrorAction Stop)
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+        $Summary.RuleCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 1
+        (Get-Nitpick -Name UseIsNotOperator) | Should -BeNullOrEmpty
+    }
+
+    It 'terminates when exclusions remove every selected rule' {
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be parsed.' }
+
+        {
+            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -ExcludeRule '*' -ErrorAction Continue
+        } | Should -Throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
+
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'terminates when no rules are discoverable or registered' {
+        Mock Find-Nitpick -ModuleName Nitpick {}
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be parsed.' }
+
+        {
+            Start-Nitpicking -Script {} -ErrorAction Continue
+        } | Should -Throw 'No Nitpick rules were discovered or registered.*'
+
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+    }
+
+    It 'validates selectors after registering explicitly requested rule modules' {
+        $Module = New-Module -Name NitpickSelectionRules -ScriptBlock {
+            function Test-ModuleRule {
+                param($ScriptBlockAst)
+            }
+            Export-ModuleMember -Function Test-ModuleRule
+        }
+        Import-Module -ModuleInfo $Module
+        Mock Find-Nitpick -ModuleName Nitpick {}
+        Mock Find-Nitpick -ModuleName Nitpick {
+            Get-Command -Name Test-ModuleRule -Module NitpickSelectionRules
+        } -ParameterFilter { $IncludeModule -contains 'NitpickSelectionRules' }
+
+        try {
+            $Results = @(Start-Nitpicking -Script {} -RuleModule NitpickSelectionRules `
+                -IncludeRule ModuleRule -Output Object -ErrorAction Stop)
+
+            $Results | Should -HaveCount 1
+            $Results[0].RuleCount | Should -Be 1
+            $Results[0].FindingCount | Should -Be 0
+        } finally {
+            Remove-Module NitpickSelectionRules -Force
+        }
     }
 
     It 'reports parser errors for in-memory scripts as error findings' {
@@ -213,18 +428,14 @@ Describe 'Start-Nitpicking' {
             -Source Tests `
             -EditorEnabled:$false
 
-        $Results = @(
+        {
             Start-Nitpicking `
                 -Script {} `
                 -IncludeRule EditorDisabledRule `
                 -EditorMode `
                 -Output Object `
-                -WarningAction SilentlyContinue
-        )
-
-        $Results.Count | Should -Be 1
-        $Results[0].GetType().Name | Should -Be 'NitpickSummary'
-        $Results[0].RuleCount | Should -Be 0
+                -ErrorAction Continue
+        } | Should -Throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
     }
 
     It 'returns finding and summary text by default' {

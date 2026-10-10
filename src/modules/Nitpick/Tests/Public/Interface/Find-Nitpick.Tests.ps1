@@ -81,6 +81,15 @@ Describe 'Find-Nitpick' {
         $Rules.Count | Should -Be 0
     }
 
+    It 'allows unmatched include selectors during discovery' {
+        $Errors = @()
+        $Rules = @(Find-Nitpick -IncludeModule NitpickDiscoveryRules `
+            -IncludeRule 'MissingRule','Missing*' -ErrorAction Stop -ErrorVariable Errors)
+
+        $Rules | Should -HaveCount 0
+        $Errors | Should -HaveCount 0
+    }
+
     It 'uses the command name as the rule ID when no noun is available' {
         [CommandInfo[]] $Rules = Find-Nitpick `
             -IncludeModule NitpickDiscoveryRules `

@@ -9,7 +9,32 @@ using namespace System.Management.Automation.Language
     Ordinary lint behavior is unchanged unless Fix is specified. Fix applies safe,
     validated corrections to file-backed targets using transactional AstEditor saves.
     In-memory inputs return rendered text without writing. PowerShell parser errors are
-    reported as Error findings.
+    reported as Error findings. Rule selection must succeed before any targets are read.
+
+.PARAMETER IncludeRule
+    Selects canonical Nitpick rule names, such as UseIsNotOperator, not command names
+    such as Test-UseIsNotOperator. Matching is case-insensitive and supports wildcards.
+    Every literal selector must match a discovered or registered rule before exclusions
+    and editor-mode filtering. Unmatched wildcard selectors are allowed, provided at
+    least one eligible rule remains.
+
+.PARAMETER Path
+    A file, directory, or wildcard path. Literal paths must exist. File targets are
+    resolved across all piped paths before analysis or fixing. Empty wildcard matches
+    are allowed, but the complete invocation must select at least one file.
+
+.PARAMETER IncludePath
+    Filters resolved file targets by full path, before ExcludePath is applied.
+    Literal selectors must match a file's full path; wildcard selectors may match
+    nothing. Validation is across the invocation and precedes analysis or fixing.
+
+.PARAMETER ExcludePath
+    Excludes matching full paths. Unmatched exclusions are allowed, but at least one
+    file must remain after filtering. Path filters do not apply to Script inputs.
+
+.PARAMETER ExcludeRule
+    Excludes matching rule names. Unmatched exclusions are allowed. If no eligible
+    rules remain after exclusions and editor-mode filtering, execution terminates.
 
 .PARAMETER Fix
     Applies safe corrections against one immutable source snapshot per file. Use Preview
@@ -74,13 +99,19 @@ function Start-Nitpicking {
             throw 'The Preview switch requires Fix.'
         }
 
-        Find-Nitpick `
-            -IncludeRule $IncludeRule `
-            -ExcludeRule $ExcludeRule |
-        Register-Nitpick
+        $DiscoveredRules = @(Find-Nitpick -IncludeRule $IncludeRule)
+        $DiscoveredRuleNames = @(
+            foreach ($Command in $DiscoveredRules) {
+                $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+                $RuleName
+                if (-not ($ExcludeRule | Where-Object { $RuleName -like $_ })) {
+                    Register-Nitpick -Callable $Command -ErrorAction Stop
+                }
+            }
+        )
 
         foreach ($RuleModuleEntry in $RuleModule) {
-            Register-Nitpick -Module $RuleModuleEntry
+            Register-Nitpick -Module $RuleModuleEntry -ErrorAction Stop
         }
 
         # TODO: Figure out how to register rules from a specified path
@@ -88,14 +119,33 @@ function Start-Nitpicking {
         #     . $RulePathEntry
         # }
 
+        $KnownRuleNames = @($DiscoveredRuleNames) + @(Get-Nitpick | Select-Object -ExpandProperty Name)
+        $UnmatchedSelectors = @(
+            foreach ($Selector in $IncludeRule) {
+                if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                    -not ($KnownRuleNames | Where-Object { $_ -like $Selector })) {
+                    $Selector
+                }
+            }
+        )
+        if ($UnmatchedSelectors.Count -gt 0) {
+            throw ((
+                "No Nitpick rules match the IncludeRule selector(s): {0}. " +
+                "Use canonical rule names (for example, UseIsNotOperator, not Test-UseIsNotOperator). " +
+                "Use Find-Nitpick for discovery and Get-Nitpick for registered rules."
+            ) -f ($UnmatchedSelectors -join ', '))
+        }
+
         [object[]] $Rules = Get-Nitpick `
             -IncludeRule $IncludeRule `
             -ExcludeRule $ExcludeRule |
             Where-Object { -not $EditorMode -or $_.EditorEnabled }
 
         if (-not $Rules) {
-            # TODO: Be more detailed about where we searched for rules
-            Write-Warning "No rules found to apply."
+            if ($KnownRuleNames.Count -eq 0) {
+                throw 'No Nitpick rules were discovered or registered. Import a rule module or register a rule before running Start-Nitpicking.'
+            }
+            throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
         }
 
         $Summary = [NitpickSummary]::new()
@@ -107,11 +157,30 @@ function Start-Nitpicking {
             Error = 2
         }
         $ThresholdFindingCount = 0
+        $ResolvedTargets = [System.Collections.Generic.List[object]]::new()
+        $CandidatePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     }
 
     process {
         $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            Get-ChildItem -Path $Path -Recurse -Filter $Filter |
+            $Roots = if ([System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Path)) {
+                Get-Item -Path $Path -ErrorAction Stop
+            } else {
+                Get-Item -LiteralPath $Path -ErrorAction Stop
+            }
+            $Files = @(
+                foreach ($Root in $Roots) {
+                    if ($Root.PSIsContainer) {
+                        Get-ChildItem -LiteralPath $Root.FullName -File -Recurse -Filter $Filter -ErrorAction Stop
+                    } elseif ($Root -is [System.IO.FileInfo] -and $Root.Name -like $Filter) {
+                        $Root
+                    }
+                }
+            )
+            foreach ($File in $Files) {
+                [void] $CandidatePaths.Add($File.FullName)
+            }
+            $Files |
                 Where-NitpickIncluded `
                     -PropertyPath FullName `
                     -Include $IncludePath `
@@ -120,8 +189,30 @@ function Start-Nitpicking {
         } else {
             $Script
         }
-
         foreach ($Target in $Targets) {
+            $ResolvedTargets.Add($Target)
+        }
+    }
+
+    end {
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            $UnmatchedPaths = @(
+                foreach ($Selector in $IncludePath) {
+                    if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                        -not $CandidatePaths.Contains($Selector)) {
+                        $Selector
+                    }
+                }
+            )
+            if ($UnmatchedPaths.Count -gt 0) {
+                throw "No file targets match the literal IncludePath selector(s): $($UnmatchedPaths -join ', '). Use full file paths or wildcard filters."
+            }
+            if ($ResolvedTargets.Count -eq 0) {
+                throw 'No file targets remain after resolving paths and applying Filter, IncludePath, and ExcludePath.'
+            }
+        }
+
+        foreach ($Target in $ResolvedTargets) {
             $Document = $null
             $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                 $Target.FullName
@@ -171,7 +262,8 @@ function Start-Nitpicking {
                     -RuleSuppressionID 'PowerShellParseError' `
                     -ScriptPath $TargetPath `
                     -Explanation 'The PowerShell parser could not parse this source.' `
-                    -OutputAs NitpickFinding))
+                    -OutputAs NitpickFinding
+                ))
             }
 
             $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
@@ -354,9 +446,6 @@ function Start-Nitpicking {
                 ConvertTo-NitpickText -Ast $Ast -Finding $SortedFindings
             }
         }
-    }
-
-    end {
         $Stopwatch.Stop()
         $Summary.Duration = $Stopwatch.Elapsed
 
