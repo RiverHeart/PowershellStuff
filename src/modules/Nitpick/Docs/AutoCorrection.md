@@ -380,13 +380,16 @@ Allow the previewed correction transaction to be committed safely.
 
 ## Phase 6: Structural and Change-Set Fix Providers
 
+**Status: Chunk 6.1 specified; rule migration remains pending**
+
 ### Objective
 
 Support corrections that require token awareness, sibling inspection, or coordinated edits beyond one replacement range.
 
 ### Work
 
-- Define a fix-provider contract that receives the current `AstDocument`, finding, and rule context.
+- Prove one concrete coordinated transform using the existing rule contract before
+  introducing a separate provider abstraction or document-aware invocation.
 - Require providers to return detached edits through the same AstEditor API.
 - Keep providers declarative: they plan edits but do not write files.
 - Use change sets for coordinated multi-edit transforms.
@@ -398,6 +401,59 @@ Support corrections that require token awareness, sibling inspection, or coordin
 ### Exit Criteria
 
 At least one token-aware rule applies a structural change set through the same preview, validation, conflict, and commit pipeline.
+
+### Chunk 6.1: First Transformation Contract
+
+The first example is `Test-UseIsNotOperator`. Fix-planning code initially remains
+inside the rule; "provider" does not imply registration or dispatch machinery.
+AstEditor continues to own detached edits and source integrity.
+
+- Offer the fix for a `Not` unary expression whose child is a parenthesized `PipelineAst`
+  with exactly one `CommandExpressionAst` containing an `Is` binary expression.
+  Retain the existing current-script-block detection scope.
+- Redirected or background type-test pipelines remain diagnostic-only: outer
+  `-not` observes redirected output or a job rather than the ordinary Boolean
+  type-test result. Require no command-expression redirections and no background
+  execution before offering a `Safe` fix. Background execution is a PowerShell 7
+  case. Keep a comment at this guard explaining why moving negation is unsafe.
+- Make two detached, extent-backed edits: delete the unary negation token and
+  replace the binary operator token with canonical `-isnot`.
+- Locate the negation token at the unary expression's start. Locate the `Is`
+  token between the binary expression's left and right operand extents, not by
+  searching the whole expression for its first `Is` token. Require one token
+  at each location; unexpected token shapes must be reported, not guessed.
+- Token extents provide source coordinates and expected text. No document-aware
+  rule invocation or new AstEditor helper is required by this example. Token
+  acquisition must use the exact full source snapshot, retaining absolute offsets;
+  reparsing only a substring would give incorrect coordinates.
+- Retain parentheses, whitespace, comments, line endings, operand text, and operator
+  text occurring inside strings or variable names. For example,
+  `-not ($Value -is [int])` becomes ` ($Value -isnot [int])`; the leading space is
+  intentional. `-NOT($Value -IS [int])` becomes `($Value -isnot [int])`.
+- Both corrections are `Safe` for this bounded syntax, with rule identity
+  `UseIsNotOperator` and one `ChangeSetId` per finding:
+  `UseIsNotOperator:<unary-start-offset>:<unary-end-offset>`. IDs include producer
+  identity and occurrence, so separate findings are not accidentally coupled.
+- Nested matching expressions may be corrected in the same batch. Their two-token
+  edit ranges are disjoint even though their finding extents nest:
+  `-not (-not ($Value -is [int]) -is [bool])` becomes
+  ` ( ($Value -isnot [int]) -isnot [bool])`. Actual overlapping edits from other
+  groups still reject the complete selected target batch under the existing policy.
+- Do not expand detection to `!`, additional parentheses around the type test,
+  multi-element pipelines, pipeline chains, other binary operators, or nested
+  script-block scopes in this chunk. Existing recognized inner matches remain
+  eligible even when a surrounding expression is not itself recognized.
+- After migration, native Nitpick receives the coordinated fix. ScriptAnalyzer
+  receives the diagnostic without suggested corrections for this rule, including
+  explicit native-finding conversion. Do not retain the current broad replacement
+  as a second planner or expose either member of a coordinated group independently.
+  Existing simple corrections from other rules remain supported.
+
+`Tests/Public/Rules/UseIsNotOperator.Structural.Contracts.Tests.ps1` proves exact
+two-token rendering with current AstEditor APIs. These executable tests specify
+syntax and edit mechanics, not a completed rule migration. Skipped contracts name
+chunks 6.2 and 6.3 and reserve native output and ScriptAnalyzer behavior until those
+chunks implement them. Both PowerShell 5.1 and 7 exercise the syntax contract.
 
 ## Phase 7: Optional Multiple Passes
 
