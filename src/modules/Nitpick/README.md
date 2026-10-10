@@ -27,6 +27,13 @@ Byte fingerprints reject changed sources before replacement. Transactions are pe
 so a failed target does not roll back successful changes to another target. Use
 `-ErrorAction Stop` to stop on a reported error.
 
+`UseIsNotOperator` offers a native coordinated fix for `-not (<expression> -is <type>)`:
+it removes only `-not` and replaces the actual operator with `-isnot`, retaining parentheses
+and trivia. Redirected/background type-test pipelines remain diagnostic-only. ScriptAnalyzer
+also receives diagnostics only for this rule. Finding conversion omits corrections with a
+`ChangeSetId`, since ScriptAnalyzer cannot enforce atomic groups; ungrouped simple suggestions
+remain available.
+
 ## Gotchas
 
 ### Module-defined output types

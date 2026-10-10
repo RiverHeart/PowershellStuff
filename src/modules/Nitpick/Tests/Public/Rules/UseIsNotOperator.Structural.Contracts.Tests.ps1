@@ -140,12 +140,13 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Corrected | Should -BeOfType ([bool])
     }
 
-    It 'Phase 6.2: emits native coordinated corrections and previews exact text: <Label>' -Skip -ForEach $Cases {
+    It 'emits native coordinated corrections and previews exact text: <Label>' -ForEach $Cases {
         $Document = New-AstDocument -InputObject $Source
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
         $Findings = @($Rule.Invoke($Document.Ast))
 
         $Findings | Should -HaveCount $Count
+        $Document.Edits.Count | Should -Be 0
         foreach ($Finding in $Findings) {
             $Finding.GetType().Name | Should -Be 'NitpickFinding'
             $Finding.Corrections | Should -HaveCount 2
@@ -158,7 +159,18 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
             foreach ($Correction in $Finding.Corrections) {
                 $Correction.Applicability | Should -Be 'Safe'
                 $Correction.RuleName | Should -Be 'UseIsNotOperator'
+                $Correction.TextEdit.GetType().Name | Should -Be 'AstTextEdit'
+                $Correction.Description | Should -Not -BeNullOrEmpty
+                $Correction.ExpectedText | Should -BeExactly $Source.Substring(
+                    $Correction.StartOffset,
+                    $Correction.EndOffset - $Correction.StartOffset
+                )
             }
+            $Finding.Corrections[0].StartOffset | Should -Be $Finding.ViolationExtent.StartOffset
+            $Finding.Corrections[0].ExpectedText | Should -Be '-not'
+            $Finding.Corrections[0].ReplacementText | Should -BeExactly ''
+            $Finding.Corrections[1].ExpectedText | Should -Be '-is'
+            $Finding.Corrections[1].ReplacementText | Should -BeExactly '-isnot'
         }
         @($Findings.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount $Count
         $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
@@ -169,7 +181,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Result.Findings.Final | Should -HaveCount 0
     }
 
-    It 'Phase 6.2: retains a native diagnostic without corrections for <Source>' -Skip -ForEach $DiagnosticOnlyCases {
+    It 'retains a native diagnostic without corrections for <Source>' -ForEach $DiagnosticOnlyCases {
         $Document = New-AstDocument -InputObject $Source
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
         $Findings = @($Rule.Invoke($Document.Ast))
@@ -177,10 +189,89 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Findings | Should -HaveCount 1
         $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
         $Findings[0].RuleName | Should -Be 'UseIsNotOperator'
-        @($Findings[0].Corrections) | Should -HaveCount 0
+        $Findings[0].Corrections | Should -BeNullOrEmpty
     }
 
-    It 'Phase 6.3: retains diagnostics but exposes no partial ScriptAnalyzer fix' -Skip {
+    It 'retains file provenance and absolute offsets when analyzing a nested script block' {
+        $Path = Join-Path $TestDrive 'Nested.ps1'
+        $Source = "# prefix`nfunction Test-Value { -not ('literal -is' -is [string]) }"
+        [System.IO.File]::WriteAllText($Path, $Source)
+        $Document = New-AstDocument -Path $Path
+        $Function = $Document.Ast.Find({
+            param ($Node)
+
+            $Node -is [FunctionDefinitionAst]
+        }, $false)
+        $Rule = New-Nitpick -Callable Test-UseIsNotOperator
+        $Findings = @($Rule.Invoke($Function.Body))
+
+        $Findings | Should -HaveCount 1
+        $Findings[0].ViolationExtent.File | Should -BeExactly $Document.Path
+        $Findings[0].Location | Should -BeLike "$($Document.Path):2:*"
+        foreach ($Correction in $Findings[0].Corrections) {
+            $Correction.FilePathOrContext | Should -BeExactly $Document.Path
+            $Correction.StartLineNumber | Should -Be 2
+            $Correction.ExpectedText | Should -BeExactly $Source.Substring(
+                $Correction.StartOffset,
+                $Correction.EndOffset - $Correction.StartOffset
+            )
+        }
+        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings
+
+        $Result.RenderedText | Should -BeExactly (
+            "# prefix`nfunction Test-Value {  ('literal -is' -isnot [string]) }"
+        )
+        [System.IO.File]::ReadAllText($Path) | Should -BeExactly $Source
+    }
+
+    It 'does not expand production detection to <Source>' -ForEach @(
+        @{ Source = '!($Value -is [int])' }
+        @{ Source = '-not (($Value -is [int]))' }
+        @{ Source = '-not ($Value -is [int] | Write-Output)' }
+        @{ Source = '& { -not ($Value -is [int]) }' }
+    ) {
+        $Document = New-AstDocument -InputObject $Source
+        $Rule = New-Nitpick -Callable Test-UseIsNotOperator
+
+        @($Rule.Invoke($Document.Ast)) | Should -HaveCount 0
+    }
+
+    It 'returns a direct ScriptAnalyzer diagnostic without suggestions' {
+        $Findings = @(Test-UseIsNotOperator -ScriptBlockAst { -not ($Value -is [int]) }.Ast)
+
+        $Findings | Should -HaveCount 1
+        $Findings[0].GetType().FullName |
+            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
+        $Findings[0].SuggestedCorrections | Should -BeNullOrEmpty
+    }
+
+    It 'corrects subexpressions in interpolated strings without changing literal text: <Label>' -ForEach @(
+        @{
+            Label = 'one interpolation'
+            Source = '"literal -is $(-not ($Value -is [int]))"'
+            Expected = '"literal -is $( ($Value -isnot [int]))"'
+        }
+        @{
+            Label = 'nested interpolated strings'
+            Source = '"outer $("-is $(-not ($Value -is [int]))")"'
+            Expected = '"outer $("-is $( ($Value -isnot [int]))")"'
+        }
+    ) {
+        $Document = New-AstDocument -InputObject $Source
+        $Rule = New-Nitpick -Callable Test-UseIsNotOperator
+        $Findings = @($Rule.Invoke($Document.Ast))
+
+        $Document.ParseErrors | Should -BeNullOrEmpty
+        $Findings | Should -HaveCount 1
+        $Findings[0].Corrections | Should -HaveCount 2
+        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+
+        $Result.RenderedText | Should -BeExactly $Expected
+        $Result.Corrections.Accepted | Should -HaveCount 2
+        $Result.Findings.Final | Should -HaveCount 0
+    }
+
+    It 'retains diagnostics but exposes no partial ScriptAnalyzer fix' {
         $Results = @(Invoke-ScriptAnalyzer `
             -ScriptDefinition '-not (''literal -is'' -is [string])' `
             -CustomRulePath (Join-Path $PSScriptRoot '../../../Nitpick.psd1') `

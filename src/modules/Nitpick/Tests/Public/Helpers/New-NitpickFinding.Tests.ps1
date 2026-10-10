@@ -72,6 +72,46 @@ Describe 'New-NitpickFinding' {
             Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
     }
 
+    It 'omits coordinated corrections while preserving ungrouped suggestions' -ForEach @(
+        @{ OutputAs = 'NitpickFinding' }
+        @{ OutputAs = 'DiagnosticRecord' }
+    ) {
+        $GroupedCorrections = @(
+            New-NitpickCorrection `
+                -ViolationExtent $Extent `
+                -ReplacementText '$First' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'First coordinated edit.' `
+                -ChangeSetId 'TestRule:0'
+            New-NitpickCorrection `
+                -ViolationExtent $Extent `
+                -ReplacementText '$Second' `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Second coordinated edit.' `
+                -ChangeSetId 'TestRule:0'
+        )
+        $Finding = New-NitpickFinding `
+            -RuleName Test-Rule `
+            -Message 'A problem was found.' `
+            -ViolationExtent $Extent `
+            -Severity Information `
+            -RuleSuppressionID NPTestRule `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Test explanation.' `
+            -Corrections (@($Correction) + $GroupedCorrections) `
+            -OutputAs $OutputAs
+
+        $Diagnostic = if ($OutputAs -eq 'NitpickFinding') {
+            $Finding.Corrections | Should -HaveCount 3
+            $Finding.ToDiagnosticRecord()
+        } else {
+            $Finding
+        }
+
+        $Diagnostic.SuggestedCorrections | Should -HaveCount 1
+        $Diagnostic.SuggestedCorrections[0].Text | Should -BeExactly '$Replacement'
+    }
+
     It 'converts a finding with a null rule suppression ID' {
         $Finding = New-NitpickFinding `
             -RuleName Test-Rule `

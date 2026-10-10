@@ -380,7 +380,7 @@ Allow the previewed correction transaction to be committed safely.
 
 ## Phase 6: Structural and Change-Set Fix Providers
 
-**Status: Chunk 6.1 specified; rule migration remains pending**
+**Status: Chunks 6.1 and 6.2 implemented; broader transaction proof remains pending**
 
 ### Objective
 
@@ -450,10 +450,30 @@ AstEditor continues to own detached edits and source integrity.
   Existing simple corrections from other rules remain supported.
 
 `Tests/Public/Rules/UseIsNotOperator.Structural.Contracts.Tests.ps1` proves exact
-two-token rendering with current AstEditor APIs. These executable tests specify
-syntax and edit mechanics, not a completed rule migration. Skipped contracts name
-chunks 6.2 and 6.3 and reserve native output and ScriptAnalyzer behavior until those
-chunks implement them. Both PowerShell 5.1 and 7 exercise the syntax contract.
+two-token rendering with current AstEditor APIs. Native rule migration and diagnostic
+conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 and 7.
+
+### Chunk 6.2: Implemented Native Rule
+
+- `Test-UseIsNotOperator` constructs detached token edits inline and returns findings
+  through `New-NitpickFinding`, retaining severity, suppression identity, and scope.
+- The rule tokenizes the full source once per invocation with matches. It does not
+  create or mutate an AstDocument, queue edits, or save files. Token extents retain
+  absolute coordinates even when the supplied AST is a nested script-block scope.
+  Token lookup includes expandable-string `NestedTokens` so recognized interpolation
+  subexpressions retain fixes without changing the surrounding literal text.
+- Each eligible finding carries two `Safe` corrections in its occurrence-specific
+  change set. Preview uses the existing `Resolve-NitpickCorrection` pipeline.
+- Redirected/background matches keep their diagnostics with no corrections.
+- The minimal ScriptAnalyzer boundary was pulled forward from chunk 6.3 because
+  migration otherwise exposes unsafe independent suggestions. Finding conversion
+  omits all corrections carrying a nonempty `ChangeSetId`, retaining ungrouped
+  suggestions and native correction metadata. This applies to automatic conversion
+  and explicit `NitpickFinding.ToDiagnosticRecord()` calls; it does not prohibit
+  explicitly projecting an individual correction with `ToCorrectionExtent()`.
+- No provider registry, new invocation contract, or AstEditor helper was introduced.
+  Expanded conflict/failure tests and the real rule's file-application proof remain
+  chunks 6.4 and 6.5 work.
 
 ## Phase 7: Optional Multiple Passes
 
