@@ -380,7 +380,7 @@ Allow the previewed correction transaction to be committed safely.
 
 ## Phase 6: Structural and Change-Set Fix Providers
 
-**Status: Chunks 6.1 through 6.4 implemented; file-transaction proof remains pending**
+**Status: Chunks 6.1 through 6.5 implemented; final documentation closeout remains**
 
 ### Objective
 
@@ -472,8 +472,8 @@ conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 a
   and explicit `NitpickFinding.ToDiagnosticRecord()` calls; it does not prohibit
   explicitly projecting an individual correction with `ToCorrectionExtent()`.
 - No provider registry, new invocation contract, or AstEditor helper was introduced.
-  The real rule's file-application proof remains chunk 6.5 work; expanded
-  conflict/failure coverage is recorded below.
+  Expanded conflict/failure coverage and the real rule's file-application proof
+  are recorded below.
 
 ### Chunk 6.4: Atomicity and Conflict Attribution
 
@@ -496,6 +496,30 @@ conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 a
 
 The focused contracts live in
 `Tests/Public/Interface/Resolve-NitpickCorrection.ChangeSets.Tests.ps1`.
+
+### Chunk 6.5: Real-Rule Transaction Proof
+
+`Tests/Public/Interface/Start-Nitpicking.Structural.Fix.Tests.ps1` exercises the
+coordinated rule through `Start-Nitpicking` rather than a synthetic correction rule.
+
+- A file-backed AST supplied via `-Script` remains in-memory: candidate text and
+  final findings are returned, but the source bytes are unchanged and Save is not called.
+- File preview and application produce equivalent fingerprints, diffs, source ranges,
+  expected text, replacement text, rule identities, and group IDs from the same snapshot.
+  Successful application commits four edits for two findings in one target transaction.
+- Application preserves UTF-8 BOM, non-ASCII source text, and CRLF bytes. Rerunning
+  the rule on the corrected file returns `NoChanges`.
+- `WhatIf` retains candidate analysis without saving or reporting fixed corrections.
+- A simulated failure at AstEditor's file-replacement boundary leaves original bytes
+  intact and cleans staging files. Candidate diagnostics remain available; effective
+  text, final findings, summaries, and `ErrorOn` revert to original analysis. All four
+  accepted edits are reported skipped, with none committed.
+- A diagnostic-only redirected match can remain after another group commits.
+  Final counts and severity thresholds reflect that remaining finding, not the
+  original count or an assumption that successful writes resolve every finding.
+
+No production workflow changes were required. Transactions remain single-pass
+and per target; token acquisition evaluation is still deferred.
 
 ## Phase 7: Optional Multiple Passes
 
