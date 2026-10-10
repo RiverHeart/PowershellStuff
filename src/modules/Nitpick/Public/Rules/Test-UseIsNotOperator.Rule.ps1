@@ -15,6 +15,11 @@ using namespace System.Management.Automation.Language
     Redirected and background pipelines are diagnostic-only. ScriptAnalyzer receives
     diagnostics without suggested corrections because it cannot preserve change-set atomicity.
 
+.PARAMETER Context
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
+    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
+    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+
 .EXAMPLE
     Test-UseIsNotOperator -ScriptBlockAst {
         if (-not ($x -is [int])) {
@@ -37,25 +42,39 @@ function Test-UseIsNotOperator {
         [ValidateNotNullOrEmpty()]
         [ScriptBlockAst] $ScriptBlockAst,
 
+        [Parameter(ParameterSetName='ScriptBlockAst')]
+        [System.Collections.IDictionary] $Context,
+
         [Parameter(ParameterSetName='Details')]
         [switch] $Details
     )
 
     begin {
+        $Command = $PSCmdlet.MyInvocation.MyCommand
+        $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
         $Metadata = [pscustomobject]@{
-            Name = 'UseIsNotOperator'
-            Command = $PSCmdlet.MyInvocation.MyCommand.Name
+            Name = $RuleName
+            CommandName = $Command.Name
             Category = 'Style'
             Description = 'Detects instances of the `-not (<expression> -is <type>)` pattern and suggests using the `-isnot` operator instead.'
             Severity = 'Information'
             Explanation = 'Using the `-isnot` operator is preferred over the `-not (<expression> -is <type>)` pattern for readability.'
         }
+
+        # Rule Behavior
+        $Behavior = $Context.RuleBehavior
+        $ShouldRecurse = if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false } else { $Behavior.SearchNestedScriptBlocks }
+        $OutputAs = if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' } else { $Behavior.OutputType }
     }
 
     process {
         if ($Details) { return $Metadata }
 
         try {
+            #-----------------
+            # MARK: DETECTION
+            #-----------------
+
             $MatchingExpressions = $ScriptBlockAst.FindAll({
                 param($AstNode)
 
@@ -69,7 +88,7 @@ function Test-UseIsNotOperator {
                     $AstNode.Child.Pipeline.PipelineElements[0].Expression -is [BinaryExpressionAst] -and
                     $AstNode.Child.Pipeline.PipelineElements[0].Expression.Operator -eq 'Is'
                 )
-            }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
+            }, $ShouldRecurse <# ScriptAnalyzer analyzes nested scopes separately; native callers opt into recursion. #>)
 
             $Tokens = $null
             if ($MatchingExpressions.Count -gt 0) {
@@ -93,6 +112,10 @@ function Test-UseIsNotOperator {
                 }
                 $Tokens = $AllTokens.ToArray()
             }
+
+            #-----------------
+            # MARK: REPORTING
+            #-----------------
 
             $MatchingExpressions | ForEach-Object {
                 $BadNode = $_
@@ -152,7 +175,8 @@ function Test-UseIsNotOperator {
                     -RuleSuppressionID $Metadata.Name `
                     -Corrections $Corrections `
                     -ScriptPath $FilePath `
-                    -Explanation $Metadata.Explanation
+                    -Explanation $Metadata.Explanation `
+                    -OutputAs $OutputAs
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

@@ -228,7 +228,6 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         @{ Source = '!($Value -is [int])' }
         @{ Source = '-not (($Value -is [int]))' }
         @{ Source = '-not ($Value -is [int] | Write-Output)' }
-        @{ Source = '& { -not ($Value -is [int]) }' }
     ) {
         $Document = New-AstDocument -InputObject $Source
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator

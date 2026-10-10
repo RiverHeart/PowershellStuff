@@ -384,33 +384,36 @@ class NitpickRule {
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
     [object[]] Invoke([ScriptBlockAst] $Ast) {
-        # Global, not script: a class method's $script: scope and a dot-sourced function's
-        # $script: scope can drift apart on PS5.1 Desktop after repeated module -Force
-        # reloads (e.g. across Pester test files), silently breaking New-NitpickFinding's
-        # read of this flag. Global scope is one fixed scope immune to that drift.
-        $PreviousInvocationContext = Get-Variable `
-            -Name NitpickInvocationContext `
-            -Scope Global `
-            -ErrorAction SilentlyContinue
-
-        $PreviousInvocationContextValue = $PreviousInvocationContext.Value
-
-        try {
-            $global:NitpickInvocationContext = 'Nitpick'
-            [object[]] $Results = @(& $this.Callable -ScriptBlockAst $Ast)
-            return $Results
-        } finally {
-            if ($null -ne $PreviousInvocationContext) {
-                $global:NitpickInvocationContext = $PreviousInvocationContextValue
-            } else {
-                Remove-Variable `
-                    -Name NitpickInvocationContext `
-                    -Scope Global `
-                    -WhatIf:$false `
-                    -Confirm:$false `
-                    -ErrorAction SilentlyContinue
+        return $this.Invoke($Ast, @{
+            Caller = 'Nitpick'
+            File = $Ast.Extent.File
+            RuleBehavior = @{
+                SearchNestedScriptBlocks = $true
+                OutputType = 'NitpickFinding'
             }
+        })
+    }
+
+    <#
+    .SYNOPSIS
+        Invokes the rule against the specified ScriptBlockAst.
+    .PARAMETER Ast
+        The ScriptBlockAst to check against the rule.
+    .PARAMETER Context
+        The context dictionary to pass to the rule invocation.
+    .OUTPUTS
+        [object[]] # NitpickFinding or DiagnosticRecord instances
+    #>
+    [object[]] Invoke(
+        [ScriptBlockAst] $Ast,
+        [System.Collections.IDictionary] $Context
+    ) {
+        $Parameters = @{ ScriptBlockAst = $Ast }
+        if (Get-CallableParameter -Callable $this.Callable -Name Context) {
+            $Parameters.Context = $Context
         }
+        [object[]] $Results = @(& $this.Callable @Parameters)
+        return $Results
     }
 }
 

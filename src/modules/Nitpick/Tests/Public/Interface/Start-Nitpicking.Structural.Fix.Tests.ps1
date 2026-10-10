@@ -8,6 +8,37 @@ AfterAll {
 }
 
 Describe 'Start-Nitpicking coordinated structural transactions' {
+    It 'uses native nested traversal for initial analysis and fix reanalysis' {
+        $Source = 'function Test-Value { param([Parameter(Mandatory=$true)] [string] $Name); -not ($Name -is [string]) }'
+        $Rules = @('UseIsNotOperator', 'AvoidParameterAttributeBool')
+        $Initial = @(Start-Nitpicking -Script $Source -IncludeRule $Rules -Output Object -NoSummary)
+        $Initial | Should -HaveCount 2
+        foreach ($Finding in $Initial) {
+            $Finding.GetType().Name | Should -Be 'NitpickFinding'
+        }
+
+        $Output = @(Start-Nitpicking -Script $Source -IncludeRule $Rules -Fix -Output Object -NoSummary)
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result.Findings.Original | Should -HaveCount 2
+        $Result.Findings.Final | Should -HaveCount 0
+        $Result.Corrections.Accepted | Should -HaveCount 3
+        $Result.WasReanalyzed | Should -BeTrue
+        $Result.RenderedText | Should -BeExactly 'function Test-Value { param([Parameter(Mandatory)] [string] $Name);  ($Name -isnot [string]) }'
+
+    }
+
+    It 'retains nested diagnostic-only findings during fix reanalysis' {
+        $Source = 'function Test-Value { -not ($Name -is [string]); -not ($Name -is [string] > $null) }'
+        $Output = @(Start-Nitpicking -Script $Source -IncludeRule UseIsNotOperator -Fix -Output Object -NoSummary)
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+
+        $Result.Findings.Original | Should -HaveCount 2
+        $Result.Findings.Final | Should -HaveCount 1
+        $Result.Findings.Final[0].GetType().Name | Should -Be 'NitpickFinding'
+        $Result.Findings.Final[0].Corrections | Should -BeNullOrEmpty
+        $Result.WasReanalyzed | Should -BeTrue
+    }
+
     BeforeEach {
         InModuleScope Nitpick {
             (Get-NitpickRegistry).Nitpicks.Clear()
