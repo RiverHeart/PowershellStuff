@@ -380,7 +380,7 @@ Allow the previewed correction transaction to be committed safely.
 
 ## Phase 6: Structural and Change-Set Fix Providers
 
-**Status: Chunks 6.1 and 6.2 implemented; broader transaction proof remains pending**
+**Status: Chunks 6.1 through 6.4 implemented; file-transaction proof remains pending**
 
 ### Objective
 
@@ -472,8 +472,30 @@ conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 a
   and explicit `NitpickFinding.ToDiagnosticRecord()` calls; it does not prohibit
   explicitly projecting an individual correction with `ToCorrectionExtent()`.
 - No provider registry, new invocation contract, or AstEditor helper was introduced.
-  Expanded conflict/failure tests and the real rule's file-application proof remain
-  chunks 6.4 and 6.5 work.
+  The real rule's file-application proof remains chunk 6.5 work; expanded
+  conflict/failure coverage is recorded below.
+
+### Chunk 6.4: Atomicity and Conflict Attribution
+
+- Tests exercise the real rule's two-edit groups with one non-Safe member, a member
+  lacking a native edit, a stale authoritative edit, a conflicting competing group,
+  and a rendered parse failure. No member of a rejected group is reported accepted.
+- Policy rejection skips only the ineligible group. AstEditor stale/conflict rejection
+  rejects all selected groups without queueing any edit. Parse failure retains
+  candidate diagnostics but restores effective rendered text to the original source.
+- ChangeSetId retains target-wide meaning. Different producers sharing an ID join
+  one group intentionally; independent producers must namespace IDs. Tests cover
+  both shared IDs and coincident local labels with distinct rule prefixes.
+- Conflict translation distinguishes participants by range, exact reason, and
+  replacement text, and excludes the existing correction when locating the incoming
+  participant. Equal ranges/reasons or identical proposed replacements still report
+  two distinct correction objects. Conflict messages include producer and group
+  identity alongside AstEditor's source ranges; the result schema is unchanged.
+- Token acquisition optimization is deferred to a separate session. This chunk
+  changes neither tokenization nor source-integrity ownership.
+
+The focused contracts live in
+`Tests/Public/Interface/Resolve-NitpickCorrection.ChangeSets.Tests.ps1`.
 
 ## Phase 7: Optional Multiple Passes
 

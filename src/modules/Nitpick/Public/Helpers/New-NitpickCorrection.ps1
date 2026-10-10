@@ -50,7 +50,8 @@
 
 .PARAMETER ChangeSetId
     An optional identifier shared by corrections that form one change set. Every correction
-    in a change set is accepted or skipped together.
+    in a change set is accepted or skipped together. IDs are target-wide, including across
+    rules; include producer identity and occurrence unless that coupling is intentional.
 
 .PARAMETER RuleName
     An optional stable identity for the rule that produced the correction.
