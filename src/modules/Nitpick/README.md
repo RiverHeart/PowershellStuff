@@ -82,17 +82,18 @@ Another low hanging fruit problem is the inability to have ScriptAnalyzer throw 
 
 Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick.
 
-| Criterion | PSScriptAnalyzer | Nitpick |
-| :---      | :------: | :--------: |
-| **Core Language** | C# | PowerShell |
-| **Built-In Ruleset** | 75 Rules | 2 Rules |
-| **VSCode Integration** | Yes | No |
-| **VSCode Debuggable** | No | Yes |
-| **Configuration File** | Yes | No |
-| **Rule Categories** | No | Yes |
-| **Rule Scoping** | No | Yes |
-| **Nested Module Support** | No | Yes |
-| **Errors On Failures** | No | Yes |
+| Criterion | PSScriptAnalyzer | Nitpick | Explanation |
+| :---      | :------: | :--------: | :--- |
+| **Core Language** | C# | PowerShell |  |
+| **Built-In Ruleset** | 75 Rules | 2 Rules |  |
+| **VSCode Integration** | Yes | No |  |
+| **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
+| **Configuration File** | Yes | No | |
+| **Rule Categories** | No | Yes |  |
+| **Rule Scoping** | No | Yes |  |
+| **Nested Module Support** | No | Yes |  |
+| **Errors On Failures** | No | Yes | ScriptAnalyzer doesn't throw for failures so Powershell task runners have to call it from a subprocess with `-EnableExit` or sort through the objects and throw itself. |
+| **Text Mode** | No | Yes | Text mode returns text instead of objects, formatted like regular linter output. |
 
 ## Notes
 
