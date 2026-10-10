@@ -16,7 +16,7 @@ Start-Nitpicking -Path .\Example.ps1 -Fix -WhatIf
 `-Fix` now writes file-backed `-Path` targets unless `-Preview`, `-WhatIf`, or a declined
 confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
 for rendered text, candidate/final findings, skipped corrections, conflicts, and write diagnostics.
-Only `WasWritten` and `FixedCorrections` indicate committed edits; accepted corrections can
+Only `WasWritten` and `Corrections.Fixed` indicate committed edits; accepted corrections can
 still be previews or rejected at commit. Final severity counts and `-ErrorOn` use candidate
 analysis for previews and committed analysis for successful writes. Failed/declined writes
 retain the original findings and report no fixed corrections.
@@ -33,6 +33,15 @@ and trivia. Redirected/background type-test pipelines remain diagnostic-only. Sc
 also receives diagnostics only for this rule. Finding conversion omits corrections with a
 `ChangeSetId`, since ScriptAnalyzer cannot enforce atomic groups; ungrouped simple suggestions
 remain available.
+
+Phase 6 is complete: token-aware coordinated fixes use the existing single-pass
+preview, validation, reanalysis, and per-target commit pipeline. No separate provider
+framework is required. `ChangeSetId` is target-wide; independent producers must namespace
+their IDs to avoid accidental coupling. Optional multi-pass correction remains proposed.
+Token acquisition scaling will be evaluated separately.
+
+See [Nitpick Autocorrection](Docs/AutoCorrection.md) for the implemented contracts,
+result schema, safety boundaries, and remaining work.
 
 ## Gotchas
 

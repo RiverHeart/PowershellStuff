@@ -2,7 +2,10 @@
 
 ## Status
 
-Phases 0 through 5 are implemented. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 through 6 are implemented. Phase 7 remains proposed. Native Nitpick supports
+single-pass coordinated structural fixes through the same preview and transactional
+application pipeline as simple fixes. PSScriptAnalyzer diagnostics and ungrouped
+correction suggestions remain interoperable; coordinated change sets are native-only.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -12,7 +15,8 @@ The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps
 - Reject overlapping or stale corrections instead of guessing.
 - Validate corrected PowerShell before changing a file.
 - Provide a preview-first workflow with explicit write semantics.
-- Preserve `CorrectionExtent` output for PSScriptAnalyzer consumers.
+- Preserve `CorrectionExtent` output for ungrouped simple fixes without exposing
+  coordinated edits as independently applicable PSScriptAnalyzer suggestions.
 - Allow future structural fixes without requiring every rule to implement a custom editor.
 
 ## Guiding Model
@@ -40,7 +44,9 @@ AstEditor owns source-edit mechanics:
 Nitpick owns lint and correction policy:
 
 - Rule execution, findings, applicability, rule identity, user-facing descriptions, and PSScriptAnalyzer interoperability.
-- `ChangeSetId` as the declaration that corrections produced by a rule must be selected or skipped together.
+- `ChangeSetId` as the target-wide declaration that corrections must be selected
+  or skipped together. Producers namespace IDs unless cross-finding or cross-rule
+  coordination is intentional.
 - Selection of eligible change sets, final reanalysis, summaries, and translation of AstEditor validation results into rule-aware outcomes.
 
 `NitpickCorrection` is a metadata envelope around one AstEditor text edit. Existing edit properties may remain as compatibility projections, but the wrapped AstEditor edit is authoritative. Nitpick does not independently validate ranges, stale text, or overlaps.
@@ -380,7 +386,7 @@ Allow the previewed correction transaction to be committed safely.
 
 ## Phase 6: Structural and Change-Set Fix Providers
 
-**Status: Chunks 6.1 through 6.5 implemented; final documentation closeout remains**
+**Status: Complete**
 
 ### Objective
 
@@ -521,6 +527,30 @@ coordinated rule through `Start-Nitpicking` rather than a synthetic correction r
 No production workflow changes were required. Transactions remain single-pass
 and per target; token acquisition evaluation is still deferred.
 
+### Chunk 6.6: Closeout and Abstraction Assessment
+
+The Phase 6 exit criterion is satisfied: `Test-UseIsNotOperator` supplies a token-aware,
+coordinated change set that traverses preview, atomic validation, final reanalysis,
+and transactional commit in both supported runtime editions.
+
+Fix planning remains inline in the rule. A provider registry, callback dispatcher,
+new provider type, or document-aware rule invocation is not justified by this example.
+The existing detached-edit contract and Nitpick correction envelope provide the
+integration boundary. Revisit abstraction only when another concrete consumer
+demonstrates reusable behavior.
+
+The final Phase 6 Nitpick module regression runs passed 216 tests on Windows
+PowerShell 5.1 and 218 on PowerShell 7.6.6, with no failures or skipped tests.
+Those runs precede this documentation-only closeout; they are not new runs.
+
+### Deferred Follow-Up: Token Acquisition
+
+Evaluate repeated full-source tokenization, expandable-string token traversal, and
+per-finding token scans in a separate session. Measure increasing source sizes and
+enabled-rule counts before choosing shared source context, token lookup helpers, or
+invocation changes. Phase 6 does not optimize this work or claim it is cost-free.
+This evaluation is independent of the proposed Phase 7 multi-pass feature.
+
 ## Phase 7: Optional Multiple Passes
 
 ### Objective
@@ -555,7 +585,9 @@ PowerShell 5.1 and PowerShell 7 must both exercise the correction path because p
 
 The preview MVP ends after Phase 4, with Phase 3A as a prerequisite. It supports safe non-overlapping corrections, immutable-snapshot rendering, parse validation, final reanalysis, diffs, and corrected in-memory output without modifying files.
 
-The first file-writing release ends after Phase 5. Structural providers, multi-edit change sets, and multiple correction passes remain follow-up capabilities.
+The first file-writing release ends after Phase 5. Phase 6 adds the implemented
+token-aware coordinated-fix proof without a separate provider framework. Optional
+multiple correction passes remain proposed in Phase 7.
 
 ## Conflict and Failure Policy
 
@@ -567,31 +599,46 @@ The first file-writing release ends after Phase 5. Structural providers, multi-e
 - Preserve the original file if any commit step fails.
 - Report rule names, descriptions, and source ranges for every skipped correction.
 
-## Proposed Result Model
+## Implemented Result Model
 
-A correction run should return one result per target with fields similar to:
+Correction workflows return one `Nitpick.CorrectionResult` per target, constructed
+by `New-NitpickCorrectionResult`, with this shared preview/application/failure schema:
 
 ```text
 Path
+WriteStatus
 OriginalFingerprint
-PassCount
-AcceptedCorrections
-SkippedCorrections
-Conflicts
+Document
+WriteResult
+WasWritten
+WasReanalyzed
+Findings
+  Original
+  Candidate
+  Final
+  Remaining
+  Fixed
+  Skipped
+  Conflicted
+  FailedValidation
+Corrections
+  Accepted
+  Fixed
+  Skipped
+  Conflicts
 ParseErrors
-OriginalFindings
-FinalFindings
-RemainingFindings
-IntroducedFindings
-Diff
 CandidateText
 RenderedText
-WasReanalyzed
-WasWritten
-WriteStatus
+Diff
+ErrorRecord
 ```
 
-The exact type can be introduced after the preview workflow demonstrates which fields callers need.
+`Corrections.Accepted` describes validated selection, not a committed write.
+`Corrections.Fixed` and `WasWritten` identify committed edits; `Findings.Fixed`
+identifies original findings with committed corrections, not guaranteed resolution.
+`Findings.Remaining` holds effective final findings. Omitted group properties are
+empty arrays. `PassCount`, per-pass outcomes, and a separate `IntroducedFindings`
+property are not part of the current result contract.
 
 ## Suggested Delivery Order
 
@@ -602,7 +649,7 @@ The exact type can be introduced after the preview workflow demonstrates which f
 5. Realign ownership around detached AstEditor edits and atomic batches.
 6. Integrate preview and final-analysis reporting with `Start-Nitpicking`.
 7. Harden AstEditor persistence and implement transactional apply.
-8. Introduce coordinated structural fix providers.
+8. Prove coordinated structural fixes through existing rule and editor contracts.
 9. Add bounded multi-pass correction.
 
 This order keeps AstEditor work demand-driven while preventing Nitpick from becoming a second source editor. Detached edits and atomic in-memory batches block public preview integration; encoding preservation, concurrent-change detection, and atomic file replacement block file application but do not need to delay preview.
