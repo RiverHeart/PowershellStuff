@@ -14,6 +14,10 @@
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
 
+.PARAMETER Document
+    The AstEditor document analyzed by Nitpick. Its snapshot and queued transaction
+    are retained in the result so preview and file application use the same edits.
+
 .PARAMETER Finding
     Native Nitpick findings containing corrections produced from the source snapshot.
 
@@ -55,7 +59,7 @@
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
-    $Result.Conflicts
+    $Result.Corrections.Conflicts
     $Result.RenderedText -eq $Source
 
     Inspects conflicts when independent change sets overlap. Under the target-level conflict
@@ -66,19 +70,23 @@
         -Script $Source `
         -Finding $Finding `
         -Rule $SelectedRules
-    $Result.FinalFindings
+    $Result.Findings.Final
 
     Passes the rules that produced the original findings when the preview must verify that
     corrected findings disappear and report findings that remain after rendering. Omit Rule
     when only correction selection, validation, and rendered text are needed.
 #>
 function Resolve-NitpickCorrection {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Script')]
     [OutputType([pscustomobject])]
     param (
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Script')]
         [AllowEmptyString()]
         [string] $Script,
+
+        [Parameter(Mandatory, ParameterSetName = 'Document')]
+        [ValidateScript({ $_.GetType().Name -eq 'AstDocument' -and $_.Edits.Count -eq 0 })]
+        [psobject] $Document,
 
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
@@ -90,7 +98,14 @@ function Resolve-NitpickCorrection {
         [string] $Path
     )
 
-    $Document = New-AstDocument -InputObject $Script
+    if ($PSCmdlet.ParameterSetName -eq 'Script') {
+        $Document = New-AstDocument -InputObject $Script
+    } else {
+        $Script = $Document.OriginalText
+        if ($Document.IsFileBacked) {
+            $Path = $Document.Path
+        }
+    }
     $AcceptedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
     $SkippedCorrections = [System.Collections.Generic.List[object]]::new()
     $SelectedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
@@ -239,19 +254,35 @@ function Resolve-NitpickCorrection {
         $WasReanalyzed = $true
     }
 
-    return [pscustomobject]@{
-        PSTypeName = 'Nitpick.CorrectionPreviewResult'
+    $ResultParameters = @{
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
-        OriginalFindings = $Finding
-        FinalFindings = $FinalFindings.ToArray()
-        AcceptedCorrections = $AcceptedCorrections.ToArray()
-        SkippedCorrections = $SkippedCorrections.ToArray()
-        Conflicts = $Conflicts.ToArray()
+        Document = $Document
+        OriginalFingerprint = $Document.OriginalFingerprint
+        WasReanalyzed = $WasReanalyzed
+        WriteStatus = if ($Resolution.ParseErrorCount -gt 0) {
+            'FailedValidation'
+        } elseif ($SelectedCorrections.Count -gt 0 -and $AcceptedCorrections.Count -eq 0) {
+            'Rejected'
+        } elseif ($AcceptedCorrections.Count -eq 0) {
+            'NoChanges'
+        } else {
+            'Preview'
+        }
+        Findings = @{
+            Original = $Finding
+            Final = $FinalFindings.ToArray()
+            Candidate = $FinalFindings.ToArray()
+            Remaining = @(if ($WasReanalyzed) { $FinalFindings.ToArray() } else { $Finding })
+        }
+        Corrections = @{
+            Accepted = $AcceptedCorrections.ToArray()
+            Skipped = $SkippedCorrections.ToArray()
+            Conflicts = $Conflicts.ToArray()
+        }
         ParseErrors = $Resolution.ParseErrors
         CandidateText = $CandidateText
         RenderedText = $RenderedText
         Diff = Show-AstDiff -Document $Document
-        WasReanalyzed = $WasReanalyzed
-        WasWritten = $false
     }
+    New-NitpickCorrectionResult @ResultParameters
 }

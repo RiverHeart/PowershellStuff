@@ -68,6 +68,9 @@ class AstDocument {
     # Preserves source provenance and gives Save-AstDocument a default target path.
     [string] $Path
     [string] $OriginalText
+    [string] $OriginalFingerprint
+    [bool] $IsFileBacked
+    [System.Text.Encoding] $SourceEncoding = [System.Text.UTF8Encoding]::new($false, $true)
     [string] $NewLineSequence = "`n"
     [Ast] $Ast
     [Token[]] $Tokens
@@ -83,6 +86,9 @@ class AstDocument {
     ) {
         $this.Path = $Path
         $this.OriginalText = $Text
+        $this.OriginalFingerprint = Get-AstSourceFingerprint -Bytes (
+            $this.SourceEncoding.GetBytes($Text)
+        )
         $this.Ast = $Ast
         $this.Tokens = $Tokens
         $this.ParseErrors = $ParseErrors
@@ -301,8 +307,6 @@ Export-ModuleMember `
     -Cmdlet $Manifest.CmdletsToExport `
     -Variable $Manifest.VariablesToExport `
     -Alias $Manifest.AliasesToExport
-
-
 
 
 

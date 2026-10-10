@@ -30,6 +30,77 @@ Describe 'Start-Nitpicking' {
         }
     }
 
+    It 'reports parser errors for in-memory scripts as error findings' {
+        $Results = @(
+            Start-Nitpicking `
+                -Script 'if (' `
+                -Output Object `
+                -WarningAction SilentlyContinue `
+                -ErrorAction SilentlyContinue
+        )
+        $ParseFinding = $Results | Where-Object RuleName -eq 'PowerShellParseError'
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+        $ParseFinding | Should -Not -BeNullOrEmpty
+        $ParseFinding.Severity | Should -Be 'Error'
+        $ParseFinding.Message | Should -Not -BeNullOrEmpty
+        $Summary.ErrorCount | Should -BeGreaterThan 0
+    }
+
+    It 'reports parser errors for file-backed scripts as error findings' {
+        $Path = Join-Path $TestDrive 'ParseError.ps1'
+        [System.IO.File]::WriteAllText($Path, 'if (')
+
+        try {
+            $Results = @(
+                Start-Nitpicking `
+                    -Path $Path `
+                    -Output Object `
+                    -WarningAction SilentlyContinue `
+                    -ErrorAction SilentlyContinue
+            )
+            $ParseFinding = $Results | Where-Object RuleName -eq 'PowerShellParseError'
+            $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+            $ParseFinding | Should -Not -BeNullOrEmpty
+            $ParseFinding.Severity | Should -Be 'Error'
+            $ParseFinding.Location | Should -Match 'ParseError\.ps1:'
+            $Summary.ErrorCount | Should -BeGreaterThan 0
+        } finally {
+            Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'continues linting remaining files when a target cannot be read' {
+        $MissingPath = Join-Path $TestDrive 'Missing.ps1'
+        $ValidPath = Join-Path $TestDrive 'Valid.ps1'
+        [System.IO.File]::WriteAllText($ValidPath, '$Value = 1')
+        $MissingTarget = [pscustomobject]@{ FullName = $MissingPath }
+        $ValidTarget = Get-Item -LiteralPath $ValidPath
+        Mock Get-ChildItem -ModuleName Nitpick {
+            @($MissingTarget, $ValidTarget)
+        }
+        $Errors = @()
+
+        try {
+            $Results = @(
+                Start-Nitpicking `
+                    -Path $TestDrive `
+                    -Output Object `
+                    -WarningAction SilentlyContinue `
+                    -ErrorAction SilentlyContinue `
+                    -ErrorVariable Errors
+            )
+            $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+            $Summary.TargetCount | Should -Be 2
+            $Summary.FailedTargetCount | Should -Be 1
+            $Errors | Should -Not -BeNullOrEmpty
+        } finally {
+            Remove-Item -LiteralPath $ValidPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'filters paths using wildcard include and exclude patterns' {
         $IncludedPath = Join-Path $TestDrive 'included.ps1'
         $ExcludedPath = Join-Path $TestDrive 'excluded.ps1'
@@ -218,7 +289,7 @@ Describe 'Start-Nitpicking' {
                 -Output Object
         )
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
@@ -226,7 +297,7 @@ Describe 'Start-Nitpicking' {
         $Preview.RenderedText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
         $Preview.Diff | Should -Match 'Mandatory=\$true'
         $Preview.Diff | Should -Match 'Mandatory'
-        $Preview.AcceptedCorrections | Should -HaveCount 1
+        $Preview.Corrections.Accepted | Should -HaveCount 1
         $Preview.WasWritten | Should -BeFalse
         $Summary.FindingCount | Should -Be 0
         $Summary.InformationCount | Should -Be 0
@@ -285,11 +356,11 @@ Describe 'Start-Nitpicking' {
                 -NoSummary
         )
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionPreviewResult'
+            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
 
-        $Preview.SkippedCorrections | Should -HaveCount 2
-        $Preview.Conflicts | Should -HaveCount 1
+        $Preview.Corrections.Skipped | Should -HaveCount 2
+        $Preview.Corrections.Conflicts | Should -HaveCount 1
         $Preview.RenderedText | Should -Be '$Value = 123'
         $Preview.Diff | Should -Be 'No queued edits.'
     }

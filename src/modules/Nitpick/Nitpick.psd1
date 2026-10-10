@@ -78,6 +78,7 @@ FunctionsToExport = @(
     'New-Nitpick'
     'New-NitpickTemplate'
     'New-NitpickCorrection'
+    'New-NitpickCorrectionResult'
     'New-NitpickFinding'
     'New-Rule'
     'Register-Nitpick'

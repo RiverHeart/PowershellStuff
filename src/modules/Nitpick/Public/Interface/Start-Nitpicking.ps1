@@ -6,13 +6,15 @@ using namespace System.Management.Automation.Language
 
 .DESCRIPTION
     Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
-    Ordinary lint behavior is unchanged unless Fix is specified. In this phase Fix previews
-    safe corrections and reanalyzes the rendered source; it never writes files.
+    Ordinary lint behavior is unchanged unless Fix is specified. Fix applies safe,
+    validated corrections to file-backed targets using transactional AstEditor saves.
+    In-memory inputs return rendered text without writing. PowerShell parser errors are
+    reported as Error findings.
 
 .PARAMETER Fix
-    Requests Nitpick's autocorrection workflow. In this phase, Fix previews safe corrections
-    against one immutable source snapshot per target. File-backed and in-memory inputs are
-    never modified.
+    Applies safe corrections against one immutable source snapshot per file. Use Preview
+    or WhatIf to inspect the transaction without modifying files. In-memory inputs return
+    rendered text in object output.
 
 .PARAMETER Preview
     Previews safe corrections against one immutable source snapshot per target. Final
@@ -32,10 +34,10 @@ using namespace System.Management.Automation.Language
         -Preview
 #>
 function Start-Nitpicking {
-    [CmdletBinding(DefaultParameterSetName='Path')]
+    [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
     [Alias('nitpick', 'np')]
     [OutputType([string])]
-    [OutputType('NitpickFinding', 'NitpickSummary', 'Nitpick.CorrectionPreviewResult')]
+    [OutputType('NitpickFinding', 'NitpickSummary', 'Nitpick.CorrectionResult')]
     param(
         [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
         [string] $Path,
@@ -108,23 +110,70 @@ function Start-Nitpicking {
     }
 
     process {
-        $Asts = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+        $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
             Get-ChildItem -Path $Path -Recurse -Filter $Filter |
                 Where-NitpickIncluded `
                     -PropertyPath FullName `
                     -Include $IncludePath `
                     -Exclude $ExcludePath `
-                    -Wildcard |
-                ForEach-Object {
-                    Import-ScriptBlockAst $_.FullName
-                }
+                    -Wildcard
         } else {
             $Script
         }
 
-        foreach ($Ast in $Asts) {
+        foreach ($Target in $Targets) {
+            $Document = $null
+            $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                $Target.FullName
+            } else {
+                '<ScriptBlock>'
+            }
+            try {
+                $Document = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                    New-AstDocument -Path $Target.FullName
+                } else {
+                    New-AstDocument -InputObject $Target
+                }
+
+                # WARNING: Keep original extent context for rules; reparsing memory input resets it.
+                $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and -not $Fix) {
+                    $Target
+                } else {
+                    $Document.Ast
+                }
+                $ParseErrors = $Document.ParseErrors
+            } catch [System.IO.IOException], [System.IO.InvalidDataException], [System.Security.SecurityException], [System.Management.Automation.ItemNotFoundException], [UnauthorizedAccessException] {
+                $Summary.TargetCount++
+                $Summary.FailedTargetCount++
+                if ($Fix) {
+                    $ReadFailure = New-NitpickCorrectionResult `
+                        -Path $TargetPath `
+                        -WriteStatus FailedRead `
+                        -ErrorRecord $_
+                    if ($Output -eq 'Object') {
+                        Write-Output $ReadFailure
+                    } else {
+                        Write-Output "Corrections (FailedRead): $($ReadFailure.Path)"
+                    }
+                }
+                $PSCmdlet.WriteError($_)
+                continue
+            }
+
             $Summary.TargetCount++
             $TargetFindings = [System.Collections.Generic.List[object]]::new()
+            foreach ($ParseError in $ParseErrors) {
+                $TargetFindings.Add((New-NitpickFinding `
+                    -RuleName 'PowerShellParseError' `
+                    -Message $ParseError.Message `
+                    -ViolationExtent $ParseError.Extent `
+                    -Severity Error `
+                    -RuleSuppressionID 'PowerShellParseError' `
+                    -ScriptPath $TargetPath `
+                    -Explanation 'The PowerShell parser could not parse this source.' `
+                    -OutputAs NitpickFinding))
+            }
+
             $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
@@ -148,7 +197,7 @@ function Start-Nitpicking {
             $CorrectionPreview = $null
             if ($Fix) {
                 $ResolveParameters = @{
-                    Script = $Ast.Extent.Text
+                    Document = $Document
                     Finding = $TargetFindings.ToArray()
                     Rule = $ApplicableRules.ToArray()
                 }
@@ -157,19 +206,96 @@ function Start-Nitpicking {
                 }
 
                 $CorrectionPreview = Resolve-NitpickCorrection @ResolveParameters
+                if (-not $CorrectionPreview.WasReanalyzed) {
+                    $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
+                }
+                if ($CorrectionPreview.Corrections.Accepted.Count -gt 0) {
+                    if (-not $Document.IsFileBacked) {
+                        $CorrectionPreview.WriteStatus = 'InMemory'
+                    } elseif (-not $Preview) {
+                        if ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
+                            $WriteResult = Save-AstDocument `
+                                -Document $Document `
+                                -Confirm:$false `
+                                -WhatIf:$false
+                            $CorrectionPreview.WriteResult = $WriteResult
+                            $CorrectionPreview.ErrorRecord = $WriteResult.ErrorRecord
+                            $CorrectionPreview.WriteStatus = $WriteResult.WriteStatus
+                            $CorrectionPreview.WasWritten = $WriteResult.WasWritten
+                            if ($WriteResult.WasWritten) {
+                                $CorrectionPreview.Corrections.Fixed = $CorrectionPreview.Corrections.Accepted
+                            } else {
+                                $CorrectionPreview.Corrections.Skipped = @($CorrectionPreview.Corrections.Skipped) + @(
+                                    foreach ($Correction in $CorrectionPreview.Corrections.Accepted) {
+                                        [pscustomobject]@{
+                                            Correction = $Correction
+                                            Reason = "Commit failed ($($WriteResult.WriteStatus)): $($WriteResult.ErrorRecord.Exception.Message)"
+                                        }
+                                    }
+                                )
+                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
+                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
+                                $CorrectionPreview.RenderedText = $Document.OriginalText
+                                $CorrectionPreview.WasReanalyzed = $false
+                            }
+                        } else {
+                            $CorrectionPreview.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
+                            if (-not $WhatIfPreference) {
+                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
+                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
+                                $CorrectionPreview.RenderedText = $Document.OriginalText
+                                $CorrectionPreview.WasReanalyzed = $false
+                            }
+                        }
+                    }
+                }
                 $FinalFindings = if ($CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.FinalFindings
+                    $CorrectionPreview.Findings.Final
                 } else {
                     $TargetFindings.ToArray()
+                }
+                $SkippedEdits = @($CorrectionPreview.Corrections.Skipped.Correction)
+                $ConflictingEdits = @(
+                    $CorrectionPreview.Corrections.Conflicts.ExistingCorrection
+                    $CorrectionPreview.Corrections.Conflicts.IncomingCorrection
+                )
+                $FixedFindings = @($TargetFindings | Where-Object {
+                    $Committed = @($_.Corrections | Where-Object {
+                        $_ -in $CorrectionPreview.Corrections.Fixed
+                    })
+                    $Committed.Count -gt 0
+                })
+                $SkippedFindings = @($TargetFindings | Where-Object {
+                    @($_.Corrections | Where-Object { $_ -in $SkippedEdits }).Count -gt 0
+                })
+                $ConflictedFindings = @($TargetFindings | Where-Object {
+                    @($_.Corrections | Where-Object { $_ -in $ConflictingEdits }).Count -gt 0
+                })
+                $FailedValidationFindings = if ($CorrectionPreview.WriteStatus -eq 'FailedValidation') {
+                    $TargetFindings.ToArray()
+                } else {
+                    @()
+                }
+                $CorrectionPreview.Findings.Fixed = $FixedFindings
+                $CorrectionPreview.Findings.Skipped = $SkippedFindings
+                $CorrectionPreview.Findings.Conflicted = $ConflictedFindings
+                $CorrectionPreview.Findings.FailedValidation = @($FailedValidationFindings)
+                $Summary.FixedFindingCount += $FixedFindings.Count
+                $Summary.SkippedCorrectionCount += $CorrectionPreview.Corrections.Skipped.Count
+                if ($CorrectionPreview.Corrections.Conflicts.Count -gt 0) {
+                    $Summary.ConflictedTargetCount++
+                }
+                if ($CorrectionPreview.WriteStatus -in 'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
+                    $Summary.FailedTargetCount++
                 }
 
                 Write-Verbose (
                     "Correction preview for '{0}': {1} accepted, {2} skipped." -f
                     $CorrectionPreview.Path,
-                    $CorrectionPreview.AcceptedCorrections.Count,
-                    $CorrectionPreview.SkippedCorrections.Count
+                    $CorrectionPreview.Corrections.Accepted.Count,
+                    $CorrectionPreview.Corrections.Skipped.Count
                 )
-                foreach ($SkippedCorrection in $CorrectionPreview.SkippedCorrections) {
+                foreach ($SkippedCorrection in $CorrectionPreview.Corrections.Skipped) {
                     Write-Verbose (
                         "Skipped correction from '{0}': {1}" -f
                         $SkippedCorrection.Correction.RuleName,
@@ -203,13 +329,21 @@ function Start-Nitpicking {
             }
 
             if ($Output -eq 'Text' -and $CorrectionPreview) {
-                Write-Output "Correction preview:`n"
+                Write-Output "Corrections ($($CorrectionPreview.WriteStatus)):`n"
                 Write-Output $CorrectionPreview.Diff
                 Write-Output (
-                    "`n{0} accepted, {1} skipped; files were not changed." -f
-                    $CorrectionPreview.AcceptedCorrections.Count,
-                    $CorrectionPreview.SkippedCorrections.Count
+                    "`n{0} fixed, {1} accepted, {2} skipped; write status: {3}." -f
+                    $CorrectionPreview.Corrections.Fixed.Count,
+                    $CorrectionPreview.Corrections.Accepted.Count,
+                    $CorrectionPreview.Corrections.Skipped.Count,
+                    $CorrectionPreview.WriteStatus
                 )
+            }
+
+            if ($CorrectionPreview -and $CorrectionPreview.WriteResult -and
+                $CorrectionPreview.WriteResult.ErrorRecord
+            ) {
+                $PSCmdlet.WriteError($CorrectionPreview.WriteResult.ErrorRecord)
             }
 
             if ($Output -eq 'Text' -and $FinalFindings.Count -gt 0) {

@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 4 are implemented. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
+Phases 0 through 5 are implemented. Later phases remain proposed. This document describes a staged path to native Nitpick autocorrection while preserving PSScriptAnalyzer correction interoperability.
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -290,6 +290,8 @@ Connect the proven preview engine to Nitpick's user-facing command without chang
 
 ## Phase 5: Transactional File Application
 
+**Status: Complete**
+
 ### Objective
 
 Allow the previewed correction transaction to be committed safely.
@@ -324,6 +326,57 @@ Allow the previewed correction transaction to be committed safely.
 ### Exit Criteria
 
 `Start-Nitpicking -Fix` can safely update file-backed targets using the same observable transaction produced by preview.
+
+### Implemented Contract
+
+- `New-AstDocument -Path` captures one byte snapshot, its SHA-256 fingerprint, source
+  encoding, and a path-bearing AST. Nitpick analyzes that document and submits its
+  detached correction batch to the same document for preview and application.
+- `Start-Nitpicking -Fix` applies safe, validated corrections to `-Path` targets.
+  `-Fix -Preview` and `-Fix -WhatIf` return candidate analysis without writing.
+  `-Confirm` controls approval per target. `-Script` inputs remain in-memory even
+  when the supplied AST originally came from a file.
+- BOM-less files must be valid UTF-8. BOM-marked UTF-8, UTF-16 LE/BE, and UTF-32
+  LE/BE retain their original encoding and BOM. Unsupported legacy bytes are
+  rejected rather than decoded using a guessed code page.
+- `Save-AstDocument` validates parsing, encodes and flushes a uniquely named file
+  in the destination directory, checks source and destination fingerprints after
+  approval, and commits with `File.Replace` (or `File.Move` for a new destination).
+  Atomic replacement failure is reported without a destructive overwrite fallback.
+  Owned staging files are cleaned up on failure. Existing newline characters are
+  retained; replacements are not globally newline-normalized.
+- `Save-AstDocument` returns `AstEditor.WriteResult` with `WasWritten`,
+  `WriteStatus`, `ParseErrors`, and `ErrorRecord`. Expected validation/I/O failures
+  are explicit structured outcomes, not success. Callers must inspect the result.
+- Nitpick returns the existing `Nitpick.CorrectionResult` type for both
+  previews and applications. `New-NitpickCorrectionResult` constructs this
+  shared schema, including read-failure results. Outcomes are grouped under
+  `Findings` (`Original`, `Candidate`, `Final`, `Remaining`, `Fixed`, `Skipped`,
+  `Conflicted`, `FailedValidation`) and `Corrections` (`Accepted`, `Fixed`,
+  `Skipped`, `Conflicts`) so identically named outcomes for findings and
+  corrections, such as `Findings.Skipped` versus `Corrections.Skipped`, stay
+  unambiguous. Omitted group properties are empty arrays, optional diagnostics
+  are null, and write/reanalysis flags are false. The helper constructs results
+  only; it does not analyze or apply corrections.
+  `Corrections.Accepted` describes validated selection;
+  only `Corrections.Fixed` and `WasWritten` describe committed edits.
+  `Findings.Fixed` contains original findings with committed corrections, not
+  a claim that every such finding is fully resolved; `Findings.Remaining` holds
+  the effective final analysis. Skipped, conflicting, and failed-validation
+  findings are separate lists under `Findings`.
+- `CandidateText` and `Findings.Candidate` retain preview diagnostics. On failed
+  or declined writes, effective findings and threshold counts revert to the
+  original analysis; `WasReanalyzed` is false and no correction is reported fixed.
+  A stale file is not overwritten or represented as freshly analyzed.
+- Write statuses distinguish `Written`, `Preview`, `WhatIf`, `Declined`,
+  `InMemory`, `NoChanges`, `Rejected`, `FailedValidation`, `StaleSource`,
+  `StaleTarget`, `FailedRead`, and `FailedWrite`. Errors in one target are reported;
+  other targets continue unless the caller requests terminating errors.
+- Object summaries include fixed-finding, skipped-correction, conflicted-target,
+  and failed-target counts while preserving ordinary lint summary text.
+- Fingerprints detect byte changes up to the final pre-commit check. They are not
+  an OS-level compare-and-swap guarantee against an external writer racing the
+  replacement itself. A transaction is per target, not across all input files.
 
 ## Phase 6: Structural and Change-Set Fix Providers
 

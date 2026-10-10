@@ -104,7 +104,7 @@ Describe 'Test-AvoidParameterAttributeBool' {
             -Rule $Rule
 
         $Result.RenderedText | Should -Be $Expected
-        $Result.AcceptedCorrections | Should -HaveCount 1
-        $Result.FinalFindings | Should -HaveCount 0
+        $Result.Corrections.Accepted | Should -HaveCount 1
+        $Result.Findings.Final | Should -HaveCount 0
     }
 }

@@ -238,6 +238,10 @@ class NitpickSummary {
     [int] $ErrorCount
     [int] $WarningCount
     [int] $InformationCount
+    [int] $FixedFindingCount
+    [int] $SkippedCorrectionCount
+    [int] $ConflictedTargetCount
+    [int] $FailedTargetCount
     [timespan] $Duration
 
     [string] ToString() {
@@ -398,6 +402,8 @@ class NitpickRule {
                 Remove-Variable `
                     -Name NitpickInvocationContext `
                     -Scope Global `
+                    -WhatIf:$false `
+                    -Confirm:$false `
                     -ErrorAction SilentlyContinue
             }
         }

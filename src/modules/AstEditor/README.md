@@ -45,7 +45,7 @@ Resolve-AstDocument -Document $document
 - `Add-AstTextEdit`: atomically validates and queues one or more detached edits
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits by index
-- `Save-AstDocument`: writes rendered output after parse validation
+- `Save-AstDocument`: validates and transactionally saves output with a structured write result
 - `Set-AstFunction`: queues replacement of one structurally selected function
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
 - `Extract-AstFunction`: queues removal of one function and returns its source text
@@ -122,8 +122,38 @@ include nested definitions; ambiguous matches are rejected with source locations
 comment-based help immediately above the target is replaced with the function by default. Use
 `-ExcludeHelp` to preserve it.
 
-The current MVP replaces complete function definitions. It does not yet perform semantic renames,
-body-only edits, concurrent file-change detection, atomic writes, or encoding preservation.
+The current MVP replaces complete function definitions. It does not yet perform semantic renames
+or body-only edits.
+
+## Transactional Saves
+
+`New-AstDocument -Path` records a SHA-256 fingerprint of the original bytes, the encoding/BOM,
+and a path-bearing AST. `Save-AstDocument` preserves that encoding and existing newline
+characters, validates rendered syntax, and stages output in the destination directory before
+atomic replacement. It checks source and destination fingerprints after confirmation and
+immediately before commit. It does not fall back to truncating the original if replacement fails.
+
+Supported file encodings are valid BOM-less UTF-8 and BOM-marked UTF-8, UTF-16 LE/BE, and
+UTF-32 LE/BE. Legacy code-page encodings are not inferred. In-memory documents require
+`-OutPath` and default to UTF-8 without a BOM.
+
+```powershell
+$result = Save-AstDocument -Document $document -Confirm:$false
+if ($result.ErrorRecord) {
+    throw $result.ErrorRecord
+}
+$result.WasWritten
+$result.WriteStatus
+```
+
+Expected validation and I/O failures return structured `AstEditor.WriteResult` objects with
+`ErrorRecord` and `WasWritten = $false`. Check these fields before reporting success.
+`-WhatIf` and declined confirmations also return non-written results. Temporary files owned
+by the transaction are cleaned up on failure. Fingerprints protect the last pre-commit check,
+not an OS-level compare-and-swap against a writer racing the replacement itself.
+
+`Edit-PSFunction -Apply` uses this save contract. `Split-PSFunction` still has a separate
+multi-file write workflow; it is not a transactional multi-file commit.
 
 ## Function Extraction
 
@@ -182,5 +212,5 @@ Output is written to:
 
 ## Notes
 
-AstEditor intentionally avoids mutating PowerShell AST objects in-place.
-It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+- AstEditor intentionally avoids mutating PowerShell AST objects in-place.
+- It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
