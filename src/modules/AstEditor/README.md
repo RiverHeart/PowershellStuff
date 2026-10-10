@@ -32,21 +32,51 @@ $document = New-AstDocument -InputObject 'function Get-Greeting {}'
 Resolve-AstDocument -Document $document
 ```
 
-`AstDocument` and `AstTextEdit` are internal implementation types. Consumers should instantiate
-documents through `New-AstDocument` and pass the returned objects to the other exported commands.
+`AstDocument` remains an internal implementation type. Consumers create documents through
+`New-AstDocument` and detached edits through `New-AstTextEdit` or structural edit commands.
 
 ## Core Model
 
-- `AstTextEdit`: internal representation of a single replacement/insertion operation
-- `AstDocument`: internal immutable parse data plus a queued list of `AstTextEdit` edits
+- `AstTextEdit`: class-based detached edit contract with source coordinates, expected text, replacement text, and reason
+- `AstDocument`: internal immutable parse data plus a queued edit list
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
+- `New-AstTextEdit`: creates a detached edit from an extent or document-bound offset range
+- `New-AstCollectionEdit`: creates the same detached edit contract for a structural collection removal
+- `Add-AstTextEdit`: atomically validates and queues one or more detached edits
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits by index
-- `Save-AstDocument`: writes rendered output after parse validation
+- `Save-AstDocument`: validates and transactionally saves output with a structured write result
 - `Set-AstFunction`: queues replacement of one structurally selected function
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
 - `Extract-AstFunction`: queues removal of one function and returns its source text
 - `Split-PSFunction`: previews or applies extraction of top-level functions into individual files
+
+## Generic Text Edits
+
+Offset ranges are zero-based and end-exclusive. Construct edits without side effects, then submit
+the selected target batch to `Add-AstTextEdit`:
+
+```powershell
+$document = New-AstDocument -InputObject '$Value = 1'
+$edit = New-AstTextEdit `
+	-Document $document `
+	-StartOffset 9 `
+	-EndOffset 10 `
+	-ReplacementText '2' `
+	-ExpectedText '1' `
+	-Reason 'Update the value'
+Add-AstTextEdit -Document $document -TextEdit $edit
+
+$result = Resolve-AstDocument -Document $document -PassThruText
+$result.RenderedText
+```
+
+Use `New-AstTextEdit -Extent` when an `IScriptExtent` identifies the complete edit range.
+`New-AstCollectionEdit` returns the same contract for token-aware collection removal. Batch
+queueing validates expected text, ranges, overlaps, and same-offset insertions before queueing any
+member. Conflict exceptions expose the existing and incoming edits through `ExistingEdit` and
+`IncomingEdit` entries in `Exception.Data`. The offset and extent parameter sets on
+`Add-AstTextEdit` remain convenience surfaces for one edit.
 
 ## Function Editing
 
@@ -92,8 +122,38 @@ include nested definitions; ambiguous matches are rejected with source locations
 comment-based help immediately above the target is replaced with the function by default. Use
 `-ExcludeHelp` to preserve it.
 
-The current MVP replaces complete function definitions. It does not yet perform semantic renames,
-body-only edits, concurrent file-change detection, atomic writes, or encoding preservation.
+The current MVP replaces complete function definitions. It does not yet perform semantic renames
+or body-only edits.
+
+## Transactional Saves
+
+`New-AstDocument -Path` records a SHA-256 fingerprint of the original bytes, the encoding/BOM,
+and a path-bearing AST. `Save-AstDocument` preserves that encoding and existing newline
+characters, validates rendered syntax, and stages output in the destination directory before
+atomic replacement. It checks source and destination fingerprints after confirmation and
+immediately before commit. It does not fall back to truncating the original if replacement fails.
+
+Supported file encodings are valid BOM-less UTF-8 and BOM-marked UTF-8, UTF-16 LE/BE, and
+UTF-32 LE/BE. Legacy code-page encodings are not inferred. In-memory documents require
+`-OutPath` and default to UTF-8 without a BOM.
+
+```powershell
+$result = Save-AstDocument -Document $document -Confirm:$false
+if ($result.ErrorRecord) {
+    throw $result.ErrorRecord
+}
+$result.WasWritten
+$result.WriteStatus
+```
+
+Expected validation and I/O failures return structured `AstEditor.WriteResult` objects with
+`ErrorRecord` and `WasWritten = $false`. Check these fields before reporting success.
+`-WhatIf` and declined confirmations also return non-written results. Temporary files owned
+by the transaction are cleaned up on failure. Fingerprints protect the last pre-commit check,
+not an OS-level compare-and-swap against a writer racing the replacement itself.
+
+`Edit-PSFunction -Apply` uses this save contract. `Split-PSFunction` still has a separate
+multi-file write workflow; it is not a transactional multi-file commit.
 
 ## Function Extraction
 
@@ -152,5 +212,5 @@ Output is written to:
 
 ## Notes
 
-AstEditor intentionally avoids mutating PowerShell AST objects in-place.
-It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+- AstEditor intentionally avoids mutating PowerShell AST objects in-place.
+- It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.

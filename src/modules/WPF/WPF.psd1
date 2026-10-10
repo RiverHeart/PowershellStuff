@@ -74,7 +74,9 @@ TypesToProcess = @(
 # FormatsToProcess = @()
 
 # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
-# NestedModules = @()
+NestedModules = @(
+    'SubModules\WPFRules\WPFRules.psm1'
+)
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
@@ -246,11 +248,20 @@ AliasesToExport = '*'
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
 
+    # For TabCentral integration
     TabExpansion = @{
         Completers = @(
             'Complete-WPFThis'
         )
         Modifiers = @()
+    }
+
+    # For Nitpick integration
+    Linting = @{
+        Rules = @(
+            'Test-AvoidBlockingUI'
+        )
+        RuleModules = @('SubModules/WPFRules/WPF.psd1')
     }
 
     PSData = @{
