@@ -8,7 +8,13 @@ using namespace System.Management.Automation
 .DESCRIPTION
     Finds exported Test and Measure commands with the required Nitpick callable
     signature. Selected modules and their nested modules are searched. Only
-    modules already loaded in the current session are inspected.
+    modules already loaded in the current session are inspected by default.
+    Removed nested modules and temporary module scopes are not traversed.
+
+.PARAMETER Module
+    Exact module objects to inspect instead of the default loaded-module roots.
+    Their loaded nested modules are also inspected. IncludeModule and ExcludeModule
+    filter the root module names.
 
 .EXAMPLE
     Returns all valid Nitpick rules from the currently loaded modules.
@@ -35,13 +41,21 @@ function Find-Nitpick {
         [string[]] $ExcludeRule,
 
         [string[]] $IncludeModule,
-        [string[]] $ExcludeModule
+        [string[]] $ExcludeModule,
+
+        [ValidateNotNullOrEmpty()]
+        [PSModuleInfo[]] $Module
     )
 
     $DefaultInclude = @('Test-*', 'Measure-*')
 
+    $LoadedModules = [HashSet[PSModuleInfo]]::new()
+    Get-Module -All | ForEach-Object {
+        $null = $LoadedModules.Add($_)
+    }
+    $RootModules = if ($PSBoundParameters.ContainsKey('Module')) { $Module } else { Get-Module }
     $PendingModules = [Queue[PSModuleInfo]]::new()
-    Get-Module |
+    $RootModules |
         Where-NitpickIncluded `
             -PropertyPath Name `
             -Include $IncludeModule `
@@ -52,9 +66,7 @@ function Find-Nitpick {
         }
 
     $VisitedModules = [HashSet[PSModuleInfo]]::new()
-    $DiscoveredCommands = [HashSet[string]]::new(
-        [System.StringComparer]::OrdinalIgnoreCase
-    )
+    $DiscoveredCommands = [HashSet[CommandInfo]]::new()
 
     while ($PendingModules.Count -gt 0) {
         $CurrentModule = $PendingModules.Dequeue()
@@ -63,7 +75,9 @@ function Find-Nitpick {
         }
 
         $CurrentModule.NestedModules | ForEach-Object {
-            $PendingModules.Enqueue($_)
+            if ($LoadedModules.Contains($_)) {
+                $PendingModules.Enqueue($_)
+            }
         }
 
         $CurrentModule.ExportedCommands.Values |
@@ -93,14 +107,8 @@ function Find-Nitpick {
                 })
             } |
             Where-Object {
-                $CommandIdentity = '{0}|{1}|{2}|{3}' -f @(
-                    $_.Module.Guid
-                    $_.Module.Version
-                    $_.Module.Path
-                    $_.Name
-                )
                 # Returns true for new items, false for duplicates.
-                $DiscoveredCommands.Add($CommandIdentity)
+                $DiscoveredCommands.Add($_)
             }
     }
 }

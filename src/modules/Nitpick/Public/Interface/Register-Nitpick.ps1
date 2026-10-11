@@ -122,7 +122,7 @@ function Register-Nitpick {
             if ($Existing) {
                 $IsSame =
                     $Existing.Source -eq $Nitpick.Source -and
-                    $Existing.Callable -eq $Nitpick.Callable
+                    (Test-NitpickCallableIdentity -Left $Existing.Callable -Right $Nitpick.Callable)
 
                 if ($IsSame) {
                     Write-Verbose "Nitpick '$($Nitpick.Name)' is already registered."

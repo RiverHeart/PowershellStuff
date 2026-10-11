@@ -79,6 +79,13 @@ Describe 'Register-Nitpick' {
         } | Should -Throw '*already registered*'
     }
 
+    It 'recognizes lookup and discovery wrappers for the same exported function' {
+        $Original = Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -PassThru
+        $Repeated = Find-Nitpick -IncludeModule Nitpick -IncludeRule UseIsNotOperator |
+            Register-Nitpick -PassThru -ErrorAction Stop
+        [object]::ReferenceEquals($Original, $Repeated) | Should -BeTrue
+    }
+
     It 'replaces a duplicate rule when Force is specified' {
         Register-Nitpick -Callable {
             param ($ScriptBlockAst)

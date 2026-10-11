@@ -45,6 +45,55 @@ result schema, safety boundaries, and remaining work.
 
 ## Gotchas
 
+### Loading custom rule modules
+
+Use `-RulePath` to import trusted rule modules before discovery:
+
+```powershell
+Start-Nitpicking -Path .\Example.ps1 -RulePath .\MyRules
+Start-Nitpicking -Path .\Example.ps1 -RulePath .\MyRules\MyRules.psd1
+Start-Nitpicking -Path .\Example.ps1 -RulePath .\MyRules\MyRules.psm1 -IncludeRule MyRule
+```
+
+`-RulePath` accepts multiple literal filesystem paths: module directories, `.psd1`
+manifests, `.psm1` script modules, and `.dll` binary modules. Directories are passed to
+`Import-Module` for PowerShell to resolve, including module layouts that use a manifest
+or binary entrypoint. Loose `.ps1` scripts, wildcard expansion, and recursive module
+searches are not supported. All path entries are validated before any imports; invalid
+paths and import errors terminate before analysis or fixing. A `.psd1` must be a module
+manifest, not a rule-settings data file.
+
+Modules must export their rule commands. Default discovery selects `Test-*` and
+`Measure-*` commands with a `ScriptBlockAst` parameter and also inspects nested modules.
+Include and exclude selectors use canonical rule names, as described below.
+Imports use temporary module scopes without forced reloads, so rule commands are not
+exported into the caller's global scope. Path-loaded rules are included only when requested;
+they are not automatically registered or rediscovered through temporary scope references.
+This is not an unloading guarantee: module state and import side effects can persist.
+Module imports execute code; only load rule packages you trust.
+
+`-RuleModule` includes rules from already loaded modules; it does not import them.
+Automatic discovery of other loaded rule modules remains unchanged.
+
+### Discovery versus registration
+
+`Start-Nitpicking` builds an invocation-local rule list without modifying the registry.
+This intentionally replaces its previous automatic registration behavior.
+Use `Register-Nitpick` explicitly for persistent rules, scriptblock callables, or metadata
+overrides such as category and editor enablement. `Get-Nitpick` lists only those explicit
+registrations, not the rules automatically discovered by the last lint invocation.
+
+An explicitly registered rule takes precedence over discovery of the same callable,
+preserving its metadata and running it only once. Different callables with the same
+case-insensitive canonical name terminate rule selection before analysis or fixing.
+Excluded rules do not participate in conflict checks; editor-mode filtering follows them.
+Failed selection does not partially populate the registry.
+
+`Unregister-Nitpick` removes a registration, not an exported command. A rule from a
+loaded module can still be discovered afterward; use `-ExcludeRule` to prevent execution.
+Nested rule packages remain supported, but discovery ignores removed nested modules
+and temporary scopes that are not in PowerShell's loaded-module list.
+
 ### Rule selection must succeed before execution
 
 `Start-Nitpicking -IncludeRule` accepts canonical rule names such as

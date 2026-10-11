@@ -56,6 +56,24 @@ Describe 'Find-Nitpick' {
         $Rules.Name | Should -Contain 'Measure-ValidNitpick'
     }
 
+    It 'supports exact module objects without scanning other loaded roots' {
+        $Rules = @(Find-Nitpick -Module $RuleModule)
+        $Rules | Should -HaveCount 2
+        $Rules.ModuleName | Should -Not -Contain Nitpick
+    }
+
+    It 'does not discover rules retained in removed nested module references' {
+        $Parent = New-Module -Name NitpickDiscoveryParent -ScriptBlock {
+            param ($Child)
+            Import-Module -ModuleInfo $Child -Scope Local
+            Export-ModuleMember -Function @()
+        } -ArgumentList $RuleModule
+        Import-Module -ModuleInfo $Parent
+        @(Find-Nitpick -Module $Parent) | Should -HaveCount 2
+        Remove-Module -ModuleInfo $RuleModule -Force
+        @(Find-Nitpick -Module $Parent) | Should -HaveCount 0
+    }
+
     It 'filters command names with wildcard patterns' {
         [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules -Name 'Test-*'
 

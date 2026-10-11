@@ -220,7 +220,7 @@ Describe 'Start-Nitpicking' {
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
     }
 
-    It 'validates selectors after registering explicitly requested rule modules' {
+    It 'validates selectors after discovering explicitly requested rule modules without registration' {
         $Module = New-Module -Name NitpickSelectionRules -ScriptBlock {
             function Test-ModuleRule {
                 param($ScriptBlockAst)
@@ -240,9 +240,71 @@ Describe 'Start-Nitpicking' {
             $Results | Should -HaveCount 1
             $Results[0].RuleCount | Should -Be 1
             $Results[0].FindingCount | Should -Be 0
+            @(Get-Nitpick) | Should -HaveCount 0
         } finally {
             Remove-Module NitpickSelectionRules -Force
         }
+    }
+
+    It 'does not persist automatically discovered rules even after repeated invocations' {
+        foreach ($Invocation in 1..2) {
+            $Results = @(Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -Output Object)
+            $Results[0].RuleCount | Should -Be 1
+            @(Get-Nitpick) | Should -HaveCount 0
+        }
+    }
+
+    It 'preserves explicit metadata and executes the same discovered callable only once' {
+        $Registered = Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) `
+            -Category Quality -Source CustomSource -PassThru
+        $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
+            -IncludeRule UseIsNotOperator -Output Object -ErrorAction Stop)
+
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+        $Summary.RuleCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 1
+
+        $Remaining = @(Get-Nitpick)
+        $Remaining | Should -HaveCount 1
+        [object]::ReferenceEquals($Remaining[0], $Registered) | Should -BeTrue
+        $Remaining[0].Category | Should -Be Quality
+        $Remaining[0].Source | Should -Be CustomSource
+    }
+
+    It 'uses explicit editor enablement rather than discovered defaults' {
+        Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -EditorEnabled $false
+        {
+            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -EditorMode
+        } | Should -Throw '*No eligible Nitpick rules remain*'
+        (Get-Nitpick -Name UseIsNotOperator).EditorEnabled | Should -BeFalse
+    }
+
+    It 'rejects a conflicting explicit callable without modifying the registry or reading targets' {
+        $Registered = Register-Nitpick `
+            -Callable { param ($ScriptBlockAst) } `
+            -Name UseIsNotOperator -Source Tests -PassThru
+
+        Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
+        {
+            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -ErrorAction Continue
+        } | Should -Throw "*Different Nitpick callables share the canonical rule name 'UseIsNotOperator'*"
+        Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+        [object]::ReferenceEquals((Get-Nitpick -Name UseIsNotOperator), $Registered) | Should -BeTrue
+    }
+
+    It 'does not partially register discovered rules after selector failure' {
+        {
+            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator,MissingRule
+        } | Should -Throw '*No Nitpick rules match*'
+        @(Get-Nitpick) | Should -HaveCount 0
+    }
+
+    It 'unregisters explicit metadata without disabling discovery' {
+        Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -EditorEnabled $false
+        Unregister-Nitpick -Name UseIsNotOperator
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -EditorMode -Output Object)
+        $Results[0].RuleCount | Should -Be 1
+        @(Get-Nitpick) | Should -HaveCount 0
     }
 
     It 'reports parser errors for in-memory scripts as error findings' {
