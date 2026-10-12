@@ -45,6 +45,10 @@ result schema, safety boundaries, and remaining work.
 
 ## Gotchas
 
+For the proposed replacement of ambient discovery with explicit manifest-declared
+packages and qualified rule IDs, see [Manifest-Declared Rule Packages](Docs/RulePackages.md).
+That plan does not change the current behavior documented below.
+
 ### Loading custom rule modules
 
 Use `-RulePath` to import trusted rule modules before discovery:
