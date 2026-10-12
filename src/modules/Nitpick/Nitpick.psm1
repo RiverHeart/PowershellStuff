@@ -270,6 +270,8 @@ class NitpickSummary {
 
 class NitpickRule {
     [string] $Name
+    [string] $Namespace
+    [string] $Id
     [string] $Category
     [bool] $EditorEnabled
     [string] $CallableType
@@ -303,6 +305,7 @@ class NitpickRule {
         if ($TargetCallable -is [scriptblock]) {
             $this.CallableType = 'ScriptBlock'
             $this.Callable = $TargetCallable
+            $this.Namespace = 'Local'
         } else {
             $this.Name = if ($TargetCallable.Noun) {
                 $TargetCallable.Noun
@@ -312,6 +315,11 @@ class NitpickRule {
             $this.CallableType = 'Function'
             $this.Callable = $TargetCallable
             $this.Source = $TargetCallable.ModuleName
+            $this.Namespace = if ($TargetCallable.ModuleName) {
+                $TargetCallable.ModuleName
+            } else {
+                'Local'
+            }
         }
 
         $HasDetails = $TargetCallable |
@@ -326,7 +334,7 @@ class NitpickRule {
             }
         }
 
-        foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source', 'Description', 'Severity', 'Explanation') {
+        foreach ($Property in 'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source', 'Description', 'Severity', 'Explanation') {
             if ($Overrides.ContainsKey($Property)) {
                 $this.$Property = $Overrides[$Property]
             }
@@ -338,6 +346,10 @@ class NitpickRule {
         if ($TargetCallable -isnot [scriptblock] -and -not $this.Source) {
             throw 'Source is mandatory for non-module functions/cmdlets.'
         }
+
+        Assert-NitpickIdentitySegment -Value $this.Name -SegmentType Name
+        Assert-NitpickIdentitySegment -Value $this.Namespace -SegmentType Namespace
+        $this.Id = '{0}/{1}' -f $this.Namespace, $this.Name
     }
 
     <#

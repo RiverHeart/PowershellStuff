@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 0 is implemented; Phases 1 through 7 remain proposed.
+Phases 0 and 1 are implemented; Phases 2 through 7 remain proposed.
 The examples below describe the intended API, not the current API.
 
 The contracts live in [RulePackages.Contracts.Tests.ps1](../Tests/RulePackages.Contracts.Tests.ps1).
@@ -296,7 +296,7 @@ Ambiguous named resolution must identify competing origins and recommend an expl
 path. Selected-ID conflicts must identify both declaring and implementing origins.
 Do not silently fall back to built-ins on any acquisition error.
 
-## Phase 1: Qualified Rule Identity
+## Phase 1: Qualified Rule Identity (Complete)
 
 ### Objective
 
@@ -321,6 +321,18 @@ Introduce one native identity model without changing how sources are obtained ye
 
 All selected rules can carry stable IDs; the legacy invocation still passes until the
 coordinated public cutover in Phase 4.
+
+### Implemented
+
+- `NitpickRule` retains local `Name` and descriptive `Source`, and now exposes
+  `Namespace` plus the computed `Namespace/Name` `Id`.
+- Scriptblock and module-less command rules default to `Local`; command rules with an
+  implementing module default to that module's name. `New-Nitpick -Namespace` supports
+  an explicit owner independent of the implementing module.
+- A shared identity-segment validator rejects empty or whitespace-only values, path
+  separators, and wildcard syntax. Callable `Details` metadata cannot set ownership.
+- The legacy invocation and source-discovery behavior remain unchanged; registry and
+  selection still use their pre-cutover behavior until Phase 4.
 
 ## Phase 2: Explicit Module Resolver
 

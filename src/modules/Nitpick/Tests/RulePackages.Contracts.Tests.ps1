@@ -143,7 +143,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
     }
 
-    Context 'Phase 1: qualified identity (pending implementation)' -Skip {
+    Context 'Phase 1: qualified identity' {
         It 'keeps local Name and descriptive Source separate from the default scriptblock ID' {
             $Rule = New-Nitpick -Name AvoidFoo -Source Personal -Callable { param ($ScriptBlockAst) }
             $Rule.Name | Should -Be AvoidFoo
@@ -164,6 +164,43 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Rule.Name | Should -Be UseIsNotOperator
             $Rule.Namespace | Should -Be Nitpick
             $Rule.Id | Should -Be 'Nitpick/UseIsNotOperator'
+        }
+
+        It 'uses the declared namespace when a rule is implemented by a supporting module' {
+            $Module = New-Module -Name WPFRules -ScriptBlock {
+                function Test-AvoidBlockingUI {
+                    param($ScriptBlockAst)
+                }
+                Export-ModuleMember -Function Test-AvoidBlockingUI
+            }
+            $Callable = $Module.ExportedCommands['Test-AvoidBlockingUI']
+            $Rule = New-Nitpick -Namespace WPF -Callable $Callable
+
+            $Rule.Id | Should -Be 'WPF/AvoidBlockingUI'
+            $Rule.Callable.ModuleName | Should -Be WPFRules
+        }
+
+        It 'does not accept namespace ownership from callable Details metadata' {
+            $Module = New-Module -Name IdentityMetadataRules -ScriptBlock {
+                function Test-IdentityMetadata {
+                    param(
+                        $ScriptBlockAst,
+                        [switch] $Details
+                    )
+                    if ($Details) {
+                        return [pscustomobject]@{
+                            Namespace = 'Spoofed'
+                            Name = 'IdentityMetadata'
+                            Source = 'Metadata'
+                        }
+                    }
+                }
+                Export-ModuleMember -Function Test-IdentityMetadata
+            }
+            $Rule = New-Nitpick -Callable $Module.ExportedCommands['Test-IdentityMetadata']
+
+            $Rule.Namespace | Should -Be IdentityMetadataRules
+            $Rule.Id | Should -Be 'IdentityMetadataRules/IdentityMetadata'
         }
 
         It 'rejects invalid identity segments: <Namespace>/<Name>' -ForEach @(
