@@ -1,8 +1,12 @@
 # Manifest-Declared Rule Packages
 
+## Foreword
+
+Plans are not immutable and may be changed with user permission. Unforeseen problems may arise. If you discover that an assumption was incorrect or that the implementation is either too vague or harder to implement than necessary as it was described, you should grill the user until you are both aligned on the solution. It may be worthwhile to have the user create a branch to explore solutions in before commiting to one if one solution is not obviously better than another.
+
 ## Status
 
-Phases 0 and 1 are implemented; Phases 2 through 7 remain proposed.
+Phases 0 through 2 are implemented; Phases 3 through 7 remain proposed.
 The examples below describe the intended API, not the current API.
 
 The contracts live in [RulePackages.Contracts.Tests.ps1](../Tests/RulePackages.Contracts.Tests.ps1).
@@ -334,7 +338,7 @@ coordinated public cutover in Phase 4.
 - The legacy invocation and source-discovery behavior remain unchanged; registry and
   selection still use their pre-cutover behavior until Phase 4.
 
-## Phase 2: Explicit Module Resolver
+## Phase 2: Explicit Module Resolver (Complete)
 
 ### Objective
 
@@ -342,7 +346,7 @@ Resolve names and literal paths predictably without importing modules.
 
 ### Work
 
-- Evaluate [Resolve-Module](../Private/Resolve-Module.ps1) and its callers/tests before
+- Evaluate the former `Resolve-Module` private helper and its callers/tests before
   extending or replacing it. Reuse version helpers where appropriate.
 - Its current path detection and name-based loaded lookup do not meet path pinning,
   bare-file, or ambiguity requirements; do not adopt those semantics unchanged.
@@ -360,6 +364,33 @@ Resolve names and literal paths predictably without importing modules.
 ### Exit Criteria
 
 Source identity is pinned and errors are explicit before imports or target reads.
+
+### Implemented
+
+- The former `Resolve-Module` (name/version lookup only, no path pinning or ambiguity
+  rejection) is replaced by [Resolve-NitpickModuleSource](../Private/Resolve-NitpickModuleSource.ps1),
+  which dispatches to [Resolve-NitpickModulePathSource](../Private/Resolve-NitpickModulePathSource.ps1)
+  or [Resolve-NitpickModuleNameSource](../Private/Resolve-NitpickModuleNameSource.ps1) based on
+  [Test-NitpickModulePathShape](../Private/Test-NitpickModulePathShape.ps1).
+- Path-shaped input (a separator, a provider qualifier, a recognized module extension, or an
+  existing filesystem entry) is pinned exactly: module directories, `.psd1` manifests, `.psm1`
+  script modules, and `.dll` binary modules are accepted; non-FileSystem providers, unsupported
+  extensions, and missing paths are rejected without ever falling back to name resolution.
+- Bare names reuse a single matching loaded instance, reject multiple loaded instances as
+  ambiguous, otherwise select the single highest-version available source and reject equally
+  eligible distinct sources at that version. Wildcards are rejected outright.
+- [Get-NitpickModuleManifestPath](../Private/Get-NitpickModuleManifestPath.ps1) locates the
+  manifest for a resolved entrypoint (itself, or a sibling `<Name>.psd1`) so Phase 3 can read
+  declarations without importing code. Version is read via `Import-PowerShellDataFile` and
+  `Resolve-Version`, never via module-initializing commands.
+- A same-named module loaded from a different path is never reused; an exact-path loaded
+  instance is reused as-is. Resolution never calls `Import-Module`.
+- [New-NitpickModule](../Private/New-NitpickModule.ps1) is the single construction point for
+  the `Nitpick.Module` descriptor; all three resolution branches call it instead of each
+  building their own `[pscustomobject]`, so the shape can only drift in one place. `IsLoaded`
+  is derived from `LoadedInstance` rather than passed separately.
+- Not yet wired into `Find-Nitpick` or `Start-Nitpicking`; the "Phases 2 and 3" and "Phase 3"
+  contract contexts remain skipped until manifest acquisition lands.
 
 ## Phase 3: Manifest Acquisition and Package Discovery
 
