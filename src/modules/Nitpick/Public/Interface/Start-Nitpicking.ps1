@@ -131,7 +131,14 @@ function Start-Nitpicking {
                 # Keep path imports out of Nitpick's own discoverable module scope.
                 New-Module -ReturnResult -ArgumentList $RuleModulePath -ScriptBlock {
                     param ($ModulePath)
-                    Import-Module -Name $ModulePath -Scope Local -PassThru -ErrorAction Stop
+                    $Instance = Import-Module -Name $ModulePath -Scope Local -PassThru -ErrorAction Stop
+                    # New-Module implicitly exports every function defined in this scriptblock's
+                    # dynamic module, including those Import-Module just pulled into Local scope,
+                    # which would shadow a same-named module already loaded elsewhere and leave
+                    # its functions resolvable even after that module is removed. See
+                    # Docs/RulePackageContractStateLeak.md for the full investigation.
+                    Export-ModuleMember -Function @() -Alias @()
+                    $Instance
                 } -ErrorAction Stop
             }
         )

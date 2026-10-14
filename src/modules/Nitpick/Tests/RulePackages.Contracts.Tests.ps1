@@ -34,12 +34,11 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
 '@
         New-ModuleManifest -Path $ManifestPath -RootModule ($Name + '.psm1') `
             -ModuleVersion '1.0.0' -FunctionsToExport Test-ParentRule `
-            -PrivateData @{
-                Linting = @{
-                    Rules = @('Test-ParentRule')
-                    RuleModules = @($Name + 'Rules.psm1')
-                }
-            }
+            -PrivateData @{ Linting = @{} }
+        Set-ContractManifestLinting -ManifestPath $ManifestPath -Linting @{
+            Rules = @('Test-ParentRule')
+            RuleModules = @($Name + 'Rules.psm1')
+        }
         [pscustomobject] @{
             Name = $Name
             Directory = $Directory.FullName
@@ -47,6 +46,36 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
             ParentPath = $ParentPath
             RulesPath = $RulesPath
         }
+    }
+
+    function Set-ContractManifestLinting {
+        # New-ModuleManifest stringifies nested hashtable values passed through
+        # -PrivateData (for example 'System.Collections.Hashtable') instead of
+        # serializing them as a literal. Patch the resulting placeholder line
+        # with real nested hashtable syntax so Import-PowerShellDataFile can
+        # read it back as a hashtable.
+        param (
+            [Parameter(Mandatory)]
+            [string] $ManifestPath,
+
+            [Parameter(Mandatory)]
+            [AllowEmptyCollection()]
+            [hashtable] $Linting
+        )
+
+        $EntryLines = foreach ($Key in $Linting.Keys) {
+            $QuotedValues = @($Linting[$Key]) | ForEach-Object { "'$_'" }
+            "        $Key = @($($QuotedValues -join ', '))"
+        }
+        $LintingLiteral = if ($EntryLines.Count -gt 0) {
+            "@{`n$($EntryLines -join "`n")`n    }"
+        } else {
+            '@{}'
+        }
+
+        $Content = Get-Content -LiteralPath $ManifestPath -Raw
+        $Patched = $Content -replace '(?m)^\s*Linting\s*=.*$', "    Linting = $LintingLiteral"
+        Set-Content -LiteralPath $ManifestPath -Value $Patched -NoNewline
     }
 }
 
@@ -65,9 +94,8 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         InModuleScope Nitpick -Parameters @{ Root = $ContractRoot } {
             param ($Root)
             (Get-NitpickRegistry).Nitpicks.Clear()
-            Get-Module -All |
-                Where-Object { $_.ModuleBase -like "$Root\*" } |
-                Remove-Module -Force
+            $ToRemove = @(Get-Module -All | Where-Object { $_.ModuleBase -like "$Root\*" })
+            $ToRemove | Remove-Module -Force
         }
     }
 
@@ -224,7 +252,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
     }
 
-    Context 'Phases 2 and 3: explicit sources (pending resolver and discovery)' -Skip {
+    Context 'Phases 2 and 3: explicit sources (pending resolver and discovery)' {
         It 'reuses an explicitly named loaded instance without reloading its callable' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Module = Import-Module -Name $Package.RulesPath -PassThru -ErrorAction Stop
@@ -274,15 +302,16 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Marker = Join-Path $ContractRoot 'Imported.txt'
             Set-Content -LiteralPath $Package.RulesPath -Value "Set-Content -LiteralPath '$Marker' -Value imported"
             New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
-                -ModuleVersion '1.0.0' -PrivateData @{
-                    Linting = @{ RuleModules = @('NitpickContractPackageRules.psm1', 'Missing.psm1') }
-                }
+                -ModuleVersion '1.0.0' -PrivateData @{ Linting = @{} }
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
+                RuleModules = @('NitpickContractPackageRules.psm1', 'Missing.psm1')
+            }
             { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } | Should -Throw '*Missing.psm1*'
             Test-Path -LiteralPath $Marker | Should -BeFalse
         }
     }
 
-    Context 'Phase 3: manifest package acquisition (pending implementation)' -Skip {
+    Context 'Phase 3: manifest package acquisition' {
         It 'returns rule descriptors with top-level ownership and the implementing callable' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Rules = @(Find-Nitpick -Module $Package.ManifestPath)
@@ -299,9 +328,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             Set-Content -LiteralPath $Package.ParentPath -Value 'throw "Parent must not initialize."'
             New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
-                -ModuleVersion '1.0.0' -PrivateData @{
-                    Linting = @{ RuleModules = @('NitpickContractPackageRules.psm1') }
-                }
+                -ModuleVersion '1.0.0' -PrivateData @{ Linting = @{} }
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
+                RuleModules = @('NitpickContractPackageRules.psm1')
+            }
             $Rules = @(Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop)
             $Rules | Should -HaveCount 1
             $Rules[0].Id | Should -Be 'NitpickContractPackage/ContractRule'
@@ -313,6 +343,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
                 -ModuleVersion '1.0.0' -FunctionsToExport Test-ParentRule `
                 -PrivateData @{ Linting = @{} }
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{}
             @(Find-Nitpick -Module $Package.ManifestPath) | Should -HaveCount 0
         }
 
@@ -327,7 +358,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackageRules.psm1' `
                 -ModuleVersion '1.0.0' -FunctionsToExport Test-InvalidContractRule `
-                -PrivateData @{ Linting = @{ Rules = @('Test-InvalidContractRule') } }
+                -PrivateData @{ Linting = @{} }
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
+                Rules = @('Test-InvalidContractRule')
+            }
             { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } |
                 Should -Throw '*Test-InvalidContractRule*'
         }
@@ -335,7 +369,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'rejects cycles in supporting module declarations' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             New-ModuleManifest -Path $Package.ManifestPath -ModuleVersion '1.0.0' `
-                -PrivateData @{ Linting = @{ RuleModules = @('NitpickContractPackage.psd1') } }
+                -PrivateData @{ Linting = @{} }
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
+                RuleModules = @('NitpickContractPackage.psd1')
+            }
             { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } | Should -Throw '*cycle*'
         }
 

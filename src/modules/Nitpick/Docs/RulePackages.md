@@ -392,7 +392,7 @@ Source identity is pinned and errors are explicit before imports or target reads
 - Not yet wired into `Find-Nitpick` or `Start-Nitpicking`; the "Phases 2 and 3" and "Phase 3"
   contract contexts remain skipped until manifest acquisition lands.
 
-## Phase 3: Manifest Acquisition and Package Discovery
+## Phase 3: Manifest Acquisition and Package Discovery (Complete)
 
 ### Objective
 
@@ -418,6 +418,46 @@ Obtain only declared rules and explicit standalone exports under the correct nam
 
 Explicit packages can be acquired independently of the execution command and ambient
 rule-module state.
+
+### Implemented
+
+- [Get-NitpickModuleLinting](../Private/Get-NitpickModuleLinting.ps1) reads and validates
+  `PrivateData.Linting` from a resolved module's manifest without importing it, distinguishing
+  an absent `Linting` key (standalone fallback discovery applies) from an empty-but-present one
+  (no fallback, zero rules). `Rules`/`RuleModules` entries must be non-empty, non-whitespace
+  strings.
+- A `DirectedAcyclicGraph` class (copied wholesale from PleaseWork's
+  `DirectedAcyclicGraph.ps1`, not taken as a module dependency, to keep Nitpick free of
+  non-built-in runtime dependencies for a small reusable class) is colocated directly in
+  [Nitpick.psm1](../Nitpick.psm1), consistent with Nitpick's other classes.
+- [Resolve-NitpickPackageGraph](../Private/Resolve-NitpickPackageGraph.ps1)
+  statically resolves the complete `RuleModules` declaration graph into that
+  `DirectedAcyclicGraph` before any import happens, keyed by each node's resolved path.
+  Absolute `RuleModules` paths, unresolvable entries, and cycles are all rejected before any
+  module initializes.
+- [Get-NitpickPackage](../Private/Get-NitpickPackage.ps1) orchestrates acquisition:
+  resolves the top-level source, rejects `Local` as a reserved package namespace, validates the
+  full graph, then walks it in topological order, importing each node only if its declared
+  `Rules`/standalone fallback requires it. A rule-modules-only parent is never imported. All
+  acquired rules are stamped with the top-level package's namespace via `New-Nitpick -Namespace`,
+  regardless of which nested module implements them. Declared `Rules` entries that are missing
+  or fail `Assert-CallableSignature` raise an explicit manifest-attributed error.
+- [Find-Nitpick](../Public/Interface/Find-Nitpick.ps1) now accepts `string` entries (names or
+  paths) alongside the legacy `PSModuleInfo[]` entries for `-Module`, routing strings through
+  `Get-NitpickPackage`. The legacy ambient/nested-module-traversal path is left untouched;
+  full unification is deferred to Phase 4, when `RulePath`/`RuleModule` are removed.
+- **State-leak fix**: the isolation idiom `New-Module -ReturnResult { Import-Module -Scope Local
+  -PassThru }`, used by both `Get-NitpickPackage` and the pre-existing `Start-Nitpicking
+  -RulePath` path, relied on `-ReturnResult` to keep the imported module out of Nitpick's own
+  scope. It does not suppress `New-Module`'s own implicit function exports, so the wrapper
+  re-exported the imported module's functions as its own. When a same-named module was already
+  loaded elsewhere, this shadowed the original module's commands; `Remove-Module` then cleared
+  the package's module-table entry without removing the shadowing function, leaving a leaked,
+  still-callable command after teardown. Both call sites now explicitly suppress the wrapper's
+  exports with `Export-ModuleMember -Function @() -Alias @()`.
+- All 35 `RulePackages.Contracts.Tests.ps1` tests for Phases 1-3 pass (12 Phase 4/5 contexts
+  remain appropriately skipped); the full Nitpick suite passes on both PowerShell 7 and Windows
+  PowerShell 5.1 with no regressions.
 
 ## Phase 4: Public Selection and Registry Cutover
 

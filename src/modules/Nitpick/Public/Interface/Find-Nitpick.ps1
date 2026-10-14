@@ -3,7 +3,8 @@ using namespace System.Management.Automation
 
 <#
 .SYNOPSIS
-    Finds valid Nitpick rules exported by loaded modules.
+    Finds valid Nitpick rules exported by loaded modules, or acquires a rule
+    package from an explicit module name or literal path.
 
 .DESCRIPTION
     Finds exported Test and Measure commands with the required Nitpick callable
@@ -11,10 +12,17 @@ using namespace System.Management.Automation
     modules already loaded in the current session are inspected by default.
     Removed nested modules and temporary module scopes are not traversed.
 
+    A string entry in Module is resolved and acquired as an explicit rule
+    package instead: its declared PrivateData.Linting is read, its RuleModules
+    declaration graph is statically validated before anything is imported, and
+    the resulting identity-bearing NitpickRule descriptors are stamped with
+    that top-level package's namespace. A module with no Linting declaration
+    contributes only its own standalone-compatible exported commands.
+
 .PARAMETER Module
-    Exact module objects to inspect instead of the default loaded-module roots.
-    Their loaded nested modules are also inspected. IncludeModule and ExcludeModule
-    filter the root module names.
+    Exact module objects to inspect instead of the default loaded-module roots,
+    or module names/literal paths to acquire as explicit rule packages.
+    IncludeModule and ExcludeModule filter only the module-object root names.
 
 .EXAMPLE
     Returns all valid Nitpick rules from the currently loaded modules.
@@ -27,6 +35,11 @@ using namespace System.Management.Automation
     Find-Nitpick -IncludeModule Nitpick, MyNitpickRules
 
 .EXAMPLE
+    Acquires an explicit rule package by name or literal path.
+
+    Find-Nitpick -Module WPF
+
+.EXAMPLE
     Pipes the output of Find-Nitpick to Register-Nitpick.
 
     Find-Nitpick | Register-Nitpick
@@ -34,6 +47,7 @@ using namespace System.Management.Automation
 function Find-Nitpick {
     [CmdletBinding()]
     [OutputType([System.Management.Automation.CommandInfo])]
+    [OutputType([object])]
     param(
         [string[]] $Name,
 
@@ -44,16 +58,19 @@ function Find-Nitpick {
         [string[]] $ExcludeModule,
 
         [ValidateNotNullOrEmpty()]
-        [PSModuleInfo[]] $Module
+        [ValidateScript({ $_ -is [string] -or $_ -is [PSModuleInfo] })]
+        [object[]] $Module
     )
 
     $DefaultInclude = @('Test-*', 'Measure-*')
+    $PSModuleInfoEntries = @($Module | Where-Object { $_ -is [PSModuleInfo] })
+    $StringEntries = @($Module | Where-Object { $_ -is [string] })
 
     $LoadedModules = [HashSet[PSModuleInfo]]::new()
     Get-Module -All | ForEach-Object {
         $null = $LoadedModules.Add($_)
     }
-    $RootModules = if ($PSBoundParameters.ContainsKey('Module')) { $Module } else { Get-Module }
+    $RootModules = if ($PSBoundParameters.ContainsKey('Module')) { $PSModuleInfoEntries } else { Get-Module }
     $PendingModules = [Queue[PSModuleInfo]]::new()
     $RootModules |
         Where-NitpickIncluded `
@@ -110,5 +127,18 @@ function Find-Nitpick {
                 # Returns true for new items, false for duplicates.
                 $DiscoveredCommands.Add($_)
             }
+    }
+
+    foreach ($Entry in $StringEntries) {
+        try {
+            $PackageRules = Get-NitpickPackage -Module $Entry -ErrorAction Stop
+        } catch {
+            Write-Error -ErrorRecord $_
+            continue
+        }
+
+        $PackageRules |
+            Where-NitpickIncluded -PropertyPath Name -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
+            Where-NitpickIncluded -PropertyPath Name -Include $Name -Wildcard
     }
 }
