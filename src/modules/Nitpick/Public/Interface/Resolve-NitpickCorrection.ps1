@@ -1,3 +1,5 @@
+using namespace System.Collections.Generic
+
 <#
 .SYNOPSIS
     Previews native Nitpick corrections against one source snapshot.
@@ -108,11 +110,12 @@ function Resolve-NitpickCorrection {
             $Path = $Document.Path
         }
     }
-    $AcceptedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
-    $SkippedCorrections = [System.Collections.Generic.List[object]]::new()
-    $SelectedCorrections = [System.Collections.Generic.List[NitpickCorrection]]::new()
-    $Conflicts = [System.Collections.Generic.List[object]]::new()
-    $FinalFindings = [System.Collections.Generic.List[object]]::new()
+
+    $AcceptedCorrections = [List[NitpickCorrection]]::new()
+    $SkippedCorrections = [List[object]]::new()
+    $SelectedCorrections = [List[NitpickCorrection]]::new()
+    $Conflicts = [List[object]]::new()
+    $FinalFindings = [List[object]]::new()
     $ChangeSets = [ordered]@{}
     $StandaloneCorrectionId = 0
 
@@ -124,9 +127,11 @@ function Resolve-NitpickCorrection {
         } else {
             "Correction:$StandaloneCorrectionId"
         }
+
         if (-not $ChangeSets.Contains($ChangeSetKey)) {
-            $ChangeSets[$ChangeSetKey] = [System.Collections.Generic.List[NitpickCorrection]]::new()
+            $ChangeSets[$ChangeSetKey] = [List[NitpickCorrection]]::new()
         }
+
         $ChangeSets[$ChangeSetKey].Add($Correction)
         $StandaloneCorrectionId++
     }
@@ -136,11 +141,13 @@ function Resolve-NitpickCorrection {
     foreach ($ChangeSetKey in $ChangeSets.Keys) {
         $ChangeSet = $ChangeSets[$ChangeSetKey]
         $RejectionReason = $null
+
         foreach ($Correction in $ChangeSet) {
             if ($Correction.Applicability -ne 'Safe') {
                 $RejectionReason = "Applicability '$($Correction.Applicability)' is not selected."
                 break
             }
+
             if (-not $Correction.TextEdit) {
                 $RejectionReason = 'Correction does not contain an AstEditor text edit.'
                 break
@@ -178,23 +185,26 @@ function Resolve-NitpickCorrection {
             if ($FailureKind -eq 'Conflict') {
                 $ExistingEdit = $_.Exception.Data['ExistingEdit']
                 $IncomingEdit = $_.Exception.Data['IncomingEdit']
+
                 $ExistingCorrection = $SelectedCorrections |
                     Where-Object {
                         $_.TextEdit.StartOffset -eq $ExistingEdit.StartOffset -and
-                            $_.TextEdit.EndOffset -eq $ExistingEdit.EndOffset -and
-                            $_.TextEdit.Reason -ceq $ExistingEdit.Reason -and
-                            $_.TextEdit.ReplacementText -ceq $ExistingEdit.ReplacementText
+                        $_.TextEdit.EndOffset -eq $ExistingEdit.EndOffset -and
+                        $_.TextEdit.Reason -ceq $ExistingEdit.Reason -and
+                        $_.TextEdit.ReplacementText -ceq $ExistingEdit.ReplacementText
                     } |
                     Select-Object -First 1
+
                 $IncomingCorrection = $SelectedCorrections |
                     Where-Object {
                         $_.TextEdit.StartOffset -eq $IncomingEdit.StartOffset -and
-                            $_.TextEdit.EndOffset -eq $IncomingEdit.EndOffset -and
-                            $_.TextEdit.Reason -ceq $IncomingEdit.Reason -and
-                            $_.TextEdit.ReplacementText -ceq $IncomingEdit.ReplacementText -and
-                            -not [object]::ReferenceEquals($_, $ExistingCorrection)
+                        $_.TextEdit.EndOffset -eq $IncomingEdit.EndOffset -and
+                        $_.TextEdit.Reason -ceq $IncomingEdit.Reason -and
+                        $_.TextEdit.ReplacementText -ceq $IncomingEdit.ReplacementText -and
+                        -not [object]::ReferenceEquals($_, $ExistingCorrection)
                     } |
                     Select-Object -First 1
+
                 $Conflicts.Add([pscustomobject]@{
                     ExistingCorrection = $ExistingCorrection
                     IncomingCorrection = $IncomingCorrection
@@ -216,6 +226,7 @@ function Resolve-NitpickCorrection {
             } else {
                 "AstEditor rejected the target batch: $($_.Exception.Message)"
             }
+
             foreach ($Correction in $SelectedCorrections) {
                 $SkippedCorrections.Add([pscustomobject]@{
                     Correction = $Correction
@@ -238,6 +249,7 @@ function Resolve-NitpickCorrection {
                 Reason = 'The rendered correction batch contains parse errors.'
             })
         }
+
         $AcceptedCorrections.Clear()
         $RenderedText = $Script
     }
@@ -258,11 +270,13 @@ function Resolve-NitpickCorrection {
         } else {
             (New-AstDocument -InputObject $RenderedText).Ast
         }
+
         foreach ($SelectedRule in $Rule) {
             foreach ($FinalFinding in $SelectedRule.Invoke($RenderedAst)) {
                 $FinalFindings.Add($FinalFinding)
             }
         }
+
         $WasReanalyzed = $true
     }
 
@@ -271,6 +285,7 @@ function Resolve-NitpickCorrection {
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint
         WasReanalyzed = $WasReanalyzed
+
         WriteStatus = if ($Resolution.ParseErrorCount -gt 0) {
             'FailedValidation'
         } elseif ($SelectedCorrections.Count -gt 0 -and $AcceptedCorrections.Count -eq 0) {
@@ -280,21 +295,25 @@ function Resolve-NitpickCorrection {
         } else {
             'Preview'
         }
+
         Findings = @{
             Original = $Finding
             Final = $FinalFindings.ToArray()
             Candidate = $FinalFindings.ToArray()
             Remaining = @(if ($WasReanalyzed) { $FinalFindings.ToArray() } else { $Finding })
         }
+
         Corrections = @{
             Accepted = $AcceptedCorrections.ToArray()
             Skipped = $SkippedCorrections.ToArray()
             Conflicts = $Conflicts.ToArray()
         }
+
         ParseErrors = $Resolution.ParseErrors
         CandidateText = $CandidateText
         RenderedText = $RenderedText
         Diff = Show-AstDiff -Document $Document
     }
+
     New-NitpickCorrectionResult @ResultParameters
 }
