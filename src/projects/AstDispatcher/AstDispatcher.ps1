@@ -1,7 +1,20 @@
-using namespace System.Management.Automation.Language
 using namespace System.Collections.Generic
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
 
 # Proof of concept for AstVisitorDispatch in the Nitpick module
+
+class CallableMetadataAttribute : System.Attribute {
+    #$Target = [AttributeTargets]::All
+    #[System.AttributeUsage($Target)]
+
+    [hashtable] $Metadata
+
+    CallableMetadataAttribute([scriptblock] $Metadata) {
+        $this.Metadata = $Metadata.Invoke()
+    }
+}
+
 
 # Test scriptblock
 $TestScriptblock = {
@@ -23,6 +36,9 @@ $TestScriptblock = {
 }
 
 $FunctionAstScriptblock = {
+    [CallableMetadataAttribute({@{
+        Type = "FunctionDefinitionAst"
+    }})]
     param(
         [FunctionDefinitionAst] $Ast
     )
@@ -31,11 +47,25 @@ $FunctionAstScriptblock = {
 }
 
 $ScriptblockAstScriptblock = {
+    [CallableMetadataAttribute({@{
+        Type = "ScriptBlockAst"
+    }})]
     param(
         [ScriptBlockAst] $Ast
     )
 
     Write-Host "Visited scriptblock"
+}
+
+function VariableExpressionAst {
+    [CallableMetadataAttribute({@{
+        Type = "VariableExpressionAst"
+    }})]
+    param(
+        [VariableExpressionAst] $Ast
+    )
+
+    Write-Host "Visited variable expression"
 }
 
 <#
@@ -46,12 +76,35 @@ $ScriptblockAstScriptblock = {
 function Dispatcher {
     param(
         [Ast] $Ast,
-        [ScriptBlock[]] $Callables
+
+        [ValidateScript({ $_ -is [ScriptBlock] -or $_ -is [CommandInfo] })]
+        [object[]] $Callables
     )
 
     $VisitorMap = @{}
 
     foreach($Callable in $Callables) {
+
+        # While cute, not being able to rely on CallableMetadataAttribute at parse
+        # time means using this attribute won't be viable...
+        $Metadata = @{}
+        if ($Callable -is [Scriptblock]) {
+            $MetadataAttributeAst = $Callable.Ast.ParamBlock.Attributes |
+                Where-Object { $_.TypeName.Name -eq 'CallableMetadataAttribute' } |
+                Select-Object -First 1
+
+            $Metadata = $MetadataAttributeAst.Find({
+                    param($AstNode)
+                    $AstNode -is [HashtableAst]
+                }, $true) |
+                ForEach-Object {
+                    $_.SafeGetValue()
+                }
+        } elseif ($Callable -is [CommandInfo]) {
+            $RawMetadata = $Callable.Attributes | Where-Object { $_ -is [CallableMetadataAttribute] } | Select-Object -First 1
+        } else {
+            throw "Unsupported callable type: $($Callable.GetType().FullName)"
+        }
 
         # NOTE: Not sure if callables should be allowed to support multiple types
         $InterestingTypes = $Callable.Ast.ParamBlock.Parameters.Attributes.TypeName.Name |
@@ -87,6 +140,10 @@ function Dispatcher {
 
 $DispatcherParams = @{
     Ast = $TestScriptblock.Ast
-    Callables = @($FunctionAstScriptblock, $ScriptblockAstScriptblock)
+    Callables = @(
+        $FunctionAstScriptblock,
+        $ScriptblockAstScriptblock,
+        (Get-Command VariableExpressionAst)
+    )
 }
 Dispatcher @DispatcherParams
