@@ -174,6 +174,33 @@ Nitpick should not emulate this behavior. When Nitpick accepts rules from multip
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
   - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
 
+### PowerShell engine quirks worth their own rules
+
+A few language/engine quirks surfaced during the [Rule Packages](Docs/RulePackages.md) Phase 4
+work that are easy to reintroduce elsewhere in this repository, and are not currently caught by
+anything:
+
+- Member-access on a zero-element array (`@($EmptyArray.Property)`) does not enumerate per item
+  the way it does for two or more elements; it falls back to a direct property lookup on the
+  array itself and yields one `$null`, not zero results. `ForEach-Object { $_.Property }` behaves
+  correctly at every count and should be preferred.
+- `ForEach-Object <MemberName>` (the single-positional-argument member-name shorthand) itself
+  honors `$WhatIfPreference` and silently returns nothing under `-WhatIf`, unlike
+  `ForEach-Object { $_.MemberName }`. This is easy to hit whenever that shorthand is used inside
+  a `SupportsShouldProcess` command, even far from any actual `ShouldProcess` call.
+- `Select-Object -First`/`-Last` leaks a spurious `StopUpstreamCommandsException` into a caller's
+  `-ErrorVariable` on Windows PowerShell 5.1 whenever that caller also specifies `-ErrorAction`
+  (any value, not just `Stop`). This one stayed latent in the Phase 2 module resolvers for an
+  entire session; it only surfaced once Phase 4 made that code path universally reachable.
+
+**TODO:**
+  - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` /
+    `-WhatIf` pitfalls above.
+  - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete
+    test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule
+    category) that flags constructs known to behave differently, or outright break, across
+    supported PowerShell versions/editions.
+
 ## Why Not Use PSScriptAnalyzer?
 
 "Stop reinventing the wheel", "contribute to ScriptAnalyzer instead," I hear you cry. Listen, ScriptAnalyzer is clearly functional but neither flexible enough for what I'd like to do nor as ergonomic as other mainstream linters. Contributing to the ScriptAnalyzer project is out of the question as I'm neither a C# dev nor would I be able to convince the powers that be to make sweeping changes just to satisfy my vision.

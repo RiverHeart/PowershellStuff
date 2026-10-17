@@ -31,15 +31,18 @@ function Resolve-NitpickModuleNameSource {
         throw [InvalidDataException]::new("Module name '$Value' must match exactly; wildcard patterns are not supported.")
     }
 
-    $LoadedMatches = @(Get-Module -All | Where-Object { $_.Name -eq $Value })
+    [array] $LoadedMatches = Get-Module -All | Where-Object { $_.Name -eq $Value }
     if ($LoadedMatches.Count -gt 1) {
         throw [InvalidDataException]::new("Module name '$Value' is ambiguous; multiple loaded instances were found. Specify an explicit path to disambiguate.")
     }
 
     if ($LoadedMatches.Count -eq 1) {
-        # Array indexing avoids Select-Object -First's internal short-circuit mechanism,
-        # which leaks a spurious StopUpstreamCommandsException into any caller's
-        # -ErrorVariable on Windows PowerShell 5.1 whenever -ErrorAction is also specified.
+        # Index instead of Select-Object -First 1, which leaks a spurious
+        # StopUpstreamCommandsException into any caller's -ErrorVariable on Windows
+        # PowerShell 5.1 whenever -ErrorAction is also specified. [array]-typing (rather
+        # than @()-wrapping) keeps $LoadedMatches indexable: .Count is 0 even when
+        # PowerShell leaves the variable $null, and this branch never indexes unless
+        # Count is already confirmed to be exactly 1.
         $Instance = $LoadedMatches[0]
         $ModuleParams = @{
             Name = $Instance.Name
@@ -52,13 +55,14 @@ function Resolve-NitpickModuleNameSource {
         return
     }
 
-    $AvailableMatches = @(Get-Module -ListAvailable -Name $Value | Where-Object { $_.Name -eq $Value })
+    [array] $AvailableMatches = Get-Module -ListAvailable -Name $Value | Where-Object { $_.Name -eq $Value }
     if ($AvailableMatches.Count -eq 0) {
         throw [ItemNotFoundException]::new("Module '$Value' was not found.")
     }
 
-    $HighestVersion = (@($AvailableMatches | Sort-Object -Property Version -Descending))[0].Version
-    $TopMatches = @($AvailableMatches | Where-Object { $_.Version -eq $HighestVersion })
+    [array] $SortedMatches = $AvailableMatches | Sort-Object -Property Version -Descending
+    $HighestVersion = $SortedMatches[0].Version
+    [array] $TopMatches = $AvailableMatches | Where-Object { $_.Version -eq $HighestVersion }
     $DistinctPaths = $TopMatches.Path | Select-Object -Unique
 
     if ($DistinctPaths.Count -gt 1) {
