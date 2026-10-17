@@ -1,3 +1,9 @@
+using namespace System
+using namespace System.Diagnostics
+using namespace System.IO
+using namespace System.Security
+using namespace System.Collections.Generic
+using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 <#
@@ -118,7 +124,7 @@ function Start-Nitpicking {
         $KnownRuleIds = @($DiscoveredRules | ForEach-Object { $_.Id }) + @($RegisteredRules | ForEach-Object { $_.Id })
         $UnmatchedSelectors = @(
             foreach ($Selector in $IncludeRule) {
-                if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
                     -not ($KnownRuleIds | Where-Object { $_ -like $Selector })) {
                     $Selector
                 }
@@ -161,20 +167,20 @@ function Start-Nitpicking {
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
-        $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $Stopwatch = [Stopwatch]::StartNew()
         $SeverityRank = @{
             Information = 0
             Warning = 1
             Error = 2
         }
         $ThresholdFindingCount = 0
-        $ResolvedTargets = [System.Collections.Generic.List[object]]::new()
-        $CandidatePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $ResolvedTargets = [List[object]]::new()
+        $CandidatePaths = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     }
 
     process {
         $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            $Roots = if ([System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Path)) {
+            $Roots = if ([WildcardPattern]::ContainsWildcardCharacters($Path)) {
                 Get-Item -Path $Path -ErrorAction Stop
             } else {
                 Get-Item -LiteralPath $Path -ErrorAction Stop
@@ -183,7 +189,7 @@ function Start-Nitpicking {
                 foreach ($Root in $Roots) {
                     if ($Root.PSIsContainer) {
                         Get-ChildItem -LiteralPath $Root.FullName -File -Recurse -Filter $Filter -ErrorAction Stop
-                    } elseif ($Root -is [System.IO.FileInfo] -and $Root.Name -like $Filter) {
+                    } elseif ($Root -is [FileInfo] -and $Root.Name -like $Filter) {
                         $Root
                     }
                 }
@@ -209,7 +215,7 @@ function Start-Nitpicking {
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
             $UnmatchedPaths = @(
                 foreach ($Selector in $IncludePath) {
-                    if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                    if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
                         -not $CandidatePaths.Contains($Selector)) {
                         $Selector
                     }
@@ -244,7 +250,7 @@ function Start-Nitpicking {
                     $Document.Ast
                 }
                 $ParseErrors = $Document.ParseErrors
-            } catch [System.IO.IOException], [System.IO.InvalidDataException], [System.Security.SecurityException], [System.Management.Automation.ItemNotFoundException], [UnauthorizedAccessException] {
+            } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
                 $Summary.TargetCount++
                 $Summary.FailedTargetCount++
                 if ($Fix) {
@@ -263,7 +269,7 @@ function Start-Nitpicking {
             }
 
             $Summary.TargetCount++
-            $TargetFindings = [System.Collections.Generic.List[object]]::new()
+            $TargetFindings = [List[object]]::new()
             foreach ($ParseError in $ParseErrors) {
                 $TargetFindings.Add((New-NitpickFinding `
                     -RuleName 'PowerShellParseError' `
@@ -277,7 +283,7 @@ function Start-Nitpicking {
                 ))
             }
 
-            $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
+            $ApplicableRules = [List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                     $Ast.Extent.File
