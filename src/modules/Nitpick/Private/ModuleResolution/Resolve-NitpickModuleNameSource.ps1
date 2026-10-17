@@ -31,13 +31,16 @@ function Resolve-NitpickModuleNameSource {
         throw [InvalidDataException]::new("Module name '$Value' must match exactly; wildcard patterns are not supported.")
     }
 
-    $LoadedMatches = Get-Module -All | Where-Object { $_.Name -eq $Value }
+    $LoadedMatches = @(Get-Module -All | Where-Object { $_.Name -eq $Value })
     if ($LoadedMatches.Count -gt 1) {
         throw [InvalidDataException]::new("Module name '$Value' is ambiguous; multiple loaded instances were found. Specify an explicit path to disambiguate.")
     }
 
     if ($LoadedMatches.Count -eq 1) {
-        $Instance = $LoadedMatches | Select-Object -First 1
+        # Array indexing avoids Select-Object -First's internal short-circuit mechanism,
+        # which leaks a spurious StopUpstreamCommandsException into any caller's
+        # -ErrorVariable on Windows PowerShell 5.1 whenever -ErrorAction is also specified.
+        $Instance = $LoadedMatches[0]
         $ModuleParams = @{
             Name = $Instance.Name
             Version = $Instance.Version
@@ -54,15 +57,15 @@ function Resolve-NitpickModuleNameSource {
         throw [ItemNotFoundException]::new("Module '$Value' was not found.")
     }
 
-    $HighestVersion = ($AvailableMatches | Sort-Object -Property Version -Descending | Select-Object -First 1).Version
-    $TopMatches = $AvailableMatches | Where-Object { $_.Version -eq $HighestVersion }
+    $HighestVersion = (@($AvailableMatches | Sort-Object -Property Version -Descending))[0].Version
+    $TopMatches = @($AvailableMatches | Where-Object { $_.Version -eq $HighestVersion })
     $DistinctPaths = $TopMatches.Path | Select-Object -Unique
 
     if ($DistinctPaths.Count -gt 1) {
         throw [InvalidDataException]::new("Module name '$Value' is ambiguous; multiple distinct sources at version '$HighestVersion' were found. Specify an explicit path to disambiguate.")
     }
 
-    $Selected = $TopMatches | Select-Object -First 1
+    $Selected = $TopMatches[0]
     $ModuleParams = @{
         Name = $Selected.Name
         Version = $Selected.Version

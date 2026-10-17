@@ -13,14 +13,17 @@ Describe 'Get-Nitpick' {
             $Registry.Nitpicks.Clear()
             $Registry.Nitpicks['Style-Alpha'] = [pscustomobject] @{
                 Name = 'Style-Alpha'
+                Id = 'Style-Alpha'
                 Category = 'Style'
             }
             $Registry.Nitpicks['Style-Beta'] = [pscustomobject] @{
                 Name = 'Style-Beta'
+                Id = 'Style-Beta'
                 Category = 'Style'
             }
             $Registry.Nitpicks['Quality-Alpha'] = [pscustomobject] @{
                 Name = 'Quality-Alpha'
+                Id = 'Quality-Alpha'
                 Category = 'Quality'
             }
         }
@@ -52,6 +55,21 @@ Describe 'Get-Nitpick' {
         $Rules = @(Get-Nitpick -Name 'Missing-Rule')
 
         $Rules.Count | Should -Be 0
+    }
+
+    It 'returns a rule by exact, case-insensitive ID' {
+        $Rules = @(Get-Nitpick -Id 'style-alpha')
+
+        $Rules.Count | Should -Be 1
+        $Rules[0].Name | Should -Be 'Style-Alpha'
+    }
+
+    It 'filters rules by wildcard ID patterns' {
+        $Rules = @(Get-Nitpick -Id '*-Alpha')
+
+        $Rules.Count | Should -Be 2
+        $Rules.Name | Should -Contain 'Style-Alpha'
+        $Rules.Name | Should -Contain 'Quality-Alpha'
     }
 
     It 'combines name and Category filters' {

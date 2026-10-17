@@ -6,16 +6,24 @@
     Lists custom Nitpick hooks in the
     Nitpick registry.
 
+.PARAMETER Id
+    Exact or wildcard qualified rule ID (Namespace/Name), case-insensitive.
+
 .EXAMPLE
     Get-Nitpick
 
 .EXAMPLE
     Get-Nitpick -Category Quality -Name Complete-Example
+
+.EXAMPLE
+    Get-Nitpick -Id Local/AvoidFoo
 #>
 function Get-Nitpick {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param(
+        [string[]] $Id,
+
         [string] $Name,
 
         [ArgumentCompleter({ Complete-NitpickCategory })]
@@ -33,13 +41,7 @@ function Get-Nitpick {
 
     $Registry = Get-NitpickRegistry
 
-    $Nitpicks = if ($Name) {
-        $Registry.Nitpicks[$Name]
-    } else {
-        $Registry.Nitpicks.Values
-    }
-
-    $Nitpicks |
+    $Registry.Nitpicks.Values |
         Where-Object {
             # Exact name match
             if ($Name -and $_.Name -ne $Name) {
@@ -59,7 +61,11 @@ function Get-Nitpick {
             -Exclude $ExcludeCategory `
             -Wildcard |
         Where-NitpickIncluded `
-            -PropertyPath Name `
+            -PropertyPath Id `
+            -Include $Id `
+            -Wildcard |
+        Where-NitpickIncluded `
+            -PropertyPath Id `
             -Include $IncludeRule `
             -Exclude $ExcludeRule `
             -Wildcard

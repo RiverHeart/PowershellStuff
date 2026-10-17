@@ -6,7 +6,7 @@ Plans are not immutable and may be changed with user permission. Unforeseen prob
 
 ## Status
 
-Phases 0 through 2 are implemented; Phases 3 through 7 remain proposed.
+Phases 0 through 4 are implemented; Phases 5 through 7 remain proposed.
 The examples below describe the intended API, not the current API.
 
 The contracts live in [RulePackages.Contracts.Tests.ps1](../Tests/RulePackages.Contracts.Tests.ps1).
@@ -459,7 +459,7 @@ rule-module state.
   remain appropriately skipped); the full Nitpick suite passes on both PowerShell 7 and Windows
   PowerShell 5.1 with no regressions.
 
-## Phase 4: Public Selection and Registry Cutover
+## Phase 4: Public Selection and Registry Cutover (Complete)
 
 ### Objective
 
@@ -489,6 +489,60 @@ Switch the public native API coherently to explicit sources and qualified select
 
 The native source and selection API is consistent across discovery, execution, and
 registration. Existing file-target tests pass with only necessary selector migrations.
+
+### Implemented
+
+- [Find-Nitpick](../Public/Interface/Find-Nitpick.ps1) is now purely the shared package
+  contract: the legacy `PSModuleInfo[]`/nested-module-traversal path and the
+  `-IncludeModule`/`-ExcludeModule`/`-Name` parameters are removed entirely. `-Module`
+  is a plain `[string[]]` defaulting to `'Nitpick'`, so a bare call acquires only the
+  built-in package; multiple entries acquire additively. `-IncludeRule`/`-ExcludeRule`
+  filter the resulting `NitpickRule` descriptors by `Id` with wildcard support.
+- [Start-Nitpicking](../Public/Interface/Start-Nitpicking.ps1) replaces `RulePath` and
+  `RuleModule` with `-Module` (`[string[]]`). Selection now resolves built-ins, each
+  requested package, and registered rules into one `Id`-keyed effective set: literal
+  `IncludeRule` selectors are validated against the full known-ID set before exclusions
+  and editor-mode filtering; same-ID-same-callable candidates are deduplicated (a
+  registered rule's metadata wins); same-ID-different-callable candidates terminate
+  selection before any target is read. Excluded rules never participate in conflict
+  detection.
+- [Register-Nitpick](../Public/Interface/Register-Nitpick.ps1) gained `-Namespace` and
+  now keys the registry by `Id`. A piped `NitpickRule` (for example from `Find-Nitpick`)
+  can still have its `-Category`/`-Source`/`-EditorEnabled`/`-Name`/`-Namespace`
+  overridden explicitly; with no overrides bound it registers the exact same reference
+  (preserving prior reference-equality passthrough behavior). `-IncludeRule`/
+  `-ExcludeRule` match `Id` with wildcard support.
+- [Get-Nitpick](../Public/Interface/Get-Nitpick.ps1) gained `-Id` (exact or wildcard,
+  case-insensitive, matching PowerShell's default case-insensitive hashtable key
+  comparison) alongside the existing non-key `-Name` filter.
+  [Unregister-Nitpick](../Public/Interface/Unregister-Nitpick.ps1) replaced `-Name` with
+  `-Id` for the same case-insensitive exact/wildcard registry-key removal.
+- **PowerShell 5.1-specific fix**: `Select-Object -First 1`, used by the Phase 2 module
+  resolvers ([Resolve-NitpickModuleNameSource](../Private/ModuleResolution/Resolve-NitpickModuleNameSource.ps1),
+  [Resolve-NitpickModulePathSource](../Private/ModuleResolution/Resolve-NitpickModulePathSource.ps1)),
+  leaks a spurious `StopUpstreamCommandsException` into any caller's `-ErrorVariable` on
+  Windows PowerShell 5.1 whenever that caller also specifies `-ErrorAction`. Because
+  `Find-Nitpick`'s new default (`-Module 'Nitpick'`) now resolves the built-in package by
+  bare name on every invocation, this fired on effectively every `Start-Nitpicking` call
+  that also passed `-ErrorAction`/`-ErrorVariable`. Both resolvers now use array indexing
+  (`@(...)[0]`) instead of `Select-Object -First 1`, which avoids the internal
+  short-circuit mechanism entirely; `Select-Object -Unique` (no `-First`) is unaffected
+  and was left as-is.
+- `Start-Nitpicking.RulePath.Tests.ps1` is replaced by
+  [Start-Nitpicking.Module.Tests.ps1](../Tests/Public/Interface/Start-Nitpicking.Module.Tests.ps1);
+  its exhaustive path-shape-validation edge cases (missing paths, loose scripts,
+  wildcards, non-filesystem providers) are already owned by
+  [Resolve-NitpickModuleSource.Tests.ps1](../Tests/Private/ModuleResolution/Resolve-NitpickModuleSource.Tests.ps1)
+  from Phase 2, so only one representative propagation check was kept here.
+  `Find-Nitpick.Tests.ps1` is similarly rewritten around the new built-in-by-default and
+  explicit-package contract rather than ambient module scanning.
+- All existing `Start-Nitpicking`/`Find-Nitpick`/`Register-Nitpick`/`Get-Nitpick`/
+  `Unregister-Nitpick` tests migrated their selectors from bare canonical names (for
+  example `UseIsNotOperator`) to qualified IDs (`Nitpick/UseIsNotOperator`,
+  `Local/<Name>` for scriptblock registrations with no explicit namespace).
+- The full Nitpick suite passes on both PowerShell 7 and Windows PowerShell 5.1 with no
+  regressions (337 passed / 335 passed respectively, only the 3 Phase 5 contexts
+  remaining appropriately skipped).
 
 ## Phase 5: Findings, Corrections, and External Compatibility
 

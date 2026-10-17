@@ -26,8 +26,8 @@ Describe 'Unregister-Nitpick' {
         }
     }
 
-    It 'removes a rule by exact name' {
-        Unregister-Nitpick -Name Style-Alpha
+    It 'removes a rule by exact ID' {
+        Unregister-Nitpick -Id Style-Alpha
 
         InModuleScope Nitpick {
             $Registry = Get-NitpickRegistry
@@ -36,8 +36,18 @@ Describe 'Unregister-Nitpick' {
         }
     }
 
-    It 'supports wildcard names' {
-        Unregister-Nitpick -Name '*Alpha'
+    It 'removes a rule by case-insensitive exact ID' {
+        Unregister-Nitpick -Id STYLE-ALPHA
+
+        InModuleScope Nitpick {
+            $Registry = Get-NitpickRegistry
+            $Registry.Nitpicks.ContainsKey('Style-Alpha') | Should -BeFalse
+            $Registry.Nitpicks.ContainsKey('Style-Beta') | Should -BeTrue
+        }
+    }
+
+    It 'supports wildcard IDs' {
+        Unregister-Nitpick -Id '*Alpha'
 
         InModuleScope Nitpick {
             $Registry = Get-NitpickRegistry
@@ -48,7 +58,7 @@ Describe 'Unregister-Nitpick' {
     }
 
     It 'limits removal to the requested type' {
-        Unregister-Nitpick -Name '*' -Category Style
+        Unregister-Nitpick -Id '*' -Category Style
 
         InModuleScope Nitpick {
             $Registry = Get-NitpickRegistry

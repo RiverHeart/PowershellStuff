@@ -266,7 +266,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Results = @(
             Start-Nitpicking `
                 -Path $Path `
-                -IncludeRule AvoidParameterAttributeBool `
+                -IncludeRule Nitpick/AvoidParameterAttributeBool `
                 -Fix `
                 -Preview `
                 -Output Object `
@@ -442,7 +442,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Results = @(
             Start-Nitpicking `
                 -Script '$Value = 1' `
-                -IncludeRule FinalSeverityRule `
+                -IncludeRule Local/FinalSeverityRule `
                 -Fix `
                 -ErrorOn Error `
                 -Output Object `
@@ -526,7 +526,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Results = @(
             Start-Nitpicking `
                 -Path $TestDrive `
-                -IncludeRule PerTargetRule `
+                -IncludeRule Local/PerTargetRule `
                 -Fix `
                 -Output Object `
                 -NoSummary

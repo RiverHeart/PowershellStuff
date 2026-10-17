@@ -47,10 +47,14 @@ function Resolve-NitpickModulePathSource {
 
     if ($Item.PSIsContainer) {
         $EntrypointName = $Item.Name
-        $Entrypoint = '.psd1', '.psm1', '.dll' |
-            ForEach-Object { Join-Path -Path $Item.FullName -ChildPath ($EntrypointName + $_) } |
-            Where-Object { Test-Path -LiteralPath $_ } |
-            Select-Object -First 1
+        # Array indexing (not Select-Object -First) avoids leaking a spurious
+        # StopUpstreamCommandsException into a caller's -ErrorVariable on Windows
+        # PowerShell 5.1 whenever -ErrorAction is also specified.
+        $Entrypoint = @(
+            '.psd1', '.psm1', '.dll' |
+                ForEach-Object { Join-Path -Path $Item.FullName -ChildPath ($EntrypointName + $_) } |
+                Where-Object { Test-Path -LiteralPath $_ }
+        )[0]
 
         if (-not $Entrypoint) {
             throw [InvalidDataException]::new("Module directory '$($Item.FullName)' must contain a $EntrypointName.psd1, $EntrypointName.psm1, or $EntrypointName.dll entrypoint.")
@@ -71,9 +75,7 @@ function Resolve-NitpickModulePathSource {
 
     $ManifestPath = Get-NitpickModuleManifestPath -Path $ResolvedPath -Name $ResolvedName
 
-    $LoadedInstance = Get-Module -All |
-        Where-Object { $_.Path -eq $ResolvedPath } |
-        Select-Object -First 1
+    $LoadedInstance = @(Get-Module -All | Where-Object { $_.Path -eq $ResolvedPath })[0]
 
     $ResolvedVersion = $null
     if ($LoadedInstance) {

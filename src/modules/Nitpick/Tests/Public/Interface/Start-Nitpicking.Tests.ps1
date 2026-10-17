@@ -62,7 +62,7 @@ Describe 'Start-Nitpicking' {
 
         {
             Start-Nitpicking -Script '-not ($Value -is [int])' `
-                -IncludeRule UseIsNotOperator,MissingRule,AnotherMissingRule,'Missing*' -Output Object |
+                -IncludeRule 'Nitpick/UseIsNotOperator',MissingRule,AnotherMissingRule,'Missing*' -Output Object |
                 ForEach-Object { $Output.Add($_) }
         } | Should -Throw '*No Nitpick rules match the IncludeRule selector(s): MissingRule, AnotherMissingRule.*'
 
@@ -73,7 +73,7 @@ Describe 'Start-Nitpicking' {
 
     It 'accepts matching wildcard, case-insensitive, and overlapping selectors' {
         $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
-            -IncludeRule 'useisnotoperator','*IsNot*','Missing*' -Output Object -ErrorAction Stop)
+            -IncludeRule 'nitpick/useisnotoperator','*IsNot*','Missing*' -Output Object -ErrorAction Stop)
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Summary.RuleCount | Should -Be 1
@@ -101,7 +101,7 @@ Describe 'Start-Nitpicking' {
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Fixes must not start.' }
         {
             @($Valid, (Join-Path $TestDrive 'Missing.ps1')) |
-                Start-Nitpicking -IncludeRule UseIsNotOperator -Fix -Output Object -ErrorAction Continue
+                Start-Nitpicking -IncludeRule Nitpick/UseIsNotOperator -Fix -Output Object -ErrorAction Continue
         } | Should -Throw
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
@@ -115,7 +115,7 @@ Describe 'Start-Nitpicking' {
         Set-Content -LiteralPath $Valid -Value '$Value = 1'
         $Results = @(
             @($Empty.FullName, (Join-Path $TestDrive 'Missing*.ps1'), $Valid) |
-                Start-Nitpicking -IncludeRule UseIsNotOperator -Output Object -ErrorAction Stop
+                Start-Nitpicking -IncludeRule Nitpick/UseIsNotOperator -Output Object -ErrorAction Stop
         )
         $Results | Should -HaveCount 1
         $Results[0].TargetCount | Should -Be 1
@@ -131,7 +131,7 @@ Describe 'Start-Nitpicking' {
     ) {
         $TestDrive = (New-Item -Path (Join-Path $TestDrive ([guid]::NewGuid().ToString())) -ItemType Directory).FullName
         $SelectionFixture = $TestDrive
-        $Parameters = @{ Path = $TestDrive; IncludeRule = 'UseIsNotOperator'; Output = 'Object' }
+        $Parameters = @{ Path = $TestDrive; IncludeRule = 'Nitpick/UseIsNotOperator'; Output = 'Object' }
         if ($Mode -eq 'directory named like a script') {
             $null = New-Item -Path (Join-Path $TestDrive 'Fake.ps1') -ItemType Directory
         } elseif ($Mode -ne 'empty directory' -and $Mode -ne 'unmatched wildcard') {
@@ -160,7 +160,7 @@ Describe 'Start-Nitpicking' {
         Set-Content -LiteralPath $First -Value '$Value = 1'
         Set-Content -LiteralPath $Second -Value '$Value = 2'
         $Results = @(
-            @($First, $Second) | Start-Nitpicking -IncludeRule UseIsNotOperator `
+            @($First, $Second) | Start-Nitpicking -IncludeRule Nitpick/UseIsNotOperator `
                 -IncludePath $First,$Second,'*Missing*' -ExcludePath $First,'*Absent*' -Output Object
         )
         $Results | Should -HaveCount 1
@@ -175,14 +175,14 @@ Describe 'Start-Nitpicking' {
         Set-Content -LiteralPath $Valid -Value '$Value = 1'
         Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
         {
-            Start-Nitpicking -Path $TestDrive -IncludeRule UseIsNotOperator `
+            Start-Nitpicking -Path $TestDrive -IncludeRule Nitpick/UseIsNotOperator `
                 -IncludePath $Valid,$Missing -Output Object
         } | Should -Throw '*No file targets match the literal IncludePath selector(s):*Missing.ps1*'
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
     }
 
     It 'does not apply file-target requirements to in-memory scripts' {
-        $Results = @(Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator `
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator `
             -IncludePath 'Missing.ps1' -ExcludePath '*' -Output Object)
         $Results | Should -HaveCount 1
         $Results[0].TargetCount | Should -Be 1
@@ -190,7 +190,7 @@ Describe 'Start-Nitpicking' {
 
     It 'validates known include selectors before applying exclusions' {
         $Results = @(Start-Nitpicking -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
-            -IncludeRule UseIsNotOperator,AvoidParameterAttributeBool `
+            -IncludeRule Nitpick/UseIsNotOperator,Nitpick/AvoidParameterAttributeBool `
             -ExcludeRule '*IsNot*','Missing*' -Output Object -ErrorAction Stop)
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
@@ -203,7 +203,7 @@ Describe 'Start-Nitpicking' {
         Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be parsed.' }
 
         {
-            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -ExcludeRule '*' -ErrorAction Continue
+            Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator -ExcludeRule '*' -ErrorAction Continue
         } | Should -Throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
 
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
@@ -220,7 +220,7 @@ Describe 'Start-Nitpicking' {
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
     }
 
-    It 'validates selectors after discovering explicitly requested rule modules without registration' {
+    It 'validates selectors after acquiring an explicitly requested module without registration' {
         $Module = New-Module -Name NitpickSelectionRules -ScriptBlock {
             function Test-ModuleRule {
                 param($ScriptBlockAst)
@@ -228,14 +228,10 @@ Describe 'Start-Nitpicking' {
             Export-ModuleMember -Function Test-ModuleRule
         }
         Import-Module -ModuleInfo $Module
-        Mock Find-Nitpick -ModuleName Nitpick {}
-        Mock Find-Nitpick -ModuleName Nitpick {
-            Get-Command -Name Test-ModuleRule -Module NitpickSelectionRules
-        } -ParameterFilter { $IncludeModule -contains 'NitpickSelectionRules' }
 
         try {
-            $Results = @(Start-Nitpicking -Script {} -RuleModule NitpickSelectionRules `
-                -IncludeRule ModuleRule -Output Object -ErrorAction Stop)
+            $Results = @(Start-Nitpicking -Script {} -Module NitpickSelectionRules `
+                -IncludeRule NitpickSelectionRules/ModuleRule -Output Object -ErrorAction Stop)
 
             $Results | Should -HaveCount 1
             $Results[0].RuleCount | Should -Be 1
@@ -248,7 +244,7 @@ Describe 'Start-Nitpicking' {
 
     It 'does not persist automatically discovered rules even after repeated invocations' {
         foreach ($Invocation in 1..2) {
-            $Results = @(Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -Output Object)
+            $Results = @(Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator -Output Object)
             $Results[0].RuleCount | Should -Be 1
             @(Get-Nitpick) | Should -HaveCount 0
         }
@@ -258,7 +254,7 @@ Describe 'Start-Nitpicking' {
         $Registered = Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) `
             -Category Quality -Source CustomSource -PassThru
         $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
-            -IncludeRule UseIsNotOperator -Output Object -ErrorAction Stop)
+            -IncludeRule Nitpick/UseIsNotOperator -Output Object -ErrorAction Stop)
 
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
         $Summary.RuleCount | Should -Be 1
@@ -274,7 +270,7 @@ Describe 'Start-Nitpicking' {
     It 'uses explicit editor enablement rather than discovered defaults' {
         Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -EditorEnabled $false
         {
-            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -EditorMode
+            Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator -EditorMode
         } | Should -Throw '*No eligible Nitpick rules remain*'
         (Get-Nitpick -Name UseIsNotOperator).EditorEnabled | Should -BeFalse
     }
@@ -282,27 +278,27 @@ Describe 'Start-Nitpicking' {
     It 'rejects a conflicting explicit callable without modifying the registry or reading targets' {
         $Registered = Register-Nitpick `
             -Callable { param ($ScriptBlockAst) } `
-            -Name UseIsNotOperator -Source Tests -PassThru
+            -Namespace Nitpick -Name UseIsNotOperator -Source Tests -PassThru
 
         Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
         {
-            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -ErrorAction Continue
-        } | Should -Throw "*Different Nitpick callables share the canonical rule name 'UseIsNotOperator'*"
+            Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator -ErrorAction Continue
+        } | Should -Throw "*Different Nitpick callables share the rule ID 'Nitpick/UseIsNotOperator'*"
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
-        [object]::ReferenceEquals((Get-Nitpick -Name UseIsNotOperator), $Registered) | Should -BeTrue
+        [object]::ReferenceEquals((Get-Nitpick -Id Nitpick/UseIsNotOperator), $Registered) | Should -BeTrue
     }
 
     It 'does not partially register discovered rules after selector failure' {
         {
-            Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator,MissingRule
+            Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator,MissingRule
         } | Should -Throw '*No Nitpick rules match*'
         @(Get-Nitpick) | Should -HaveCount 0
     }
 
     It 'unregisters explicit metadata without disabling discovery' {
         Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -EditorEnabled $false
-        Unregister-Nitpick -Name UseIsNotOperator
-        $Results = @(Start-Nitpicking -Script {} -IncludeRule UseIsNotOperator -EditorMode -Output Object)
+        Unregister-Nitpick -Id Nitpick/UseIsNotOperator
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule Nitpick/UseIsNotOperator -EditorMode -Output Object)
         $Results[0].RuleCount | Should -Be 1
         @(Get-Nitpick) | Should -HaveCount 0
     }
@@ -390,7 +386,7 @@ Describe 'Start-Nitpicking' {
                 -Path $TestDrive `
                 -IncludePath '*.ps1' `
                 -ExcludePath '*excluded.ps1' `
-                -IncludeRule AvoidParameterAttributeBool `
+                -IncludeRule Nitpick/AvoidParameterAttributeBool `
                 -Output Object
         )
 
@@ -447,14 +443,14 @@ Describe 'Start-Nitpicking' {
         $PathResults = @(
             Start-Nitpicking `
                 -Path $TestDrive `
-                -IncludeRule ScopedRule `
+                -IncludeRule Local/ScopedRule `
                 -Output Object `
                 -NoSummary
         )
         $ScriptResults = @(
             Start-Nitpicking `
                 -Script { $Anonymous } `
-                -IncludeRule ScopedRule `
+                -IncludeRule Local/ScopedRule `
                 -Output Object `
                 -NoSummary
         )
@@ -469,7 +465,7 @@ Describe 'Start-Nitpicking' {
         $Results = @(
             Start-Nitpicking `
                 -Script { param([Parameter(Mandatory=$true)] [string] $Name) } `
-                -IncludeRule AvoidParameterAttributeBool `
+                -IncludeRule Nitpick/AvoidParameterAttributeBool `
                 -Output Object `
                 -NoSummary
         )
@@ -493,7 +489,7 @@ Describe 'Start-Nitpicking' {
         {
             Start-Nitpicking `
                 -Script {} `
-                -IncludeRule EditorDisabledRule `
+                -IncludeRule Local/EditorDisabledRule `
                 -EditorMode `
                 -Output Object `
                 -ErrorAction Continue
@@ -507,7 +503,7 @@ Describe 'Start-Nitpicking' {
         $Results = @(
             Start-Nitpicking `
                 -Script $Script.Ast `
-                -IncludeRule AvoidParameterAttributeBool
+                -IncludeRule Nitpick/AvoidParameterAttributeBool
         )
 
         $Results.Count | Should -Be 2
@@ -542,7 +538,7 @@ Describe 'Start-Nitpicking' {
 
         $RenderedOutput = Start-Nitpicking `
             -Script $Script.Ast `
-            -IncludeRule OutOfOrder `
+            -IncludeRule Local/OutOfOrder `
             -NoSummary
 
         $Lines = $RenderedOutput -split '\r?\n'
@@ -556,7 +552,7 @@ Describe 'Start-Nitpicking' {
         $Results = @(
             Start-Nitpicking `
                 -Script $Source `
-                -IncludeRule AvoidParameterAttributeBool `
+                -IncludeRule Nitpick/AvoidParameterAttributeBool `
                 -Fix `
                 -Preview `
                 -Output Object
@@ -622,7 +618,7 @@ Describe 'Start-Nitpicking' {
         $Results = @(
             Start-Nitpicking `
                 -Script '$Value = 123' `
-                -IncludeRule ConflictingRule `
+                -IncludeRule Local/ConflictingRule `
                 -Fix `
                 -Preview `
                 -Output Object `
@@ -660,7 +656,7 @@ Describe 'Start-Nitpicking' {
         $ThresholdErrors = @()
         $null = Start-Nitpicking `
             -Script {} `
-            -IncludeRule $RuleName `
+            -IncludeRule "Local/$RuleName" `
             -ErrorOn $ErrorOn `
             -NoSummary `
             -ErrorAction SilentlyContinue `
