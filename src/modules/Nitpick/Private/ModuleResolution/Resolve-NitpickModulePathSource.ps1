@@ -47,10 +47,15 @@ function Resolve-NitpickModulePathSource {
 
     if ($Item.PSIsContainer) {
         $EntrypointName = $Item.Name
-        $Entrypoint = '.psd1', '.psm1', '.dll' |
+        # Index instead of Select-Object -First 1, which leaks a spurious
+        # StopUpstreamCommandsException into a caller's -ErrorVariable on Windows
+        # PowerShell 5.1 whenever -ErrorAction is also specified. Unlike .Count,
+        # indexing into a genuinely $null [array]-typed variable still throws, so
+        # guard the index with a Count check rather than relying on [array] alone.
+        [array] $Entrypoints = '.psd1', '.psm1', '.dll' |
             ForEach-Object { Join-Path -Path $Item.FullName -ChildPath ($EntrypointName + $_) } |
-            Where-Object { Test-Path -LiteralPath $_ } |
-            Select-Object -First 1
+            Where-Object { Test-Path -LiteralPath $_ }
+        $Entrypoint = if ($Entrypoints.Count -gt 0) { $Entrypoints[0] } else { $null }
 
         if (-not $Entrypoint) {
             throw [InvalidDataException]::new("Module directory '$($Item.FullName)' must contain a $EntrypointName.psd1, $EntrypointName.psm1, or $EntrypointName.dll entrypoint.")
@@ -71,9 +76,8 @@ function Resolve-NitpickModulePathSource {
 
     $ManifestPath = Get-NitpickModuleManifestPath -Path $ResolvedPath -Name $ResolvedName
 
-    $LoadedInstance = Get-Module -All |
-        Where-Object { $_.Path -eq $ResolvedPath } |
-        Select-Object -First 1
+    [array] $LoadedInstances = Get-Module -All | Where-Object { $_.Path -eq $ResolvedPath }
+    $LoadedInstance = if ($LoadedInstances.Count -gt 0) { $LoadedInstances[0] } else { $null }
 
     $ResolvedVersion = $null
     if ($LoadedInstance) {

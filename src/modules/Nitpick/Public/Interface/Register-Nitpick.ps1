@@ -23,8 +23,19 @@
 
 .EXAMPLE
     Register a new Nitpick rule named 'TestRule' with the specified callable, category, and source.
+    With no explicit Namespace, scriptblock registrations default to Local/TestRule.
 
     Register-Nitpick `
+        -Name TestRule `
+        -Callable { param ($ScriptBlockAst) } `
+        -Category Style `
+        -Source Tests
+
+.EXAMPLE
+    Register a new Nitpick rule under an explicit namespace instead of the Local default.
+
+    Register-Nitpick `
+        -Namespace ProjectChecks `
         -Name TestRule `
         -Callable { param ($ScriptBlockAst) } `
         -Category Style `
@@ -54,13 +65,17 @@ function Register-Nitpick {
         [ValidateNotNullOrEmpty()]
         [string] $Name,
 
+        [Parameter(HelpMessage='The namespace of the nitpick. Defaults to Local for scriptblocks and commands without an implementing module, or to the implementing module''s name.')]
+        [ValidateNotNullOrEmpty()]
+        [string] $Namespace,
+
         [Parameter(HelpMessage='Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Source,
 
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string] $Module,
+        [string[]] $Module,
 
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
@@ -74,26 +89,43 @@ function Register-Nitpick {
             Write-Verbose "No callable provided. Running discovery."
 
             $FindParams = @{}
-            if ($Module) { $FindParams.IncludeModule = $Module }
+            if ($Module) { $FindParams.Module = $Module }
 
             # NOTE: Maybe filter after constructing Nitpick if user provides the
             # rule id instead of the function name?
             $Callable = Find-Nitpick @FindParams
         }
 
+        $HasOverrides = @('Name', 'Namespace', 'Category', 'EditorEnabled', 'Source') |
+            Where-Object { $PSBoundParameters.ContainsKey($_) }
+
         foreach($CallableEntry in $Callable) {
-            if ($CallableEntry -is [NitpickRule]) {
+            if ($CallableEntry -is [NitpickRule] -and -not $HasOverrides) {
                 $Nitpick = $CallableEntry
             } else {
+                # An already-constructed NitpickRule (for example piped from Find-Nitpick) can
+                # still have its descriptive Category/Source/EditorEnabled metadata overridden
+                # here; its own Name/Namespace/Category/EditorEnabled/Source are the defaults
+                # for any override not explicitly bound, so its ID is preserved unless the
+                # caller explicitly requests a different Name or Namespace.
+                $BaseNitpick = if ($CallableEntry -is [NitpickRule]) { $CallableEntry } else { $null }
+                $BaseCallable = if ($BaseNitpick) { $BaseNitpick.Callable } else { $CallableEntry }
+
                 $NitpickParams = @{}
-                if ($Name) { $NitpickParams.Name = $Name }
-                if ($Category) { $NitpickParams.Category = $Category }
+                foreach ($Property in 'Name', 'Namespace', 'Category', 'Source') {
+                    if ($PSBoundParameters.ContainsKey($Property)) {
+                        $NitpickParams[$Property] = $PSBoundParameters[$Property]
+                    } elseif ($BaseNitpick -and $BaseNitpick.$Property) {
+                        $NitpickParams[$Property] = $BaseNitpick.$Property
+                    }
+                }
                 if ($PSBoundParameters.ContainsKey('EditorEnabled')) {
                     $NitpickParams.EditorEnabled = $EditorEnabled
+                } elseif ($BaseNitpick) {
+                    $NitpickParams.EditorEnabled = $BaseNitpick.EditorEnabled
                 }
-                if ($Source) { $NitpickParams.Source = $Source }
 
-                $Nitpick = $CallableEntry | New-Nitpick @NitpickParams
+                $Nitpick = $BaseCallable | New-Nitpick @NitpickParams
             }
 
             if ($Nitpick.CallableType -ne 'ScriptBlock') {
@@ -108,24 +140,22 @@ function Register-Nitpick {
                 }
             }
 
-            $IsIncluded =
-                ($null -eq $IncludeRule -or $Nitpick.Name -in $IncludeRule) -and
-                ($null -eq $ExcludeRule -or $Nitpick.Name -notin $ExcludeRule)
+            $Registry = Get-NitpickRegistry
+            $IsIncluded = @($Nitpick) |
+                Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard
 
             if (-not $IsIncluded) {
                 continue
             }
 
-            $Registry = Get-NitpickRegistry
-
-            $Existing = $Registry.Nitpicks[$Nitpick.Name]
+            $Existing = $Registry.Nitpicks[$Nitpick.Id]
             if ($Existing) {
                 $IsSame =
                     $Existing.Source -eq $Nitpick.Source -and
                     (Test-NitpickCallableIdentity -Left $Existing.Callable -Right $Nitpick.Callable)
 
                 if ($IsSame) {
-                    Write-Verbose "Nitpick '$($Nitpick.Name)' is already registered."
+                    Write-Verbose "Nitpick '$($Nitpick.Id)' is already registered."
                     if ($PassThru) {
                         Write-Output $Existing
                     }
@@ -133,17 +163,17 @@ function Register-Nitpick {
                 }
 
                 if (-not $Force) {
-                    Write-Error "A Nitpick with the name '$($Nitpick.Name)' is already registered."
+                    Write-Error "A Nitpick with the ID '$($Nitpick.Id)' is already registered."
                     continue
                 }
             }
 
             if ($Existing) {
-                Write-Verbose "Overwriting existing Nitpick '$($Nitpick.Name)'."
+                Write-Verbose "Overwriting existing Nitpick '$($Nitpick.Id)'."
             } else {
-                Write-Verbose "Registering '$($Nitpick.Category)' rule '$($Nitpick.Name)'."
+                Write-Verbose "Registering '$($Nitpick.Category)' rule '$($Nitpick.Id)'."
             }
-            $Registry.Nitpicks[$Nitpick.Name] = $Nitpick
+            $Registry.Nitpicks[$Nitpick.Id] = $Nitpick
 
             if ($PassThru) {
                 Write-Output $Nitpick

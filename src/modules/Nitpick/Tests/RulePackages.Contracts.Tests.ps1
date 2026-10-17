@@ -382,7 +382,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
     }
 
-    Context 'Phase 4: native API cutover (pending implementation)' -Skip {
+    Context 'Phase 4: native API cutover' {
         It 'loads packages additively and limits execution with a namespace selector' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Baseline = @(Start-Nitpicking -Script {} -Output Object)

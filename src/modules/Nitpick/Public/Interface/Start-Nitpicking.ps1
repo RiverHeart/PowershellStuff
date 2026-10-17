@@ -1,3 +1,9 @@
+using namespace System
+using namespace System.Diagnostics
+using namespace System.IO
+using namespace System.Security
+using namespace System.Collections.Generic
+using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 <#
@@ -12,23 +18,16 @@ using namespace System.Management.Automation.Language
     reported as Error findings. Rule selection must succeed before any targets are read.
 
 .PARAMETER IncludeRule
-    Selects canonical Nitpick rule names, such as UseIsNotOperator, not command names
-    such as Test-UseIsNotOperator. Matching is case-insensitive and supports wildcards.
-    Every literal selector must match a discovered or registered rule before exclusions
-    and editor-mode filtering. Unmatched wildcard selectors are allowed, provided at
+    Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
+    WPF/AvoidBlockingUI, not command names such as Test-UseIsNotOperator and not bare
+    local names. Matching is case-insensitive and supports wildcards. Every literal
+    selector must match a discovered or registered rule before exclusions and
+    editor-mode filtering. Unmatched wildcard selectors are allowed, provided at
     least one eligible rule remains.
 
-.PARAMETER RulePath
-    Literal filesystem paths to trusted rule modules: a module manifest (.psd1),
-    script module (.psm1), binary module (.dll), or directory. Directories are passed
-    to Import-Module so PowerShell resolves the module entrypoint. All paths are
-    validated before importing, and modules are imported in a temporary module scope.
-    Loose scripts, wildcard paths, and recursive module searches are not supported.
-    Discovered rules are invocation-local; this command does not register them.
-
-.PARAMETER RuleModule
-    Names of already loaded modules whose discoverable rules should be included.
-    This parameter does not import modules; use RulePath to load a module from disk.
+.PARAMETER Module
+    Module names or literal paths to acquire as additive rule packages, alongside the
+    built-in package and any explicit registrations. Does not register acquired rules.
 
 .PARAMETER Path
     A file, directory, or wildcard path. Literal paths must exist. File targets are
@@ -45,7 +44,7 @@ using namespace System.Management.Automation.Language
     file must remain after filtering. Path filters do not apply to Script inputs.
 
 .PARAMETER ExcludeRule
-    Excludes matching rule names. Unmatched exclusions are allowed. If no eligible
+    Excludes matching rule IDs. Unmatched exclusions are allowed. If no eligible
     rules remain after exclusions and editor-mode filtering, execution terminates.
 
 .PARAMETER Fix
@@ -66,7 +65,7 @@ using namespace System.Management.Automation.Language
 
     Start-Nitpicking `
         -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
-        -IncludeRule AvoidParameterAttributeBool `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool `
         -Fix `
         -Preview
 #>
@@ -85,8 +84,7 @@ function Start-Nitpicking {
         [ScriptBlockAstTransform()]
         [ScriptBlockAst] $Script,
 
-        [string[]] $RulePath,
-        [string[]] $RuleModule,
+        [string[]] $Module,
 
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
@@ -111,58 +109,23 @@ function Start-Nitpicking {
             throw 'The Preview switch requires Fix.'
         }
 
-        $RuleModulePaths = @(
-            foreach ($RulePathEntry in $RulePath) {
-                if ([string]::IsNullOrWhiteSpace($RulePathEntry)) {
-                    throw 'RulePath entries must not be empty or whitespace.'
-                }
-                $RuleItem = Get-Item -LiteralPath $RulePathEntry -ErrorAction Stop
-                if ($RuleItem -is [System.IO.DirectoryInfo]) {
-                    $RuleItem.FullName
-                } elseif ($RuleItem -is [System.IO.FileInfo] -and $RuleItem.Extension -in '.psd1', '.psm1', '.dll') {
-                    $RuleItem.FullName
-                } else {
-                    throw "RulePath '$RulePathEntry' must be a module directory, .psd1 manifest, .psm1 script module, or .dll binary module."
-                }
-            }
-        )
-        $ImportedRuleModules = @(
-            foreach ($RuleModulePath in ($RuleModulePaths | Select-Object -Unique)) {
-                # Keep path imports out of Nitpick's own discoverable module scope.
-                New-Module -ReturnResult -ArgumentList $RuleModulePath -ScriptBlock {
-                    param ($ModulePath)
-                    $Instance = Import-Module -Name $ModulePath -Scope Local -PassThru -ErrorAction Stop
-                    # New-Module implicitly exports every function defined in this scriptblock's
-                    # dynamic module, including those Import-Module just pulled into Local scope,
-                    # which would shadow a same-named module already loaded elsewhere and leave
-                    # its functions resolvable even after that module is removed. See
-                    # Docs/RulePackageContractStateLeak.md for the full investigation.
-                    Export-ModuleMember -Function @() -Alias @()
-                    $Instance
-                } -ErrorAction Stop
-            }
-        )
-
         $DiscoveredRules = @(
             Find-Nitpick -IncludeRule $IncludeRule
-            if ($ImportedRuleModules.Count -gt 0) {
-                Find-Nitpick -Module $ImportedRuleModules -IncludeRule $IncludeRule
-            }
-            if ($RuleModule) {
-                Find-Nitpick -IncludeModule $RuleModule -IncludeRule $IncludeRule
-            }
-        )
-        $DiscoveredRuleNames = @(
-            foreach ($Command in $DiscoveredRules) {
-                if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+            foreach ($ModuleEntry in ($Module | Select-Object -Unique)) {
+                Find-Nitpick -Module $ModuleEntry -IncludeRule $IncludeRule -ErrorAction Stop
             }
         )
         $RegisteredRules = @(Get-Nitpick)
-        $KnownRuleNames = @($DiscoveredRuleNames) + @($RegisteredRules | Select-Object -ExpandProperty Name)
+        # Member-access on a zero- or one-element array does not enumerate per item (it
+        # falls back to a direct property lookup on the array/item itself), so @().Id
+        # yields one $null rather than zero results. Pipe through ForEach-Object instead
+        # (the scriptblock form, not the single-positional-argument member-name shorthand,
+        # which itself honors $WhatIfPreference and silently returns nothing under -WhatIf).
+        $KnownRuleIds = @($DiscoveredRules | ForEach-Object { $_.Id }) + @($RegisteredRules | ForEach-Object { $_.Id })
         $UnmatchedSelectors = @(
             foreach ($Selector in $IncludeRule) {
-                if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Selector) -and
-                    -not ($KnownRuleNames | Where-Object { $_ -like $Selector })) {
+                if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                    -not ($KnownRuleIds | Where-Object { $_ -like $Selector })) {
                     $Selector
                 }
             }
@@ -170,39 +133,33 @@ function Start-Nitpicking {
         if ($UnmatchedSelectors.Count -gt 0) {
             throw ((
                 "No Nitpick rules match the IncludeRule selector(s): {0}. " +
-                "Use canonical rule names (for example, UseIsNotOperator, not Test-UseIsNotOperator). " +
-                "Use Find-Nitpick for discovery and Get-Nitpick for registered rules."
+                "Use qualified rule IDs (for example, Nitpick/UseIsNotOperator, not UseIsNotOperator " +
+                "or Test-UseIsNotOperator). Use Find-Nitpick for discovery and Get-Nitpick for registered rules."
             ) -f ($UnmatchedSelectors -join ', '))
         }
 
         $EffectiveRules = @{}
         $RegisteredRules |
-            Where-NitpickIncluded -PropertyPath Name -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
-            ForEach-Object { $EffectiveRules[$_.Name] = $_ }
-        foreach ($Command in $DiscoveredRules) {
-            $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
-            if ($ExcludeRule | Where-Object { $RuleName -like $_ }) {
-                continue
-            }
-            $Existing = $EffectiveRules[$RuleName]
-            if ($Existing) {
-                if (-not (Test-NitpickCallableIdentity -Left $Existing.Callable -Right $Command)) {
-                    throw "Different Nitpick callables share the canonical rule name '$RuleName'. Exclude the rule or remove the conflicting registration/module."
+            Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
+            ForEach-Object { $EffectiveRules[$_.Id] = $_ }
+        $DiscoveredRules |
+            Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
+            ForEach-Object {
+                $Existing = $EffectiveRules[$_.Id]
+                if ($Existing) {
+                    if (-not (Test-NitpickCallableIdentity -Left $Existing.Callable -Right $_.Callable)) {
+                        throw "Different Nitpick callables share the rule ID '$($_.Id)'. Exclude the rule or remove the conflicting registration/module."
+                    }
+                    return
                 }
-                continue
+                $EffectiveRules[$_.Id] = $_
             }
-            $Rule = New-Nitpick -Callable $Command -ErrorAction Stop
-            if ($Rule.Name -ne $RuleName) {
-                throw "Rule name '$($Rule.Name)' must match callable name '$RuleName'."
-            }
-            $EffectiveRules[$RuleName] = $Rule
-        }
         [object[]] $Rules = @(
             $EffectiveRules.Values | Where-Object { -not $EditorMode -or $_.EditorEnabled }
         )
 
         if (-not $Rules) {
-            if ($KnownRuleNames.Count -eq 0) {
+            if ($KnownRuleIds.Count -eq 0) {
                 throw 'No Nitpick rules were discovered or registered. Import a rule module or register a rule before running Start-Nitpicking.'
             }
             throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
@@ -210,20 +167,20 @@ function Start-Nitpicking {
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
-        $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $Stopwatch = [Stopwatch]::StartNew()
         $SeverityRank = @{
             Information = 0
             Warning = 1
             Error = 2
         }
         $ThresholdFindingCount = 0
-        $ResolvedTargets = [System.Collections.Generic.List[object]]::new()
-        $CandidatePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $ResolvedTargets = [List[object]]::new()
+        $CandidatePaths = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     }
 
     process {
         $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            $Roots = if ([System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Path)) {
+            $Roots = if ([WildcardPattern]::ContainsWildcardCharacters($Path)) {
                 Get-Item -Path $Path -ErrorAction Stop
             } else {
                 Get-Item -LiteralPath $Path -ErrorAction Stop
@@ -232,7 +189,7 @@ function Start-Nitpicking {
                 foreach ($Root in $Roots) {
                     if ($Root.PSIsContainer) {
                         Get-ChildItem -LiteralPath $Root.FullName -File -Recurse -Filter $Filter -ErrorAction Stop
-                    } elseif ($Root -is [System.IO.FileInfo] -and $Root.Name -like $Filter) {
+                    } elseif ($Root -is [FileInfo] -and $Root.Name -like $Filter) {
                         $Root
                     }
                 }
@@ -258,7 +215,7 @@ function Start-Nitpicking {
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
             $UnmatchedPaths = @(
                 foreach ($Selector in $IncludePath) {
-                    if (-not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                    if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
                         -not $CandidatePaths.Contains($Selector)) {
                         $Selector
                     }
@@ -293,7 +250,7 @@ function Start-Nitpicking {
                     $Document.Ast
                 }
                 $ParseErrors = $Document.ParseErrors
-            } catch [System.IO.IOException], [System.IO.InvalidDataException], [System.Security.SecurityException], [System.Management.Automation.ItemNotFoundException], [UnauthorizedAccessException] {
+            } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
                 $Summary.TargetCount++
                 $Summary.FailedTargetCount++
                 if ($Fix) {
@@ -312,7 +269,7 @@ function Start-Nitpicking {
             }
 
             $Summary.TargetCount++
-            $TargetFindings = [System.Collections.Generic.List[object]]::new()
+            $TargetFindings = [List[object]]::new()
             foreach ($ParseError in $ParseErrors) {
                 $TargetFindings.Add((New-NitpickFinding `
                     -RuleName 'PowerShellParseError' `
@@ -326,7 +283,7 @@ function Start-Nitpicking {
                 ))
             }
 
-            $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
+            $ApplicableRules = [List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                     $Ast.Extent.File
