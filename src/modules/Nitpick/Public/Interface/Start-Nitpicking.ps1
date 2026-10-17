@@ -109,27 +109,29 @@ function Start-Nitpicking {
             throw 'The Preview switch requires Fix.'
         }
 
-        $DiscoveredRules = @(
-            Find-Nitpick -IncludeRule $IncludeRule
-            foreach ($ModuleEntry in ($Module | Select-Object -Unique)) {
-                Find-Nitpick -Module $ModuleEntry -IncludeRule $IncludeRule -ErrorAction Stop
+        $DiscoveredRules = [List[object]]::new()
+        foreach ($Rule in (Find-Nitpick -IncludeRule $IncludeRule)) {
+            $DiscoveredRules.Add($Rule)
+        }
+        foreach ($ModuleEntry in ($Module | Select-Object -Unique)) {
+            foreach ($Rule in (Find-Nitpick -Module $ModuleEntry -IncludeRule $IncludeRule -ErrorAction Stop)) {
+                $DiscoveredRules.Add($Rule)
             }
-        )
-        $RegisteredRules = @(Get-Nitpick)
-        # Member-access on a zero- or one-element array does not enumerate per item (it
-        # falls back to a direct property lookup on the array/item itself), so @().Id
-        # yields one $null rather than zero results. Pipe through ForEach-Object instead
-        # (the scriptblock form, not the single-positional-argument member-name shorthand,
-        # which itself honors $WhatIfPreference and silently returns nothing under -WhatIf).
-        $KnownRuleIds = @($DiscoveredRules | ForEach-Object { $_.Id }) + @($RegisteredRules | ForEach-Object { $_.Id })
-        $UnmatchedSelectors = @(
-            foreach ($Selector in $IncludeRule) {
-                if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
-                    -not ($KnownRuleIds | Where-Object { $_ -like $Selector })) {
-                    $Selector
-                }
+        }
+        $RegisteredRules = Get-Nitpick
+        $KnownRuleIds = [List[string]]::new()
+        foreach ($Rule in $DiscoveredRules) {
+            $KnownRuleIds.Add($Rule.Id)
+        }
+        foreach ($Rule in $RegisteredRules) {
+            $KnownRuleIds.Add($Rule.Id)
+        }
+        $UnmatchedSelectors = foreach ($Selector in $IncludeRule) {
+            if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                -not ($KnownRuleIds | Where-Object { $_ -like $Selector })) {
+                $Selector
             }
-        )
+        }
         if ($UnmatchedSelectors.Count -gt 0) {
             throw ((
                 "No Nitpick rules match the IncludeRule selector(s): {0}. " +
