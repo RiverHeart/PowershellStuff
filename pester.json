@@ -32,6 +32,10 @@
     {
       "Name": "WpfDesigner",
       "ConfigPath": "src/projects/WpfDesigner/pester.json"
+    },
+    {
+      "Name": "StableArray",
+      "ConfigPath": "src/projects/StableArray/pester.json"
     }
   ]
 }

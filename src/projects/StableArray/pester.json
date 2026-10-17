@@ -1,0 +1,11 @@
+{
+  "TestSuite": "StableArray",
+  "Run": {
+    "Path": [
+      "Tests"
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  }
+}
