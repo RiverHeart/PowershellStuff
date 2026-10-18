@@ -114,59 +114,12 @@ function Start-Nitpicking {
             throw 'The Preview switch requires Fix.'
         }
 
-        $DiscoveredRules = [List[object]]::new()
-
-        Find-Nitpick -Module $Module -IncludeRule $IncludeRule -IncludeDefaults:(-not $ExcludeDefaults) -ErrorAction Stop |
-            ForEach-Object { $DiscoveredRules.Add($_) }
-
-        $RegisteredRules = Get-Nitpick
-        $KnownRuleIds = [List[string]]::new()
-        $DiscoveredRules | ForEach-Object { $KnownRuleIds.Add($_.Id) }
-        $RegisteredRules | ForEach-Object { $KnownRuleIds.Add($_.Id) }
-
-        $UnmatchedSelectors = foreach ($Selector in $IncludeRule) {
-            if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
-                -not ($KnownRuleIds | Where-Object { $_ -like $Selector })) {
-                $Selector
-            }
-        }
-        if ($UnmatchedSelectors.Count -gt 0) {
-            throw ((
-                "No Nitpick rules match the IncludeRule selector(s): {0}. " +
-                "Use qualified rule IDs (for example, Nitpick/UseIsNotOperator, not UseIsNotOperator " +
-                "or Test-UseIsNotOperator). Use Find-Nitpick for discovery and Get-Nitpick for registered rules."
-            ) -f ($UnmatchedSelectors -join ', '))
-        }
-
-        $EffectiveRules = @{}
-
-        $RegisteredRules |
-            Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
-            ForEach-Object { $EffectiveRules[$_.Id] = $_ }
-
-        $DiscoveredRules |
-            Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
-            ForEach-Object {
-                $Existing = $EffectiveRules[$_.Id]
-                if ($Existing) {
-                    if (-not (Test-NitpickCallableIdentity -Left $Existing.Callable -Right $_.Callable)) {
-                        throw "Different Nitpick callables share the rule ID '$($_.Id)'. Exclude the rule or remove the conflicting registration/module."
-                    }
-                    return
-                }
-                $EffectiveRules[$_.Id] = $_
-            }
-
-        [object[]] $Rules = @(
-            $EffectiveRules.Values | Where-Object { -not $EditorMode -or $_.EditorEnabled }
-        )
-
-        if (-not $Rules) {
-            if ($KnownRuleIds.Count -eq 0) {
-                throw 'No Nitpick rules were discovered or registered. Import a rule module or register a rule before running Start-Nitpicking.'
-            }
-            throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
-        }
+        [object[]] $Rules = @(Resolve-NitpickEffectiveRuleSet `
+            -Module $Module `
+            -IncludeRule $IncludeRule `
+            -ExcludeRule $ExcludeRule `
+            -ExcludeDefaults:$ExcludeDefaults `
+            -EditorMode:$EditorMode)
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
