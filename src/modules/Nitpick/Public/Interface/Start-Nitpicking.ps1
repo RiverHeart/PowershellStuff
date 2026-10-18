@@ -29,6 +29,10 @@ using namespace System.Management.Automation.Language
     Module names or literal paths to acquire as additive rule packages, alongside the
     built-in package and any explicit registrations. Does not register acquired rules.
 
+.PARAMETER ExcludeDefaults
+    Omits the built-in Nitpick package, including when Module is also omitted (in
+    which case no rules are discovered; registered rules may still apply).
+
 .PARAMETER Path
     A file, directory, or wildcard path. Literal paths must exist. File targets are
     resolved across all piped paths before analysis or fixing. Empty wildcard matches
@@ -98,6 +102,7 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
+        [switch] $ExcludeDefaults,
         [switch] $EditorMode,
         [switch] $NoSummary,
         [switch] $Fix,
@@ -110,22 +115,15 @@ function Start-Nitpicking {
         }
 
         $DiscoveredRules = [List[object]]::new()
-        foreach ($Rule in (Find-Nitpick -IncludeRule $IncludeRule)) {
-            $DiscoveredRules.Add($Rule)
-        }
-        foreach ($ModuleEntry in ($Module | Select-Object -Unique)) {
-            foreach ($Rule in (Find-Nitpick -Module $ModuleEntry -IncludeRule $IncludeRule -ErrorAction Stop)) {
-                $DiscoveredRules.Add($Rule)
-            }
-        }
+
+        Find-Nitpick -Module $Module -IncludeRule $IncludeRule -IncludeDefaults:(-not $ExcludeDefaults) -ErrorAction Stop |
+            ForEach-Object { $DiscoveredRules.Add($_) }
+
         $RegisteredRules = Get-Nitpick
         $KnownRuleIds = [List[string]]::new()
-        foreach ($Rule in $DiscoveredRules) {
-            $KnownRuleIds.Add($Rule.Id)
-        }
-        foreach ($Rule in $RegisteredRules) {
-            $KnownRuleIds.Add($Rule.Id)
-        }
+        $DiscoveredRules | ForEach-Object { $KnownRuleIds.Add($_.Id) }
+        $RegisteredRules | ForEach-Object { $KnownRuleIds.Add($_.Id) }
+
         $UnmatchedSelectors = foreach ($Selector in $IncludeRule) {
             if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
                 -not ($KnownRuleIds | Where-Object { $_ -like $Selector })) {
@@ -141,9 +139,11 @@ function Start-Nitpicking {
         }
 
         $EffectiveRules = @{}
+
         $RegisteredRules |
             Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
             ForEach-Object { $EffectiveRules[$_.Id] = $_ }
+
         $DiscoveredRules |
             Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard |
             ForEach-Object {
@@ -156,6 +156,7 @@ function Start-Nitpicking {
                 }
                 $EffectiveRules[$_.Id] = $_
             }
+
         [object[]] $Rules = @(
             $EffectiveRules.Values | Where-Object { -not $EditorMode -or $_.EditorEnabled }
         )

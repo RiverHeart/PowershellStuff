@@ -6,8 +6,10 @@ using namespace System.Management.Automation
 
 .DESCRIPTION
     Returns identity-bearing NitpickRule descriptors for one or more rule
-    packages. With no Module, only the built-in Nitpick package is acquired;
-    ambient loaded modules are never scanned.
+    packages. With no Module, only the built-in Nitpick package is acquired.
+    Specifying Module acquires only the requested package(s), replacing the
+    built-in default, unless IncludeDefaults is also specified to acquire both
+    together. Ambient loaded modules are never scanned.
 
     Each requested module name or literal path is resolved and acquired as an
     explicit rule package: its declared PrivateData.Linting is read, its
@@ -28,15 +30,27 @@ using namespace System.Management.Automation
 .PARAMETER ExcludeRule
     Excludes matching rule IDs. Supports wildcards.
 
+.PARAMETER IncludeDefaults
+    Also acquires the built-in Nitpick package alongside explicitly requested
+    Module entries, instead of Module replacing it. Has no effect on its own
+    (the built-in package is already acquired) when Module is omitted; pass
+    -IncludeDefaults:$false with no Module to acquire nothing instead.
+
 .EXAMPLE
     Returns all valid Nitpick rules from the built-in package.
 
     Find-Nitpick
 
 .EXAMPLE
-    Acquires an explicit rule package by name or literal path.
+    Acquires only the explicitly requested rule package, replacing the
+    built-in default.
 
     Find-Nitpick -Module WPF
+
+.EXAMPLE
+    Acquires an explicit rule package additively with the built-in package.
+
+    Find-Nitpick -Module WPF -IncludeDefaults
 
 .EXAMPLE
     Pipes the output of Find-Nitpick to Register-Nitpick.
@@ -47,13 +61,24 @@ function Find-Nitpick {
     [CmdletBinding()]
     [OutputType([object])]
     param(
-        [string[]] $Module = 'Nitpick',
-
+        [string[]] $Module,
         [string[]] $IncludeRule,
-        [string[]] $ExcludeRule
+        [string[]] $ExcludeRule,
+        [switch] $IncludeDefaults
     )
 
-    foreach ($Entry in $Module) {
+    $ShouldIncludeDefaults = if ($PSBoundParameters.ContainsKey('IncludeDefaults')) {
+        [bool] $IncludeDefaults
+    } else {
+        -not $Module
+    }
+
+    $Modules = @()
+    $Modules += $Module
+    if ($ShouldIncludeDefaults) { $Modules += 'Nitpick' }
+    $Modules = $Modules | Select-Object -Unique
+
+    foreach ($Entry in $Modules) {
         try {
             $PackageRules = Get-NitpickPackage -Module $Entry -ErrorAction Stop
         } catch {

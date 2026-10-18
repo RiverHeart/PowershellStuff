@@ -144,6 +144,30 @@ Describe 'Register-Nitpick' {
         $Rules.Name | Should -Contain 'AvoidParameterAttributeBool'
     }
 
+    It 'registers only an explicit module package, matching piped Find-Nitpick output' {
+        $RuleModule = New-Module -Name NitpickRegisterDiscoveryRules -ScriptBlock {
+            function Test-RegisterPackageRule {
+                param ($ScriptBlockAst)
+            }
+            Export-ModuleMember -Function Test-RegisterPackageRule
+        }
+        Import-Module -ModuleInfo $RuleModule -Force
+        try {
+            $Rules = @(Register-Nitpick -Module NitpickRegisterDiscoveryRules -PassThru)
+
+            $Rules.Id | Should -Be 'NitpickRegisterDiscoveryRules/RegisterPackageRule'
+
+            InModuleScope Nitpick {
+                (Get-NitpickRegistry).Nitpicks.Clear()
+            }
+            $PipedRules = @(Find-Nitpick -Module NitpickRegisterDiscoveryRules | Register-Nitpick -PassThru)
+
+            $PipedRules.Id | Should -Be 'NitpickRegisterDiscoveryRules/RegisterPackageRule'
+        } finally {
+            Remove-Module -Name NitpickRegisterDiscoveryRules -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'registers an existing NitpickRule without reconstructing it' {
         $Rule = New-Nitpick -Callable {
             param ($ScriptBlockAst)

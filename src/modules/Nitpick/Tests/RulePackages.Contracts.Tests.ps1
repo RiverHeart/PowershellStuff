@@ -306,7 +306,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
                 RuleModules = @('NitpickContractPackageRules.psm1', 'Missing.psm1')
             }
-            { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } | Should -Throw '*Missing.psm1*'
+
+            { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } |
+                Should -Throw '*Missing.psm1*'
+
             Test-Path -LiteralPath $Marker | Should -BeFalse
         }
     }
@@ -410,8 +413,14 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'permits equal local names from different package namespaces' {
             $Alpha = New-ContractRulePackage -Name NitpickContractAlpha -Root $ContractRoot
             $Beta = New-ContractRulePackage -Name NitpickContractBeta -Root $ContractRoot
-            $Results = @(Start-Nitpicking -Script {} -Module $Alpha.ManifestPath,$Beta.ManifestPath `
-                -IncludeRule 'NitpickContractAlpha/ContractRule','NitpickContractBeta/ContractRule' -Output Object)
+            $Results = @(
+                Start-Nitpicking `
+                    -Script {} `
+                    -Module $Alpha.ManifestPath,$Beta.ManifestPath `
+                    -IncludeRule 'NitpickContractAlpha/ContractRule','NitpickContractBeta/ContractRule' `
+                    -Output Object `
+                    -ExcludeDefaults
+            )
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
             $Summary.RuleCount | Should -Be 2
             $Summary.FindingCount | Should -Be 2

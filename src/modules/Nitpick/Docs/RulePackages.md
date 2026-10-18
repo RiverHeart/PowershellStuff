@@ -495,9 +495,13 @@ registration. Existing file-target tests pass with only necessary selector migra
 - [Find-Nitpick](../Public/Interface/Find-Nitpick.ps1) is now purely the shared package
   contract: the legacy `PSModuleInfo[]`/nested-module-traversal path and the
   `-IncludeModule`/`-ExcludeModule`/`-Name` parameters are removed entirely. `-Module`
-  is a plain `[string[]]` defaulting to `'Nitpick'`, so a bare call acquires only the
-  built-in package; multiple entries acquire additively. `-IncludeRule`/`-ExcludeRule`
-  filter the resulting `NitpickRule` descriptors by `Id` with wildcard support.
+  is a plain `[string[]]` with no default; a bare call acquires only the built-in
+  package, multiple entries acquire additively, and one explicit entry replaces the
+  built-in default rather than adding to it. `-IncludeDefaults` adds the built-in
+  package back alongside explicit `-Module` entries instead of replacing it; it has no
+  effect when `-Module` is omitted unless bound explicitly to `$false`, which acquires
+  nothing. `-IncludeRule`/`-ExcludeRule` filter the resulting `NitpickRule` descriptors
+  by `Id` with wildcard support.
 - [Start-Nitpicking](../Public/Interface/Start-Nitpicking.ps1) replaces `RulePath` and
   `RuleModule` with `-Module` (`[string[]]`). Selection now resolves built-ins, each
   requested package, and registered rules into one `Id`-keyed effective set: literal
@@ -505,13 +509,19 @@ registration. Existing file-target tests pass with only necessary selector migra
   and editor-mode filtering; same-ID-same-callable candidates are deduplicated (a
   registered rule's metadata wins); same-ID-different-callable candidates terminate
   selection before any target is read. Excluded rules never participate in conflict
-  detection.
+  detection. Its own `-ExcludeDefaults` switch keeps the opt-out built-ins-by-default
+  contract end users expect, translating to an explicit `Find-Nitpick -IncludeDefaults`
+  argument (`$true` unless `-ExcludeDefaults` is set) so the built-in package and any
+  requested packages are always acquired together in one call.
 - [Register-Nitpick](../Public/Interface/Register-Nitpick.ps1) gained `-Namespace` and
   now keys the registry by `Id`. A piped `NitpickRule` (for example from `Find-Nitpick`)
   can still have its `-Category`/`-Source`/`-EditorEnabled`/`-Name`/`-Namespace`
   overridden explicitly; with no overrides bound it registers the exact same reference
   (preserving prior reference-equality passthrough behavior). `-IncludeRule`/
-  `-ExcludeRule` match `Id` with wildcard support.
+  `-ExcludeRule` match `Id` with wildcard support. Its own `-Module` discovery relies on
+  `Find-Nitpick`'s replace-by-default behavior with no extra guarding, so
+  `Register-Nitpick -Module X` and the equivalent `Find-Nitpick -Module X |
+  Register-Nitpick` pipeline register the same package-only rule set.
 - [Get-Nitpick](../Public/Interface/Get-Nitpick.ps1) gained `-Id` (exact or wildcard,
   case-insensitive, matching PowerShell's default case-insensitive hashtable key
   comparison) alongside the existing non-key `-Name` filter.
@@ -522,8 +532,8 @@ registration. Existing file-target tests pass with only necessary selector migra
   [Resolve-NitpickModulePathSource](../Private/ModuleResolution/Resolve-NitpickModulePathSource.ps1)),
   leaks a spurious `StopUpstreamCommandsException` into any caller's `-ErrorVariable` on
   Windows PowerShell 5.1 whenever that caller also specifies `-ErrorAction`. Because
-  `Find-Nitpick`'s new default (`-Module 'Nitpick'`) now resolves the built-in package by
-  bare name on every invocation, this fired on effectively every `Start-Nitpicking` call
+  `Start-Nitpicking` always resolves the built-in package by bare name (either alone or
+  alongside requested packages), this fired on effectively every `Start-Nitpicking` call
   that also passed `-ErrorAction`/`-ErrorVariable`. Both resolvers now use array indexing
   (`@(...)[0]`) instead of `Select-Object -First 1`, which avoids the internal
   short-circuit mechanism entirely; `Select-Object -Unique` (no `-First`) is unaffected
@@ -541,7 +551,7 @@ registration. Existing file-target tests pass with only necessary selector migra
   example `UseIsNotOperator`) to qualified IDs (`Nitpick/UseIsNotOperator`,
   `Local/<Name>` for scriptblock registrations with no explicit namespace).
 - The full Nitpick suite passes on both PowerShell 7 and Windows PowerShell 5.1 with no
-  regressions (337 passed / 335 passed respectively, only the 3 Phase 5 contexts
+  regressions (341 passed / 339 passed respectively, only the 3 Phase 5 contexts
   remaining appropriately skipped).
 
 ## Phase 5: Findings, Corrections, and External Compatibility

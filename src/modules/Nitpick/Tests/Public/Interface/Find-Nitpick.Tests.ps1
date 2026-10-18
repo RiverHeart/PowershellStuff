@@ -49,6 +49,12 @@ Describe 'Find-Nitpick' {
         $Rules.Id | Should -Contain 'Nitpick/UseIsNotOperator'
     }
 
+    It 'acquires nothing when IncludeDefaults is explicitly suppressed with no Module' {
+        $Rules = @(Find-Nitpick -IncludeDefaults:$false)
+
+        $Rules | Should -HaveCount 0
+    }
+
     It 'does not discover an unrelated loaded module by default' {
         $Rules = @(Find-Nitpick)
 
@@ -77,13 +83,19 @@ Describe 'Find-Nitpick' {
     }
 
     It 'filters rules by wildcard qualified ID' {
-        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules -IncludeRule 'NitpickDiscoveryRules/*Valid*')
+        $Rules = @(Find-Nitpick `
+            -Module NitpickDiscoveryRules `
+            -IncludeRule 'NitpickDiscoveryRules/*Valid*'
+        )
 
         $Rules.Count | Should -Be 2
     }
 
     It 'excludes rules by qualified ID' {
-        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules -ExcludeRule 'NitpickDiscoveryRules/*')
+        $Rules = @(Find-Nitpick `
+            -Module NitpickDiscoveryRules `
+            -ExcludeRule 'NitpickDiscoveryRules/*'
+        )
 
         $Rules.Count | Should -Be 0
     }
@@ -97,6 +109,13 @@ Describe 'Find-Nitpick' {
         $Errors | Should -HaveCount 0
     }
 
+    It 'replaces the built-in default with a single explicit module entry' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules)
+
+        @($Rules | Where-Object Namespace -eq Nitpick) | Should -HaveCount 0
+        @($Rules | Where-Object Namespace -eq NitpickDiscoveryRules) | Should -HaveCount 2
+    }
+
     It 'accepts multiple module entries additively' {
         $Rules = @(Find-Nitpick -Module Nitpick, NitpickDiscoveryRules)
 
@@ -104,10 +123,21 @@ Describe 'Find-Nitpick' {
         @($Rules | Where-Object Namespace -eq NitpickDiscoveryRules) | Should -HaveCount 2
     }
 
+    It 'acquires the built-in package alongside an explicit module when IncludeDefaults is specified' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules -IncludeDefaults)
+
+        @($Rules | Where-Object Namespace -eq Nitpick) | Should -Not -BeNullOrEmpty
+        @($Rules | Where-Object Namespace -eq NitpickDiscoveryRules) | Should -HaveCount 2
+    }
+
     It 'writes a non-terminating error and continues past an unresolvable module' {
         $Errors = @()
-        $Rules = @(Find-Nitpick -Module 'NitpickDiscoveryRules', 'MissingModule' `
-            -ErrorAction SilentlyContinue -ErrorVariable Errors)
+        $Rules = @(
+            Find-Nitpick `
+            -Module 'NitpickDiscoveryRules', 'MissingModule' `
+            -ErrorAction SilentlyContinue `
+            -ErrorVariable Errors
+        )
 
         $Rules.Count | Should -Be 2
         $Errors | Should -Not -BeNullOrEmpty
