@@ -259,116 +259,17 @@ function Start-Nitpicking {
                 }
             }
 
-            $FinalFindings = $TargetFindings.ToArray()
-            $CorrectionPreview = $null
-            if ($Fix) {
-                $ResolveParameters = @{
-                    Document = $Document
-                    Finding = $TargetFindings.ToArray()
-                    Rule = $ApplicableRules.ToArray()
-                }
-                if ($Ast.Extent.File) {
-                    $ResolveParameters.Path = $Ast.Extent.File
-                }
+            $CorrectionResult = Resolve-NitpickTargetCorrection `
+                -Fix:$Fix `
+                -Preview:$Preview `
+                -Document $Document `
+                -Finding $TargetFindings.ToArray() `
+                -Rule $ApplicableRules.ToArray() `
+                -Ast $Ast `
+                -Summary $Summary
 
-                $CorrectionPreview = Resolve-NitpickCorrection @ResolveParameters
-                if (-not $CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
-                }
-                if ($CorrectionPreview.Corrections.Accepted.Count -gt 0) {
-                    if (-not $Document.IsFileBacked) {
-                        $CorrectionPreview.WriteStatus = 'InMemory'
-                    } elseif (-not $Preview) {
-                        if ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
-                            $WriteResult = Save-AstDocument `
-                                -Document $Document `
-                                -Confirm:$false `
-                                -WhatIf:$false
-                            $CorrectionPreview.WriteResult = $WriteResult
-                            $CorrectionPreview.ErrorRecord = $WriteResult.ErrorRecord
-                            $CorrectionPreview.WriteStatus = $WriteResult.WriteStatus
-                            $CorrectionPreview.WasWritten = $WriteResult.WasWritten
-                            if ($WriteResult.WasWritten) {
-                                $CorrectionPreview.Corrections.Fixed = $CorrectionPreview.Corrections.Accepted
-                            } else {
-                                $CorrectionPreview.Corrections.Skipped = @($CorrectionPreview.Corrections.Skipped) + @(
-                                    foreach ($Correction in $CorrectionPreview.Corrections.Accepted) {
-                                        [pscustomobject]@{
-                                            Correction = $Correction
-                                            Reason = "Commit failed ($($WriteResult.WriteStatus)): $($WriteResult.ErrorRecord.Exception.Message)"
-                                        }
-                                    }
-                                )
-                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
-                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
-                                $CorrectionPreview.RenderedText = $Document.OriginalText
-                                $CorrectionPreview.WasReanalyzed = $false
-                            }
-                        } else {
-                            $CorrectionPreview.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
-                            if (-not $WhatIfPreference) {
-                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
-                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
-                                $CorrectionPreview.RenderedText = $Document.OriginalText
-                                $CorrectionPreview.WasReanalyzed = $false
-                            }
-                        }
-                    }
-                }
-                $FinalFindings = if ($CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.Findings.Final
-                } else {
-                    $TargetFindings.ToArray()
-                }
-                $SkippedEdits = @($CorrectionPreview.Corrections.Skipped.Correction)
-                $ConflictingEdits = @(
-                    $CorrectionPreview.Corrections.Conflicts.ExistingCorrection
-                    $CorrectionPreview.Corrections.Conflicts.IncomingCorrection
-                )
-                $FixedFindings = @($TargetFindings | Where-Object {
-                    $Committed = @($_.Corrections | Where-Object {
-                        $_ -in $CorrectionPreview.Corrections.Fixed
-                    })
-                    $Committed.Count -gt 0
-                })
-                $SkippedFindings = @($TargetFindings | Where-Object {
-                    @($_.Corrections | Where-Object { $_ -in $SkippedEdits }).Count -gt 0
-                })
-                $ConflictedFindings = @($TargetFindings | Where-Object {
-                    @($_.Corrections | Where-Object { $_ -in $ConflictingEdits }).Count -gt 0
-                })
-                $FailedValidationFindings = if ($CorrectionPreview.WriteStatus -eq 'FailedValidation') {
-                    $TargetFindings.ToArray()
-                } else {
-                    @()
-                }
-                $CorrectionPreview.Findings.Fixed = $FixedFindings
-                $CorrectionPreview.Findings.Skipped = $SkippedFindings
-                $CorrectionPreview.Findings.Conflicted = $ConflictedFindings
-                $CorrectionPreview.Findings.FailedValidation = @($FailedValidationFindings)
-                $Summary.FixedFindingCount += $FixedFindings.Count
-                $Summary.SkippedCorrectionCount += $CorrectionPreview.Corrections.Skipped.Count
-                if ($CorrectionPreview.Corrections.Conflicts.Count -gt 0) {
-                    $Summary.ConflictedTargetCount++
-                }
-                if ($CorrectionPreview.WriteStatus -in 'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
-                    $Summary.FailedTargetCount++
-                }
-
-                Write-Verbose (
-                    "Correction preview for '{0}': {1} accepted, {2} skipped." -f
-                    $CorrectionPreview.Path,
-                    $CorrectionPreview.Corrections.Accepted.Count,
-                    $CorrectionPreview.Corrections.Skipped.Count
-                )
-                foreach ($SkippedCorrection in $CorrectionPreview.Corrections.Skipped) {
-                    Write-Verbose (
-                        "Skipped correction from '{0}': {1}" -f
-                        $SkippedCorrection.Correction.RuleName,
-                        $SkippedCorrection.Reason
-                    )
-                }
-            }
+            $CorrectionPreview = $CorrectionResult.CorrectionPreview
+            $FinalFindings = $CorrectionResult.FinalFindings
 
             foreach ($Finding in $FinalFindings) {
                 $Summary.FindingCount++
