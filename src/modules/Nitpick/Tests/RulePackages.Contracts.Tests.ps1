@@ -484,7 +484,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
     }
 
-    Context 'Phase 5: native attribution and interoperability (pending implementation)' -Skip {
+    Context 'Phase 5: coordinator-owned identity (pending implementation)' -Skip {
         It 'attributes legacy producer names to the executing qualified rule' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Results = @(Start-Nitpicking -Script {} -Module $Package.ManifestPath `
@@ -510,19 +510,6 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Ids[0] | Should -Be 'Nitpick/UseIsNotOperator'
             $Preview.WasReanalyzed | Should -BeTrue
             $Preview.Findings.Final | Should -HaveCount 0
-        }
-
-        It 'keeps local suppression matching despite qualified native selection' {
-            $Source = @'
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('UseIsNotOperator', '')]
-param()
--not ($Value -is [int])
-'@
-            $Results = @(Start-Nitpicking -Script $Source `
-                -IncludeRule 'Nitpick/UseIsNotOperator' -Output Object)
-            $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
-            $Summary.RuleCount | Should -Be 1
-            $Summary.FindingCount | Should -Be 0
         }
     }
 }

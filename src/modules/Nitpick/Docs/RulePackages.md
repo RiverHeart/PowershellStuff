@@ -98,13 +98,15 @@ The callable retains its implementing module instance. Acquisition must also ret
 the declaring manifest/source location internally for conflict diagnostics; that
 provenance does not require importing the parent runtime.
 
-Native findings and corrections gain `RuleId` as authoritative execution attribution.
-Existing `RuleName` remains the explicit local/external name, and `RuleSuppressionID`
-keeps its existing meaning. This avoids repurposing a legacy property or guessing an
-external name by parsing a qualified string. Native displays, grouping, selection,
-and conflict attribution use `RuleId`; `ToDiagnosticRecord()` uses `RuleName`.
-Producer-provided identities are validated or attributed by the coordinator, never
-allowed to impersonate a different executing descriptor.
+Native findings and corrections gain `RuleId` as authoritative execution attribution,
+computed from the executing `NitpickRule`'s `Namespace`/`Name`. `RuleName` and
+`RuleSuppressionID` carry that same coordinator-assigned local `Name` value; a rule's
+own callable body never supplies or overrides any of the three. Native displays,
+grouping, selection, and conflict attribution use the qualified `RuleId`;
+`ToDiagnosticRecord()` emits `RuleName` as the local name. There is no separate
+producer-supplied identity to validate: a rename of a rule's backing command or
+registration changes its finding identity immediately, with no compatibility alias
+(see Deferred Decisions).
 
 ## Intended Public API
 
@@ -551,36 +553,46 @@ registration. Existing file-target tests pass with only necessary selector migra
   example `UseIsNotOperator`) to qualified IDs (`Nitpick/UseIsNotOperator`,
   `Local/<Name>` for scriptblock registrations with no explicit namespace).
 - The full Nitpick suite passes on both PowerShell 7 and Windows PowerShell 5.1 with no
-  regressions (341 passed / 339 passed respectively, only the 3 Phase 5 contexts
+  regressions (352 passed / 350 passed respectively, only the 2 Phase 5 contexts
   remaining appropriately skipped).
 
-## Phase 5: Findings, Corrections, and External Compatibility
+## Phase 5: Findings, Corrections, and Coordinator-Owned Identity
 
 ### Objective
 
-Make qualified identity observable end-to-end without breaking existing external names.
+Make qualified identity observable end-to-end, with the coordinator as the sole source of a
+rule's `RuleId`, `RuleName`, and `RuleSuppressionID` on every native finding and correction.
 
 ### Work
 
 - Carry executing-rule identity through candidate/final findings, correction metadata,
   conflicts, grouped results, and text/object output.
-- Update suppression and external conversion to consume explicit local identity.
-- Apply attribution consistently to native findings and imported diagnostics; do not
-  silently accept a foreign producer ID as the executing rule's identity.
+- Stamp `RuleId`, `RuleName`, and `RuleSuppressionID` from the executing `NitpickRule`'s
+  `Namespace`/`Name` on every native finding and correction; a rule's own callable body
+  never supplies or overrides any of the three (see [CONTEXT.md](../CONTEXT.md): Local Name).
+  **Short-term shape, deliberately cheap to reverse**: `New-NitpickFinding`/
+  `New-NitpickCorrection` keep their existing mandatory `-RuleName`/`-RuleSuppressionID`
+  parameters unchanged (still meaningful for standalone/direct invocation outside Nitpick);
+  the coordinator unconditionally overwrites both properties, plus stamps `RuleId`, on
+  every finding and nested correction immediately after `NitpickRule.Invoke()` returns.
+  Revisit whether these parameters should be removed from the producer-facing signature
+  entirely once the standalone-invocation story is reconsidered.
+- Change `ConvertTo-NitpickText`'s rightmost column from `RuleName` to `RuleId`; two
+  findings sharing a local name from different namespaces (already legal since Phase 4)
+  must remain visually distinguishable in text output, which bare `RuleName` cannot do.
 - Audit default formatting and all callers that formerly matched `RuleName` or `Name`.
 
 ### Tests
 
 - Two packages emit the same local name and remain distinguishable in native output.
 - Preview, fix, and reanalysis retain the same qualified ID.
-- PSScriptAnalyzer receives unchanged local diagnostic names and suppression IDs.
-- Existing local suppressions still apply; qualified selectors do not become suppression aliases.
 - Ungrouped suggestions, coordinated native fixes, and intentional cross-rule groups remain intact.
 
 ### Exit Criteria
 
-Native identity is complete across observable surfaces and focused interoperability
-and autocorrection regression tests pass.
+Native identity is complete across observable surfaces and focused autocorrection regression
+tests pass. See [ADR-0001](adr/0001-defer-scriptanalyzer-adapter.md) for why PSScriptAnalyzer
+interoperability and suppression-semantics tests are explicitly out of scope for this phase.
 
 ## Phase 6: WPF Package and Documentation Migration
 
@@ -647,7 +659,10 @@ qualified registry or changing selectors before their consumers are ready.
 ## Deferred Decisions
 
 - Version-pinned named module specifications beyond explicit paths.
-- Qualified suppression syntax and a deliberate migration of suppression semantics.
+- Qualified suppression syntax and a deliberate migration of suppression semantics, including
+  any rename-compatibility/legacy-alias mechanism for a rule's Local Name.
 - Configurable package namespaces, aliases, and installed-package auto-discovery.
-- Typed AST rule declarations and an external analyzer adapter.
+- Typed AST rule declarations and an external analyzer adapter; see
+  [ADR-0001](adr/0001-defer-scriptanalyzer-adapter.md) for why direct PSScriptAnalyzer
+  `-CustomRulePath` compatibility is de-emphasized rather than extended alongside Phase 5.
 - Rule acquisition caching and reload policy, only after profiling and lifecycle tests.
