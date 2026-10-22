@@ -6,6 +6,10 @@
       "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
     },
     {
+      "Name": "MarkdownExtractor",
+      "ConfigPath": ".github/skills/markdown-extractor/tests/pester.json"
+    },
+    {
       "Name": "WPF",
       "ConfigPath": "src/modules/WPF/pester.json"
     },
