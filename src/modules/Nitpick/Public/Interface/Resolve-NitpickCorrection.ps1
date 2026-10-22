@@ -11,9 +11,9 @@ using namespace System.Collections.Generic
     target-wide; producers should include their rule identity and occurrence in IDs
     unless they intentionally coordinate across findings or rules. If the
     selected batch is stale or conflicting, AstEditor rejects it without queueing any
-    member. If a candidate introduces parse errors, RenderedText remains the original
-    source and CandidateText contains the rejected output for diagnostics. The result
-    includes the edit diff and final findings when rules are supplied.
+    member. Returns a stable proposal containing candidate text, validation diagnostics,
+    and candidate findings when rules are supplied. Application never changes these
+    facts; a proposal does not claim that edits were written.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -34,7 +34,7 @@ using namespace System.Collections.Generic
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
-    $Result.RenderedText
+    $Result.CandidateText
 
     Previews all independent safe corrections attached to the findings. Every correction
     without a ChangeSetId is evaluated independently, and all accepted corrections are
@@ -63,18 +63,18 @@ using namespace System.Collections.Generic
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
-    $Result.Corrections.Conflicts
-    $Result.RenderedText -eq $Source
+    $Result.Conflicts
+    $Result.CandidateText -eq $Source
 
     Inspects conflicts when independent change sets overlap. Under the target-level conflict
-    policy, an overlap rejects the complete preview batch and leaves RenderedText unchanged.
+    policy, an overlap rejects the complete preview batch and leaves candidate text unchanged.
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrection `
         -Script $Source `
         -Finding $Finding `
         -Rule $SelectedRules
-    $Result.Findings.Final
+    $Result.CandidateFindings
 
     Passes the rules that produced the original findings when the preview must verify that
     corrected findings disappear and report findings that remain after rendering. Omit Rule
@@ -82,7 +82,7 @@ using namespace System.Collections.Generic
 #>
 function Resolve-NitpickCorrection {
     [CmdletBinding(DefaultParameterSetName = 'Script')]
-    [OutputType([pscustomobject])]
+    [OutputType('Nitpick.CorrectionProposal')]
     param (
         [Parameter(Mandatory, ParameterSetName = 'Script')]
         [AllowEmptyString()]
@@ -240,7 +240,6 @@ function Resolve-NitpickCorrection {
     # Render and parse the selected batch without changing the source file.
     $Resolution = Resolve-AstDocument -Document $Document -PassThruText
     $CandidateText = $Resolution.RenderedText
-    $RenderedText = $CandidateText
 
     if ($AcceptedCorrections.Count -gt 0 -and $Resolution.ParseErrorCount -gt 0) {
         foreach ($Correction in $AcceptedCorrections) {
@@ -251,7 +250,6 @@ function Resolve-NitpickCorrection {
         }
 
         $AcceptedCorrections.Clear()
-        $RenderedText = $Script
     }
 
     # MARK: FINAL REANALYSIS
@@ -262,13 +260,13 @@ function Resolve-NitpickCorrection {
             $Tokens = $null
             $ParseErrors = $null
             [Parser]::ParseInput(
-                $RenderedText,
+                $CandidateText,
                 $Path,
                 [ref] $Tokens,
                 [ref] $ParseErrors
             )
         } else {
-            (New-AstDocument -InputObject $RenderedText).Ast
+            (New-AstDocument -InputObject $CandidateText).Ast
         }
 
         foreach ($SelectedRule in $Rule) {
@@ -280,40 +278,31 @@ function Resolve-NitpickCorrection {
         $WasReanalyzed = $true
     }
 
-    $ResultParameters = @{
+    [pscustomobject]@{
+        PSTypeName = 'Nitpick.CorrectionProposal'
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint
+        OriginalText = $Script
+        OriginalFindings = @($Finding)
         WasReanalyzed = $WasReanalyzed
 
-        WriteStatus = if ($Resolution.ParseErrorCount -gt 0) {
+        Status = if ($Resolution.ParseErrorCount -gt 0) {
             'FailedValidation'
         } elseif ($SelectedCorrections.Count -gt 0 -and $AcceptedCorrections.Count -eq 0) {
             'Rejected'
         } elseif ($AcceptedCorrections.Count -eq 0) {
             'NoChanges'
         } else {
-            'Preview'
+            'Ready'
         }
 
-        Findings = @{
-            Original = $Finding
-            Final = $FinalFindings.ToArray()
-            Candidate = $FinalFindings.ToArray()
-            Remaining = @(if ($WasReanalyzed) { $FinalFindings.ToArray() } else { $Finding })
-        }
-
-        Corrections = @{
-            Accepted = $AcceptedCorrections.ToArray()
-            Skipped = $SkippedCorrections.ToArray()
-            Conflicts = $Conflicts.ToArray()
-        }
-
-        ParseErrors = $Resolution.ParseErrors
+        CandidateFindings = $FinalFindings.ToArray()
+        AcceptedCorrections = $AcceptedCorrections.ToArray()
+        SkippedCorrections = $SkippedCorrections.ToArray()
+        Conflicts = $Conflicts.ToArray()
+        ParseErrors = @($Resolution.ParseErrors)
         CandidateText = $CandidateText
-        RenderedText = $RenderedText
         Diff = Show-AstDiff -Document $Document
     }
-
-    New-NitpickCorrectionResult @ResultParameters
 }

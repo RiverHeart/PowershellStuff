@@ -46,9 +46,11 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
             @{ Label = 'two independent occurrences'; Source = '-not ($Value -is [int]); -not ($Other -is [string])'; Expected = ' ($Value -isnot [int]);  ($Other -isnot [string])'; Count = 2 }
             @{ Label = 'nested matching expressions'; Source = '-not (-not ($Value -is [int]) -is [bool])'; Expected = ' ( ($Value -isnot [int]) -isnot [bool])'; Count = 2 }
         )
+
         $DiagnosticOnlyCases = @(
             @{ Source = '-not ($Value -is [int] > $Path)' }
         )
+
         if ($PSVersionTable.PSVersion.Major -ge 7) {
             $DiagnosticOnlyCases += @{ Source = '-not ($Value -is [int] &)' }
         }
@@ -57,23 +59,29 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
     It 'can render two precise detached token edits per match: <Label>' -ForEach $Cases {
         $Document = New-AstDocument -InputObject $Source
         $Document.ParseErrors | Should -BeNullOrEmpty
+
         $Matches = @(Get-IsNotContractMatch -Ast $Document.Ast)
         $Matches | Should -HaveCount $Count
+
         $Edits = @(
             foreach ($Match in $Matches) {
                 $Binary = $Match.Child.Pipeline.PipelineElements[0].Expression
+
                 $Negation = @($Document.Tokens | Where-Object {
                     $_.Kind -eq [TokenKind]::Not -and
                         $_.Extent.StartOffset -eq $Match.Extent.StartOffset -and
                         $_.Extent.EndOffset -le $Match.Child.Extent.StartOffset
                 })
+
                 $Operator = @($Document.Tokens | Where-Object {
                     $_.Kind -eq [TokenKind]::Is -and
                         $_.Extent.StartOffset -ge $Binary.Left.Extent.EndOffset -and
                         $_.Extent.EndOffset -le $Binary.Right.Extent.StartOffset
                 })
+
                 $Negation | Should -HaveCount 1
                 $Operator | Should -HaveCount 1
+
                 New-AstTextEdit -Extent $Negation[0].Extent -ReplacementText '' -Reason 'Remove unary negation'
                 New-AstTextEdit -Extent $Operator[0].Extent -ReplacementText '-isnot' -Reason 'Negate the type test'
             }
@@ -81,18 +89,21 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
 
         $Edits | Should -HaveCount ($Count * 2)
         $Document.Edits.Count | Should -Be 0
+
         foreach ($Edit in $Edits) {
             $Edit.ExpectedText | Should -BeExactly $Source.Substring(
                 $Edit.StartOffset,
                 $Edit.EndOffset - $Edit.StartOffset
             )
         }
-        $null = Add-AstTextEdit -Document $Document -TextEdit $Edits
-        $Resolution = Resolve-AstDocument -Document $Document -PassThruText
 
+        $null = Add-AstTextEdit -Document $Document -TextEdit $Edits
+
+        $Resolution = Resolve-AstDocument -Document $Document -PassThruText
         $Resolution.ParseErrors | Should -BeNullOrEmpty
         $Resolution.RenderedText | Should -BeExactly $Expected
         $RenderedDocument = New-AstDocument -InputObject $Resolution.RenderedText
+
         @(Get-IsNotContractMatch -Ast $RenderedDocument.Ast) | Should -HaveCount 0
     }
 
@@ -117,12 +128,12 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         } else {
             $Document.ParseErrors | Should -BeNullOrEmpty
         }
+
         @(Get-IsNotContractMatch -Ast $Document.Ast) | Should -HaveCount 0
     }
 
     It 'does not plan a Safe fix for value-changing pipeline execution: <Source>' -ForEach $DiagnosticOnlyCases {
         $Document = New-AstDocument -InputObject $Source
-
         $Document.ParseErrors | Should -BeNullOrEmpty
         @(Get-IsNotContractMatch -Ast $Document.Ast) | Should -HaveCount 0
     }
@@ -134,8 +145,8 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         @{ Label = 'array'; Value = @(1, 2) }
     ) {
         $Original = -not ($Value -is [int])
-        $Corrected = ($Value -isnot [int])
 
+        $Corrected = ($Value -isnot [int])
         $Corrected | Should -BeExactly $Original
         $Corrected | Should -BeOfType ([bool])
     }
@@ -144,18 +155,21 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Document = New-AstDocument -InputObject $Source
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
         $Findings = @($Rule.Invoke($Document.Ast))
-
         $Findings | Should -HaveCount $Count
+
         $Document.Edits.Count | Should -Be 0
+
         foreach ($Finding in $Findings) {
             $Finding.GetType().Name | Should -Be 'NitpickFinding'
             $Finding.Corrections | Should -HaveCount 2
-            @($Finding.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount 1
             $Finding.Corrections[0].ChangeSetId | Should -BeExactly (
                 'UseIsNotOperator:{0}:{1}' -f
                     $Finding.ViolationExtent.StartOffset,
                     $Finding.ViolationExtent.EndOffset
             )
+
+           @($Finding.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount 1
+
             foreach ($Correction in $Finding.Corrections) {
                 $Correction.Applicability | Should -Be 'Safe'
                 $Correction.RuleName | Should -Be 'UseIsNotOperator'
@@ -166,26 +180,28 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
                     $Correction.EndOffset - $Correction.StartOffset
                 )
             }
+
             $Finding.Corrections[0].StartOffset | Should -Be $Finding.ViolationExtent.StartOffset
             $Finding.Corrections[0].ExpectedText | Should -Be '-not'
             $Finding.Corrections[0].ReplacementText | Should -BeExactly ''
             $Finding.Corrections[1].ExpectedText | Should -Be '-is'
             $Finding.Corrections[1].ReplacementText | Should -BeExactly '-isnot'
         }
+
         @($Findings.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount $Count
         $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
 
-        $Result.RenderedText | Should -BeExactly $Expected
-        $Result.Corrections.Accepted | Should -HaveCount ($Count * 2)
-        $Result.Corrections.Skipped | Should -HaveCount 0
-        $Result.Findings.Final | Should -HaveCount 0
+        $Result.CandidateText | Should -BeExactly $Expected
+        $Result.AcceptedCorrections | Should -HaveCount ($Count * 2)
+        $Result.SkippedCorrections | Should -HaveCount 0
+        $Result.CandidateFindings | Should -HaveCount 0
     }
 
     It 'retains a native diagnostic without corrections for <Source>' -ForEach $DiagnosticOnlyCases {
         $Document = New-AstDocument -InputObject $Source
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
-        $Findings = @($Rule.Invoke($Document.Ast))
 
+        $Findings = @($Rule.Invoke($Document.Ast))
         $Findings | Should -HaveCount 1
         $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
         $Findings[0].RuleName | Should -Be 'UseIsNotOperator'
@@ -202,12 +218,14 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
 
             $Node -is [FunctionDefinitionAst]
         }, $false)
-        $Rule = New-Nitpick -Callable Test-UseIsNotOperator
-        $Findings = @($Rule.Invoke($Function.Body))
 
+        $Rule = New-Nitpick -Callable Test-UseIsNotOperator
+
+        $Findings = @($Rule.Invoke($Function.Body))
         $Findings | Should -HaveCount 1
         $Findings[0].ViolationExtent.File | Should -BeExactly $Document.Path
         $Findings[0].Location | Should -BeLike "$($Document.Path):2:*"
+
         foreach ($Correction in $Findings[0].Corrections) {
             $Correction.FilePathOrContext | Should -BeExactly $Document.Path
             $Correction.StartLineNumber | Should -Be 2
@@ -216,11 +234,12 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
                 $Correction.EndOffset - $Correction.StartOffset
             )
         }
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings
 
-        $Result.RenderedText | Should -BeExactly (
+        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings
+        $Result.CandidateText | Should -BeExactly (
             "# prefix`nfunction Test-Value {  ('literal -is' -isnot [string]) }"
         )
+
         [System.IO.File]::ReadAllText($Path) | Should -BeExactly $Source
     }
 
@@ -231,13 +250,11 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
     ) {
         $Document = New-AstDocument -InputObject $Source
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
-
         @($Rule.Invoke($Document.Ast)) | Should -HaveCount 0
     }
 
     It 'returns a direct ScriptAnalyzer diagnostic without suggestions' {
         $Findings = @(Test-UseIsNotOperator -ScriptBlockAst { -not ($Value -is [int]) }.Ast)
-
         $Findings | Should -HaveCount 1
         $Findings[0].GetType().FullName |
             Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
@@ -263,11 +280,11 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Document.ParseErrors | Should -BeNullOrEmpty
         $Findings | Should -HaveCount 1
         $Findings[0].Corrections | Should -HaveCount 2
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
 
-        $Result.RenderedText | Should -BeExactly $Expected
-        $Result.Corrections.Accepted | Should -HaveCount 2
-        $Result.Findings.Final | Should -HaveCount 0
+        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result.CandidateText | Should -BeExactly $Expected
+        $Result.AcceptedCorrections | Should -HaveCount 2
+        $Result.CandidateFindings | Should -HaveCount 0
     }
 
     It 'retains diagnostics but exposes no partial ScriptAnalyzer fix' {
@@ -280,7 +297,9 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Results | Should -HaveCount 1
         $Results[0].RuleName | Should -Be 'UseIsNotOperator'
         @($Results[0].SuggestedCorrections) | Should -HaveCount 0
+
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
+
         $Finding = @($Rule.Invoke({ -not ($Value -is [int]) }.Ast))[0]
         @($Finding.ToDiagnosticRecord().SuggestedCorrections) | Should -HaveCount 0
     }

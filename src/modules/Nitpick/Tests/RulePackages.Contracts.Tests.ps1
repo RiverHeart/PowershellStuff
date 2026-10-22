@@ -15,10 +15,12 @@ BeforeAll {
         $ParentPath = Join-Path $Directory.FullName ($Name + '.psm1')
         $RulesPath = Join-Path $Directory.FullName ($Name + 'Rules.psm1')
         $ManifestPath = Join-Path $Directory.FullName ($Name + '.psd1')
+
         Set-Content -LiteralPath $ParentPath -Value @'
 function Test-ParentRule { param ($ScriptBlockAst) }
 Export-ModuleMember -Function Test-ParentRule
 '@
+
         Set-Content -LiteralPath $RulesPath -Value @'
 function Get-ContractMessage { 'Declared rule executed.' }
 function Test-ContractRule {
@@ -35,10 +37,12 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
         New-ModuleManifest -Path $ManifestPath -RootModule ($Name + '.psm1') `
             -ModuleVersion '1.0.0' -FunctionsToExport Test-ParentRule `
             -PrivateData @{ Linting = @{} }
+
         Set-ContractManifestLinting -ManifestPath $ManifestPath -Linting @{
             Rules = @('Test-ParentRule')
             RuleModules = @($Name + 'Rules.psm1')
         }
+
         [pscustomobject] @{
             Name = $Name
             Directory = $Directory.FullName
@@ -67,6 +71,7 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
             $QuotedValues = @($Linting[$Key]) | ForEach-Object { "'$_'" }
             "        $Key = @($($QuotedValues -join ', '))"
         }
+
         $LintingLiteral = if ($EntryLines.Count -gt 0) {
             "@{`n$($EntryLines -join "`n")`n    }"
         } else {
@@ -112,10 +117,14 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'preserves explicitly registered metadata for the same discovered callable' {
             $Rule = Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) `
                 -Category Quality -Source Personal -PassThru -ErrorAction Stop
+
             $null = Start-Nitpicking -Script {} -Output Object -ErrorAction Stop
+
             $Remaining = @(Get-Nitpick)
             $Remaining | Should -HaveCount 1
+
             [object]::ReferenceEquals($Remaining[0], $Rule) | Should -BeTrue
+
             $Remaining[0].Category | Should -Be Quality
             $Remaining[0].Source | Should -Be Personal
         }
@@ -127,8 +136,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
                 Start-Nitpicking -Path $ContractRoot -IncludeRule MissingContractRule `
                     -Fix -Output Object -ErrorAction Continue
             } | Should -Throw '*No Nitpick rules match*'
+
             Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
             Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+
             @(Get-Nitpick) | Should -HaveCount 0
         }
 
@@ -137,6 +148,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
                 -Message 'Contract finding.' -Severity Information -ViolationExtent {}.Ast.Extent `
                 -ScriptPath '<ScriptBlock>' -Explanation 'External identity contract.' `
                 -OutputAs NitpickFinding
+
             $Diagnostic = $Finding.ToDiagnosticRecord()
             $Diagnostic.RuleName | Should -Be ContractRule
             $Diagnostic.RuleSuppressionID | Should -Be ContractSuppression
@@ -149,10 +161,13 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
                 Import-Module -Name $Path -Scope Local -PassThru -ErrorAction Stop
                 Export-ModuleMember -Function @() -Alias @()
             }
+
             $Rule = New-Nitpick -Callable $Module.ExportedCommands['Test-ContractRule']
+
             $Findings = @($Rule.Invoke({}.Ast))
             $Findings | Should -HaveCount 1
             $Findings[0].Message | Should -Be 'Declared rule executed.'
+
             @(Get-Command Test-ContractRule -ErrorAction SilentlyContinue) | Should -HaveCount 0
             @(Get-Nitpick) | Should -HaveCount 0
         }
@@ -162,11 +177,13 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Source = '-not ($Value -is [int])'
             Set-Content -LiteralPath $Path -Value $Source -NoNewline
             $Results = @(Start-Nitpicking -Path $Path -Fix -Preview -Output Object -ErrorAction Stop)
+
             $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
-            $Preview.RenderedText | Should -Be ' ($Value -isnot [int])'
-            $Preview.Corrections.Accepted | Should -HaveCount 2
-            @($Preview.Corrections.Accepted.ChangeSetId | Sort-Object -Unique) | Should -HaveCount 1
-            $Preview.WasWritten | Should -BeFalse
+            $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
+            $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
+            $Preview.Application.CommittedCorrections | Should -HaveCount 0
+            @($Preview.Proposal.AcceptedCorrections.ChangeSetId | Sort-Object -Unique) | Should -HaveCount 1
+
             [System.IO.File]::ReadAllText($Path) | Should -Be $Source
         }
     }
@@ -181,8 +198,12 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
 
         It 'allows an explicit registration namespace without changing Source' {
-            $Rule = New-Nitpick -Namespace ProjectChecks -Name AvoidFoo -Source Personal `
+            $Rule = New-Nitpick `
+                -Namespace ProjectChecks `
+                -Name AvoidFoo `
+                -Source Personal `
                 -Callable { param ($ScriptBlockAst) }
+
             $Rule.Id | Should -Be 'ProjectChecks/AvoidFoo'
             $Rule.Source | Should -Be Personal
         }
@@ -201,9 +222,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
                 }
                 Export-ModuleMember -Function Test-AvoidBlockingUI
             }
-            $Callable = $Module.ExportedCommands['Test-AvoidBlockingUI']
-            $Rule = New-Nitpick -Namespace WPF -Callable $Callable
 
+            $Callable = $Module.ExportedCommands['Test-AvoidBlockingUI']
+
+            $Rule = New-Nitpick -Namespace WPF -Callable $Callable
             $Rule.Id | Should -Be 'WPF/AvoidBlockingUI'
             $Rule.Callable.ModuleName | Should -Be WPFRules
         }
@@ -225,8 +247,8 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
                 }
                 Export-ModuleMember -Function Test-IdentityMetadata
             }
-            $Rule = New-Nitpick -Callable $Module.ExportedCommands['Test-IdentityMetadata']
 
+            $Rule = New-Nitpick -Callable $Module.ExportedCommands['Test-IdentityMetadata']
             $Rule.Namespace | Should -Be IdentityMetadataRules
             $Rule.Id | Should -Be 'IdentityMetadataRules/IdentityMetadata'
         }
@@ -266,11 +288,18 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $SecondRoot = New-Item -Path (Join-Path $ContractRoot 'Second') -ItemType Directory
             $First = New-ContractRulePackage -Name NitpickContractPackage -Root $FirstRoot.FullName
             $Second = New-ContractRulePackage -Name NitpickContractPackage -Root $SecondRoot.FullName
-            New-ModuleManifest -Path $Second.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
-                -ModuleVersion '2.0.0' -FunctionsToExport Test-ParentRule
+
+            New-ModuleManifest `
+                -Path $Second.ManifestPath `
+                -RootModule 'NitpickContractPackage.psm1' `
+                -ModuleVersion '2.0.0' `
+                -FunctionsToExport Test-ParentRule
+
             $FirstModule = Import-Module -Name $First.ManifestPath -PassThru -ErrorAction Stop
             $SecondModule = Import-Module -Name $Second.ManifestPath -PassThru -ErrorAction Stop
+
             [object]::ReferenceEquals($FirstModule, $SecondModule) | Should -BeFalse
+
             { Find-Nitpick -Module NitpickContractPackage -ErrorAction Stop } |
                 Should -Throw '*ambiguous*'
         }
@@ -280,7 +309,9 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $SecondRoot = New-Item -Path (Join-Path $ContractRoot 'Second') -ItemType Directory
             $First = New-ContractRulePackage -Name NitpickContractPackage -Root $FirstRoot.FullName
             $Second = New-ContractRulePackage -Name NitpickContractPackage -Root $SecondRoot.FullName
+
             Import-Module -Name $First.RulesPath -ErrorAction Stop
+
             $Rules = @(Find-Nitpick -Module $Second.RulesPath)
             $Rules | Should -HaveCount 1
             $Rules[0].Callable.Module.Path | Should -Be $Second.RulesPath
@@ -303,6 +334,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             Set-Content -LiteralPath $Package.RulesPath -Value "Set-Content -LiteralPath '$Marker' -Value imported"
             New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
                 -ModuleVersion '1.0.0' -PrivateData @{ Linting = @{} }
+
             Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
                 RuleModules = @('NitpickContractPackageRules.psm1', 'Missing.psm1')
             }
@@ -319,11 +351,13 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Rules = @(Find-Nitpick -Module $Package.ManifestPath)
             $Rules | Should -HaveCount 2
+
             $Rule = $Rules | Where-Object Id -eq 'NitpickContractPackage/ContractRule'
             $Rule.Name | Should -Be ContractRule
             $Rule.Namespace | Should -Be NitpickContractPackage
             $Rule.Callable.Name | Should -Be Test-ContractRule
             $Rule.Callable.Module.Path | Should -Be $Package.RulesPath
+
             @(Get-Nitpick) | Should -HaveCount 0
         }
 
@@ -332,9 +366,11 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             Set-Content -LiteralPath $Package.ParentPath -Value 'throw "Parent must not initialize."'
             New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
                 -ModuleVersion '1.0.0' -PrivateData @{ Linting = @{} }
+
             Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
                 RuleModules = @('NitpickContractPackageRules.psm1')
             }
+
             $Rules = @(Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop)
             $Rules | Should -HaveCount 1
             $Rules[0].Id | Should -Be 'NitpickContractPackage/ContractRule'
@@ -343,9 +379,13 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
 
         It 'treats an empty Linting declaration as empty rather than fallback discovery' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
-            New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackage.psm1' `
-                -ModuleVersion '1.0.0' -FunctionsToExport Test-ParentRule `
+            New-ModuleManifest `
+                -Path $Package.ManifestPath `
+                -RootModule 'NitpickContractPackage.psm1' `
+                -ModuleVersion '1.0.0' `
+                -FunctionsToExport Test-ParentRule `
                 -PrivateData @{ Linting = @{} }
+
             Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{}
             @(Find-Nitpick -Module $Package.ManifestPath) | Should -HaveCount 0
         }
@@ -359,12 +399,17 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
 
         It 'rejects an explicitly declared invalid rule rather than ignoring it' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
-            New-ModuleManifest -Path $Package.ManifestPath -RootModule 'NitpickContractPackageRules.psm1' `
-                -ModuleVersion '1.0.0' -FunctionsToExport Test-InvalidContractRule `
+            New-ModuleManifest `
+                -Path $Package.ManifestPath `
+                -RootModule 'NitpickContractPackageRules.psm1' `
+                -ModuleVersion '1.0.0' `
+                -FunctionsToExport Test-InvalidContractRule `
                 -PrivateData @{ Linting = @{} }
+
             Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
                 Rules = @('Test-InvalidContractRule')
             }
+
             { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } |
                 Should -Throw '*Test-InvalidContractRule*'
         }
@@ -373,9 +418,11 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             New-ModuleManifest -Path $Package.ManifestPath -ModuleVersion '1.0.0' `
                 -PrivateData @{ Linting = @{} }
+
             Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
                 RuleModules = @('NitpickContractPackage.psd1')
             }
+
             { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } | Should -Throw '*cycle*'
         }
 
@@ -395,8 +442,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Summary.RuleCount | Should -Be ($BaselineSummary.RuleCount + 2)
             $Limited = @(Start-Nitpicking -Script {} -Module $Package.ManifestPath `
                 -IncludeRule 'NitpickContractPackage/*' -Output Object)
+
             $LimitedSummary = $Limited | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
             $LimitedSummary.RuleCount | Should -Be 2
+
             @(Get-Nitpick) | Should -HaveCount 0
         }
 
@@ -405,8 +454,10 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             Import-Module -Name $Package.RulesPath -ErrorAction Stop
             $Rules = @(Find-Nitpick)
             @($Rules | Where-Object Namespace -ne Nitpick) | Should -HaveCount 0
+
             New-ModuleManifest -Path $Package.ManifestPath -ModuleVersion '1.0.0' `
                 -NestedModules 'NitpickContractPackageRules.psm1' -FunctionsToExport @()
+
             @(Find-Nitpick -Module $Package.ManifestPath) | Should -HaveCount 0
         }
 
@@ -421,6 +472,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
                     -Output Object `
                     -ExcludeDefaults
             )
+
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
             $Summary.RuleCount | Should -Be 2
             $Summary.FindingCount | Should -Be 2
@@ -429,6 +481,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'uses case-insensitive qualified registry lookup and exact removal' {
             $Rule = Register-Nitpick -Name AvoidFoo -Source Personal `
                 -Callable { param ($ScriptBlockAst) } -PassThru
+
             [object]::ReferenceEquals((Get-Nitpick -Id 'local/avoidfoo'), $Rule) | Should -BeTrue
             Unregister-Nitpick -Id 'LOCAL/AVOIDFOO'
             @(Get-Nitpick) | Should -HaveCount 0
@@ -447,12 +500,15 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'rejects conflicting selected IDs before reading targets but allows their exclusion' {
             $Registered = Register-Nitpick -Namespace Nitpick -Name UseIsNotOperator -Source Personal `
                 -Callable { param ($ScriptBlockAst) } -PassThru
+
             Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be read.' }
             {
                 Start-Nitpicking -Script {} -IncludeRule 'Nitpick/UseIsNotOperator' -ErrorAction Continue
             } | Should -Throw '*Nitpick/UseIsNotOperator*'
             Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
+
             [object]::ReferenceEquals((Get-Nitpick -Id $Registered.Id), $Registered) | Should -BeTrue
+
             {
                 Start-Nitpicking -Script {} -ExcludeRule 'Nitpick/UseIsNotOperator' -Output Object
             } | Should -Throw 'Targets must not be read.'
@@ -489,11 +545,13 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Results = @(Start-Nitpicking -Script {} -Module $Package.ManifestPath `
                 -IncludeRule 'NitpickContractPackage/ContractRule' -Output Object)
+
             $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
             $Findings | Should -HaveCount 1
             $Findings[0].RuleId | Should -Be 'NitpickContractPackage/ContractRule'
             $Findings[0].RuleName | Should -Be ContractRule
             $Findings[0].RuleSuppressionID | Should -Be ContractRule
+
             $Diagnostic = $Findings[0].ToDiagnosticRecord()
             $Diagnostic.RuleName | Should -Be ContractRule
             $Diagnostic.RuleSuppressionID | Should -Be ContractRule
@@ -502,14 +560,16 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'retains qualified IDs through preview and corrected-source reanalysis' {
             $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
                 -IncludeRule 'Nitpick/UseIsNotOperator' -Fix -Preview -Output Object)
+
             $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
-            $Preview.RenderedText | Should -Be ' ($Value -isnot [int])'
-            $Preview.Corrections.Accepted | Should -HaveCount 2
-            $Ids = @($Preview.Corrections.Accepted.RuleId | Sort-Object -Unique)
+            $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
+            $Preview.Report.EffectiveFindings | Should -HaveCount 0
+            $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
+            $Preview.Proposal.WasReanalyzed | Should -BeTrue
+
+            $Ids = @($Preview.Proposal.AcceptedCorrections.RuleId | Sort-Object -Unique)
             $Ids | Should -HaveCount 1
             $Ids[0] | Should -Be 'Nitpick/UseIsNotOperator'
-            $Preview.WasReanalyzed | Should -BeTrue
-            $Preview.Findings.Final | Should -HaveCount 0
         }
     }
 }

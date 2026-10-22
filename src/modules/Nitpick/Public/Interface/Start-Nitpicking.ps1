@@ -14,8 +14,10 @@ using namespace System.Management.Automation.Language
     Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
     Ordinary lint behavior is unchanged unless Fix is specified. Fix applies safe,
     validated corrections to file-backed targets using transactional AstEditor saves.
-    In-memory inputs return rendered text without writing. PowerShell parser errors are
-    reported as Error findings. Rule selection must succeed before any targets are read.
+    In-memory inputs return candidate text without writing. Correction output separates
+    stable proposal facts, application outcomes, and effective reporting. PowerShell
+    parser errors are reported as Error findings. Rule selection must succeed before
+    any targets are read.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
@@ -54,7 +56,7 @@ using namespace System.Management.Automation.Language
 .PARAMETER Fix
     Applies safe corrections against one immutable source snapshot per file. Use Preview
     or WhatIf to inspect the transaction without modifying files. In-memory inputs return
-    rendered text in object output.
+    candidate text in object output under Report.EffectiveText.
 
 .PARAMETER Preview
     Previews safe corrections against one immutable source snapshot per target. Final
@@ -212,8 +214,7 @@ function Start-Nitpicking {
                 if ($Fix) {
                     $ReadFailure = New-NitpickCorrectionResult `
                         -Path $TargetPath `
-                        -WriteStatus FailedRead `
-                        -ErrorRecord $_
+                        -Application @{ Status = 'FailedRead'; ErrorRecord = $_ }
                     if ($Output -eq 'Object') {
                         Write-Output $ReadFailure
                     } else {
@@ -259,17 +260,32 @@ function Start-Nitpicking {
                 }
             }
 
-            $CorrectionResult = Resolve-NitpickTargetCorrection `
-                -Fix:$Fix `
-                -Preview:$Preview `
-                -Document $Document `
-                -Finding $TargetFindings.ToArray() `
-                -Rule $ApplicableRules.ToArray() `
-                -Ast $Ast `
-                -Summary $Summary
+            $CorrectionResult = $null
+            $FinalFindings = $TargetFindings.ToArray()
+            if ($Fix) {
+                $CorrectionResult = Resolve-NitpickTargetCorrection `
+                    -Preview:$Preview `
+                    -Document $Document `
+                    -Finding $TargetFindings.ToArray() `
+                    -Rule $ApplicableRules.ToArray() `
+                    -Ast $Ast
 
-            $CorrectionPreview = $CorrectionResult.CorrectionPreview
-            $FinalFindings = $CorrectionResult.FinalFindings
+                $FinalFindings = $CorrectionResult.Report.EffectiveFindings
+                $Summary.FindingsWithCommittedCorrectionsCount +=
+                    $CorrectionResult.Report.FindingsWithCommittedCorrections.Count
+
+                $Summary.SkippedCorrectionCount += $CorrectionResult.Proposal.SkippedCorrections.Count
+
+                if ($CorrectionResult.Proposal.Conflicts.Count -gt 0) {
+                    $Summary.ConflictedTargetCount++
+                }
+
+                if ($CorrectionResult.Proposal.Status -eq 'FailedValidation' -or
+                    $CorrectionResult.Application.Status -in
+                        'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
+                    $Summary.FailedTargetCount++
+                }
+            }
 
             foreach ($Finding in $FinalFindings) {
                 $Summary.FindingCount++
@@ -291,26 +307,26 @@ function Start-Nitpicking {
                 }
             }
 
-            if ($Output -eq 'Object' -and $CorrectionPreview) {
-                Write-Output $CorrectionPreview
+            if ($Output -eq 'Object' -and $CorrectionResult) {
+                Write-Output $CorrectionResult
             }
 
-            if ($Output -eq 'Text' -and $CorrectionPreview) {
-                Write-Output "Corrections ($($CorrectionPreview.WriteStatus)):`n"
-                Write-Output $CorrectionPreview.Diff
+            if ($Output -eq 'Text' -and $CorrectionResult) {
                 Write-Output (
-                    "`n{0} fixed, {1} accepted, {2} skipped; write status: {3}." -f
-                    $CorrectionPreview.Corrections.Fixed.Count,
-                    $CorrectionPreview.Corrections.Accepted.Count,
-                    $CorrectionPreview.Corrections.Skipped.Count,
-                    $CorrectionPreview.WriteStatus
+                    "Corrections (proposal: {0}; application: {1}):`n" -f
+                    $CorrectionResult.Proposal.Status, $CorrectionResult.Application.Status
+                )
+                Write-Output $CorrectionResult.Proposal.Diff
+                Write-Output (
+                    "`n{0} committed, {1} accepted, {2} skipped." -f
+                    $CorrectionResult.Application.CommittedCorrections.Count,
+                    $CorrectionResult.Proposal.AcceptedCorrections.Count,
+                    $CorrectionResult.Proposal.SkippedCorrections.Count
                 )
             }
 
-            if ($CorrectionPreview -and $CorrectionPreview.WriteResult -and
-                $CorrectionPreview.WriteResult.ErrorRecord
-            ) {
-                $PSCmdlet.WriteError($CorrectionPreview.WriteResult.ErrorRecord)
+            if ($CorrectionResult -and $CorrectionResult.Application.ErrorRecord) {
+                $PSCmdlet.WriteError($CorrectionResult.Application.ErrorRecord)
             }
 
             if ($Output -eq 'Text' -and $FinalFindings.Count -gt 0) {

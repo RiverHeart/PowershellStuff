@@ -243,7 +243,7 @@ class NitpickSummary {
     [int] $ErrorCount
     [int] $WarningCount
     [int] $InformationCount
-    [int] $FixedFindingCount
+    [int] $FindingsWithCommittedCorrectionsCount
     [int] $SkippedCorrectionCount
     [int] $ConflictedTargetCount
     [int] $FailedTargetCount

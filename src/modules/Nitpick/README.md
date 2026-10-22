@@ -15,11 +15,24 @@ Start-Nitpicking -Path .\Example.ps1 -Fix -WhatIf
 
 `-Fix` now writes file-backed `-Path` targets unless `-Preview`, `-WhatIf`, or a declined
 confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
-for rendered text, candidate/final findings, skipped corrections, conflicts, and write diagnostics.
-Only `WasWritten` and `Corrections.Fixed` indicate committed edits; accepted corrections can
-still be previews or rejected at commit. Final severity counts and `-ErrorOn` use candidate
-analysis for previews and committed analysis for successful writes. Failed/declined writes
-retain the original findings and report no fixed corrections.
+for a correction envelope with `Proposal`, `Application`, and `Report` groups.
+`Proposal` retains candidate text, reanalysis, skipped corrections, and conflicts regardless
+of application outcome. Only `Application.CommittedCorrections` describes committed edits;
+`Application.Status` records whether writing succeeded, failed, or was not requested.
+Severity counts and `-ErrorOn` use `Report.EffectiveFindings`: candidate analysis for previews
+and successful writes when available, original analysis for failed or declined writes.
+`Report.EffectiveText` contains the corresponding output text; `Report.AnalysisSource`
+identifies which analysis backs the findings, including original-finding fallback when
+reanalysis is unavailable.
+
+The result contract intentionally breaks the earlier flat schema: use
+`Proposal.AcceptedCorrections` instead of `Corrections.Accepted`,
+`Application.CommittedCorrections` instead of `Corrections.Fixed`, and
+`Report.EffectiveFindings` instead of `Findings.Final` or `Findings.Remaining`.
+`Report.FindingsWithCommittedCorrections` attributes committed edits to original findings;
+it does not claim complete resolution. The summary property is now
+`FindingsWithCommittedCorrectionsCount`, replacing `FixedFindingCount`.
+Failed writes do not turn valid accepted proposals into skipped corrections.
 
 Files retain encoding, BOM, and existing newline characters through AstEditor's transactional
 save. BOM-less input must be valid UTF-8; BOM-marked UTF-8, UTF-16, and UTF-32 are supported.

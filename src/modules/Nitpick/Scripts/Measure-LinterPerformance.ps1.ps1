@@ -181,22 +181,30 @@ try {
     $Encoding = [System.Text.UTF8Encoding]::new($true)
     [System.IO.File]::WriteAllText($FixPath, $Source, $Encoding)
     $Original = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
+
     $Preview = @(Start-Nitpicking -Path $FixPath -IncludeRule UseIsNotOperator -Fix -Preview -Output Object -NoSummary) |
         Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+
     $PreviewUnchanged = $Original -ceq [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
+
     $Applied = @(Start-Nitpicking -Path $FixPath -IncludeRule UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
         Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+
     $Second = @(Start-Nitpicking -Path $FixPath -IncludeRule UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
         Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+
     $Expected = "# fixture`r`nif ( (`$x -isnot [int])) {}`r`n"
     $ExpectedBytes = [byte[]] (@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))
     $BytesPreserved = [Convert]::ToBase64String($ExpectedBytes) -ceq
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
-    if (-not $PreviewUnchanged -or -not $Applied.WasWritten -or
-        $Second.WriteStatus -ne 'NoChanges' -or -not $BytesPreserved -or
-        $Applied.Findings.Final.Count -ne 0 -or $Applied.Findings.Fixed.Count -ne 1) {
+
+    if (-not $PreviewUnchanged -or $Applied.Application.Status -ne 'Written' -or
+        $Second.Proposal.Status -ne 'NoChanges' -or -not $BytesPreserved -or
+        $Applied.Report.EffectiveFindings.Count -ne 0 -or
+        $Applied.Report.FindingsWithCommittedCorrections.Count -ne 1) {
         throw 'Preview/apply/idempotence checks failed.'
     }
+
     [pscustomobject]@{
         PowerShell = $PSVersionTable.PSVersion.ToString()
         Edition = $PSVersionTable.PSEdition
@@ -218,12 +226,12 @@ try {
         Fix = @{
             PreviewUnchanged = $PreviewUnchanged
             BytesPreserved = $BytesPreserved
-            Applied = $Applied.WasWritten
-            AcceptedEdits = $Preview.Corrections.Accepted.Count
-            FixedFindings = $Applied.Findings.Fixed.Count
-            RemainingFindings = $Applied.Findings.Final.Count
-            SecondRun = $Second.WriteStatus
-            RenderedText = $Applied.RenderedText
+            Applied = $Applied.Application.Status -eq 'Written'
+            AcceptedEdits = $Preview.Proposal.AcceptedCorrections.Count
+            FindingsWithCommittedCorrections = $Applied.Report.FindingsWithCommittedCorrections.Count
+            RemainingFindings = $Applied.Report.EffectiveFindings.Count
+            SecondRun = $Second.Proposal.Status
+            EffectiveText = $Applied.Report.EffectiveText
         }
     } | ConvertTo-Json -Depth 6
 } finally {

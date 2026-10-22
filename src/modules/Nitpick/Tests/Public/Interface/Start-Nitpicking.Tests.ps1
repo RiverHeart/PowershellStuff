@@ -80,6 +80,17 @@ Describe 'Start-Nitpicking' {
         $Summary.FindingCount | Should -Be 1
     }
 
+    It 'does ordinary lint without invoking target correction or emitting an envelope when Fix is omitted' {
+        Mock Resolve-NitpickTargetCorrection -ModuleName Nitpick { throw 'Lint must not resolve corrections.' }
+
+        $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
+            -IncludeRule Nitpick/UseIsNotOperator -Output Object -ErrorAction Stop)
+
+        @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' }) | Should -HaveCount 1
+        @($Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }) | Should -HaveCount 0
+        Should -Invoke Resolve-NitpickTargetCorrection -ModuleName Nitpick -Times 0 -Exactly
+    }
+
     It 'terminates when wildcard rule selection leaves no eligible rules' {
         {
             Start-Nitpicking -Script {} -IncludeRule 'Missing*' -ErrorAction Continue
@@ -97,12 +108,14 @@ Describe 'Start-Nitpicking' {
         $SelectionFixture = $TestDrive
         $Valid = Join-Path $TestDrive 'Valid.ps1'
         Set-Content -LiteralPath $Valid -Value '$Value = 1'
+
         Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Fixes must not start.' }
         {
             @($Valid, (Join-Path $TestDrive 'Missing.ps1')) |
                 Start-Nitpicking -IncludeRule Nitpick/UseIsNotOperator -Fix -Output Object -ErrorAction Continue
         } | Should -Throw
+
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
     }
@@ -563,11 +576,12 @@ Describe 'Start-Nitpicking' {
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Preview | Should -Not -BeNullOrEmpty
-        $Preview.RenderedText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
-        $Preview.Diff | Should -Match 'Mandatory=\$true'
-        $Preview.Diff | Should -Match 'Mandatory'
-        $Preview.Corrections.Accepted | Should -HaveCount 1
-        $Preview.WasWritten | Should -BeFalse
+        $Preview.Report.EffectiveText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
+        $Preview.Proposal.Diff | Should -Match 'Mandatory=\$true'
+        $Preview.Proposal.Diff | Should -Match 'Mandatory'
+        $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
+        $Preview.Application.CommittedCorrections | Should -HaveCount 0
+
         $Summary.FindingCount | Should -Be 0
         $Summary.InformationCount | Should -Be 0
     }
@@ -628,10 +642,10 @@ Describe 'Start-Nitpicking' {
             $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
 
-        $Preview.Corrections.Skipped | Should -HaveCount 2
-        $Preview.Corrections.Conflicts | Should -HaveCount 1
-        $Preview.RenderedText | Should -Be '$Value = 123'
-        $Preview.Diff | Should -Be 'No queued edits.'
+        $Preview.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Preview.Proposal.Conflicts | Should -HaveCount 1
+        $Preview.Proposal.Diff | Should -Be 'No queued edits.'
+        $Preview.Report.EffectiveText | Should -Be '$Value = 123'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {

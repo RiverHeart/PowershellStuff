@@ -1,50 +1,38 @@
-using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    Applies or previews Fix corrections for one analyzed target and categorizes its findings.
+    Resolves, applies, and reports corrections for one analyzed target.
 
 .DESCRIPTION
-    Returns the target's findings unchanged, with no CorrectionPreview, unless Fix is
-    specified. When Fix is specified, resolves safe corrections against the target's
-    immutable snapshot via Resolve-NitpickCorrection, writes them to disk through
-    Save-AstDocument unless the document is in-memory, Preview is specified, or
-    ShouldProcess declines, and reverts to the pre-fix findings when a write fails or is
-    declined. Categorizes the target's findings into Fixed/Skipped/Conflicted/
-    FailedValidation on the returned CorrectionPreview and accumulates the running
-    Summary's fix-related counters.
-
-.PARAMETER Fix
-    Applies or previews corrections. Returns the original findings unchanged when omitted.
-
-.PARAMETER Preview
-    Resolves and reports corrections without writing them, even when Fix is specified.
+    Owns ShouldProcess and application policy, not proposal facts or summary counters.
+    Preview, WhatIf, and in-memory targets expose valid candidate text. Declined or
+    failed writes expose the original snapshot while retaining the complete proposal.
+    Candidate findings are used only when reanalysis is available.
 
 .PARAMETER Document
-    The AstDocument snapshot backing the target being corrected.
+    The AstDocument snapshot backing the target.
 
 .PARAMETER Finding
-    The target's complete finding set before correction.
+    The complete original finding set.
 
 .PARAMETER Rule
-    The rules that applied to this target, used to resolve corrections.
+    Selected rules to rerun against candidate text.
 
 .PARAMETER Ast
-    The parsed Ast for the target, used to resolve the originating file path.
+    Original AST retaining source path context.
 
-.PARAMETER Summary
-    The running NitpickSummary for the invocation; its fix-related counters are updated
-    directly, since NitpickSummary is a reference type.
+.PARAMETER Preview
+    Reports candidate corrections without writing.
 
 .EXAMPLE
-    Resolve-NitpickTargetCorrection -Fix -Document $Document -Finding $Findings `
-        -Rule $Rules -Ast $Ast -Summary $Summary
+    Resolve-NitpickTargetCorrection -Document $Document -Finding $Findings `
+        -Rule $Rules -Ast $Ast -Preview
 #>
 function Resolve-NitpickTargetCorrection {
     [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([pscustomobject])]
-    param(
+    [OutputType('Nitpick.CorrectionResult')]
+    param (
         [Parameter(Mandatory)]
         [psobject] $Document,
 
@@ -59,22 +47,8 @@ function Resolve-NitpickTargetCorrection {
         [Parameter(Mandatory)]
         [Ast] $Ast,
 
-        [Parameter(Mandatory)]
-        [NitpickSummary] $Summary,
-
-        [switch] $Fix,
         [switch] $Preview
     )
-
-    $FinalFindings = $Finding
-    $CorrectionPreview = $null
-
-    if (-not $Fix) {
-        return [pscustomobject]@{
-            CorrectionPreview = $CorrectionPreview
-            FinalFindings = $FinalFindings
-        }
-    }
 
     $ResolveParameters = @{
         Document = $Document
@@ -84,107 +58,64 @@ function Resolve-NitpickTargetCorrection {
     if ($Ast.Extent.File) {
         $ResolveParameters.Path = $Ast.Extent.File
     }
+    $Proposal = Resolve-NitpickCorrection @ResolveParameters
 
-    $CorrectionPreview = Resolve-NitpickCorrection @ResolveParameters
-    if (-not $CorrectionPreview.WasReanalyzed) {
-        $CorrectionPreview.Findings.Final = $Finding
-    }
-    if ($CorrectionPreview.Corrections.Accepted.Count -gt 0) {
+    $Application = @{ Status = 'NotAttempted' }
+    if ($Proposal.Status -eq 'Ready') {
         if (-not $Document.IsFileBacked) {
-            $CorrectionPreview.WriteStatus = 'InMemory'
-        } elseif (-not $Preview) {
-            if ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
-                $WriteResult = Save-AstDocument `
-                    -Document $Document `
-                    -Confirm:$false `
-                    -WhatIf:$false
-                $CorrectionPreview.WriteResult = $WriteResult
-                $CorrectionPreview.ErrorRecord = $WriteResult.ErrorRecord
-                $CorrectionPreview.WriteStatus = $WriteResult.WriteStatus
-                $CorrectionPreview.WasWritten = $WriteResult.WasWritten
-                if ($WriteResult.WasWritten) {
-                    $CorrectionPreview.Corrections.Fixed = $CorrectionPreview.Corrections.Accepted
-                } else {
-                    $CorrectionPreview.Corrections.Skipped = @($CorrectionPreview.Corrections.Skipped) + @(
-                        foreach ($Correction in $CorrectionPreview.Corrections.Accepted) {
-                            [pscustomobject]@{
-                                Correction = $Correction
-                                Reason = "Commit failed ($($WriteResult.WriteStatus)): $($WriteResult.ErrorRecord.Exception.Message)"
-                            }
-                        }
-                    )
-                    $CorrectionPreview.Findings.Final = $Finding
-                    $CorrectionPreview.Findings.Remaining = $Finding
-                    $CorrectionPreview.RenderedText = $Document.OriginalText
-                    $CorrectionPreview.WasReanalyzed = $false
-                }
-            } else {
-                $CorrectionPreview.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
-                if (-not $WhatIfPreference) {
-                    $CorrectionPreview.Findings.Final = $Finding
-                    $CorrectionPreview.Findings.Remaining = $Finding
-                    $CorrectionPreview.RenderedText = $Document.OriginalText
-                    $CorrectionPreview.WasReanalyzed = $false
-                }
+            $Application.Status = 'InMemory'
+        } elseif ($Preview) {
+            $Application.Status = 'Preview'
+        } elseif ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
+            $WriteResult = Save-AstDocument -Document $Document -Confirm:$false -WhatIf:$false
+            $Application.Status = $WriteResult.WriteStatus
+            $Application.WriteResult = $WriteResult
+            $Application.ErrorRecord = $WriteResult.ErrorRecord
+            if ($WriteResult.WasWritten) {
+                $Application.CommittedCorrections = $Proposal.AcceptedCorrections
             }
+        } else {
+            $Application.Status = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
         }
     }
-    $FinalFindings = if ($CorrectionPreview.WasReanalyzed) {
-        $CorrectionPreview.Findings.Final
-    } else {
-        $Finding
-    }
-    $SkippedEdits = @($CorrectionPreview.Corrections.Skipped.Correction)
-    $ConflictingEdits = @(
-        $CorrectionPreview.Corrections.Conflicts.ExistingCorrection
-        $CorrectionPreview.Corrections.Conflicts.IncomingCorrection
-    )
-    $FixedFindings = @($Finding | Where-Object {
-        $Committed = @($_.Corrections | Where-Object {
-            $_ -in $CorrectionPreview.Corrections.Fixed
-        })
-        $Committed.Count -gt 0
-    })
-    $SkippedFindings = @($Finding | Where-Object {
-        @($_.Corrections | Where-Object { $_ -in $SkippedEdits }).Count -gt 0
-    })
-    $ConflictedFindings = @($Finding | Where-Object {
-        @($_.Corrections | Where-Object { $_ -in $ConflictingEdits }).Count -gt 0
-    })
-    $FailedValidationFindings = if ($CorrectionPreview.WriteStatus -eq 'FailedValidation') {
-        $Finding
-    } else {
-        @()
-    }
-    $CorrectionPreview.Findings.Fixed = $FixedFindings
-    $CorrectionPreview.Findings.Skipped = $SkippedFindings
-    $CorrectionPreview.Findings.Conflicted = $ConflictedFindings
-    $CorrectionPreview.Findings.FailedValidation = @($FailedValidationFindings)
-    $Summary.FixedFindingCount += $FixedFindings.Count
-    $Summary.SkippedCorrectionCount += $CorrectionPreview.Corrections.Skipped.Count
-    if ($CorrectionPreview.Corrections.Conflicts.Count -gt 0) {
-        $Summary.ConflictedTargetCount++
-    }
-    if ($CorrectionPreview.WriteStatus -in 'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
-        $Summary.FailedTargetCount++
-    }
 
-    Write-Verbose (
-        "Correction preview for '{0}': {1} accepted, {2} skipped." -f
-        $CorrectionPreview.Path,
-        $CorrectionPreview.Corrections.Accepted.Count,
-        $CorrectionPreview.Corrections.Skipped.Count
-    )
-    foreach ($SkippedCorrection in $CorrectionPreview.Corrections.Skipped) {
-        Write-Verbose (
-            "Skipped correction from '{0}': {1}" -f
-            $SkippedCorrection.Correction.RuleName,
-            $SkippedCorrection.Reason
+    $UseCandidateText = $Proposal.Status -eq 'NoChanges' -or
+        $Application.Status -in 'InMemory', 'Preview', 'WhatIf', 'Written'
+    $UseCandidateFindings = $UseCandidateText -and $Proposal.WasReanalyzed
+    $Report = @{
+        AnalysisSource = if ($UseCandidateFindings) { 'Candidate' } else { 'Original' }
+        EffectiveText = if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
+        EffectiveFindings = if ($UseCandidateFindings) {
+            $Proposal.CandidateFindings
+        } else {
+            $Proposal.OriginalFindings
+        }
+
+        FindingsWithCommittedCorrections = @(
+            foreach ($OriginalFinding in $Proposal.OriginalFindings) {
+                foreach ($Correction in $OriginalFinding.Corrections) {
+                    if ($Correction -in $Application.CommittedCorrections) {
+                        $OriginalFinding
+                        break
+                    }
+                }
+            }
         )
     }
 
-    [pscustomobject]@{
-        CorrectionPreview = $CorrectionPreview
-        FinalFindings = $FinalFindings
+    Write-Verbose (
+        "Correction proposal for '{0}': {1} accepted, {2} skipped; application: {3}." -f
+        $Proposal.Path, $Proposal.AcceptedCorrections.Count,
+        $Proposal.SkippedCorrections.Count, $Application.Status
+    )
+
+    foreach ($SkippedCorrection in $Proposal.SkippedCorrections) {
+        Write-Verbose (
+            "Skipped correction from '{0}': {1}" -f
+            $SkippedCorrection.Correction.RuleName, $SkippedCorrection.Reason
+        )
     }
+
+    New-NitpickCorrectionResult -Path $Proposal.Path -Proposal $Proposal `
+        -Application $Application -Report $Report
 }

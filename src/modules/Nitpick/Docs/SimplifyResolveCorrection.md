@@ -25,6 +25,9 @@ Separate its information into three groups:
 CorrectionResult
   Path
   Proposal
+    Path
+    Document
+    OriginalFingerprint
     Status
     OriginalText
     OriginalFindings
@@ -155,9 +158,8 @@ properties and then restore them on failure.
 
 Update [New-NitpickCorrectionResult](../Public/Helpers/New-NitpickCorrectionResult.ps1)
 for the new envelope. Add a proposal constructor only if shared construction or
-schema validation warrants it. Reassess
-[ConvertTo-NitpickResultGroup](../Private/ConvertTo-NitpickResultGroup.ps1) rather
-than preserving it solely to support the old shape.
+schema validation warrants it. Remove the old array-only `ConvertTo-NitpickResultGroup`
+helper if the new envelope no longer needs it.
 
 ## 4. Migrate consumers and accounting
 
