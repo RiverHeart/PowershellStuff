@@ -40,3 +40,34 @@ _Avoid_: Display name, suppression ID (as if these were separate from Local Name
 A rule's fully qualified identity: `Namespace/Local Name` (for example `WPF/AvoidBlockingUI`).
 Used for selection, the registry key, and conflict/attribution across native findings.
 _Avoid_: Qualified name, full name
+
+## Correction lifecycle ownership
+
+| Component | Owns | Must not do |
+| --- | --- | --- |
+| [Correction resolver](Public/Interface/Resolve-NitpickCorrection.ps1) | Selection policy, candidate validation and analysis, proposal diagnostics | Save files or choose effective reporting |
+| [Target coordinator](Private/Resolve-NitpickTargetCorrection.ps1) | ShouldProcess, application policy, effective report selection | Rewrite proposal facts or update invocation totals |
+| [Invocation coordinator](Public/Interface/Start-Nitpicking.ps1) | Output, error emission, summaries, severity thresholds | Redo correction selection or reinterpret candidate validity |
+| [Result constructor](Public/Helpers/New-NitpickCorrectionResult.ps1) | Envelope shape and lifecycle consistency checks | Repair contradictions, resolve corrections, or perform I/O |
+| [AstEditor](../AstEditor/README.md) | Edit validation and transactional persistence | Decide Nitpick selection or reporting policy |
+
+The resolver delegates edit-range, stale-text, conflict, and parsing checks to
+AstEditor; it owns the Nitpick policy applied to those results, not a second source
+validation implementation.
+
+Proposal diagnostics are stable by ownership, not enforced immutability.
+`Proposal.Document` is a mutable transaction handle containing the queued edits.
+Consumers must not modify its edits between resolution and application. Application
+must save that same transaction, not rebuild it from diagnostic fields. A failed or
+declined write does not undo candidate reanalysis or change accepted edits into skips.
+
+`Report.AnalysisSource` identifies the source analyzed by `EffectiveFindings`, not
+necessarily the source of `EffectiveText`. Without reanalysis, a valid candidate can
+be returned as text alongside original findings. `None` means no analysis, text, or
+findings; a read failure has no proposal. Original analysis always refers to the
+captured snapshot, not a fresh read of potentially changed disk contents.
+
+The constructor rejects invalid status values, unsupported candidate reporting,
+unproven commitments, and contradictory read failures. It does not freeze the
+result or independently rerun analysis or persistence to verify its evidence.
+Do not add top-level aliases or secondary flags that duplicate the owning groups.

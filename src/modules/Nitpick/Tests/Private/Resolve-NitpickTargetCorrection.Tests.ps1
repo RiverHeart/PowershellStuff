@@ -58,7 +58,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         }
     }
 
-    It 'returns candidate text in memory but original findings without reanalysis' {
+    It 'uses AnalysisSource for findings rather than effective text when reanalysis is unavailable' {
         $Fixture = New-TargetCorrectionFixture -NoReanalysis
         $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
         Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
@@ -75,6 +75,8 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Application.CommittedCorrections | Should -HaveCount 0
 
         $Result.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
+        $Result.Report.EffectiveText | Should -BeExactly $Fixture.Proposal.CandidateText
+        $Result.Report.EffectiveText | Should -Not -BeExactly $Fixture.Proposal.OriginalText
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveFindings -is [array] | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 1
@@ -100,6 +102,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         }
 
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
+
         $Result.Application.Status | Should -Be 'Written'
         $Result.Application.CommittedCorrections | Should -HaveCount 2
         $Result.Application.WriteResult.WasWritten | Should -BeTrue

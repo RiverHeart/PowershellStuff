@@ -21,9 +21,15 @@ of application outcome. Only `Application.CommittedCorrections` describes commit
 `Application.Status` records whether writing succeeded, failed, or was not requested.
 Severity counts and `-ErrorOn` use `Report.EffectiveFindings`: candidate analysis for previews
 and successful writes when available, original analysis for failed or declined writes.
-`Report.EffectiveText` contains the corresponding output text; `Report.AnalysisSource`
-identifies which analysis backs the findings, including original-finding fallback when
-reanalysis is unavailable.
+`Report.EffectiveText` contains the selected output text. `Report.AnalysisSource`
+identifies the source analyzed by `EffectiveFindings`, not necessarily `EffectiveText`:
+without reanalysis, valid candidate text can accompany original findings.
+
+Proposal diagnostics are stable by ownership, not enforced immutability.
+`Proposal.Document` is the mutable queued transaction; consumers must not change its
+edits between resolution and application. The result constructor rejects contradictory
+lifecycle states instead of repairing them. See the
+[ownership boundaries](CONTEXT.md#correction-lifecycle-ownership) for maintainer responsibilities.
 
 The result contract intentionally breaks the earlier flat schema: use
 `Proposal.AcceptedCorrections` instead of `Corrections.Accepted`,

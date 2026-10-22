@@ -625,6 +625,11 @@ Report
 `Resolve-NitpickCorrection` returns just the proposal above, with type name
 `Nitpick.CorrectionProposal`. Its document retains the queued transaction; its facts
 are not mutated by application or reporting.
+The document is a mutable transaction handle, not an immutable diagnostic value.
+Consumers must not change queued edits between resolution and application. Apply the
+same transaction rather than rebuilding edits from the proposal's diagnostic fields.
+See [correction lifecycle ownership](../CONTEXT.md#correction-lifecycle-ownership)
+for component responsibilities.
 
 `Application.CommittedCorrections` is populated only by a successful write.
 `Report.FindingsWithCommittedCorrections` contains each original finding once if any
@@ -638,11 +643,22 @@ findings remain original and `AnalysisSource` says so, even when effective text 
 candidate. Failed or declined writes expose original text and findings. A rejected or
 invalid candidate is never reported as a successful preview. With no changes, valid
 candidate reanalysis can still be used, but application is `NotAttempted`.
+`AnalysisSource` identifies the source analyzed by `EffectiveFindings`; it does not
+identify the source of `EffectiveText`.
 
 Read failures have a null proposal, application status `FailedRead`, an error record,
 and no report analysis. No-Fix invocations do not emit correction envelopes.
 Arrays remain arrays, including empty and singleton collections; absent optional
 records are null.
+
+The constructor validates recognized application statuses and analysis sources and
+rejects contradictory states before emitting an envelope. Committed corrections and
+their attributed findings require `Written`; a written application requires a Ready
+proposal and successful AstEditor write evidence, and committed edits must belong to
+the accepted proposal. Candidate reporting requires valid candidate reanalysis and
+an outcome that permits using it. `None` cannot contain effective text or findings.
+`FailedRead` requires an error, no proposal, and no analysis. An uninitialized default
+envelope remains valid. Validation does not repair input or freeze returned objects.
 
 ### Breaking migration
 

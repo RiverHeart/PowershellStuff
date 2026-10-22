@@ -21,6 +21,8 @@ using namespace System.Collections.Generic
 .PARAMETER Document
     The AstEditor document analyzed by Nitpick. Its snapshot and queued transaction
     are retained in the result so preview and file application use the same edits.
+    This is a mutable transaction handle: consumers must not modify its queued edits
+    between resolution and application. Proposal diagnostics are stable by ownership.
 
 .PARAMETER Finding
     Native Nitpick findings containing corrections produced from the source snapshot.
