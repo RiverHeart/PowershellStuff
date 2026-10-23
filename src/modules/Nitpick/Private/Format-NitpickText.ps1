@@ -2,7 +2,7 @@
 .SYNOPSIS
     Formats findings for one Nitpick target as console-friendly text.
 #>
-function ConvertTo-NitpickText {
+function Format-NitpickText {
     [CmdletBinding()]
     [OutputType([string])]
     param(

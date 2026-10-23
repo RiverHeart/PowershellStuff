@@ -333,7 +333,7 @@ function Start-Nitpicking {
                 $SortedFindings = $FinalFindings | Sort-Object `
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
-                ConvertTo-NitpickText -Ast $Ast -Finding $SortedFindings
+                Format-NitpickText -Ast $Ast -Finding $SortedFindings
             }
         }
         $Stopwatch.Stop()

@@ -577,7 +577,7 @@ rule's `RuleId`, `RuleName`, and `RuleSuppressionID` on every native finding and
   every finding and nested correction immediately after `NitpickRule.Invoke()` returns.
   Revisit whether these parameters should be removed from the producer-facing signature
   entirely once the standalone-invocation story is reconsidered.
-- Change `ConvertTo-NitpickText`'s rightmost column from `RuleName` to `RuleId`; two
+- Change `Format-NitpickText`'s rightmost column from `RuleName` to `RuleId`; two
   findings sharing a local name from different namespaces (already legal since Phase 4)
   must remain visually distinguishable in text output, which bare `RuleName` cannot do.
 - Audit default formatting and all callers that formerly matched `RuleName` or `Name`.
