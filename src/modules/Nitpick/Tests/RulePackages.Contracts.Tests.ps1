@@ -540,9 +540,13 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
     }
 
-    Context 'Phase 5: coordinator-owned identity (pending implementation)' -Skip {
+    Context 'Phase 5: coordinator-owned identity' {
         It 'attributes legacy producer names to the executing qualified rule' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
+            $ProducerText = Get-Content -LiteralPath $Package.RulesPath -Raw
+            $ProducerText = $ProducerText.Replace('-RuleName ContractRule', '-RuleName WrongProducer')
+            $ProducerText = $ProducerText.Replace('-RuleSuppressionID ContractRule', '-RuleSuppressionID WrongSuppression')
+            Set-Content -LiteralPath $Package.RulesPath -Value $ProducerText
             $Results = @(Start-Nitpicking -Script {} -Module $Package.ManifestPath `
                 -IncludeRule 'NitpickContractPackage/ContractRule' -Output Object)
 
@@ -555,6 +559,23 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Diagnostic = $Findings[0].ToDiagnosticRecord()
             $Diagnostic.RuleName | Should -Be ContractRule
             $Diagnostic.RuleSuppressionID | Should -Be ContractRule
+        }
+
+        It 'distinguishes equal local names from two declaring packages in text and object output' {
+            $First = New-ContractRulePackage -Name FirstPackage -Root $ContractRoot
+            $Second = New-ContractRulePackage -Name SecondPackage -Root $ContractRoot
+            $Parameters = @{
+                Script = {}; Module = @($First.ManifestPath, $Second.ManifestPath)
+                IncludeRule = @('FirstPackage/ContractRule', 'SecondPackage/ContractRule')
+                NoSummary = $true; ErrorAction = 'Stop'
+            }
+            $Findings = @(Start-Nitpicking @Parameters -Output Object)
+            $Findings | Should -HaveCount 2
+            @($Findings.RuleId | Sort-Object) |
+                Should -Be @('FirstPackage/ContractRule', 'SecondPackage/ContractRule')
+            $Text = Start-Nitpicking @Parameters
+            $Text | Should -Match 'FirstPackage/ContractRule'
+            $Text | Should -Match 'SecondPackage/ContractRule'
         }
 
         It 'retains qualified IDs through preview and corrected-source reanalysis' {

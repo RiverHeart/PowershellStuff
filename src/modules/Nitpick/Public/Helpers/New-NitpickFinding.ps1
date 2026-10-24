@@ -8,6 +8,9 @@
     ScriptAnalyzer-compatible rules must explicitly request DiagnosticRecord output.
     Diagnostic conversion omits corrections with a ChangeSetId because ScriptAnalyzer
     cannot preserve their all-or-nothing selection. Ungrouped suggestions remain available.
+    Standalone findings retain producer-supplied local labels and have no qualified RuleId.
+    NitpickRule. Invoke assigns descriptor-owned RuleId and RuleName to native findings
+    and nested corrections, and assigns the same local name to findings' RuleSuppressionID.
 
 .EXAMPLE
     $Finding = New-NitpickFinding `

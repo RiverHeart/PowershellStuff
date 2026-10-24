@@ -112,7 +112,7 @@ function Resolve-NitpickTargetCorrection {
     foreach ($SkippedCorrection in $Proposal.SkippedCorrections) {
         Write-Verbose (
             "Skipped correction from '{0}': {1}" -f
-            $SkippedCorrection.Correction.RuleName, $SkippedCorrection.Reason
+            (Get-NitpickRuleLabel -InputObject $SkippedCorrection.Correction), $SkippedCorrection.Reason
         )
     }
 

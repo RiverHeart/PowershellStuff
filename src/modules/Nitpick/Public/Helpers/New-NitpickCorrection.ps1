@@ -54,7 +54,9 @@
     rules; include producer identity and occurrence unless that coupling is intentional.
 
 .PARAMETER RuleName
-    An optional stable identity for the rule that produced the correction.
+    An optional standalone display label. NitpickRule.Invoke replaces it with the
+    executing rule's local name and assigns its qualified RuleId. Corrections do not
+    carry a separate suppression identity.
 
 .PARAMETER ReplacementText
     Text that replaces the described source range. An empty string represents deletion.

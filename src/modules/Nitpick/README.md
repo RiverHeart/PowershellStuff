@@ -1,3 +1,25 @@
+## Native finding identity
+
+Coordinated native findings and corrections carry a qualified `RuleId`, such as
+`Nitpick/UseIsNotOperator` or `Local/MyRule`. The executing rule descriptor owns that
+identity: it replaces producer-supplied attribution during both original execution and
+candidate reanalysis. Ownership follows the declaring package or registration, not
+necessarily the module implementing the callable.
+
+Text output, default finding tables, string conversion, and correction diagnostics use
+qualified IDs. `RuleName` remains the coordinator-assigned local name; findings'
+`RuleSuppressionID` carries that same local value for diagnostic conversion. Corrections
+have no suppression field. These are transitional fields: the long-term direction is a
+single `RuleId`, but this phase does not change helper signatures or suppression semantics.
+
+Parser findings use `Nitpick/PowerShellParseError`; that attribution does not create a
+selectable rule or registry entry. Direct producer/helper invocation bypasses coordinated
+attribution: when `RuleId` is absent, display uses the supplied `RuleName` without inventing
+a namespace. No standalone `RuleId` input parameter is introduced yet.
+
+Identity is retained across the correction proposal, application, and report without
+rewriting proposal facts or changing target-wide `ChangeSetId` grouping.
+
 ## Autocorrection
 
 Preview safe corrections and view the diff without modifying files:

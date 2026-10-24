@@ -41,6 +41,32 @@ A rule's fully qualified identity: `Namespace/Local Name` (for example `WPF/Avoi
 Used for selection, the registry key, and conflict/attribution across native findings.
 _Avoid_: Qualified name, full name
 
+### Identity direction
+
+Long term, `RuleId` is the rule name and the single rule identity. The separate
+`RuleName` and `RuleSuppressionID` finding fields are transitional compatibility
+fields, not independent identities to extend. Phase 5 retains them while establishing
+coordinator-owned qualified attribution; it does not add a suppression field to corrections.
+Their eventual removal requires an explicit migration of helper signatures, standalone
+invocation, diagnostic conversion, and suppression behavior. See
+[Phase 5](Docs/RulePackages.md#phase-5-findings-corrections-and-coordinator-owned-identity).
+
+### Identity boundaries
+
+Coordinated rule execution unconditionally assigns the executing descriptor's identity,
+including `Local/Name` for locally owned rules. Producer-supplied attribution is replaced,
+not validated against the callable's implementing module; implementation and ownership
+can differ.
+
+Nitpick assigns its parser findings `Nitpick/PowerShellParseError`. An owned diagnostic
+ID does not imply a discoverable/selectable rule or a registry entry.
+
+Standalone producer/helper invocation bypasses coordinated attribution. In Phase 5,
+display the supplied `RuleName` when `RuleId` is absent without inventing a namespace.
+This display fallback does not establish identity and must not conceal missing stamping
+in coordinated execution. An explicit standalone `RuleId` input API is deferred to the
+later helper-signature migration.
+
 ## Correction lifecycle ownership
 
 | Component | Owns | Must not do |

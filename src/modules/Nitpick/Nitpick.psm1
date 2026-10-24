@@ -25,6 +25,7 @@ class NitpickCorrection {
     [string] $ExpectedText
     [string] $Applicability = 'Safe'
     [string] $ChangeSetId
+    [string] $RuleId
     [string] $RuleName
     [string] $ReplacementText
     [string] $FilePathOrContext
@@ -151,6 +152,7 @@ class NitpickCorrection {
 class NitpickFinding {
     [IScriptExtent] $ViolationExtent
     [string] $Message
+    [string] $RuleId
     [string] $RuleName
     [string] $RuleSuppressionID
     [string] $Severity
@@ -222,14 +224,14 @@ class NitpickFinding {
         return '{0}: {1} {2}: {3}' -f `
             $this.Location,
             $this.Severity,
-            $this.RuleName,
+            (Get-NitpickRuleLabel -InputObject $this),
             $this.Message
     }
 }
 
 Update-TypeData `
     -TypeName 'NitpickFinding' `
-    -DefaultDisplayPropertySet 'Location', 'RuleName', 'Message' `
+    -DefaultDisplayPropertySet 'Location', 'RuleId', 'Message' `
     -Force
 
 
@@ -391,6 +393,9 @@ class NitpickRule {
     <#
     .SYNOPSIS
         Invokes the rule against the specified ScriptBlockAst.
+    .DESCRIPTION
+        Assigns descriptor-owned identity to native findings and nested corrections.
+        Non-native outputs, including explicit DiagnosticRecords, are returned unchanged.
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .OUTPUTS
@@ -426,6 +431,18 @@ class NitpickRule {
             $Parameters.Context = $Context
         }
         [object[]] $Results = @(& $this.Callable @Parameters)
+        foreach ($Finding in $Results) {
+            if ($Finding -isnot [NitpickFinding]) {
+                continue
+            }
+            $Finding.RuleId = $this.Id
+            $Finding.RuleName = $this.Name
+            $Finding.RuleSuppressionID = $this.Name
+            foreach ($Correction in $Finding.Corrections) {
+                $Correction.RuleId = $this.Id
+                $Correction.RuleName = $this.Name
+            }
+        }
         return $Results
     }
 }

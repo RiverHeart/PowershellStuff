@@ -6,18 +6,18 @@ Plans are not immutable and may be changed with user permission. Unforeseen prob
 
 ## Status
 
-Phases 0 through 4 are implemented; Phases 5 through 7 remain proposed.
-The examples below describe the intended API, not the current API.
+Phases 0 through 5 are implemented; Phases 6 and 7 remain proposed.
+Phase 6 still owns WPF migration and the broader documentation cutover.
 
-The contracts live in [RulePackages.Contracts.Tests.ps1](../Tests/RulePackages.Contracts.Tests.ps1).
-Existing invariants execute now. Future contracts are discoverable in skipped contexts
-whose names identify the implementing phases. Existing interface, interoperability,
-and autocorrection tests remain active; these contracts do not replace them.
+The package contracts live in [RulePackages.Contracts.Tests.ps1](../Tests/RulePackages.Contracts.Tests.ps1);
+execution and display attribution also have focused coverage in
+[Identity.Contracts.Tests.ps1](../Tests/Identity.Contracts.Tests.ps1).
+All current contracts execute without skipped contexts. Existing interface,
+interoperability, and autocorrection tests remain active; these contracts do not replace them.
 
-Nitpick currently discovers compatible commands across loaded modules and their
-loaded nested modules. `Start-Nitpicking` also accepts `RulePath` and `RuleModule`,
-combines discovery with explicit registrations, and builds an invocation-local rule
-list. Rules are currently keyed and selected by an unqualified canonical name.
+Nitpick acquires explicit packages through `Module`, combines them with built-in rules
+and explicit registrations, and builds an invocation-local rule list. Native rule
+selection and attribution use qualified IDs; ambient loaded modules are not rule sources.
 
 This plan replaces ambient discovery with explicit rule sources and qualified
 native identities. Breaking changes are acceptable for this experimental project;
@@ -99,9 +99,11 @@ the declaring manifest/source location internally for conflict diagnostics; that
 provenance does not require importing the parent runtime.
 
 Native findings and corrections gain `RuleId` as authoritative execution attribution,
-computed from the executing `NitpickRule`'s `Namespace`/`Name`. `RuleName` and
-`RuleSuppressionID` carry that same coordinator-assigned local `Name` value; a rule's
-own callable body never supplies or overrides any of the three. Native displays,
+computed from the executing `NitpickRule`'s `Namespace`/`Name`. Findings' `RuleName` and
+`RuleSuppressionID`, and corrections' `RuleName`, carry that same coordinator-assigned
+local `Name` value as transitional compatibility fields. Do not add a
+`RuleSuppressionID` property to corrections. A rule's
+own callable body never supplies or overrides execution attribution. Native displays,
 grouping, selection, and conflict attribution use the qualified `RuleId`;
 `ToDiagnosticRecord()` emits `RuleName` as the local name. There is no separate
 producer-supplied identity to validate: a rename of a rule's backing command or
@@ -558,34 +560,115 @@ registration. Existing file-target tests pass with only necessary selector migra
 
 ## Phase 5: Findings, Corrections, and Coordinator-Owned Identity
 
+**Status: Complete**
+
 ### Objective
 
 Make qualified identity observable end-to-end, with the coordinator as the sole source of a
-rule's `RuleId`, `RuleName`, and `RuleSuppressionID` on every native finding and correction.
+rule's `RuleId` and `RuleName` on every native finding and correction, and of
+`RuleSuppressionID` on findings. Do not add a suppression property to corrections.
+Long term, converge on `RuleId` as the single rule identity (synonymous with rule name),
+removing the separate `RuleName`/`RuleSuppressionID` fields in a later explicit cutover.
+
+### Baseline Before Phase 5
+
+The correction lifecycle described in [SimplifyResolveCorrection.md](SimplifyResolveCorrection.md)
+is implemented. `Resolve-NitpickCorrection` returns a `Nitpick.CorrectionProposal`;
+`Resolve-NitpickTargetCorrection` wraps it in a `Nitpick.CorrectionResult` with separate
+`Proposal`, `Application`, and `Report` owners. Phase 5 adds execution attribution to this
+contract; it does not restore the old grouped result schema or change application policy.
+
+Before this phase, `NitpickFinding` had `RuleName` and `RuleSuppressionID`;
+`NitpickCorrection` had only `RuleName`. Neither had `RuleId`, and
+`NitpickRule.Invoke()` returned producer results without stamping identity.
 
 ### Work
 
-- Carry executing-rule identity through candidate/final findings, correction metadata,
-  conflicts, grouped results, and text/object output.
-- Stamp `RuleId`, `RuleName`, and `RuleSuppressionID` from the executing `NitpickRule`'s
-  `Namespace`/`Name` on every native finding and correction; a rule's own callable body
-  never supplies or overrides any of the three (see [CONTEXT.md](../CONTEXT.md): Local Name).
+- Carry executing-rule identity through the existing lifecycle surfaces:
+  - `Proposal.OriginalFindings` and `Proposal.CandidateFindings`, including nested corrections.
+  - `Proposal.AcceptedCorrections`, `Proposal.SkippedCorrections[].Correction`, and
+    `Proposal.Conflicts[].ExistingCorrection`/`IncomingCorrection`.
+  - `Application.CommittedCorrections`.
+  - `Report.EffectiveFindings` and `Report.FindingsWithCommittedCorrections`, including
+    nested corrections, plus ordinary lint findings emitted without `Fix`.
+- Stamp findings' `RuleId`, `RuleName`, and `RuleSuppressionID`, and corrections'
+  `RuleId` and `RuleName`, from the executing `NitpickRule`'s `Namespace`/`Name`.
+  A rule's own callable body never supplies or overrides execution attribution
+  (see [CONTEXT.md](../CONTEXT.md): Local Name).
   **Short-term shape, deliberately cheap to reverse**: `New-NitpickFinding`/
-  `New-NitpickCorrection` keep their existing mandatory `-RuleName`/`-RuleSuppressionID`
-  parameters unchanged (still meaningful for standalone/direct invocation outside Nitpick);
-  the coordinator unconditionally overwrites both properties, plus stamps `RuleId`, on
-  every finding and nested correction immediately after `NitpickRule.Invoke()` returns.
+  `New-NitpickCorrection` keep their existing signatures unchanged: the finding helper's
+  `-RuleName`/`-RuleSuppressionID` are mandatory, while the correction helper's `-RuleName`
+  is optional and it has no `-RuleSuppressionID`. These parameters remain meaningful
+  for standalone/direct invocation outside Nitpick.
+  Establish one coordinator-owned stamping boundary shared by original execution and
+  candidate reanalysis. Both call `NitpickRule.Invoke()`; stamping only in
+  `Start-Nitpicking` would miss candidate findings. Attribute findings and nested
+  corrections before they enter a proposal. Application and reporting must not rewrite
+  proposal identity, clone corrections merely to relabel them, or replace object
+  associations used to attribute committed corrections to original findings.
   Revisit whether these parameters should be removed from the producer-facing signature
   entirely once the standalone-invocation story is reconsidered.
-- Change `Format-NitpickText`'s rightmost column from `RuleName` to `RuleId`; two
-  findings sharing a local name from different namespaces (already legal since Phase 4)
-  must remain visually distinguishable in text output, which bare `RuleName` cannot do.
-- Audit default formatting and all callers that formerly matched `RuleName` or `Name`.
+- Use qualified execution attribution in conflict reasons and skipped-correction verbose
+  messages. Keep direct resolver use possible for standalone findings/corrections that
+  have not passed through coordinator execution; do not fabricate a package identity
+  from producer-supplied text.
+- Preserve target-wide `ChangeSetId` semantics. Stamping identity must not prefix or
+  rewrite change-set IDs: intentional cross-rule groups must remain atomic.
+- Use qualified `RuleId` in `Format-NitpickText`'s existing rightmost column so findings
+  sharing a local name from different namespaces remain visually distinguishable.
+  Audit default object formatting and `NitpickFinding.ToString()` for the same identity goal.
+- Audit native callers that formerly matched `RuleName` or `Name`. The performance
+  measurement script is explicitly deferred from this phase.
+
+### Agreed Decisions
+
+- **Correction suppression field:** corrections currently have no suppression property,
+  and diagnostic conversion takes suppression identity from the finding. Stamp corrections
+  with `RuleId`/`RuleName` only, retaining `RuleSuppressionID` on findings for now.
+  Do not add a correction suppression property or a new mandatory producer parameter.
+- **Text presentation:** show qualified `RuleId` in the existing rightmost column.
+- **Parser findings:** assign `Nitpick/PowerShellParseError` explicitly. Nitpick owns
+  these diagnostics even though they are not produced by a `NitpickRule`. This identity
+  does not create a discoverable/selectable rule or a registry entry.
+- **Standalone invocation:** when `RuleId` is absent, display the producer-supplied
+  `RuleName` without qualification. This is a display fallback, not an inferred identity.
+  Do not invent `Local/...` or `_/...` IDs; `Local` denotes an actual owning namespace,
+  not unknown ownership. Apply the same label policy to standalone conflict and
+  skipped-correction diagnostics.
+- **Coordinated execution:** always replace producer-supplied attribution with the
+  executing descriptor's identity, including for `Local` rules. Do not validate a
+  producer's qualifier against its implementing module: the declaring package or
+  registration may own a rule implemented elsewhere. Missing attribution after this
+  boundary is a defect; standalone display fallback must not conceal it.
+- **Standalone explicit-ID API:** defer a producer-facing `RuleId` parameter to the
+  later helper-signature migration. Phase 5 neither overloads `RuleName` with a
+  qualification contract nor adds conditional module-ownership validation.
+- **Long-term identity:** `RuleId` is the rule name and the intended single identity.
+  `RuleName` and `RuleSuppressionID` are transitional compatibility fields, not independent
+  identities to extend. Their eventual removal requires an explicit migration of helper
+  signatures, standalone invocation, diagnostic conversion, and suppression behavior;
+  Phase 5 does not perform that breaking cutover.
 
 ### Tests
 
 - Two packages emit the same local name and remain distinguishable in native output.
-- Preview, fix, and reanalysis retain the same qualified ID.
+- Producers supplying different local names or suppression IDs cannot override the
+  executing rule's identity, including on nested corrections.
+- Preview, successful file writes, and candidate reanalysis retain qualified identity
+  across the proposal, application, and report surfaces listed above. Leave a finding
+  after reanalysis so candidate finding identity is actually exercised.
+- Declined, failed, and stale writes retain candidate identity in the proposal while
+  effective reporting selects original findings. No committed corrections appear on
+  non-write paths; application/reporting never mutate proposal identity.
+- Conflict reasons and skipped-correction diagnostics distinguish equal local names
+  from different namespaces.
+- Parser findings carry and display `Nitpick/PowerShellParseError` without introducing
+  a selectable rule or changing selection/registry behavior.
+- Standalone/direct helper and resolver use preserves unqualified labels when `RuleId`
+  is absent, without fabricating an identity.
+- Coordinated module and `Local` rule findings always have descriptor-assigned IDs;
+  producer-supplied attribution cannot override them, and display fallback does not
+  substitute for these assertions.
 - Ungrouped suggestions, coordinated native fixes, and intentional cross-rule groups remain intact.
 
 ### Exit Criteria
@@ -593,6 +676,33 @@ rule's `RuleId`, `RuleName`, and `RuleSuppressionID` on every native finding and
 Native identity is complete across observable surfaces and focused autocorrection regression
 tests pass. See [ADR-0001](adr/0001-defer-scriptanalyzer-adapter.md) for why PSScriptAnalyzer
 interoperability and suppression-semantics tests are explicitly out of scope for this phase.
+
+### Implemented
+
+- `NitpickFinding` and `NitpickCorrection` now expose `RuleId`. The context-taking
+  `NitpickRule.Invoke()` overload stamps native results and nested corrections in place;
+  the default overload delegates to it. Original execution and candidate reanalysis share
+  that boundary. Explicit non-native outputs remain unchanged.
+- Findings receive the descriptor's `Id`, `Name`, and local suppression name;
+  corrections receive `Id` and `Name` only. Producer helper signatures remain unchanged.
+- Parser findings receive `Nitpick/PowerShellParseError` directly from the invocation
+  coordinator, without adding a selectable rule or registry entry.
+- Text output, default finding tables, string conversion, conflicts, and verbose skip
+  diagnostics prefer qualified attribution. Standalone objects retain their supplied
+  labels when no `RuleId` exists; no namespace is inferred.
+- Correction associations and target-wide `ChangeSetId` values remain unchanged.
+  Application/report selection never relabels proposal facts. Diagnostic-only findings'
+  absent corrections are ignored during grouping rather than counted as skipped edits.
+- Contract coverage includes two declaring packages with equal local names, producer
+  attribution replacement, nonempty candidate findings, preview/WhatIf/in-memory output,
+  committed associations, failed/stale/declined writes, conflicts, standalone labels,
+  parser ownership, and intentional cross-rule grouping.
+- After targeted validation, the full Nitpick suite passes on PowerShell 7.6.8
+  (418 passed) and Windows PowerShell 5.1 (416 passed), with zero failures or skips.
+  Modified PowerShell files introduce no new PSScriptAnalyzer diagnostics under the
+  repository settings; existing diagnostics remain unchanged.
+- The performance measurement script and eventual single-`RuleId` helper migration
+  remain deferred as agreed.
 
 ## Phase 6: WPF Package and Documentation Migration
 

@@ -8,9 +8,13 @@ BeforeAll {
             [string] $Source = '-not ($Value -is [int])',
             [switch] $NoReanalysis,
             [switch] $Invalid,
-            [switch] $Conflict
+            [switch] $Conflict,
+            [switch] $RemainingFinding
         )
 
+        if ($RemainingFinding) {
+            $Source += '; -not ($Other -is [string])'
+        }
         $Document = if ($Path) {
             [System.IO.File]::WriteAllText($Path, $Source)
             New-AstDocument -Path $Path
@@ -19,6 +23,11 @@ BeforeAll {
         }
         $Rule = New-Nitpick -Callable Test-UseIsNotOperator
         $Findings = @($Rule.Invoke($Document.Ast))
+        if ($RemainingFinding) {
+            foreach ($Correction in $Findings[1].Corrections) {
+                $Correction.Applicability = 'Review'
+            }
+        }
         if ($Invalid) {
             $Findings[0].Corrections[1].TextEdit.ReplacementText = '('
         }
@@ -160,13 +169,20 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 
-    It 'retains candidate analysis and proposal skips after a failed write while reporting original findings' {
-        $Path = Join-Path $TestDrive 'FailedWrite.ps1'
-        $Fixture = New-TargetCorrectionFixture -Path $Path
+    It 'retains candidate identity and proposal skips after <Status> while reporting original findings' -ForEach @(
+        @{ Status = 'FailedWrite' }
+        @{ Status = 'StaleSource' }
+    ) {
+        $Path = Join-Path $TestDrive "$Status.ps1"
+        $Fixture = New-TargetCorrectionFixture -Path $Path -RemainingFinding
         $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
         Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
-        Mock Invoke-AstFileReplacement -ModuleName AstEditor {
-            throw [System.IO.IOException]::new('Simulated commit failure.')
+        if ($Status -eq 'FailedWrite') {
+            Mock Invoke-AstFileReplacement -ModuleName AstEditor {
+                throw [System.IO.IOException]::new('Simulated commit failure.')
+            }
+        } else {
+            [System.IO.File]::WriteAllText($Path, '$External = 3')
         }
 
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
@@ -176,28 +192,36 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         }
 
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
-        $Result.Application.Status | Should -Be 'FailedWrite'
+        $Result.Application.Status | Should -Be $Status
         $Result.Application.ErrorRecord | Should -Not -BeNullOrEmpty
         $Result.Application.CommittedCorrections -is [array] | Should -BeTrue
         $Result.Application.CommittedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
-        $Result.Proposal.CandidateFindings | Should -HaveCount 0
-        $Result.Proposal.SkippedCorrections | Should -HaveCount 0
+        $Result.Proposal.CandidateFindings | Should -HaveCount 1
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Result.Proposal.CandidateFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
+        foreach ($Correction in @($Result.Proposal.AcceptedCorrections) +
+            @($Result.Proposal.SkippedCorrections.Correction) +
+            @($Result.Proposal.CandidateFindings.Corrections)) {
+            $Correction.RuleId | Should -Be 'Nitpick/UseIsNotOperator'
+        }
 
         $Result.Report.AnalysisSource | Should -Be 'Original'
-        $Result.Report.EffectiveText | Should -Be '-not ($Value -is [int])'
-        $Result.Report.EffectiveFindings | Should -HaveCount 1
+        $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
+        $Result.Report.EffectiveFindings | Should -HaveCount 2
+        $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
         [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
             Should -BeExactly $Before
-        [System.IO.File]::ReadAllText($Path) | Should -Be $Fixture.Proposal.OriginalText
+        $ExpectedDiskText = if ($Status -eq 'StaleSource') { '$External = 3' } else { $Fixture.Proposal.OriginalText }
+        [System.IO.File]::ReadAllText($Path) | Should -Be $ExpectedDiskText
     }
 
     It 'preserves the proposal after a noninteractive decline and reports the original snapshot' {
         $Path = Join-Path $TestDrive 'Declined.ps1'
-        $Fixture = New-TargetCorrectionFixture -Path $Path
+        $Fixture = New-TargetCorrectionFixture -Path $Path -RemainingFinding
         $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
         Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Declined targets must not be saved.' }
@@ -231,10 +255,18 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
+        $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
-        $Result.Proposal.SkippedCorrections | Should -HaveCount 0
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Result.Proposal.CandidateFindings | Should -HaveCount 1
+        $Result.Proposal.CandidateFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
+        foreach ($Correction in @($Result.Proposal.AcceptedCorrections) +
+            @($Result.Proposal.SkippedCorrections.Correction) +
+            @($Result.Proposal.CandidateFindings.Corrections)) {
+            $Correction.RuleId | Should -Be 'Nitpick/UseIsNotOperator'
+        }
 
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
         [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |

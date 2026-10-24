@@ -18,6 +18,8 @@ using namespace System.Management.Automation.Language
     stable proposal facts, application outcomes, and effective reporting. PowerShell
     parser errors are reported as Error findings. Rule selection must succeed before
     any targets are read.
+    Native findings and corrections carry the executing rule's qualified RuleId.
+    Parser findings use Nitpick/PowerShellParseError without introducing a selectable rule.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
@@ -228,7 +230,7 @@ function Start-Nitpicking {
             $Summary.TargetCount++
             $TargetFindings = [List[object]]::new()
             foreach ($ParseError in $ParseErrors) {
-                $TargetFindings.Add((New-NitpickFinding `
+                $ParserFinding = New-NitpickFinding `
                     -RuleName 'PowerShellParseError' `
                     -Message $ParseError.Message `
                     -ViolationExtent $ParseError.Extent `
@@ -237,7 +239,9 @@ function Start-Nitpicking {
                     -ScriptPath $TargetPath `
                     -Explanation 'The PowerShell parser could not parse this source.' `
                     -OutputAs NitpickFinding
-                ))
+
+                $ParserFinding.RuleId = 'Nitpick/PowerShellParseError'
+                $TargetFindings.Add($ParserFinding)
             }
 
             $ApplicableRules = [List[NitpickRule]]::new()

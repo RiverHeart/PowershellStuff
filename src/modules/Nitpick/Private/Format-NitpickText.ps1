@@ -27,7 +27,7 @@ function Format-NitpickText {
                     $Item.ViolationExtent.StartColumnNumber
                 Severity = $Item.Severity.ToLowerInvariant()
                 Message = $Item.Message
-                RuleName = $Item.RuleName
+                RuleLabel = Get-NitpickRuleLabel -InputObject $Item
             }
         }
     )
@@ -40,7 +40,7 @@ function Format-NitpickText {
             $Row.Position.PadRight($PositionWidth),
             $Row.Severity.PadRight($SeverityWidth),
             $Row.Message.PadRight($MessageWidth),
-            $Row.RuleName
+            $Row.RuleLabel
     }
 
     return (@($DisplayPath) + $Lines) -join [Environment]::NewLine

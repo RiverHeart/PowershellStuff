@@ -14,6 +14,9 @@ using namespace System.Collections.Generic
     member. Returns a stable proposal containing candidate text, validation diagnostics,
     and candidate findings when rules are supplied. Application never changes these
     facts; a proposal does not claim that edits were written.
+    Execution attribution is retained from the supplied findings and corrections.
+    Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
+    findings without RuleId retain their producer labels in conflict diagnostics.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -124,6 +127,9 @@ function Resolve-NitpickCorrection {
     # MARK: CHANGE SET GROUPING
     # Build all-or-nothing change sets while keeping ungrouped corrections independent.
     foreach ($Correction in $Finding.Corrections) {
+        if ($null -eq $Correction) {
+            continue
+        }
         $ChangeSetKey = if ($Correction.ChangeSetId) {
             "ChangeSet:$($Correction.ChangeSetId)"
         } else {
@@ -213,9 +219,9 @@ function Resolve-NitpickCorrection {
                     Reason = (
                         "{0} Existing rule '{1}', change set '{2}'; incoming rule '{3}', change set '{4}'." -f
                             $_.Exception.Message,
-                            $ExistingCorrection.RuleName,
+                            (Get-NitpickRuleLabel -InputObject $ExistingCorrection),
                             $ExistingCorrection.ChangeSetId,
-                            $IncomingCorrection.RuleName,
+                            (Get-NitpickRuleLabel -InputObject $IncomingCorrection),
                             $IncomingCorrection.ChangeSetId
                     )
                 })

@@ -521,7 +521,7 @@ Describe 'Start-Nitpicking' {
 
         $Results.Count | Should -Be 2
         $Results[0] | Should -BeOfType ([string])
-        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  AvoidParameterAttributeBool$'
+        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool$'
         $Results[1] | Should -BeOfType ([string])
         $Results[1] | Should -Match '^1 finding \(0 errors, 0 warnings, 1 information\) across 1 target in [\d,]+ ms$'
     }
@@ -556,8 +556,8 @@ Describe 'Start-Nitpicking' {
 
         $Lines = $RenderedOutput -split '\r?\n'
         $Lines.Count | Should -Be 3
-        $Lines[1] | Should -Match '^  1:1\s+information\s+First finding\s+OutOfOrder$'
-        $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+OutOfOrder$'
+        $Lines[1] | Should -Match '^  1:1\s+information\s+First finding\s+Local/OutOfOrder$'
+        $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+Local/OutOfOrder$'
     }
 
     It 'previews corrections and summarizes final findings for in-memory input' {

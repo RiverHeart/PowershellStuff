@@ -37,6 +37,8 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Report.EffectiveFindings | Should -HaveCount 1
         $Result.Report.EffectiveFindings[0].GetType().Name | Should -Be 'NitpickFinding'
         $Result.Report.EffectiveFindings[0].Corrections | Should -BeNullOrEmpty
+        $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 0
     }
 
     BeforeEach {
@@ -119,7 +121,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Applied.Report.EffectiveText | Should -BeExactly $Expected
 
         for ($Index = 0; $Index -lt 4; $Index++) {
-            foreach ($Property in @('StartOffset', 'EndOffset', 'ExpectedText', 'ReplacementText', 'ChangeSetId', 'RuleName')) {
+            foreach ($Property in @('StartOffset', 'EndOffset', 'ExpectedText', 'ReplacementText', 'ChangeSetId', 'RuleName', 'RuleId')) {
                 $Applied.Proposal.AcceptedCorrections[$Index].$Property |
                     Should -BeExactly $Preview.Proposal.AcceptedCorrections[$Index].$Property
             }
