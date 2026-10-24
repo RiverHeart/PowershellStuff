@@ -15,7 +15,7 @@ Describe 'Find-Nitpick' {
                 param ($ScriptBlockAst)
             }
 
-            function Measure-ValidNitpick {
+            function Measure-OtherValidNitpick {
                 param ($ScriptBlockAst)
             }
 
@@ -27,16 +27,11 @@ Describe 'Find-Nitpick' {
                 param ($ScriptBlockAst)
             }
 
-            function BareNitpick {
-                param ($ScriptBlockAst)
-            }
-
             Export-ModuleMember -Function @(
                 'Test-ValidNitpick'
-                'Measure-ValidNitpick'
+                'Measure-OtherValidNitpick'
                 'Test-InvalidNitpick'
                 'Get-UnrelatedCommand'
-                'BareNitpick'
             )
         }
         Import-Module -ModuleInfo $RuleModule -Force
@@ -44,101 +39,107 @@ Describe 'Find-Nitpick' {
 
     AfterEach {
         Remove-Module -Name NitpickDiscoveryRules -Force -ErrorAction SilentlyContinue
-        Remove-Module -Name NitpickDiscoveryParent -Force -ErrorAction SilentlyContinue
-        Remove-Module -Name NitpickDiscoveryNestedRules -Force -ErrorAction SilentlyContinue
     }
 
-    It 'returns valid Test and Measure commands from the requested module' {
-        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules
+    It 'returns only the built-in package by default' {
+        $Rules = @(Find-Nitpick)
+
+        $Rules | Should -Not -BeNullOrEmpty
+        @($Rules | Where-Object Namespace -ne Nitpick) | Should -HaveCount 0
+        $Rules.Id | Should -Contain 'Nitpick/UseIsNotOperator'
+    }
+
+    It 'acquires nothing when IncludeDefaults is explicitly suppressed with no Module' {
+        $Rules = @(Find-Nitpick -IncludeDefaults:$false)
+
+        $Rules | Should -HaveCount 0
+    }
+
+    It 'does not discover an unrelated loaded module by default' {
+        $Rules = @(Find-Nitpick)
+
+        $Rules.Name | Should -Not -Contain 'ValidNitpick'
+    }
+
+    It 'acquires an explicitly requested module as a standalone package' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules)
 
         $Rules.Count | Should -Be 2
-        $Rules.Name | Should -Contain 'Test-ValidNitpick'
-        $Rules.Name | Should -Contain 'Measure-ValidNitpick'
+        $Rules.Id | Should -Contain 'NitpickDiscoveryRules/ValidNitpick'
+        $Rules.Id | Should -Contain 'NitpickDiscoveryRules/OtherValidNitpick'
+        $Rules.Namespace | Should -Contain 'NitpickDiscoveryRules'
     }
 
-    It 'filters command names with wildcard patterns' {
-        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules -Name 'Test-*'
+    It 'does not include an exported command missing the required parameter' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules)
 
-        $Rules.Count | Should -Be 1
-        $Rules[0].Name | Should -Be 'Test-ValidNitpick'
+        $Rules.Name | Should -Not -Contain 'InvalidNitpick'
     }
 
-    It 'filters rules by their noun-derived ID' {
-        [CommandInfo[]] $Rules = Find-Nitpick `
-            -IncludeModule NitpickDiscoveryRules `
-            -IncludeRule ValidNitpick
+    It 'does not include an unrelated exported command' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules)
+
+        $Rules.Name | Should -Not -Contain 'UnrelatedCommand'
+    }
+
+    It 'filters rules by wildcard qualified ID' {
+        $Rules = @(Find-Nitpick `
+            -Module NitpickDiscoveryRules `
+            -IncludeRule 'NitpickDiscoveryRules/*Valid*'
+        )
 
         $Rules.Count | Should -Be 2
-        $Rules.Name | Should -Contain 'Test-ValidNitpick'
-        $Rules.Name | Should -Contain 'Measure-ValidNitpick'
     }
 
-    It 'excludes rules by their noun-derived ID' {
-        [CommandInfo[]] $Rules = Find-Nitpick `
-            -IncludeModule NitpickDiscoveryRules `
-            -ExcludeRule ValidNitpick
+    It 'excludes rules by qualified ID' {
+        $Rules = @(Find-Nitpick `
+            -Module NitpickDiscoveryRules `
+            -ExcludeRule 'NitpickDiscoveryRules/*'
+        )
 
         $Rules.Count | Should -Be 0
     }
 
-    It 'uses the command name as the rule ID when no noun is available' {
-        [CommandInfo[]] $Rules = Find-Nitpick `
-            -IncludeModule NitpickDiscoveryRules `
-            -IncludeRule BareNitpick
+    It 'allows unmatched include selectors without raising an error' {
+        $Errors = @()
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules `
+            -IncludeRule 'NitpickDiscoveryRules/MissingRule' -ErrorAction Stop -ErrorVariable Errors)
 
-        $Rules.Count | Should -Be 1
-        $Rules[0].Name | Should -Be 'BareNitpick'
+        $Rules | Should -HaveCount 0
+        $Errors | Should -HaveCount 0
     }
 
-    It 'matches any of multiple name patterns' {
-        [CommandInfo[]] $Rules = Find-Nitpick `
-                -IncludeModule NitpickDiscoveryRules `
-                -Name 'Measure-*', 'Test-DoesNotExist'
+    It 'replaces the built-in default with a single explicit module entry' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules)
 
-        $Rules.Count | Should -Be 1
-        $Rules[0].Name | Should -Be 'Measure-ValidNitpick'
+        @($Rules | Where-Object Namespace -eq Nitpick) | Should -HaveCount 0
+        @($Rules | Where-Object Namespace -eq NitpickDiscoveryRules) | Should -HaveCount 2
     }
 
-    It 'does not return an invalid command that matches the name filter' {
-        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryRules -Name 'Test-InvalidNitpick'
+    It 'accepts multiple module entries additively' {
+        $Rules = @(Find-Nitpick -Module Nitpick, NitpickDiscoveryRules)
 
-        $Rules.Count | Should -Be 0
+        @($Rules | Where-Object Namespace -eq Nitpick) | Should -Not -BeNullOrEmpty
+        @($Rules | Where-Object Namespace -eq NitpickDiscoveryRules) | Should -HaveCount 2
     }
 
-    It 'does not return commands from modules not requested' {
-        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule Nitpick
+    It 'acquires the built-in package alongside an explicit module when IncludeDefaults is specified' {
+        $Rules = @(Find-Nitpick -Module NitpickDiscoveryRules -IncludeDefaults)
 
-        $Rules.Name | Should -Not -Contain 'Test-ValidNitpick'
-        $Rules.Name | Should -Not -Contain 'Measure-ValidNitpick'
+        @($Rules | Where-Object Namespace -eq Nitpick) | Should -Not -BeNullOrEmpty
+        @($Rules | Where-Object Namespace -eq NitpickDiscoveryRules) | Should -HaveCount 2
     }
 
-    It 'returns valid commands exported by nested modules' {
-        $ModuleDirectory = New-Item -Path "$TestDrive/NitpickDiscoveryParent" -ItemType Directory
-        $NestedModulePath = Join-Path $ModuleDirectory.FullName 'NitpickDiscoveryNestedRules.psm1'
-        $ParentModulePath = Join-Path $ModuleDirectory.FullName 'NitpickDiscoveryParent.psd1'
+    It 'writes a non-terminating error and continues past an unresolvable module' {
+        $Errors = @()
+        $Rules = @(
+            Find-Nitpick `
+            -Module 'NitpickDiscoveryRules', 'MissingModule' `
+            -ErrorAction SilentlyContinue `
+            -ErrorVariable Errors
+        )
 
-        Set-Content -Path $NestedModulePath -Value @'
-function Test-NestedNitpick {
-    param ($ScriptBlockAst)
-}
-
-function Test-InvalidNestedNitpick {
-    param ($FilePath)
-}
-
-Export-ModuleMember -Function Test-NestedNitpick, Test-InvalidNestedNitpick
-'@
-        New-ModuleManifest `
-            -Path $ParentModulePath `
-            -NestedModules 'NitpickDiscoveryNestedRules.psm1' `
-            -FunctionsToExport @() `
-            -ModuleVersion '1.0.0'
-        Import-Module -Name $ParentModulePath -Force
-
-        [CommandInfo[]] $Rules = Find-Nitpick -IncludeModule NitpickDiscoveryParent
-
-        $Rules.Count | Should -Be 1
-        $Rules[0].Name | Should -Be 'Test-NestedNitpick'
-        $Rules[0].ModuleName | Should -Be 'NitpickDiscoveryNestedRules'
+        $Rules.Count | Should -Be 2
+        $Errors | Should -Not -BeNullOrEmpty
     }
 }

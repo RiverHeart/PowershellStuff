@@ -35,6 +35,59 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
         $SecondGroup = $Findings[1].Corrections
     }
 
+    It 'returns exactly the proposal schema without application or derived finding groups' {
+        $Proposal = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Properties = @(
+            'Path', 'Document', 'OriginalFingerprint', 'Status', 'OriginalText',
+            'OriginalFindings', 'CandidateText', 'CandidateFindings', 'WasReanalyzed',
+            'AcceptedCorrections', 'SkippedCorrections', 'Conflicts', 'ParseErrors', 'Diff'
+        )
+
+        (Get-Command Resolve-NitpickCorrection).OutputType.Name | Should -Contain 'Nitpick.CorrectionProposal'
+        $Proposal.PSTypeNames[0] | Should -Be 'Nitpick.CorrectionProposal'
+        $Proposal.PSObject.Properties.Name | Should -HaveCount $Properties.Count
+
+        foreach ($Property in $Properties) {
+            $Proposal.PSObject.Properties.Name | Should -Contain $Property
+        }
+
+        foreach ($Removed in @('RenderedText', 'Findings', 'Corrections', 'Application', 'Report', 'WriteStatus', 'WasWritten')) {
+            $Proposal.PSObject.Properties.Name | Should -Not -Contain $Removed
+        }
+
+        $Proposal.Status | Should -Be 'Ready'
+        $Proposal.OriginalText | Should -BeExactly $Source
+        [object]::ReferenceEquals($Proposal.Document, $Document) | Should -BeTrue
+
+        foreach ($Property in @('OriginalFindings', 'CandidateFindings', 'AcceptedCorrections', 'SkippedCorrections', 'Conflicts', 'ParseErrors')) {
+            $Proposal.$Property -is [array] | Should -BeTrue
+        }
+
+        $Proposal.WasReanalyzed | Should -BeTrue
+    }
+
+    It 'keeps zero and single proposal collections as arrays: <Count>' -ForEach @(
+        @{ CaseSource = '$Value = 1'; Count = 0; Status = 'NoChanges' }
+        @{ CaseSource = 'param([Parameter(Mandatory=$true)] [string] $Name)'; Count = 1; Status = 'Ready' }
+    ) {
+        $Document = New-AstDocument -InputObject $CaseSource
+        $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
+        $Findings = @($Rule.Invoke($Document.Ast))
+
+        $Proposal = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Proposal.Status | Should -Be $Status
+
+        foreach ($Property in @('OriginalFindings', 'AcceptedCorrections')) {
+            $Proposal.$Property -is [array] | Should -BeTrue
+            $Proposal.$Property | Should -HaveCount $Count
+        }
+
+        foreach ($Property in @('CandidateFindings', 'SkippedCorrections', 'Conflicts', 'ParseErrors')) {
+            $Proposal.$Property -is [array] | Should -BeTrue
+            $Proposal.$Property | Should -HaveCount 0
+        }
+    }
+
     It 'skips both members when one is <Applicability> but still selects an independent group' -ForEach @(
         @{ Applicability = 'Review' }
         @{ Applicability = 'Unsafe' }
@@ -43,21 +96,25 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
 
         $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
 
-        $Result.WriteStatus | Should -Be 'Preview'
-        $Result.Corrections.Accepted | Should -HaveCount 2
-        $Result.Corrections.Skipped | Should -HaveCount 2
-        $Result.Corrections.Conflicts | Should -HaveCount 0
-        foreach ($Skipped in $Result.Corrections.Skipped) {
+        $Result.Status | Should -Be 'Ready'
+        $Result.AcceptedCorrections | Should -HaveCount 2
+        $Result.SkippedCorrections | Should -HaveCount 2
+        $Result.Conflicts | Should -HaveCount 0
+
+        foreach ($Skipped in $Result.SkippedCorrections) {
             $Skipped.Correction | Should -BeIn $FirstGroup
             $Skipped.Reason | Should -BeExactly "Applicability '$Applicability' is not selected."
         }
-        foreach ($Accepted in $Result.Corrections.Accepted) {
+
+        foreach ($Accepted in $Result.AcceptedCorrections) {
             $Accepted | Should -BeIn $SecondGroup
         }
+
         $Document.Edits.Count | Should -Be 2
-        $Result.RenderedText | Should -BeExactly '-not ($Value -is [int]);  ($Other -isnot [string])'
-        $Result.Findings.Final | Should -HaveCount 1
-        $Result.Findings.Final[0].ViolationExtent.StartOffset | Should -Be 0
+
+        $Result.CandidateText | Should -BeExactly '-not ($Value -is [int]);  ($Other -isnot [string])'
+        $Result.CandidateFindings | Should -HaveCount 1
+        $Result.CandidateFindings[0].ViolationExtent.StartOffset | Should -Be 0
     }
 
     It 'skips the complete group when one member has no native edit' {
@@ -74,12 +131,12 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
             -RuleName $Original.RuleName
 
         $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result.AcceptedCorrections | Should -HaveCount 2
+        $Result.SkippedCorrections | Should -HaveCount 2
+        $Result.SkippedCorrections.Reason | Should -Contain 'Correction does not contain an AstEditor text edit.'
+        $Result.CandidateText | Should -BeExactly '-not ($Value -is [int]);  ($Other -isnot [string])'
 
-        $Result.Corrections.Accepted | Should -HaveCount 2
-        $Result.Corrections.Skipped | Should -HaveCount 2
-        $Result.Corrections.Skipped.Reason | Should -Contain 'Correction does not contain an AstEditor text edit.'
         $Document.Edits.Count | Should -Be 2
-        $Result.RenderedText | Should -BeExactly '-not ($Value -is [int]);  ($Other -isnot [string])'
     }
 
     It 'rejects all selected groups when one authoritative edit is stale' {
@@ -87,21 +144,22 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
 
         $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
 
-        $Result.WriteStatus | Should -Be 'Rejected'
-        $Result.Corrections.Accepted | Should -HaveCount 0
-        $Result.Corrections.Skipped | Should -HaveCount 4
-        $Result.Corrections.Conflicts | Should -HaveCount 0
-        foreach ($Skipped in $Result.Corrections.Skipped) {
+        $Result.Status | Should -Be 'Rejected'
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 4
+        $Result.Conflicts | Should -HaveCount 0
+
+        foreach ($Skipped in $Result.SkippedCorrections) {
             $Skipped.Reason | Should -BeExactly 'AstEditor rejected the target because an edit is stale.'
             $Skipped.Correction.RuleName | Should -Be 'UseIsNotOperator'
             $Skipped.Correction.ChangeSetId | Should -Not -BeNullOrEmpty
         }
+
         $Document.Edits.Count | Should -Be 0
+
         $Result.CandidateText | Should -BeExactly $Source
-        $Result.RenderedText | Should -BeExactly $Source
-        $Result.Findings.Final | Should -HaveCount 2
-        $Result.Corrections.Fixed | Should -HaveCount 0
-        $Result.WasWritten | Should -BeFalse
+        $Result.OriginalText | Should -BeExactly $Source
+        $Result.OriginalFindings | Should -HaveCount 2
     }
 
     It 'attributes conflicts with matching ranges and reasons to distinct producers: <Label>' -ForEach @(
@@ -117,12 +175,14 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
             -EndOffset $Original.TextEdit.EndOffset `
             -ReplacementText $Replacement `
             -Reason $Original.TextEdit.Reason
+
         $CompetingCorrection = New-NitpickCorrection `
             -TextEdit $Edit `
             -FilePathOrContext '<ScriptBlock>' `
             -Description 'Competing operator replacement.' `
             -RuleName 'CompetingRule' `
             -ChangeSetId 'CompetingRule:operator'
+
         $CompetingFinding = New-CompetingFinding `
             -Extent $Findings[0].ViolationExtent `
             -Correction $CompetingCorrection
@@ -132,48 +192,57 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
         } else {
             @($Findings) + $CompetingFinding
         }
+
         $Result = Resolve-NitpickCorrection `
             -Document $Document `
             -Finding $OrderedFindings `
             -Rule $Rule
 
-        $Result.WriteStatus | Should -Be 'Rejected'
-        $Result.Corrections.Accepted | Should -HaveCount 0
-        $Result.Corrections.Skipped | Should -HaveCount 5
-        $Result.Corrections.Conflicts | Should -HaveCount 1
-        $Conflict = $Result.Corrections.Conflicts[0]
+        $Result.Status | Should -Be 'Rejected'
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 5
+        $Result.Conflicts | Should -HaveCount 1
+
+        $Conflict = $Result.Conflicts[0]
+
         $ExpectedExisting = if ($CompetingFirst) { $CompetingCorrection } else { $Original }
         $ExpectedIncoming = if ($CompetingFirst) { $Original } else { $CompetingCorrection }
+
         [object]::ReferenceEquals($Conflict.ExistingCorrection, $ExpectedExisting) | Should -BeTrue
         [object]::ReferenceEquals($Conflict.IncomingCorrection, $ExpectedIncoming) | Should -BeTrue
+
         foreach ($Correction in @($Original, $CompetingCorrection)) {
             $Conflict.Reason | Should -Match ([regex]::Escape($Correction.RuleName))
             $Conflict.Reason | Should -Match ([regex]::Escape($Correction.ChangeSetId))
             $Range = '[{0}, {1})' -f $Correction.StartOffset, $Correction.EndOffset
             $Conflict.Reason | Should -Match ([regex]::Escape($Range))
         }
+
         $Document.Edits.Count | Should -Be 0
-        $Result.RenderedText | Should -BeExactly $Source
-        $Result.Findings.Final | Should -HaveCount 2
+        $Result.CandidateText | Should -BeExactly $Source
+        $Result.OriginalFindings | Should -HaveCount 3
     }
 
     It 'preserves target-wide grouping when different rules deliberately share an ID' {
         $Original = $FirstGroup[1]
         $Edit = New-AstTextEdit -Extent $Document.Ast.EndBlock.Statements[1].Extent `
             -ReplacementText '($Other -isnot [string])' -Reason 'Independent review edit.'
+
         $Correction = New-NitpickCorrection -TextEdit $Edit `
             -FilePathOrContext '<ScriptBlock>' -Description $Edit.Reason `
             -RuleName 'CompetingRule' -ChangeSetId $Original.ChangeSetId -Applicability Review
+
         $Competing = New-CompetingFinding -Extent $Findings[1].ViolationExtent -Correction $Correction
 
         $Result = Resolve-NitpickCorrection -Document $Document `
             -Finding @($Findings[0], $Competing)
 
-        $Result.Corrections.Accepted | Should -HaveCount 0
-        $Result.Corrections.Skipped | Should -HaveCount 3
-        $Result.Corrections.Conflicts | Should -HaveCount 0
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 3
+        $Result.Conflicts | Should -HaveCount 0
+        $Result.CandidateText | Should -BeExactly $Source
+
         $Document.Edits.Count | Should -Be 0
-        $Result.RenderedText | Should -BeExactly $Source
     }
 
     It 'keeps namespaced groups independent when rule-local labels coincide' {
@@ -182,35 +251,35 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
         }
         $Edit = New-AstTextEdit -Extent $Document.Ast.EndBlock.Statements[1].Extent `
             -ReplacementText '($Other -isnot [string])' -Reason 'Independent review edit.'
+
         $Correction = New-NitpickCorrection -TextEdit $Edit `
             -FilePathOrContext '<ScriptBlock>' -Description $Edit.Reason `
             -RuleName 'CompetingRule' -ChangeSetId 'CompetingRule:local' -Applicability Review
+
         $Competing = New-CompetingFinding -Extent $Findings[1].ViolationExtent -Correction $Correction
 
         $Result = Resolve-NitpickCorrection -Document $Document `
             -Finding @($Findings[0], $Competing)
 
-        $Result.Corrections.Accepted | Should -HaveCount 2
-        $Result.Corrections.Skipped | Should -HaveCount 1
-        $Result.Corrections.Skipped[0].Correction | Should -Be $Correction
-        $Result.Corrections.Conflicts | Should -HaveCount 0
-        $Result.RenderedText | Should -BeExactly ' ($Value -isnot [int]); -not ($Other -is [string])'
+        $Result.AcceptedCorrections | Should -HaveCount 2
+        $Result.SkippedCorrections | Should -HaveCount 1
+        $Result.SkippedCorrections[0].Correction | Should -Be $Correction
+        $Result.Conflicts | Should -HaveCount 0
+        $Result.CandidateText | Should -BeExactly ' ($Value -isnot [int]); -not ($Other -is [string])'
     }
 
     It 'rejects the complete rendered batch when a group produces parse errors' {
         $FirstGroup[1].TextEdit.ReplacementText = '('
 
         $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
-
-        $Result.WriteStatus | Should -Be 'FailedValidation'
-        $Result.Corrections.Accepted | Should -HaveCount 0
-        $Result.Corrections.Skipped | Should -HaveCount 4
+        $Result.Status | Should -Be 'FailedValidation'
+        $Result.AcceptedCorrections | Should -HaveCount 0
+        $Result.SkippedCorrections | Should -HaveCount 4
         $Result.ParseErrors.Count | Should -BeGreaterThan 0
         $Result.CandidateText | Should -BeExactly ' ($Value ( [int]);  ($Other -isnot [string])'
-        $Result.RenderedText | Should -BeExactly $Source
-        $Result.Findings.Remaining | Should -HaveCount 2
+        $Result.OriginalText | Should -BeExactly $Source
+        $Result.OriginalFindings | Should -HaveCount 2
         $Result.WasReanalyzed | Should -BeFalse
-        $Result.WasWritten | Should -BeFalse
-        $Result.Corrections.Fixed | Should -HaveCount 0
+        $Result.CandidateFindings | Should -HaveCount 0
     }
 }

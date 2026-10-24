@@ -4,10 +4,13 @@
 
 .DESCRIPTION
     Creates a new Nitpick finding object with the specified properties. When OutputAs is not
-    specified, native Nitpick rule invocations return NitpickFinding objects and direct rule
-    invocations from PSScriptAnalyzer return DiagnosticRecord objects.
+    specified, returns NitpickFinding regardless of which assemblies are loaded.
+    ScriptAnalyzer-compatible rules must explicitly request DiagnosticRecord output.
     Diagnostic conversion omits corrections with a ChangeSetId because ScriptAnalyzer
     cannot preserve their all-or-nothing selection. Ungrouped suggestions remain available.
+    Standalone findings retain producer-supplied local labels and have no qualified RuleId.
+    NitpickRule. Invoke assigns descriptor-owned RuleId and RuleName to native findings
+    and nested corrections, and assigns the same local name to findings' RuleSuppressionID.
 
 .EXAMPLE
     $Finding = New-NitpickFinding `
@@ -52,19 +55,8 @@ function New-NitpickFinding {
 
         [Parameter(HelpMessage = "Specifies the output format for the finding.")]
         [ValidateSet('NitpickFinding', 'DiagnosticRecord')]
-        [string] $OutputAs
+        [string] $OutputAs = 'NitpickFinding'
     )
-
-    if (-not $PSBoundParameters.ContainsKey('OutputAs')) {
-        # Must match NitpickRule.Invoke()'s global (not script) scope; see its comment.
-        $OutputAs = if ($global:NitpickInvocationContext -eq 'Nitpick') {
-            'NitpickFinding'
-        } elseif (Test-AssemblyLoaded -Name 'Microsoft.Windows.PowerShell.ScriptAnalyzer') {
-            'DiagnosticRecord'
-        } else {
-            'NitpickFinding'
-        }
-    }
 
     $Finding = $null
     $FindingParams = @{

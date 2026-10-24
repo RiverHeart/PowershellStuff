@@ -57,7 +57,7 @@ Describe 'New-NitpickFinding' {
         $Finding.SuggestedCorrections.Count | Should -Be 1
     }
 
-    It 'defaults to a ScriptAnalyzer diagnostic outside a Nitpick invocation' {
+    It 'defaults to a native finding even when ScriptAnalyzer is loaded' {
         $Finding = New-NitpickFinding `
             -RuleName Test-Rule `
             -Message 'A problem was found.' `
@@ -68,8 +68,7 @@ Describe 'New-NitpickFinding' {
             -Explanation 'Test explanation.' `
             -Corrections $Correction
 
-        $Finding.GetType().FullName |
-            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
+        $Finding.GetType().Name | Should -Be 'NitpickFinding'
     }
 
     It 'omits coordinated corrections while preserving ungrouped suggestions' -ForEach @(

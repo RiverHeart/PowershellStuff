@@ -2,6 +2,30 @@
 <Configuration>
   <ViewDefinitions>
     <View>
+      <Name>NitpickFinding</Name>
+      <ViewSelectedBy>
+        <TypeName>NitpickFinding</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Location</Label></TableColumnHeader>
+          <TableColumnHeader><Label>RuleId</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Message</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Location</PropertyName></TableColumnItem>
+              <TableColumnItem>
+                <ScriptBlock>if ($_.RuleId) { $_.RuleId } else { $_.RuleName }</ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem><PropertyName>Message</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+    <View>
       <Name>NitpickSummary</Name>
       <ViewSelectedBy>
         <TypeName>NitpickSummary</TypeName>

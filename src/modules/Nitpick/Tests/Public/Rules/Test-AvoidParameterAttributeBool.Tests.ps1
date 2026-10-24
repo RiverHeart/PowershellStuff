@@ -1,4 +1,5 @@
 BeforeAll {
+    Import-Module PSScriptAnalyzer -ErrorAction Stop
     $RulesPath = Join-Path $PSScriptRoot '../../../Nitpick.psm1'
     Import-Module $RulesPath -Force
 }
@@ -12,10 +13,12 @@ Describe 'Test-AvoidParameterAttributeBool' {
             'ValueFromRemainingArguments'
             'DontShow'
         )
+
         $TestMatrix = foreach ($Attribute in $SupportedAttributes) {
             @{ Attribute = $Attribute; Value = '$true' }
             @{ Attribute = $Attribute; Value = '$false' }
         }
+
         $FalseArgumentCases = @(
             @{
                 Position = 'first'
@@ -59,7 +62,6 @@ Describe 'Test-AvoidParameterAttributeBool' {
         ").Ast
 
         $Result = @(Test-AvoidParameterAttributeBool -ScriptBlockAst $ScriptBlockAst)
-
         $Result.Count | Should -Be 1
         $Result[0].RuleName | Should -Be 'AvoidParameterAttributeBool'
         $Result[0].Severity | Should -Be 'Information'
@@ -103,8 +105,8 @@ Describe 'Test-AvoidParameterAttributeBool' {
             -Finding $Findings `
             -Rule $Rule
 
-        $Result.RenderedText | Should -Be $Expected
-        $Result.Corrections.Accepted | Should -HaveCount 1
-        $Result.Findings.Final | Should -HaveCount 0
+        $Result.CandidateText | Should -Be $Expected
+        $Result.AcceptedCorrections | Should -HaveCount 1
+        $Result.CandidateFindings | Should -HaveCount 0
     }
 }

@@ -3,26 +3,27 @@
     Removes one or more Nitpick rules.
 
 .DESCRIPTION
-    Removes registered rules from the module-level Nitpick registry.
+    Removes registered rules from the module-level Nitpick registry by their
+    exact, case-insensitive qualified ID (Namespace/Name).
 
 .EXAMPLE
-    Unregister-Nitpick -Name Test-Formatting -Category Style
+    Unregister-Nitpick -Id Local/Test-Formatting -Category Style
 
 .EXAMPLE
-    Unregister-Nitpick -Name Test*
+    Unregister-Nitpick -Id 'Local/Test*'
 
 .EXAMPLE
     Unregister-Nitpick -All
 #>
 function Unregister-Nitpick {
-    [CmdletBinding(DefaultParameterSetName = 'ByName')]
+    [CmdletBinding(DefaultParameterSetName = 'ById')]
     [OutputType([void])]
     param(
-        [Parameter(Mandatory, ParameterSetName = 'ByName')]
+        [Parameter(Mandatory, ParameterSetName = 'ById')]
         [ValidateNotNullOrEmpty()]
-        [string[]] $Name,
+        [string[]] $Id,
 
-        [Parameter(ParameterSetName = 'ByName')]
+        [Parameter(ParameterSetName = 'ById')]
         [ValidateSet('Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other')]
         [string] $Category,
 
@@ -37,10 +38,10 @@ function Unregister-Nitpick {
         return
     }
 
-    foreach ($RequestedName in $Name) {
+    foreach ($RequestedId in $Id) {
         foreach ($Key in @($Registry.Nitpicks.Keys)) {
             $Nitpick = $Registry.Nitpicks[$Key]
-            if ([string] $Key -like $RequestedName -and
+            if ([string] $Key -like $RequestedId -and
                 ([string]::IsNullOrEmpty($Category) -or $Nitpick.Category -eq $Category)
             ) {
                 $null = $Registry.Nitpicks.Remove($Key)

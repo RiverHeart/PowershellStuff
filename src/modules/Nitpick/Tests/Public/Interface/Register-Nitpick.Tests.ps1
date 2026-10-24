@@ -33,8 +33,8 @@ Describe 'Register-Nitpick' {
 
         InModuleScope Nitpick {
             $Registry = Get-NitpickRegistry
-            $Registry.Nitpicks.ContainsKey('TestRule') | Should -BeTrue
-            $Registry.Nitpicks.TestRule.Category | Should -Be 'Style'
+            $Registry.Nitpicks.ContainsKey('Local/TestRule') | Should -BeTrue
+            $Registry.Nitpicks['Local/TestRule'].Category | Should -Be 'Style'
         }
     }
 
@@ -79,6 +79,13 @@ Describe 'Register-Nitpick' {
         } | Should -Throw '*already registered*'
     }
 
+    It 'recognizes lookup and discovery wrappers for the same exported function' {
+        $Original = Register-Nitpick -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -PassThru
+        $Repeated = Find-Nitpick -IncludeRule 'Nitpick/UseIsNotOperator' |
+            Register-Nitpick -PassThru -ErrorAction Stop
+        [object]::ReferenceEquals($Original, $Repeated) | Should -BeTrue
+    }
+
     It 'replaces a duplicate rule when Force is specified' {
         Register-Nitpick -Callable {
             param ($ScriptBlockAst)
@@ -91,7 +98,7 @@ Describe 'Register-Nitpick' {
         } -Category Performance -Name TestRule -Source Tests -Force
 
         InModuleScope Nitpick {
-            $Rule = (Get-NitpickRegistry).Nitpicks.TestRule
+            $Rule = (Get-NitpickRegistry).Nitpicks['Local/TestRule']
             $Rule.Category | Should -Be 'Performance'
             & $Rule.Callable $null | Should -Be 'new'
         }
@@ -120,7 +127,7 @@ Describe 'Register-Nitpick' {
     It 'registers only included discovered rule IDs' {
         $Rules = @(Register-Nitpick `
             -Module Nitpick `
-            -IncludeRule UseIsNotOperator `
+            -IncludeRule Nitpick/UseIsNotOperator `
             -PassThru)
 
         $Rules.Count | Should -Be 1
@@ -130,11 +137,35 @@ Describe 'Register-Nitpick' {
     It 'does not register excluded discovered rule IDs' {
         $Rules = @(Register-Nitpick `
             -Module Nitpick `
-            -ExcludeRule UseIsNotOperator `
+            -ExcludeRule Nitpick/UseIsNotOperator `
             -PassThru)
 
         $Rules.Name | Should -Not -Contain 'UseIsNotOperator'
         $Rules.Name | Should -Contain 'AvoidParameterAttributeBool'
+    }
+
+    It 'registers only an explicit module package, matching piped Find-Nitpick output' {
+        $RuleModule = New-Module -Name NitpickRegisterDiscoveryRules -ScriptBlock {
+            function Test-RegisterPackageRule {
+                param ($ScriptBlockAst)
+            }
+            Export-ModuleMember -Function Test-RegisterPackageRule
+        }
+        Import-Module -ModuleInfo $RuleModule -Force
+        try {
+            $Rules = @(Register-Nitpick -Module NitpickRegisterDiscoveryRules -PassThru)
+
+            $Rules.Id | Should -Be 'NitpickRegisterDiscoveryRules/RegisterPackageRule'
+
+            InModuleScope Nitpick {
+                (Get-NitpickRegistry).Nitpicks.Clear()
+            }
+            $PipedRules = @(Find-Nitpick -Module NitpickRegisterDiscoveryRules | Register-Nitpick -PassThru)
+
+            $PipedRules.Id | Should -Be 'NitpickRegisterDiscoveryRules/RegisterPackageRule'
+        } finally {
+            Remove-Module -Name NitpickRegisterDiscoveryRules -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It 'registers an existing NitpickRule without reconstructing it' {

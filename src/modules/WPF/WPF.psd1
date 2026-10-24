@@ -258,10 +258,7 @@ PrivateData = @{
 
     # For Nitpick integration
     Linting = @{
-        Rules = @(
-            'Test-AvoidBlockingUI'
-        )
-        RuleModules = @('SubModules/WPFRules/WPF.psd1')
+        RuleModules = @('SubModules/WPFRules/WPFRules.psd1')
     }
 
     PSData = @{
@@ -292,4 +289,3 @@ PrivateData = @{
 # DefaultCommandPrefix = ''
 
 }
-

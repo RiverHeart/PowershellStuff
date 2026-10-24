@@ -7,6 +7,10 @@ using namespace System.Management.Automation
 .DESCRIPTION
     Creates a new Nitpick rule object with the specified properties.
 
+.PARAMETER Namespace
+    The rule's identity namespace. Defaults to Local for scriptblocks and commands
+    without an implementing module, or to the implementing module's name.
+
 .EXAMPLE
     Create scriptblock based Nitpick rule
 
@@ -47,6 +51,10 @@ function New-Nitpick {
         [ValidateNotNullOrEmpty()]
         [string] $Name,
 
+        [Parameter(HelpMessage='The namespace of the nitpick. Defaults to Local for scriptblocks and commands without an implementing module, or to the implementing module''s name.')]
+        [ValidateNotNullOrEmpty()]
+        [string] $Namespace,
+
         [Parameter(HelpMessage='The source of the nitpick. Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Source
@@ -54,7 +62,7 @@ function New-Nitpick {
 
     process {
         $Overrides = @{}
-        foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source') {
+        foreach ($Property in 'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source') {
             if ($PSBoundParameters.ContainsKey($Property)) {
                 $Overrides[$Property] = $PSBoundParameters[$Property]
             }

@@ -2,7 +2,7 @@
 .SYNOPSIS
     Formats findings for one Nitpick target as console-friendly text.
 #>
-function ConvertTo-NitpickText {
+function Format-NitpickText {
     [CmdletBinding()]
     [OutputType([string])]
     param(
@@ -27,7 +27,7 @@ function ConvertTo-NitpickText {
                     $Item.ViolationExtent.StartColumnNumber
                 Severity = $Item.Severity.ToLowerInvariant()
                 Message = $Item.Message
-                RuleName = $Item.RuleName
+                RuleLabel = Get-NitpickRuleLabel -InputObject $Item
             }
         }
     )
@@ -40,7 +40,7 @@ function ConvertTo-NitpickText {
             $Row.Position.PadRight($PositionWidth),
             $Row.Severity.PadRight($SeverityWidth),
             $Row.Message.PadRight($MessageWidth),
-            $Row.RuleName
+            $Row.RuleLabel
     }
 
     return (@($DisplayPath) + $Lines) -join [Environment]::NewLine

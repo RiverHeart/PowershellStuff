@@ -1,3 +1,9 @@
+using namespace System
+using namespace System.Diagnostics
+using namespace System.IO
+using namespace System.Security
+using namespace System.Collections.Generic
+using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 <#
@@ -8,13 +14,53 @@ using namespace System.Management.Automation.Language
     Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
     Ordinary lint behavior is unchanged unless Fix is specified. Fix applies safe,
     validated corrections to file-backed targets using transactional AstEditor saves.
-    In-memory inputs return rendered text without writing. PowerShell parser errors are
-    reported as Error findings.
+    In-memory inputs return candidate text without writing. Correction output separates
+    stable proposal facts, application outcomes, and effective reporting. PowerShell
+    parser errors are reported as Error findings. Rule selection must succeed before
+    any targets are read.
+    Native findings and corrections carry the executing rule's qualified RuleId.
+    Parser findings use Nitpick/PowerShellParseError without introducing a selectable rule.
+
+.PARAMETER IncludeRule
+    Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
+    WPF/AvoidBlockingUI, not command names such as Test-UseIsNotOperator and not bare
+    local names. Matching is case-insensitive and supports wildcards. Every literal
+    selector must match a discovered or registered rule before exclusions and
+    editor-mode filtering. Unmatched wildcard selectors are allowed, provided at
+    least one eligible rule remains.
+
+.PARAMETER Module
+    Module names or literal paths to acquire as additive rule packages, alongside the
+    built-in package and any explicit registrations. Package manifests may declare
+    rule commands and supporting modules; supporting modules use the declared owner's
+    namespace even when acquired directly. Does not register acquired rules.
+
+.PARAMETER ExcludeDefaults
+    Omits the built-in Nitpick package, including when Module is also omitted (in
+    which case no rules are discovered; registered rules may still apply).
+
+.PARAMETER Path
+    A file, directory, or wildcard path. Literal paths must exist. File targets are
+    resolved across all piped paths before analysis or fixing. Empty wildcard matches
+    are allowed, but the complete invocation must select at least one file.
+
+.PARAMETER IncludePath
+    Filters resolved file targets by full path, before ExcludePath is applied.
+    Literal selectors must match a file's full path; wildcard selectors may match
+    nothing. Validation is across the invocation and precedes analysis or fixing.
+
+.PARAMETER ExcludePath
+    Excludes matching full paths. Unmatched exclusions are allowed, but at least one
+    file must remain after filtering. Path filters do not apply to Script inputs.
+
+.PARAMETER ExcludeRule
+    Excludes matching rule IDs. Unmatched exclusions are allowed. If no eligible
+    rules remain after exclusions and editor-mode filtering, execution terminates.
 
 .PARAMETER Fix
     Applies safe corrections against one immutable source snapshot per file. Use Preview
     or WhatIf to inspect the transaction without modifying files. In-memory inputs return
-    rendered text in object output.
+    candidate text in object output under Report.EffectiveText.
 
 .PARAMETER Preview
     Previews safe corrections against one immutable source snapshot per target. Final
@@ -29,7 +75,7 @@ using namespace System.Management.Automation.Language
 
     Start-Nitpicking `
         -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
-        -IncludeRule AvoidParameterAttributeBool `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool `
         -Fix `
         -Preview
 #>
@@ -48,8 +94,7 @@ function Start-Nitpicking {
         [ScriptBlockAstTransform()]
         [ScriptBlockAst] $Script,
 
-        [string[]] $RulePath,
-        [string[]] $RuleModule,
+        [string[]] $Module,
 
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
@@ -63,6 +108,7 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
+        [switch] $ExcludeDefaults,
         [switch] $EditorMode,
         [switch] $NoSummary,
         [switch] $Fix,
@@ -74,44 +120,46 @@ function Start-Nitpicking {
             throw 'The Preview switch requires Fix.'
         }
 
-        Find-Nitpick `
+        [object[]] $Rules = @(Resolve-NitpickEffectiveRuleSet `
+            -Module $Module `
             -IncludeRule $IncludeRule `
-            -ExcludeRule $ExcludeRule |
-        Register-Nitpick
-
-        foreach ($RuleModuleEntry in $RuleModule) {
-            Register-Nitpick -Module $RuleModuleEntry
-        }
-
-        # TODO: Figure out how to register rules from a specified path
-        # foreach ($RulePathEntry in $RulePath) {
-        #     . $RulePathEntry
-        # }
-
-        [object[]] $Rules = Get-Nitpick `
-            -IncludeRule $IncludeRule `
-            -ExcludeRule $ExcludeRule |
-            Where-Object { -not $EditorMode -or $_.EditorEnabled }
-
-        if (-not $Rules) {
-            # TODO: Be more detailed about where we searched for rules
-            Write-Warning "No rules found to apply."
-        }
+            -ExcludeRule $ExcludeRule `
+            -ExcludeDefaults:$ExcludeDefaults `
+            -EditorMode:$EditorMode)
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
-        $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $Stopwatch = [Stopwatch]::StartNew()
         $SeverityRank = @{
             Information = 0
             Warning = 1
             Error = 2
         }
         $ThresholdFindingCount = 0
+        $ResolvedTargets = [List[object]]::new()
+        $CandidatePaths = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     }
 
     process {
         $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            Get-ChildItem -Path $Path -Recurse -Filter $Filter |
+            $Roots = if ([WildcardPattern]::ContainsWildcardCharacters($Path)) {
+                Get-Item -Path $Path -ErrorAction Stop
+            } else {
+                Get-Item -LiteralPath $Path -ErrorAction Stop
+            }
+            $Files = @(
+                foreach ($Root in $Roots) {
+                    if ($Root.PSIsContainer) {
+                        Get-ChildItem -LiteralPath $Root.FullName -File -Recurse -Filter $Filter -ErrorAction Stop
+                    } elseif ($Root -is [FileInfo] -and $Root.Name -like $Filter) {
+                        $Root
+                    }
+                }
+            )
+            foreach ($File in $Files) {
+                [void] $CandidatePaths.Add($File.FullName)
+            }
+            $Files |
                 Where-NitpickIncluded `
                     -PropertyPath FullName `
                     -Include $IncludePath `
@@ -120,8 +168,30 @@ function Start-Nitpicking {
         } else {
             $Script
         }
-
         foreach ($Target in $Targets) {
+            $ResolvedTargets.Add($Target)
+        }
+    }
+
+    end {
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            $UnmatchedPaths = @(
+                foreach ($Selector in $IncludePath) {
+                    if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                        -not $CandidatePaths.Contains($Selector)) {
+                        $Selector
+                    }
+                }
+            )
+            if ($UnmatchedPaths.Count -gt 0) {
+                throw "No file targets match the literal IncludePath selector(s): $($UnmatchedPaths -join ', '). Use full file paths or wildcard filters."
+            }
+            if ($ResolvedTargets.Count -eq 0) {
+                throw 'No file targets remain after resolving paths and applying Filter, IncludePath, and ExcludePath.'
+            }
+        }
+
+        foreach ($Target in $ResolvedTargets) {
             $Document = $null
             $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                 $Target.FullName
@@ -142,14 +212,13 @@ function Start-Nitpicking {
                     $Document.Ast
                 }
                 $ParseErrors = $Document.ParseErrors
-            } catch [System.IO.IOException], [System.IO.InvalidDataException], [System.Security.SecurityException], [System.Management.Automation.ItemNotFoundException], [UnauthorizedAccessException] {
+            } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
                 $Summary.TargetCount++
                 $Summary.FailedTargetCount++
                 if ($Fix) {
                     $ReadFailure = New-NitpickCorrectionResult `
                         -Path $TargetPath `
-                        -WriteStatus FailedRead `
-                        -ErrorRecord $_
+                        -Application @{ Status = 'FailedRead'; ErrorRecord = $_ }
                     if ($Output -eq 'Object') {
                         Write-Output $ReadFailure
                     } else {
@@ -161,9 +230,9 @@ function Start-Nitpicking {
             }
 
             $Summary.TargetCount++
-            $TargetFindings = [System.Collections.Generic.List[object]]::new()
+            $TargetFindings = [List[object]]::new()
             foreach ($ParseError in $ParseErrors) {
-                $TargetFindings.Add((New-NitpickFinding `
+                $ParserFinding = New-NitpickFinding `
                     -RuleName 'PowerShellParseError' `
                     -Message $ParseError.Message `
                     -ViolationExtent $ParseError.Extent `
@@ -171,10 +240,13 @@ function Start-Nitpicking {
                     -RuleSuppressionID 'PowerShellParseError' `
                     -ScriptPath $TargetPath `
                     -Explanation 'The PowerShell parser could not parse this source.' `
-                    -OutputAs NitpickFinding))
+                    -OutputAs NitpickFinding
+
+                $ParserFinding.RuleId = 'Nitpick/PowerShellParseError'
+                $TargetFindings.Add($ParserFinding)
             }
 
-            $ApplicableRules = [System.Collections.Generic.List[NitpickRule]]::new()
+            $ApplicableRules = [List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                     $Ast.Extent.File
@@ -188,119 +260,36 @@ function Start-Nitpicking {
                 }
 
                 $ApplicableRules.Add($Rule)
+
                 foreach ($Finding in $Rule.Invoke($Ast)) {
                     $TargetFindings.Add($Finding)
                 }
             }
 
+            $CorrectionResult = $null
             $FinalFindings = $TargetFindings.ToArray()
-            $CorrectionPreview = $null
             if ($Fix) {
-                $ResolveParameters = @{
-                    Document = $Document
-                    Finding = $TargetFindings.ToArray()
-                    Rule = $ApplicableRules.ToArray()
-                }
-                if ($Ast.Extent.File) {
-                    $ResolveParameters.Path = $Ast.Extent.File
-                }
+                $CorrectionResult = Resolve-NitpickTargetCorrection `
+                    -Preview:$Preview `
+                    -Document $Document `
+                    -Finding $TargetFindings.ToArray() `
+                    -Rule $ApplicableRules.ToArray() `
+                    -Ast $Ast
 
-                $CorrectionPreview = Resolve-NitpickCorrection @ResolveParameters
-                if (-not $CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
-                }
-                if ($CorrectionPreview.Corrections.Accepted.Count -gt 0) {
-                    if (-not $Document.IsFileBacked) {
-                        $CorrectionPreview.WriteStatus = 'InMemory'
-                    } elseif (-not $Preview) {
-                        if ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
-                            $WriteResult = Save-AstDocument `
-                                -Document $Document `
-                                -Confirm:$false `
-                                -WhatIf:$false
-                            $CorrectionPreview.WriteResult = $WriteResult
-                            $CorrectionPreview.ErrorRecord = $WriteResult.ErrorRecord
-                            $CorrectionPreview.WriteStatus = $WriteResult.WriteStatus
-                            $CorrectionPreview.WasWritten = $WriteResult.WasWritten
-                            if ($WriteResult.WasWritten) {
-                                $CorrectionPreview.Corrections.Fixed = $CorrectionPreview.Corrections.Accepted
-                            } else {
-                                $CorrectionPreview.Corrections.Skipped = @($CorrectionPreview.Corrections.Skipped) + @(
-                                    foreach ($Correction in $CorrectionPreview.Corrections.Accepted) {
-                                        [pscustomobject]@{
-                                            Correction = $Correction
-                                            Reason = "Commit failed ($($WriteResult.WriteStatus)): $($WriteResult.ErrorRecord.Exception.Message)"
-                                        }
-                                    }
-                                )
-                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
-                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
-                                $CorrectionPreview.RenderedText = $Document.OriginalText
-                                $CorrectionPreview.WasReanalyzed = $false
-                            }
-                        } else {
-                            $CorrectionPreview.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
-                            if (-not $WhatIfPreference) {
-                                $CorrectionPreview.Findings.Final = $TargetFindings.ToArray()
-                                $CorrectionPreview.Findings.Remaining = $TargetFindings.ToArray()
-                                $CorrectionPreview.RenderedText = $Document.OriginalText
-                                $CorrectionPreview.WasReanalyzed = $false
-                            }
-                        }
-                    }
-                }
-                $FinalFindings = if ($CorrectionPreview.WasReanalyzed) {
-                    $CorrectionPreview.Findings.Final
-                } else {
-                    $TargetFindings.ToArray()
-                }
-                $SkippedEdits = @($CorrectionPreview.Corrections.Skipped.Correction)
-                $ConflictingEdits = @(
-                    $CorrectionPreview.Corrections.Conflicts.ExistingCorrection
-                    $CorrectionPreview.Corrections.Conflicts.IncomingCorrection
-                )
-                $FixedFindings = @($TargetFindings | Where-Object {
-                    $Committed = @($_.Corrections | Where-Object {
-                        $_ -in $CorrectionPreview.Corrections.Fixed
-                    })
-                    $Committed.Count -gt 0
-                })
-                $SkippedFindings = @($TargetFindings | Where-Object {
-                    @($_.Corrections | Where-Object { $_ -in $SkippedEdits }).Count -gt 0
-                })
-                $ConflictedFindings = @($TargetFindings | Where-Object {
-                    @($_.Corrections | Where-Object { $_ -in $ConflictingEdits }).Count -gt 0
-                })
-                $FailedValidationFindings = if ($CorrectionPreview.WriteStatus -eq 'FailedValidation') {
-                    $TargetFindings.ToArray()
-                } else {
-                    @()
-                }
-                $CorrectionPreview.Findings.Fixed = $FixedFindings
-                $CorrectionPreview.Findings.Skipped = $SkippedFindings
-                $CorrectionPreview.Findings.Conflicted = $ConflictedFindings
-                $CorrectionPreview.Findings.FailedValidation = @($FailedValidationFindings)
-                $Summary.FixedFindingCount += $FixedFindings.Count
-                $Summary.SkippedCorrectionCount += $CorrectionPreview.Corrections.Skipped.Count
-                if ($CorrectionPreview.Corrections.Conflicts.Count -gt 0) {
+                $FinalFindings = $CorrectionResult.Report.EffectiveFindings
+                $Summary.FindingsWithCommittedCorrectionsCount +=
+                    $CorrectionResult.Report.FindingsWithCommittedCorrections.Count
+
+                $Summary.SkippedCorrectionCount += $CorrectionResult.Proposal.SkippedCorrections.Count
+
+                if ($CorrectionResult.Proposal.Conflicts.Count -gt 0) {
                     $Summary.ConflictedTargetCount++
                 }
-                if ($CorrectionPreview.WriteStatus -in 'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
-                    $Summary.FailedTargetCount++
-                }
 
-                Write-Verbose (
-                    "Correction preview for '{0}': {1} accepted, {2} skipped." -f
-                    $CorrectionPreview.Path,
-                    $CorrectionPreview.Corrections.Accepted.Count,
-                    $CorrectionPreview.Corrections.Skipped.Count
-                )
-                foreach ($SkippedCorrection in $CorrectionPreview.Corrections.Skipped) {
-                    Write-Verbose (
-                        "Skipped correction from '{0}': {1}" -f
-                        $SkippedCorrection.Correction.RuleName,
-                        $SkippedCorrection.Reason
-                    )
+                if ($CorrectionResult.Proposal.Status -eq 'FailedValidation' -or
+                    $CorrectionResult.Application.Status -in
+                        'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
+                    $Summary.FailedTargetCount++
                 }
             }
 
@@ -324,38 +313,35 @@ function Start-Nitpicking {
                 }
             }
 
-            if ($Output -eq 'Object' -and $CorrectionPreview) {
-                Write-Output $CorrectionPreview
+            if ($Output -eq 'Object' -and $CorrectionResult) {
+                Write-Output $CorrectionResult
             }
 
-            if ($Output -eq 'Text' -and $CorrectionPreview) {
-                Write-Output "Corrections ($($CorrectionPreview.WriteStatus)):`n"
-                Write-Output $CorrectionPreview.Diff
+            if ($Output -eq 'Text' -and $CorrectionResult) {
                 Write-Output (
-                    "`n{0} fixed, {1} accepted, {2} skipped; write status: {3}." -f
-                    $CorrectionPreview.Corrections.Fixed.Count,
-                    $CorrectionPreview.Corrections.Accepted.Count,
-                    $CorrectionPreview.Corrections.Skipped.Count,
-                    $CorrectionPreview.WriteStatus
+                    "Corrections (proposal: {0}; application: {1}):`n" -f
+                    $CorrectionResult.Proposal.Status, $CorrectionResult.Application.Status
+                )
+                Write-Output $CorrectionResult.Proposal.Diff
+                Write-Output (
+                    "`n{0} committed, {1} accepted, {2} skipped." -f
+                    $CorrectionResult.Application.CommittedCorrections.Count,
+                    $CorrectionResult.Proposal.AcceptedCorrections.Count,
+                    $CorrectionResult.Proposal.SkippedCorrections.Count
                 )
             }
 
-            if ($CorrectionPreview -and $CorrectionPreview.WriteResult -and
-                $CorrectionPreview.WriteResult.ErrorRecord
-            ) {
-                $PSCmdlet.WriteError($CorrectionPreview.WriteResult.ErrorRecord)
+            if ($CorrectionResult -and $CorrectionResult.Application.ErrorRecord) {
+                $PSCmdlet.WriteError($CorrectionResult.Application.ErrorRecord)
             }
 
             if ($Output -eq 'Text' -and $FinalFindings.Count -gt 0) {
                 $SortedFindings = $FinalFindings | Sort-Object `
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
-                ConvertTo-NitpickText -Ast $Ast -Finding $SortedFindings
+                Format-NitpickText -Ast $Ast -Finding $SortedFindings
             }
         }
-    }
-
-    end {
         $Stopwatch.Stop()
         $Summary.Duration = $Stopwatch.Elapsed
 

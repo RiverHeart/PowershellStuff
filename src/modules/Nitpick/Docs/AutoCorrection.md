@@ -354,32 +354,21 @@ Allow the previewed correction transaction to be committed safely.
 - `Save-AstDocument` returns `AstEditor.WriteResult` with `WasWritten`,
   `WriteStatus`, `ParseErrors`, and `ErrorRecord`. Expected validation/I/O failures
   are explicit structured outcomes, not success. Callers must inspect the result.
-- Nitpick returns the existing `Nitpick.CorrectionResult` type for both
-  previews and applications. `New-NitpickCorrectionResult` constructs this
-  shared schema, including read-failure results. Outcomes are grouped under
-  `Findings` (`Original`, `Candidate`, `Final`, `Remaining`, `Fixed`, `Skipped`,
-  `Conflicted`, `FailedValidation`) and `Corrections` (`Accepted`, `Fixed`,
-  `Skipped`, `Conflicts`) so identically named outcomes for findings and
-  corrections, such as `Findings.Skipped` versus `Corrections.Skipped`, stay
-  unambiguous. Omitted group properties are empty arrays, optional diagnostics
-  are null, and write/reanalysis flags are false. The helper constructs results
-  only; it does not analyze or apply corrections.
-  `Corrections.Accepted` describes validated selection;
-  only `Corrections.Fixed` and `WasWritten` describe committed edits.
-  `Findings.Fixed` contains original findings with committed corrections, not
-  a claim that every such finding is fully resolved; `Findings.Remaining` holds
-  the effective final analysis. Skipped, conflicting, and failed-validation
-  findings are separate lists under `Findings`.
-- `CandidateText` and `Findings.Candidate` retain preview diagnostics. On failed
-  or declined writes, effective findings and threshold counts revert to the
-  original analysis; `WasReanalyzed` is false and no correction is reported fixed.
-  A stale file is not overwritten or represented as freshly analyzed.
-- Write statuses distinguish `Written`, `Preview`, `WhatIf`, `Declined`,
-  `InMemory`, `NoChanges`, `Rejected`, `FailedValidation`, `StaleSource`,
-  `StaleTarget`, `FailedRead`, and `FailedWrite`. Errors in one target are reported;
-  other targets continue unless the caller requests terminating errors.
-- Object summaries include fixed-finding, skipped-correction, conflicted-target,
-  and failed-target counts while preserving ordinary lint summary text.
+- Nitpick returns one `Nitpick.CorrectionResult` envelope per correction-mode target.
+  `New-NitpickCorrectionResult` constructs its `Proposal`, `Application`, and `Report`
+  groups, including read-failure results. The resolver returns a stable
+  `Nitpick.CorrectionProposal` directly; application never rewrites its facts.
+- `Proposal.CandidateText`, `CandidateFindings`, and `WasReanalyzed` retain candidate
+  diagnostics even after a failed or declined write. Effective findings and threshold
+  counts then use the original snapshot. A stale file is not overwritten or represented
+  as freshly analyzed. Valid accepted corrections do not become skipped when saving fails.
+- Proposal statuses distinguish `Ready`, `NoChanges`, `Rejected`, and `FailedValidation`.
+  Application statuses distinguish `NotAttempted`, `Written`, `Preview`, `WhatIf`,
+  `Declined`, `InMemory`, `FailedValidation`, `StaleSource`, `StaleTarget`, `InvalidTarget`,
+  `FailedRead`, and `FailedWrite`. Errors in one target are reported; other targets
+  continue unless the caller requests terminating errors.
+- Object summaries include findings-with-committed-corrections, proposal-skipped-correction,
+  conflicted-target, and failed-target counts while preserving ordinary lint summary text.
 - Fingerprints detect byte changes up to the final pre-commit check. They are not
   an OS-level compare-and-swap guarantee against an external writer racing the
   replacement itself. A transaction is per target, not across all input files.
@@ -518,8 +507,8 @@ coordinated rule through `Start-Nitpicking` rather than a synthetic correction r
 - `WhatIf` retains candidate analysis without saving or reporting fixed corrections.
 - A simulated failure at AstEditor's file-replacement boundary leaves original bytes
   intact and cleans staging files. Candidate diagnostics remain available; effective
-  text, final findings, summaries, and `ErrorOn` revert to original analysis. All four
-  accepted edits are reported skipped, with none committed.
+  text, effective findings, summaries, and `ErrorOn` use original analysis. All four
+  edits remain accepted in the proposal, with none committed and no added proposal skips.
 - A diagnostic-only redirected match can remain after another group commits.
   Final counts and severity thresholds reflect that remaining finding, not the
   original count or an assumption that successful writes resolve every finding.
@@ -602,43 +591,100 @@ multiple correction passes remain proposed in Phase 7.
 ## Implemented Result Model
 
 Correction workflows return one `Nitpick.CorrectionResult` per target, constructed
-by `New-NitpickCorrectionResult`, with this shared preview/application/failure schema:
+by `New-NitpickCorrectionResult`:
 
 ```text
 Path
-WriteStatus
-OriginalFingerprint
-Document
-WriteResult
-WasWritten
-WasReanalyzed
-Findings
-  Original
-  Candidate
-  Final
-  Remaining
-  Fixed
-  Skipped
-  Conflicted
-  FailedValidation
-Corrections
-  Accepted
-  Fixed
-  Skipped
+Proposal
+  Path
+  Document
+  OriginalFingerprint
+  Status
+  OriginalText
+  OriginalFindings
+  CandidateText
+  CandidateFindings
+  WasReanalyzed
+  AcceptedCorrections
+  SkippedCorrections
   Conflicts
-ParseErrors
-CandidateText
-RenderedText
-Diff
-ErrorRecord
+  ParseErrors
+  Diff
+Application
+  Status
+  CommittedCorrections
+  WriteResult
+  ErrorRecord
+Report
+  AnalysisSource
+  EffectiveText
+  EffectiveFindings
+  FindingsWithCommittedCorrections
 ```
 
-`Corrections.Accepted` describes validated selection, not a committed write.
-`Corrections.Fixed` and `WasWritten` identify committed edits; `Findings.Fixed`
-identifies original findings with committed corrections, not guaranteed resolution.
-`Findings.Remaining` holds effective final findings. Omitted group properties are
-empty arrays. `PassCount`, per-pass outcomes, and a separate `IntroducedFindings`
-property are not part of the current result contract.
+`Resolve-NitpickCorrection` returns just the proposal above, with type name
+`Nitpick.CorrectionProposal`. Its document retains the queued transaction; its facts
+are not mutated by application or reporting.
+The document is a mutable transaction handle, not an immutable diagnostic value.
+Consumers must not change queued edits between resolution and application. Apply the
+same transaction rather than rebuilding edits from the proposal's diagnostic fields.
+See [correction lifecycle ownership](../CONTEXT.md#correction-lifecycle-ownership)
+for component responsibilities.
+
+`Application.CommittedCorrections` is populated only by a successful write.
+`Report.FindingsWithCommittedCorrections` contains each original finding once if any
+associated correction was committed, not a claim of complete resolution.
+`Report.EffectiveFindings` holds the analysis used for pipeline output, severity
+counts, and thresholds. `AnalysisSource` is `Original`, `Candidate`, or `None`.
+
+Preview, WhatIf, in-memory results, and successful writes expose valid candidate text
+and candidate findings when reanalysis is available. Without reanalysis, effective
+findings remain original and `AnalysisSource` says so, even when effective text is the
+candidate. Failed or declined writes expose original text and findings. A rejected or
+invalid candidate is never reported as a successful preview. With no changes, valid
+candidate reanalysis can still be used, but application is `NotAttempted`.
+`AnalysisSource` identifies the source analyzed by `EffectiveFindings`; it does not
+identify the source of `EffectiveText`.
+
+Read failures have a null proposal, application status `FailedRead`, an error record,
+and no report analysis. No-Fix invocations do not emit correction envelopes.
+Arrays remain arrays, including empty and singleton collections; absent optional
+records are null.
+
+The constructor validates recognized application statuses and analysis sources and
+rejects contradictory states before emitting an envelope. Committed corrections and
+their attributed findings require `Written`; a written application requires a Ready
+proposal and successful AstEditor write evidence, and committed edits must belong to
+the accepted proposal. Candidate reporting requires valid candidate reanalysis and
+an outcome that permits using it. `None` cannot contain effective text or findings.
+`FailedRead` requires an error, no proposal, and no analysis. An uninitialized default
+envelope remains valid. Validation does not repair input or freeze returned objects.
+
+### Breaking migration
+
+There are no compatibility aliases for the previous result shape:
+
+| Previous field | Replacement |
+| --- | --- |
+| `WriteStatus` | `Proposal.Status` for resolution; `Application.Status` for application |
+| `RenderedText` | `Report.EffectiveText` on envelopes; `CandidateText` on proposals |
+| `Findings.Final` / `Findings.Remaining` | `Report.EffectiveFindings` |
+| `Findings.Candidate` | `Proposal.CandidateFindings` |
+| `Findings.Fixed` | `Report.FindingsWithCommittedCorrections` |
+| `Corrections.Accepted` | `Proposal.AcceptedCorrections` |
+| `Corrections.Fixed` | `Application.CommittedCorrections` |
+| `Corrections.Skipped` / `Corrections.Conflicts` | `Proposal.SkippedCorrections` / `Proposal.Conflicts` |
+| `WasReanalyzed` | `Proposal.WasReanalyzed`, now an enduring fact |
+| `WasWritten` | Successful `Application.Status` is `Written`; underlying write result also retains its flag |
+| Summary `FixedFindingCount` | `FindingsWithCommittedCorrectionsCount` |
+
+Derived skipped/conflicted/failed-validation finding lists are no longer returned;
+proposal corrections and validation diagnostics describe those decisions directly.
+`SkippedCorrectionCount` now counts proposal-stage skips only, not accepted edits whose
+application failed. `ConflictedTargetCount` counts each target with conflicts once.
+`FailedTargetCount` counts each read, validation, or persistence failure once; conflict-only
+rejection, preview, WhatIf, in-memory results, and user declines are not failures.
+`PassCount`, per-pass outcomes, and `IntroducedFindings` remain outside this contract.
 
 ## Suggested Delivery Order
 

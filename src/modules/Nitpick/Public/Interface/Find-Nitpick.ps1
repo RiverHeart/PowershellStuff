@@ -1,24 +1,58 @@
-using namespace System.Collections.Generic
 using namespace System.Management.Automation
 
 <#
 .SYNOPSIS
-    Finds valid Nitpick rules exported by loaded modules.
+    Acquires Nitpick rule packages, defaulting to the built-in package.
 
 .DESCRIPTION
-    Finds exported Test and Measure commands with the required Nitpick callable
-    signature. Selected modules and their nested modules are searched. Only
-    modules already loaded in the current session are inspected.
+    Returns identity-bearing NitpickRule descriptors for one or more rule
+    packages. With no Module, only the built-in Nitpick package is acquired.
+    Specifying Module acquires only the requested package(s), replacing the
+    built-in default, unless IncludeDefaults is also specified to acquire both
+    together. Ambient loaded modules are never scanned.
+
+    Each requested module name or literal path is resolved and acquired as an
+    explicit rule package: its declared PrivateData.Linting is read, its
+    RuleModules declaration graph is statically validated before anything is
+    imported, and the resulting descriptors are stamped with their owning
+    module's namespace. Supporting modules declare that owner with
+    PrivateData.Linting.OwnerModule and must be listed by the owner in
+    RuleModules. A module with no Linting declaration contributes only its
+    own standalone-compatible exported commands.
+
+.PARAMETER Module
+    Module names or literal paths to acquire as explicit rule packages.
+    Omitted, this acquires only the built-in Nitpick package.
+
+.PARAMETER IncludeRule
+    Selects rule IDs (Namespace/Name), such as WPF/AvoidBlockingUI. Supports
+    wildcards. Unmatched selectors are silently excluded; this command does
+    not validate selectors the way Start-Nitpicking and Register-Nitpick do.
+
+.PARAMETER ExcludeRule
+    Excludes matching rule IDs. Supports wildcards.
+
+.PARAMETER IncludeDefaults
+    Also acquires the built-in Nitpick package alongside explicitly requested
+    Module entries, instead of Module replacing it. Has no effect on its own
+    (the built-in package is already acquired) when Module is omitted; pass
+    -IncludeDefaults:$false with no Module to acquire nothing instead.
 
 .EXAMPLE
-    Returns all valid Nitpick rules from the currently loaded modules.
+    Returns all valid Nitpick rules from the built-in package.
 
     Find-Nitpick
 
 .EXAMPLE
-    Returns all valid Nitpick rules from the specified modules.
+    Acquires only the explicitly requested rule package, replacing the
+    built-in default.
 
-    Find-Nitpick -IncludeModule Nitpick, MyNitpickRules
+    Find-Nitpick -Module WPF
+
+.EXAMPLE
+    Acquires an explicit rule package additively with the built-in package.
+
+    Find-Nitpick -Module WPF -IncludeDefaults
 
 .EXAMPLE
     Pipes the output of Find-Nitpick to Register-Nitpick.
@@ -27,80 +61,34 @@ using namespace System.Management.Automation
 #>
 function Find-Nitpick {
     [CmdletBinding()]
-    [OutputType([System.Management.Automation.CommandInfo])]
+    [OutputType([object])]
     param(
-        [string[]] $Name,
-
+        [string[]] $Module,
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
-
-        [string[]] $IncludeModule,
-        [string[]] $ExcludeModule
+        [switch] $IncludeDefaults
     )
 
-    $DefaultInclude = @('Test-*', 'Measure-*')
+    $ShouldIncludeDefaults = if ($PSBoundParameters.ContainsKey('IncludeDefaults')) {
+        [bool] $IncludeDefaults
+    } else {
+        -not $Module
+    }
 
-    $PendingModules = [Queue[PSModuleInfo]]::new()
-    Get-Module |
-        Where-NitpickIncluded `
-            -PropertyPath Name `
-            -Include $IncludeModule `
-            -Exclude $ExcludeModule `
-            -Wildcard |
-        ForEach-Object {
-            $PendingModules.Enqueue($_)
-        }
+    $Modules = @()
+    $Modules += $Module
+    if ($ShouldIncludeDefaults) { $Modules += 'Nitpick' }
+    $Modules = $Modules | Select-Object -Unique
 
-    $VisitedModules = [HashSet[PSModuleInfo]]::new()
-    $DiscoveredCommands = [HashSet[string]]::new(
-        [System.StringComparer]::OrdinalIgnoreCase
-    )
-
-    while ($PendingModules.Count -gt 0) {
-        $CurrentModule = $PendingModules.Dequeue()
-        if (-not $VisitedModules.Add($CurrentModule)) {
+    foreach ($Entry in $Modules) {
+        try {
+            $PackageRules = Get-NitpickPackage -Module $Entry -ErrorAction Stop
+        } catch {
+            Write-Error -ErrorRecord $_
             continue
         }
 
-        $CurrentModule.NestedModules | ForEach-Object {
-            $PendingModules.Enqueue($_)
-        }
-
-        $CurrentModule.ExportedCommands.Values |
-            Where-Object {
-                $Command = $_
-                $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
-
-                $IncludePatterns = if ($IncludeRule) { $IncludeRule } else { $DefaultInclude }
-                $IncludeValue = if ($IncludeRule) { $RuleName } else { $Command.Name }
-                $IsIncluded = $IncludePatterns | Where-Object { $IncludeValue -like $_ }
-                $IsExcluded = $ExcludeRule | Where-Object { $RuleName -like $_ }
-
-                if (-not $IsIncluded -or $IsExcluded) {
-                    return $false
-                }
-
-                if ($Command.Parameters.Keys -notcontains 'ScriptBlockAst') {
-                    return $false
-                }
-
-                if (-not $Name) {
-                    return $true
-                }
-
-                return [bool] ($Name | Where-Object {
-                    $Command.Name -like $_
-                })
-            } |
-            Where-Object {
-                $CommandIdentity = '{0}|{1}|{2}|{3}' -f @(
-                    $_.Module.Guid
-                    $_.Module.Version
-                    $_.Module.Path
-                    $_.Name
-                )
-                # Returns true for new items, false for duplicates.
-                $DiscoveredCommands.Add($CommandIdentity)
-            }
+        $PackageRules |
+            Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard
     }
 }

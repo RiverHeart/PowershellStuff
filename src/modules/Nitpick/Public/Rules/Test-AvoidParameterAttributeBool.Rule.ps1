@@ -8,6 +8,11 @@
     The rule suggests using the `[Parameter(<Attribute>)]` when the parameter is required,
     and omitting the attribute when the parameter is optional.
 
+.PARAMETER Context
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
+    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
+    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+
 .EXAMPLE
     Test-AvoidParameterAttributeBool -ScriptBlockAst {
         param(
@@ -23,6 +28,9 @@ function Test-AvoidParameterAttributeBool {
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
         [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+
+        [Parameter(ParameterSetName='ScriptBlockAst')]
+        [System.Collections.IDictionary] $Context,
 
         [Parameter(ParameterSetName='Details')]
         [switch] $Details
@@ -46,6 +54,9 @@ function Test-AvoidParameterAttributeBool {
             Severity = 'Information'
             Explanation = 'Assigning Boolean values to Parameter attribute arguments is unnecessary and makes them harder to read.'
         }
+        $Behavior = $Context.RuleBehavior
+        $ShouldRecurse = if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false } else { $Behavior.SearchNestedScriptBlocks }
+        $OutputAs = if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' } else { $Behavior.OutputType }
     }
 
     process {
@@ -58,7 +69,7 @@ function Test-AvoidParameterAttributeBool {
                 $Ast -is [System.Management.Automation.Language.AttributeAst] -and
                     $Ast.TypeName.Name -eq 'Parameter' -and
                     $Ast.Parent -is [System.Management.Automation.Language.ParameterAst]
-            }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
+            }, $ShouldRecurse <# ScriptAnalyzer analyzes nested scopes separately; native callers opt into recursion. #>)
 
             $MatchingArguments = foreach ($AttributeAst in $ParameterAttributes) {
                 $AttributeAst.NamedArguments | Where-Object {
@@ -110,6 +121,7 @@ function Test-AvoidParameterAttributeBool {
                     -Corrections $Correction `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `
+                    -OutputAs $OutputAs
 
                 Write-Output $Finding
             }

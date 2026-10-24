@@ -100,6 +100,15 @@ Existing PSScriptAnalyzer-style rules can remain supported during migration thro
 - Ensure one rule failure can be attributed and handled without terminating unrelated rules.
 - Benchmark dispatch overhead against independent `FindAll` calls on representative files and rule sets.
 - Determine how module manifests advertise native rules versus PSScriptAnalyzer-compatible entry points.
+- Decide where a rule's identity (the single local name shared by display and suppression)
+  is declared once this adapter model is real. Today, a command-backed rule re-derives its
+  own identity independently in two places — once in `NitpickRule`'s constructor (via
+  `Get-Command`'s `.Noun`) and again inside the rule body itself (via
+  `$PSCmdlet.MyInvocation.MyCommand.Noun`) — purely so the rule still knows its own name
+  when PSScriptAnalyzer invokes it directly with no coordinator present. An adapter-based
+  compatibility model could remove that duplication and let a rule become a purely
+  declarative descriptor with one source of truth for identity, rather than imperative code
+  that must stay self-aware of its own name.
 
 ## Suggested Implementation Sequence
 
