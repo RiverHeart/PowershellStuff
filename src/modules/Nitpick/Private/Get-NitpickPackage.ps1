@@ -7,8 +7,8 @@
     namespace, statically validates its complete RuleModules declaration graph
     before importing anything, then imports only the modules needed to obtain
     declared or standalone rules. A rule-modules-only declaration never imports
-    its own parent. All acquired rules are stamped with the top-level requested
-    package's namespace, regardless of which nested module implements them.
+    its own parent. Rules use the module namespace declared as their owner, which
+    may differ from both the requested package and implementing module.
 
 .PARAMETER Module
     A module name or literal path identifying the top-level rule package source.
@@ -35,12 +35,12 @@ function Get-NitpickPackage {
     }
 
     $PackageGraph = Resolve-NitpickPackageGraph -TopLevel $TopLevel -ErrorAction Stop
-    $Namespace = $TopLevel.Name
 
     foreach ($NodeKey in $PackageGraph.Graph.GetTopologicalOrder()) {
         $Node = $PackageGraph.Nodes[$NodeKey]
         $NodeModule = $Node.Module
         $Linting = $Node.Linting
+        $Namespace = $Node.Namespace
 
         $NeedsOwnImport = (-not $Linting.HasLinting) -or ($Linting.Rules.Count -gt 0)
 

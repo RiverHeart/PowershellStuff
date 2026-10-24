@@ -11,6 +11,8 @@ qualified IDs. `RuleName` remains the coordinator-assigned local name; findings'
 `RuleSuppressionID` carries that same local value for diagnostic conversion. Corrections
 have no suppression field. These are transitional fields: the long-term direction is a
 single `RuleId`, but this phase does not change helper signatures or suppression semantics.
+Suppression remains local-name based, so equally named rules in different namespaces share
+that behavior.
 
 Parser findings use `Nitpick/PowerShellParseError`; that attribution does not create a
 selectable rule or registry entry. Direct producer/helper invocation bypasses coordinated
@@ -86,68 +88,73 @@ result schema, safety boundaries, and remaining work.
 
 ## Gotchas
 
-For the proposed replacement of ambient discovery with explicit manifest-declared
-packages and qualified rule IDs, see [Manifest-Declared Rule Packages](Docs/RulePackages.md).
-That plan does not change the current behavior documented below.
+For the manifest contract and package ownership behavior, see
+[Manifest-Declared Rule Packages](Docs/RulePackages.md).
 
-### Loading custom rule modules
+### Acquiring rule packages
 
-Use `-RulePath` to import trusted rule modules before discovery:
+Pass module names or literal module paths to `Find-Nitpick` or `Start-Nitpicking -Module`:
 
 ```powershell
-Start-Nitpicking -Path .\Example.ps1 -RulePath .\MyRules
-Start-Nitpicking -Path .\Example.ps1 -RulePath .\MyRules\MyRules.psd1
-Start-Nitpicking -Path .\Example.ps1 -RulePath .\MyRules\MyRules.psm1 -IncludeRule MyRule
+Find-Nitpick -Module .\MyRules\MyRules.psd1
+Start-Nitpicking -Path .\Example.ps1 -Module .\MyRules\MyRules.psd1 `
+    -IncludeRule MyRules/MyRule
 ```
 
-`-RulePath` accepts multiple literal filesystem paths: module directories, `.psd1`
-manifests, `.psm1` script modules, and `.dll` binary modules. Directories are passed to
-`Import-Module` for PowerShell to resolve, including module layouts that use a manifest
-or binary entrypoint. Loose `.ps1` scripts, wildcard expansion, and recursive module
-searches are not supported. All path entries are validated before any imports; invalid
-paths and import errors terminate before analysis or fixing. A `.psd1` must be a module
-manifest, not a rule-settings data file.
+Replace legacy `-RulePath` or `-RuleModule` arguments with `-Module`. Native
+`-IncludeRule`/`-ExcludeRule` selectors now use qualified `Namespace/LocalName` IDs;
+bare local names and callable command names are not inferred.
 
-Modules must export their rule commands. Default discovery selects `Test-*` and
-`Measure-*` commands with a `ScriptBlockAst` parameter and also inspects nested modules.
-Include and exclude selectors use canonical rule names, as described below.
-Imports use temporary module scopes without forced reloads, so rule commands are not
-exported into the caller's global scope. Path-loaded rules are included only when requested;
-they are not automatically registered or rediscovered through temporary scope references.
-This is not an unloading guarantee: module state and import side effects can persist.
-Module imports execute code; only load rule packages you trust.
+Acquisition is explicit: Nitpick does not scan ambient loaded modules. A module can declare
+its own exported rule commands with `PrivateData.Linting.Rules` and compose supporting
+modules with `PrivateData.Linting.RuleModules`, using paths relative to the declaring
+manifest. A module with no `Linting` declaration can still be acquired directly; Nitpick
+then discovers compatible exported `Test-*` and `Measure-*` commands.
 
-`-RuleModule` includes rules from already loaded modules; it does not import them.
-Automatic discovery of other loaded rule modules remains unchanged.
+A supporting rule module declares its owner with `PrivateData.Linting.OwnerModule`, a
+relative path to the owner's manifest. The owner must list that supporting module in
+`RuleModules`. Nitpick validates both sides before importing, and uses the owner's module
+name as the namespace whether the rule is acquired through the owner or directly. For
+example, WPFRules declares WPF as its owner, so both `Find-Nitpick -Module WPF` and direct
+acquisition of WPFRules produce `WPF/AvoidBlockingUI`.
+
+Package imports execute module code and may load assemblies or leave other process-level
+effects; scoped imports are not an unloading guarantee. Only acquire trusted modules.
+The module name `Local` is reserved for module-less registrations and cannot own a package.
+Rule declarations currently use command callables; typed AST rule declarations remain
+proposed, as described in [Typed AST Rule Dispatch](Docs/TypedAstRuleDispatch.md).
 
 ### Discovery versus registration
 
 `Start-Nitpicking` builds an invocation-local rule list without modifying the registry.
-This intentionally replaces its previous automatic registration behavior.
 Use `Register-Nitpick` explicitly for persistent rules, scriptblock callables, or metadata
-overrides such as category and editor enablement. `Get-Nitpick` lists only those explicit
-registrations, not the rules automatically discovered by the last lint invocation.
+overrides such as category and editor enablement. Scriptblock registrations default to
+the `Local` namespace; use `-Namespace` when a scriptblock has an explicit owner.
+`Get-Nitpick` lists explicit registrations, not package rules acquired for the last
+invocation. `Find-Nitpick` acquires the built-in Nitpick package by default; specifying
+`-Module` replaces that default unless `-IncludeDefaults` is also passed. In contrast,
+`Start-Nitpicking -Module` adds packages alongside built-in rules unless `-ExcludeDefaults`
+is specified.
 
 An explicitly registered rule takes precedence over discovery of the same callable,
 preserving its metadata and running it only once. Different callables with the same
-case-insensitive canonical name terminate rule selection before analysis or fixing.
+case-insensitive qualified Rule ID terminate selection before analysis or fixing.
 Excluded rules do not participate in conflict checks; editor-mode filtering follows them.
 Failed selection does not partially populate the registry.
 
-`Unregister-Nitpick` removes a registration, not an exported command. A rule from a
-loaded module can still be discovered afterward; use `-ExcludeRule` to prevent execution.
-Nested rule packages remain supported, but discovery ignores removed nested modules
-and temporary scopes that are not in PowerShell's loaded-module list.
+`Unregister-Nitpick` removes a registration, not a package declaration or exported command.
+Use `-ExcludeRule` to prevent an acquired rule from executing.
 
 ### Rule selection must succeed before execution
 
-`Start-Nitpicking -IncludeRule` accepts canonical rule names such as
-`UseIsNotOperator`, not callable names such as `Test-UseIsNotOperator`.
-Matching is case-insensitive and supports wildcards. Every literal include selector must
-match at least one discovered or registered rule; a valid selector alongside a typo
-does not permit a partial run. Unmatched selectors cause a terminating error before
-targets are read, findings or summaries are emitted, or fixes are applied.
-Unmatched wildcard selectors are allowed if at least one eligible rule remains.
+`Start-Nitpicking -IncludeRule` accepts qualified IDs such as
+`Nitpick/UseIsNotOperator` and `WPF/AvoidBlockingUI`, not local names or command names
+such as `Test-UseIsNotOperator`. Matching is case-insensitive and supports wildcards.
+Every literal include selector must match at least one discovered or registered rule;
+a valid selector alongside a typo does not permit a partial run. Unmatched selectors
+cause a terminating error before targets are read, findings or summaries are emitted,
+or fixes are applied. Unmatched wildcard selectors are allowed if at least one eligible
+rule remains.
 
 Include selectors are validated before exclusions and editor-mode filtering.
 Unmatched exclusions are allowed, but if exclusions or `-EditorMode` leave no eligible
@@ -156,8 +163,8 @@ registered rules also terminates. These selection errors stop execution even wit
 `-ErrorAction Stop`; `-ErrorOn` remains the separate threshold for emitted findings.
 
 Discovery remains permissive: `Find-Nitpick` may return no matches without error.
-Use `Find-Nitpick` to discover callable commands and `Get-Nitpick` to inspect
-registered rules and their canonical names.
+Use `Find-Nitpick` to acquire rule descriptors and `Get-Nitpick` to inspect registered
+rules and their qualified IDs.
 
 File targets are resolved across all piped `-Path` values before analysis or fixing.
 Literal paths must exist; wildcard paths can match nothing. Only files count as targets,

@@ -7,6 +7,7 @@
     available, without importing the module. Distinguishes an absent Linting
     declaration (triggers standalone exported-command discovery) from a present,
     possibly empty, declaration (only its own Rules/RuleModules fields contribute).
+    OwnerModule, when present, identifies a supporting package's owner.
 
 .PARAMETER Module
     A resolved Nitpick.Module descriptor, as returned by Resolve-NitpickModuleSource.
@@ -28,6 +29,7 @@ function Get-NitpickModuleLinting {
         HasLinting = $false
         Rules = @()
         RuleModules = @()
+        OwnerModule = $null
     }
 
     if (-not $Module.ManifestPath) {
@@ -64,6 +66,14 @@ function Get-NitpickModuleLinting {
         if ($Result.RuleModules | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
             throw "Manifest '$($Module.ManifestPath)' declares an empty or whitespace-only PrivateData.Linting.RuleModules entry."
         }
+    }
+
+    if ($Linting.ContainsKey('OwnerModule')) {
+        if ($Linting.OwnerModule -isnot [string] -or
+            [string]::IsNullOrWhiteSpace($Linting.OwnerModule)) {
+            throw "Manifest '$($Module.ManifestPath)' declares an invalid PrivateData.Linting.OwnerModule; expected a nonempty relative path string."
+        }
+        $Result.OwnerModule = $Linting.OwnerModule
     }
 
     return $Result

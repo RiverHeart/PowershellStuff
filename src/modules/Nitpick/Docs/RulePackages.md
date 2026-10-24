@@ -6,8 +6,12 @@ Plans are not immutable and may be changed with user permission. Unforeseen prob
 
 ## Status
 
-Phases 0 through 5 are implemented; Phases 6 and 7 remain proposed.
-Phase 6 still owns WPF migration and the broader documentation cutover.
+Phases 0 through 6 are implemented; Phase 7 remains proposed.
+Phase 6 still owns WPF migration and the broader documentation cutover. It now also
+clarifies module ownership: a supporting rule module declares its owner through
+`Linting.OwnerModule`, and the owner must declare that supporting module through
+`Linting.RuleModules`. Both acquisition routes use the owner's module name as the rule
+namespace; arbitrary namespace overrides remain out of scope.
 
 The package contracts live in [RulePackages.Contracts.Tests.ps1](../Tests/RulePackages.Contracts.Tests.ps1);
 execution and display attribution also have focused coverage in
@@ -40,7 +44,8 @@ the cutover must be deliberate, documented, and covered by tests.
 - A new PSScriptAnalyzer adapter, mandatory compatibility break, or new correction engine.
 - Automatic installation, recursive filesystem searches, wildcard module sources,
   automatic reloads, or guaranteed unloading.
-- Configurable namespaces for manifest-declared packages.
+- Arbitrary namespace overrides for manifest-declared packages; a validated
+  `OwnerModule` relationship may identify a supporting module's owner.
 - Version-qualified rule IDs, rule aliases, or automatic short-name resolution.
 - A security sandbox for imported rule code.
 
@@ -63,8 +68,9 @@ Loaded-module lookup is still useful for resolving an explicitly requested name.
 
 - **Rule package**: A module-owned collection of rules, including rules implemented
   by its declared supporting rule modules.
-- **Namespace**: The logical owner of a native rule identity. A package uses the
-  declaring module's name; a module-less registration uses `Local` by default.
+- **Namespace**: The logical owner of a native rule identity. A standalone package
+  uses its own module name; a supporting package uses its validated owner's name.
+  A module-less registration uses `Local` by default.
 - **Local rule name**: The canonical callable noun, such as `AvoidBlockingUI`,
   without the `Test-` or `Measure-` verb. Scriptblocks supply their own local name.
 - **Rule ID**: The qualified native identity, `Namespace/Name`, such as
@@ -83,7 +89,8 @@ whitespace-only value, or wildcard syntax. Validate them through one shared help
 ownership from their execution scope. Command registrations default to their implementing
 module's name, or `Local` for non-module commands. Explicit registration may specify
 `-Namespace` to group its rules.
-Manifest metadata and callable `Details` must not override package ownership.
+Only a validated `OwnerModule` relationship can assign a supporting package to an owner;
+callable `Details` cannot override the resulting namespace.
 
 Native selection, registry keys, findings, correction attribution, and conflict
 diagnostics use `Id`. Preserve the local name separately for existing external
@@ -168,6 +175,22 @@ PrivateData = @{
 - `RuleModules` identifies dedicated rule modules through literal paths relative to
   the declaring manifest. Do not resolve these through the caller's working directory
   or `PSModulePath`. Reject absolute declaration paths and non-filesystem sources.
+- A supporting rule module identifies its owning module with `Linting.OwnerModule`, a
+  literal path relative to the supporting module's manifest. For example:
+
+  ```powershell
+  PrivateData = @{
+      Linting = @{
+          OwnerModule = '../../WPF.psd1'
+          Rules = @('Test-AvoidBlockingUI')
+      }
+  }
+  ```
+
+  The owner must reciprocally list the supporting module in `RuleModules`. Resolve and
+  validate both declarations before importing; derive the namespace from the resolved
+  owner's module name. Directly selecting a supporting module returns its rules under
+  that same owner namespace, without importing the owner module's runtime.
 - The fields are cumulative, not invocation-level include filters.
 - With `Linting` present, only declarations contribute rules. An empty declaration
   contributes none; it does not trigger fallback discovery.
@@ -175,8 +198,9 @@ PrivateData = @{
   exported compatible `Test-*` and `Measure-*` commands.
 - Do not automatically traverse `NestedModules`. Explicitly declaring a supporting
   module permits its own declarations to be resolved, with cycle detection.
-- Supporting modules contribute under the top-level declaring package's namespace.
-  Directly selecting `WPFRules` instead gives it the `WPFRules` namespace.
+- A top-level rule module without `OwnerModule` owns its own namespace. A module declared
+  as a supporting rule module must identify that owner; its implementation module name
+  does not independently determine rule identity.
 - A missing/nonexported/incompatible explicitly named rule is an error, not a silent skip.
   Standalone export discovery may ignore non-rule commands.
 
@@ -223,6 +247,9 @@ files, but cannot roll back arbitrary import side effects.
   metadata when it matches the selected package callable and ID.
 - Different callables or competing module versions with one selected ID terminate
   selection. Report both declaring and implementing origins.
+- Supporting modules under one owner share its namespace. Different rules with the same
+  local name therefore compete for one ID and must fail selection rather than receive
+  route-dependent identities.
 - Different namespaces may legitimately contain the same local name. The same callable
   exposed under different IDs represents distinct rules and is not deduplicated by
   callable alone.
@@ -429,7 +456,7 @@ rule-module state.
   `PrivateData.Linting` from a resolved module's manifest without importing it, distinguishing
   an absent `Linting` key (standalone fallback discovery applies) from an empty-but-present one
   (no fallback, zero rules). `Rules`/`RuleModules` entries must be non-empty, non-whitespace
-  strings.
+  strings. Phase 6 adds the optional relative `OwnerModule` path for supporting packages.
 - A `DirectedAcyclicGraph` class (copied wholesale from PleaseWork's
   `DirectedAcyclicGraph.ps1`, not taken as a module dependency, to keep Nitpick free of
   non-built-in runtime dependencies for a small reusable class) is colocated directly in
@@ -438,14 +465,15 @@ rule-module state.
   statically resolves the complete `RuleModules` declaration graph into that
   `DirectedAcyclicGraph` before any import happens, keyed by each node's resolved path.
   Absolute `RuleModules` paths, unresolvable entries, and cycles are all rejected before any
-  module initializes.
+  module initializes. Phase 6 also validates reciprocal owner links and derives each node's
+  namespace from its declared owner, rejecting owner mismatches before imports.
 - [Get-NitpickPackage](../Private/Get-NitpickPackage.ps1) orchestrates acquisition:
   resolves the top-level source, rejects `Local` as a reserved package namespace, validates the
   full graph, then walks it in topological order, importing each node only if its declared
-  `Rules`/standalone fallback requires it. A rule-modules-only parent is never imported. All
-  acquired rules are stamped with the top-level package's namespace via `New-Nitpick -Namespace`,
-  regardless of which nested module implements them. Declared `Rules` entries that are missing
-  or fail `Assert-CallableSignature` raise an explicit manifest-attributed error.
+  `Rules`/standalone fallback requires it. A rule-modules-only parent is never imported. Each
+  acquired rule is stamped with its resolved owner module's namespace via
+  `New-Nitpick -Namespace` (Phase 6 ownership update); declared `Rules` entries that are
+  missing or fail `Assert-CallableSignature` raise an explicit manifest-attributed error.
 - [Find-Nitpick](../Public/Interface/Find-Nitpick.ps1) now accepts `string` entries (names or
   paths) alongside the legacy `PSModuleInfo[]` entries for `-Module`, routing strings through
   `Get-NitpickPackage`. The legacy ambient/nested-module-traversal path is left untouched;
@@ -706,18 +734,25 @@ interoperability and suppression-semantics tests are explicitly out of scope for
 
 ## Phase 6: WPF Package and Documentation Migration
 
+**Status: Complete**
+
 ### Objective
 
-Exercise the integration with a real declaring module and document the breaking changes.
+Exercise package composition and reciprocal ownership with a real declaring module, then
+document the breaking changes.
 
 ### Work
 
-- Migrate WPF's declarations to the agreed cumulative contract. The current declaration
-  references `SubModules/WPFRules/WPF.psd1`, but the file is named
-  `SubModules/WPFRules/WPFRules.psd1`; correct that path as part of this phase.
-- Inspect whether `Test-AvoidBlockingUI` is actually exported by the parent. If it is
-  available only in WPFRules, declare the supporting module rather than a nonexistent
-  parent command.
+- Correct WPF's `RuleModules` path to the existing
+  `SubModules/WPFRules/WPFRules.psd1` manifest.
+- Make WPF's linting declaration rule-modules-only; the parent does not export
+  `Test-AvoidBlockingUI`. In WPFRules' manifest, add the exact rule declaration and
+  `OwnerModule = '../../WPF.psd1'`. Validate the reciprocal declarations and derive
+  `WPF/AvoidBlockingUI` from the owner module name, not the acquisition route.
+- Reject stale or conflicting owner links before import or target analysis. Directly
+  selecting WPFRules must return `WPF/AvoidBlockingUI`, and selecting WPF must return
+  the same ID. Multiple supporting modules may share an owner, but duplicate local
+  names under that owner must fail selection as competing IDs.
 - Audit WPFRules' dependencies separately from parent loading: its manifest currently
   requires WPF assemblies, so parent-free loading is not a promise of platform independence.
 - Update Nitpick help, README, examples, related plan links, and directly affected tests.
@@ -727,14 +762,33 @@ Exercise the integration with a real declaring module and document the breaking 
 
 ### Tests
 
-- WPF manifest acquisition yields `WPF/AvoidBlockingUI` without initializing WPF's parent runtime.
-- Direct WPFRules selection yields `WPFRules/AvoidBlockingUI`.
+- WPF manifest acquisition yields `WPF/AvoidBlockingUI` without importing WPF's parent
+  runtime; direct WPFRules selection yields the same ID.
+- Missing, mismatched, and non-reciprocal owner declarations fail before rule execution.
+- Two supporting modules that expose different rules with the same local name under WPF
+  fail selection as competing `WPF/RuleName` IDs.
 - Repeated selection and scriptblock registration examples behave as documented.
 
 ### Exit Criteria
 
 WPF is a working example of manifest integration, and documentation clearly distinguishes
 implemented behavior from proposed typed dispatch.
+
+### Implemented
+
+- WPF declares WPFRules through the corrected manifest path. WPFRules declares
+  `OwnerModule = '../../WPF.psd1'` and its exported rule command.
+- Nitpick validates reciprocal ownership before imports and stamps rules with their
+  owner's module name, including when the supporting module is acquired directly.
+- Contract tests cover stale, mismatched, and non-reciprocal owner references, competing
+  local names under one owner, and WPF acquisition through either manifest without
+  importing the WPF parent module.
+- Nitpick README and public help now describe manifest acquisition, qualified selectors,
+  local suppression behavior, trusted imports, the reserved `Local` namespace, and typed
+  AST dispatch as proposed.
+- Validation: 52 focused package-contract tests pass on PowerShell 7.6.8 and Windows
+  PowerShell 5.1; the full Nitpick suite passes on both editions (423/421 tests), and
+  the WPF suite passes on PowerShell 7.6.8 (495 tests).
 
 ## Phase 7: Final Validation and Cleanup
 
@@ -771,7 +825,9 @@ qualified registry or changing selectors before their consumers are ready.
 - Version-pinned named module specifications beyond explicit paths.
 - Qualified suppression syntax and a deliberate migration of suppression semantics, including
   any rename-compatibility/legacy-alias mechanism for a rule's Local Name.
-- Configurable package namespaces, aliases, and installed-package auto-discovery.
+- Arbitrary configurable package namespaces, aliases, and installed-package auto-discovery.
+  `OwnerModule` establishes ownership from a real module relationship; it is not a free-form
+  namespace override.
 - Typed AST rule declarations and an external analyzer adapter; see
   [ADR-0001](adr/0001-defer-scriptanalyzer-adapter.md) for why direct PSScriptAnalyzer
   `-CustomRulePath` compatibility is de-emphasized rather than extended alongside Phase 5.

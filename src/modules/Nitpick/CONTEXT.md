@@ -24,9 +24,9 @@ finding content (message, severity, corrections).
 _Avoid_: Rule author's code (reserve "callable" for the underlying PowerShell object itself)
 
 **Namespace**:
-The logical owner of a rule's identity: the declaring package's module name, or `Local` for
-a rule registered without an owning package.
-_Avoid_: Package name, module name (reserve those for the underlying PowerShell module concept)
+A rule's logical owner; its qualifier is the owning module's name even when the rule is
+implemented in a supporting module. Use `Local` for a rule registered without an owning module.
+_Avoid_: Package name, implementation module (when used as the rule's identity)
 
 **Local Name**:
 A rule's canonical identifier within its namespace (for example `UseIsNotOperator`), assigned

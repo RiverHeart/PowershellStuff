@@ -31,7 +31,9 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER Module
     Module names or literal paths to acquire as additive rule packages, alongside the
-    built-in package and any explicit registrations. Does not register acquired rules.
+    built-in package and any explicit registrations. Package manifests may declare
+    rule commands and supporting modules; supporting modules use the declared owner's
+    namespace even when acquired directly. Does not register acquired rules.
 
 .PARAMETER ExcludeDefaults
     Omits the built-in Nitpick package, including when Module is also omitted (in

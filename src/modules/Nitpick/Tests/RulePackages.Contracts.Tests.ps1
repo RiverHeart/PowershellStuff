@@ -14,6 +14,7 @@ BeforeAll {
         $Directory = New-Item -Path (Join-Path $Root $Name) -ItemType Directory
         $ParentPath = Join-Path $Directory.FullName ($Name + '.psm1')
         $RulesPath = Join-Path $Directory.FullName ($Name + 'Rules.psm1')
+        $RulesManifestPath = Join-Path $Directory.FullName ($Name + 'Rules.psd1')
         $ManifestPath = Join-Path $Directory.FullName ($Name + '.psd1')
 
         Set-Content -LiteralPath $ParentPath -Value @'
@@ -34,13 +35,21 @@ function Test-HiddenContractRule { param ($ScriptBlockAst) }
 function Test-InvalidContractRule { param ($FilePath) }
 Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
 '@
+        New-ModuleManifest -Path $RulesManifestPath -RootModule ($Name + 'Rules.psm1') `
+            -ModuleVersion '1.0.0' -FunctionsToExport Test-ContractRule, Test-InvalidContractRule `
+            -PrivateData @{ Linting = @{} }
+        Set-ContractManifestLinting -ManifestPath $RulesManifestPath -Linting @{
+            OwnerModule = $Name + '.psd1'
+            Rules = @('Test-ContractRule')
+        }
+
         New-ModuleManifest -Path $ManifestPath -RootModule ($Name + '.psm1') `
             -ModuleVersion '1.0.0' -FunctionsToExport Test-ParentRule `
             -PrivateData @{ Linting = @{} }
 
         Set-ContractManifestLinting -ManifestPath $ManifestPath -Linting @{
             Rules = @('Test-ParentRule')
-            RuleModules = @($Name + 'Rules.psm1')
+            RuleModules = @($Name + 'Rules.psd1')
         }
 
         [pscustomobject] @{
@@ -49,6 +58,7 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
             ManifestPath = $ManifestPath
             ParentPath = $ParentPath
             RulesPath = $RulesPath
+            RulesManifestPath = $RulesManifestPath
         }
     }
 
@@ -68,8 +78,12 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
         )
 
         $EntryLines = foreach ($Key in $Linting.Keys) {
-            $QuotedValues = @($Linting[$Key]) | ForEach-Object { "'$_'" }
-            "        $Key = @($($QuotedValues -join ', '))"
+            if ($Linting[$Key] -is [string]) {
+                "        $Key = '$($Linting[$Key])'"
+            } else {
+                $QuotedValues = @($Linting[$Key]) | ForEach-Object { "'$_'" }
+                "        $Key = @($($QuotedValues -join ', '))"
+            }
         }
 
         $LintingLiteral = if ($EntryLines.Count -gt 0) {
@@ -79,7 +93,8 @@ Export-ModuleMember -Function Test-ContractRule, Test-InvalidContractRule
         }
 
         $Content = Get-Content -LiteralPath $ManifestPath -Raw
-        $Patched = $Content -replace '(?m)^\s*Linting\s*=.*$', "    Linting = $LintingLiteral"
+        $Pattern = '(?ms)^[ \t]*Linting[ \t]*=[ \t]*(?:''System\.Collections\.Hashtable''|@\{.*?^[ \t]*\})'
+        $Patched = [regex]::Replace($Content, $Pattern, "    Linting = $LintingLiteral")
         Set-Content -LiteralPath $ManifestPath -Value $Patched -NoNewline
     }
 }
@@ -347,7 +362,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
     }
 
     Context 'Phase 3: manifest package acquisition' {
-        It 'returns rule descriptors with top-level ownership and the implementing callable' {
+        It 'returns rule descriptors with the declared owner and implementing callable' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Rules = @(Find-Nitpick -Module $Package.ManifestPath)
             $Rules | Should -HaveCount 2
@@ -390,11 +405,85 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             @(Find-Nitpick -Module $Package.ManifestPath) | Should -HaveCount 0
         }
 
-        It 'discovers only compatible exported commands from an explicit standalone source' {
+        It 'preserves the declared owner when acquiring a supporting module directly' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $Rules = @(Find-Nitpick -Module $Package.RulesPath)
             $Rules | Should -HaveCount 1
-            $Rules[0].Id | Should -Be 'NitpickContractPackageRules/ContractRule'
+            $Rules[0].Id | Should -Be 'NitpickContractPackage/ContractRule'
+        }
+
+        It 'rejects a supporting module whose owner does not reciprocally declare it' {
+            $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
+                Rules = @('Test-ParentRule')
+            }
+
+            { Find-Nitpick -Module $Package.RulesManifestPath -ErrorAction Stop } |
+                Should -Throw '*does not reciprocally declare it*'
+        }
+
+        It 'rejects a supporting module with a stale owner path before importing it' {
+            $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
+            Set-ContractManifestLinting -ManifestPath $Package.RulesManifestPath -Linting @{
+                OwnerModule = 'MissingOwner.psd1'
+                Rules = @('Test-ContractRule')
+            }
+
+            { Find-Nitpick -Module $Package.RulesManifestPath -ErrorAction Stop } |
+                Should -Throw '*unresolvable OwnerModule*'
+        }
+
+        It 'rejects an owner link that conflicts with the declaring package' {
+            $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
+            $null = New-ContractRulePackage -Name OtherPackage -Root $ContractRoot
+            Set-ContractManifestLinting -ManifestPath $Package.RulesManifestPath -Linting @{
+                OwnerModule = '..\OtherPackage\OtherPackage.psd1'
+                Rules = @('Test-ContractRule')
+            }
+
+            { Find-Nitpick -Module $Package.ManifestPath -ErrorAction Stop } |
+                Should -Throw '*does not declare this supporting module*'
+        }
+
+        It 'rejects duplicate local names from supporting modules under one owner' {
+            $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
+            $SecondRulesPath = Join-Path $Package.Directory 'ExtraRules.psm1'
+            $SecondRulesManifestPath = Join-Path $Package.Directory 'ExtraRules.psd1'
+            Set-Content -LiteralPath $SecondRulesPath -Value @'
+function Test-ContractRule { param ($ScriptBlockAst) }
+Export-ModuleMember -Function Test-ContractRule
+'@
+            New-ModuleManifest -Path $SecondRulesManifestPath -RootModule 'ExtraRules.psm1' `
+                -ModuleVersion '1.0.0' -FunctionsToExport Test-ContractRule `
+                -PrivateData @{ Linting = @{} }
+            Set-ContractManifestLinting -ManifestPath $SecondRulesManifestPath -Linting @{
+                OwnerModule = $Package.Name + '.psd1'
+                Rules = @('Test-ContractRule')
+            }
+            Set-ContractManifestLinting -ManifestPath $Package.ManifestPath -Linting @{
+                Rules = @('Test-ParentRule')
+                RuleModules = @(($Package.Name + 'Rules.psd1'), 'ExtraRules.psd1')
+            }
+
+            {
+                Start-Nitpicking -Script {} -Module $Package.ManifestPath `
+                    -IncludeRule "$($Package.Name)/ContractRule" -Output Object
+            } | Should -Throw "*Different Nitpick callables share the rule ID '$($Package.Name)/ContractRule'*"
+        }
+
+        It 'acquires the WPF rule with the same owner ID through either manifest without importing WPF' {
+            $WpfManifest = (Resolve-Path (Join-Path $PSScriptRoot '..\..\WPF\WPF.psd1')).Path
+            $RulesManifest = Join-Path (Split-Path $WpfManifest -Parent) `
+                'SubModules\WPFRules\WPFRules.psd1'
+
+            $ViaWpf = @(Find-Nitpick -Module $WpfManifest -ErrorAction Stop)
+            $ViaRulesModule = @(Find-Nitpick -Module $RulesManifest -ErrorAction Stop)
+
+            @($ViaWpf.Id) | Should -Contain 'WPF/AvoidBlockingUI'
+            @($ViaRulesModule.Id) | Should -Contain 'WPF/AvoidBlockingUI'
+            Get-Module -All |
+                Where-Object { $_.Name -eq 'WPF' -and $_.ModuleBase -eq (Split-Path $WpfManifest -Parent) } |
+                Should -BeNullOrEmpty
         }
 
         It 'rejects an explicitly declared invalid rule rather than ignoring it' {

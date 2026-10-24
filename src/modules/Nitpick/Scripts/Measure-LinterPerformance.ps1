@@ -11,7 +11,7 @@
     single observations, not statistically sampled cold-start measurements.
 
 .EXAMPLE
-    .\Measure-LinterPerformance.ps1 -WorkingDirectory /path/to/working/directory
+    .\Measure-LinterPerformance.ps1.ps1 -WorkingDirectory /path/to/working/directory
 #>
 [CmdletBinding()]
 param(
@@ -44,7 +44,7 @@ function Invoke-Engine {
     )
 
     if ($Engine -eq 'Nitpick') {
-        $Parameters = @{ IncludeRule = $Rule; Output = 'Object'; NoSummary = $true }
+        $Parameters = @{ IncludeRule = "Nitpick/$Rule"; Output = 'Object'; NoSummary = $true }
         if ($Path) { $Parameters.Path = $Path } else { $Parameters.Script = $Source }
         Start-Nitpicking @Parameters
     } else {
@@ -182,15 +182,15 @@ try {
     [System.IO.File]::WriteAllText($FixPath, $Source, $Encoding)
     $Original = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
 
-    $Preview = @(Start-Nitpicking -Path $FixPath -IncludeRule UseIsNotOperator -Fix -Preview -Output Object -NoSummary) |
+    $Preview = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview -Output Object -NoSummary) |
         Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
 
     $PreviewUnchanged = $Original -ceq [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
 
-    $Applied = @(Start-Nitpicking -Path $FixPath -IncludeRule UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
+    $Applied = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
         Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
 
-    $Second = @(Start-Nitpicking -Path $FixPath -IncludeRule UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
+    $Second = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
         Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
 
     $Expected = "# fixture`r`nif ( (`$x -isnot [int])) {}`r`n"

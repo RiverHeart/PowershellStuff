@@ -14,9 +14,11 @@ using namespace System.Management.Automation
     Each requested module name or literal path is resolved and acquired as an
     explicit rule package: its declared PrivateData.Linting is read, its
     RuleModules declaration graph is statically validated before anything is
-    imported, and the resulting descriptors are stamped with that top-level
-    package's namespace. A module with no Linting declaration contributes only
-    its own standalone-compatible exported commands.
+    imported, and the resulting descriptors are stamped with their owning
+    module's namespace. Supporting modules declare that owner with
+    PrivateData.Linting.OwnerModule and must be listed by the owner in
+    RuleModules. A module with no Linting declaration contributes only its
+    own standalone-compatible exported commands.
 
 .PARAMETER Module
     Module names or literal paths to acquire as explicit rule packages.
