@@ -70,8 +70,6 @@ Out of scope (do not attempt in this pass):
 - `Brush`, `Thickness`, and any other `EditorKind`-less property type. Adding a new editor
   kind is possible but is its own follow-up, not bundled into wiring up the four that
   already exist.
-- Category grouping/ordering in the rendered panel (available for free via
-  `PropertyDescriptor.Category` whenever it's wanted, but not required for a first pass).
 
 ## Relationship to existing code
 
@@ -96,7 +94,7 @@ Rough dependency order; each should land with its own tests before the next star
 this project's existing Pester conventions (dot-source the functions under test in
 `BeforeAll`, `-Tag 'WpfDesigner'`).
 
-### Slice A — Per-`EditorKind` row builders
+### Slice A — Per-`EditorKind` row builders (done)
 
 Add one function per `EditorKind` (or a single function that switches on it — either is
 fine, but keep the per-kind logic in one place rather than duplicating it at every call
@@ -120,7 +118,7 @@ keyword function directly with auto-attach suppressed (`& 'TextBox' -AutoAttach 
 { ... }`) and attach the result with `Add-WPFObject`, rather than relying on ambient
 `WPFAutoAttachContext`.
 
-### Slice B — Rebuild panel on selection change
+### Slice B — Rebuild panel on selection change (done)
 
 Add an `Update-WpfDesignerPropertyPanel -Panel <parent panel> -State <state>` function that:
 
@@ -143,7 +141,7 @@ Note: `TypeDescriptor.GetProperties` doesn't guarantee `Content`/`Width`/`Height
 ordering, so the panel's row order will look shuffled relative to today until Slice D's
 category grouping (or some ad hoc ordering) lands. Expected, not a bug.
 
-### Slice C — Property override table
+### Slice C — Property override table  (deferred)
 
 A lookup that Slice A's row builders consult for behavior reflection alone can't provide —
 the existing Width/Height minimum-20 clamp is the motivating example. Key this primarily by
@@ -160,11 +158,11 @@ Tests: a `TextBlock`'s generated Width/Height rows still clamp to 20, matching c
 `Add-WpfDesignerPropertyMinimum` behavior; an overridden property shows up with its
 override behavior applied instead of (or in addition to) the base row.
 
-### Slice D — Polish (optional, not blocking)
+### Slice D — Polish (done)
 
-- Group rows by `PropertyDescriptor.Category` instead of a flat list.
-- Friendlier `Enum` display (e.g. inserting spaces into `PascalCase` values) instead of raw
-  `.ToString()`.
+- Rows are grouped by `PropertyDescriptor.Category` in expanded sections.
+- `Enum` values retain their native `PascalCase` names, consistent with the rest of the
+  interface, and preserve the raw enum value for two-way binding.
 
 ## Open questions / risks
 

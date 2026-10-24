@@ -38,8 +38,13 @@ function Get-WpfDesignerPropertyEditor {
         'Text' {
             $TextBox = [System.Windows.Controls.TextBox]::new()
             $TextBox.DataContext = $Target
-            BindProperty -InputObject $TextBox Text $Descriptor.Name -TwoWay
-            Add-WpfDesignerEnterCommit -InputObject $TextBox
+            $TextBox.IsReadOnly = [bool] $Descriptor.IsReadOnly
+            if ($TextBox.IsReadOnly) {
+                BindProperty -InputObject $TextBox Text $Descriptor.Name
+            } else {
+                BindProperty -InputObject $TextBox Text $Descriptor.Name -Mode TwoWay
+                Add-WpfDesignerEnterCommit -InputObject $TextBox
+            }
             $TextBox
         }
         'Number' {
@@ -64,9 +69,9 @@ function Get-WpfDesignerPropertyEditor {
                     $this.Converter = New-WPFValueConverter $ConvertNumber $ConvertNumberBack
                 }.GetNewClosure()
 
-                BindProperty -InputObject $TextBox Text $Descriptor.Name -TwoWay -ScriptBlock $ConfigureBinding
+                BindProperty -InputObject $TextBox Text $Descriptor.Name -Mode TwoWay -ScriptBlock $ConfigureBinding
             } else {
-                BindProperty -InputObject $TextBox Text $Descriptor.Name -TwoWay
+                BindProperty -InputObject $TextBox Text $Descriptor.Name -Mode TwoWay
             }
             Add-WpfDesignerEnterCommit -InputObject $TextBox
             $TextBox
@@ -75,14 +80,14 @@ function Get-WpfDesignerPropertyEditor {
             $CheckBox = [System.Windows.Controls.CheckBox]::new()
             $CheckBox.Content = $Descriptor.Name
             $CheckBox.DataContext = $Target
-            BindProperty -InputObject $CheckBox IsChecked $Descriptor.Name -TwoWay
+            BindProperty -InputObject $CheckBox IsChecked $Descriptor.Name -Mode TwoWay
             $CheckBox
         }
         'Enum' {
             $ComboBox = [System.Windows.Controls.ComboBox]::new()
             $ComboBox.DataContext = $Target
             $ComboBox.ItemsSource = [System.Enum]::GetValues($Descriptor.PropertyType)
-            BindProperty -InputObject $ComboBox SelectedItem $Descriptor.Name -TwoWay
+            BindProperty -InputObject $ComboBox SelectedItem $Descriptor.Name -Mode TwoWay
             $ComboBox
         }
         default {

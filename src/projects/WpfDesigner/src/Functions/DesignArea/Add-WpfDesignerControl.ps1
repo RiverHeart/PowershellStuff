@@ -78,6 +78,10 @@ function Add-WpfDesignerControl {
     On -Event MouseLeftButtonDown -InputObject $NewElement -ScriptBlock {
         param($sender, $e)
         & $SelectHandler -Canvas $Canvas -Target $sender -State $State -Panel $Panel
+        # Draggable ignores non-Canvas parents, so stop the click selecting an ancestor.
+        if ($sender.Parent -isnot [System.Windows.Controls.Canvas]) {
+            $e.Handled = $true
+        }
     }.GetNewClosure()
 
     Draggable -InputObject $NewElement -BringToFrontOnDrag -BoundToParent

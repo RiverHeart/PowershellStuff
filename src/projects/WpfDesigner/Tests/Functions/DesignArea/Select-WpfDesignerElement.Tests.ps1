@@ -17,8 +17,8 @@ Describe 'Select-WpfDesignerElement' -Tag 'WpfDesigner' {
         Select-WpfDesignerElement -Canvas $Canvas -Target $Target -State $State -Panel $Panel
 
         $Descriptors = @(Get-WpfDesignerPropertyDescriptor -InputObject $Target)
-        $ExpectedRowCount = ($Descriptors | ForEach-Object { if ($_.EditorKind -eq 'Bool') { 1 } else { 2 } } | Measure-Object -Sum).Sum
-        $Panel.Children.Count | Should -Be -ExpectedValue $ExpectedRowCount
+        $Categories = @($Descriptors | Group-Object Category)
+        $Panel.Children.Count | Should -Be -ExpectedValue $Categories.Count
     }
 
     It 'Should leave the property panel untouched when -Panel is not supplied' {
