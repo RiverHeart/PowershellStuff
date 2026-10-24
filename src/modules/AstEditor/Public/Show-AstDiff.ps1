@@ -26,8 +26,17 @@ function Show-AstDiff {
         [AstDocument] $Document,
 
         [Parameter()]
-        [int[]] $EditIndex
+        [int[]] $EditIndex,
+
+        [switch] $NoColor
     )
+
+    $ColorIsDisabled = $NoColor -or $env:NO_COLOR
+    $Esc = if (-not $ColorIsDisabled) { [char]27 }
+    $Red = if (-not $ColorIsDisabled) { "$Esc[31m" }
+    $Green = if (-not $ColorIsDisabled) { "$Esc[32m" }
+    $Reset = if (-not $ColorIsDisabled) { "$Esc[0m" }
+    $Bold = if (-not $ColorIsDisabled) { "$Esc[1m" }
 
     $SortedEdits = $Document.Edits | Sort-Object -Property StartOffset, EndOffset
     if ($SortedEdits.Count -eq 0) {
@@ -57,12 +66,12 @@ function Show-AstDiff {
             [void] $Builder.AppendLine('')
         }
 
-        [void] $Builder.AppendLine("[$Index] $($Edit.Reason)")
+        [void] $Builder.AppendLine("${Bold}[$Index] $($Edit.Reason)${Reset}")
         [void] $Builder.AppendLine("  Offsets: $($Edit.StartOffset)..$($Edit.EndOffset)")
-        [void] $Builder.AppendLine('  --- original ---')
-        [void] $Builder.AppendLine($OriginalText)
-        [void] $Builder.AppendLine('  +++ replacement +++')
-        [void] $Builder.AppendLine($Edit.ReplacementText)
+        [void] $Builder.AppendLine("  ${Red}--- original ---${Reset}")
+        [void] $Builder.AppendLine("${Red}$OriginalText${Reset}")
+        [void] $Builder.AppendLine("  ${Green}+++ replacement +++${Reset}")
+        [void] $Builder.AppendLine("${Green}$($Edit.ReplacementText)${Reset}")
     }
 
     return $Builder.ToString().TrimEnd()

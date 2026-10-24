@@ -48,6 +48,24 @@ Run a configured suite (`-Suite` is an alias for `-TestSuite`):
 ./tools/Invoke-Test.ps1 -Suite TabCentral
 ```
 
+The host used to launch `Invoke-Test.ps1` selects the PowerShell runtime. Always
+run tests through the repository runner so it can restore the edition-specific
+CurrentUser module path before discovering Pester. For a PowerShell 5.1 run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/Invoke-Test.ps1 -Suite AstEditor
+```
+
+Do not probe Pester availability by launching `powershell.exe` directly from
+`pwsh`; the inherited `PSModulePath` can hide Windows PowerShell user modules.
+
+Use `-ExitOnError` for external automation that needs failed test results to
+terminate the host with exit code 2:
+
+```powershell
+./tools/Invoke-Test.ps1 -Suite TabCentral -ExitOnError
+```
+
 Run one or more focused paths instead of all paths configured by the suite:
 
 ```powershell

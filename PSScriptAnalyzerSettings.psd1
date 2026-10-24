@@ -2,7 +2,7 @@
     IncludeDefaultRules = $true
 
     CustomRulePath = @(
-        './src/modules/RHScriptAnalyzerRules/RHScriptAnalyzerRules.psm1'
+        './src/modules/Nitpick'
     )
 
     # Note: These rules are geared towards the WPF module and should probably be removed
