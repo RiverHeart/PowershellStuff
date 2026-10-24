@@ -6,7 +6,7 @@ Plans are not immutable and may be changed with user permission. Unforeseen prob
 
 ## Status
 
-Phases 0 through 6 are implemented; Phase 7 remains proposed.
+Phases 0 through 7 are implemented.
 Phase 6 still owns WPF migration and the broader documentation cutover. It now also
 clarifies module ownership: a supporting rule module declares its owner through
 `Linting.OwnerModule`, and the owner must declare that supporting module through
@@ -792,6 +792,8 @@ implemented behavior from proposed typed dispatch.
 
 ## Phase 7: Final Validation and Cleanup
 
+**Status: Complete**
+
 ### Objective
 
 Verify the complete behavior change and remove obsolete discovery paths.
@@ -812,6 +814,23 @@ Verify the complete behavior change and remove obsolete discovery paths.
 All planned contracts execute rather than remaining skipped. No ambient rule discovery
 or unqualified native selection remains. Imports never masquerade as registry changes,
 and selection failures precede analysis and target mutation.
+
+### Implemented
+
+- A repository-wide audit found no remaining transitional legacy-key code, ambient
+  discovery, `RulePath`/`RuleModule` parameters, or unqualified native selectors outside
+  tests that assert their rejection. Remaining `Test-*` selectors target
+  `Invoke-ScriptAnalyzer`, which selects by command name.
+- `Measure-LinterPerformance.ps1` now selects `Nitpick/`-qualified rule IDs; the script
+  was parse-checked but not executed as part of this phase.
+- No cleanup was required beyond earlier phases. `Test-Assembly` has no callers but
+  predates and is unrelated to rule packages, so it was left in place.
+- Existing contracts cover the exit criteria: package acquisition leaves the registry
+  empty, and failed or conflicting selection terminates before targets are read or fixed.
+- Validation: 52 focused package-contract tests pass with none skipped on PowerShell
+  7.6.8 and Windows PowerShell 5.1; the full Nitpick suite passes on both editions
+  (423/421 tests). The WPF suite was not rerun because Phase 7 changed no WPF files; its
+  Phase 6 manifest changes are exercised on both editions by the package contracts.
 
 ## Implementation Order
 
