@@ -142,11 +142,14 @@ Describe 'Start-Nitpicking transactional fixes' {
                 -Output Text -NoSummary -ErrorAction Stop
         ) -join "`n"
 
-        $Output | Should -Match ('Proposed corrections for ' + [regex]::Escape($Path) + ' \(preview\):')
+        $Lines = $Output -split '\r?\n'
+        $Lines[0] | Should -BeExactly $Path
+        @($Lines | Where-Object { $_ -eq $Path }).Count | Should -Be 1
         $Output | Should -Match '1 - \$Value = 1'
         $Output | Should -Match '\+ \$Value = 2'
         $Output | Should -Match '\$Value = 2'
-        $Output | Should -Match '1 proposed correction\. No files changed \(preview\)\.'
+        $Lines[-1] | Should -BeExactly '  1 proposed correction.'
+        $Output | Should -Not -MatchExactly '\(preview\)|No files changed'
         $Output | Should -Not -Match 'committed'
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
     }
@@ -160,9 +163,10 @@ Describe 'Start-Nitpicking transactional fixes' {
                 -Output Text -NoSummary -ErrorAction Stop
         ) -join "`n"
 
-        $Output | Should -Match '\[0, 1\] Replace .* with '
-        $Output | Should -Match '1 proposed correction\. No files changed \(preview\)\.'
-        $Output | Should -Not -Match '2 proposed edits'
+        $Output | Should -Match "(?m)^  (\e\[1m)?1:1  Replace .* with "
+        $Output | Should -Not -Match '\[0, 1\]'
+        $Output | Should -Match '  1 proposed correction\.'
+        $Output | Should -Not -Match '2 proposed'
     }
 
     It 'separates consecutive target blocks with host-only blank lines' {
@@ -179,7 +183,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Output | Where-Object { $_ -eq '' } | Should -BeNullOrEmpty
         $SecondPath = [regex]::Escape((Join-Path $Directory.FullName 'Second.ps1'))
         $SecondIndex = @(0..($Combined.Count - 1) | Where-Object {
-            "$($Combined[$_])" -match "^Proposed corrections for $SecondPath \(preview\):"
+            "$($Combined[$_])" -match "^$SecondPath(\r?\n|$)"
         })[0]
         $SecondIndex | Should -BeGreaterThan 0
         "$($Combined[$SecondIndex - 1])" | Should -BeExactly ''
@@ -196,7 +200,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         ) -join "`n"
 
         $Output | Should -Match 'Transaction finding'
-        $Output | Should -Not -Match 'Corrections for .* \(proposal:'
+        $Output | Should -Not -Match 'proposal:'
         $Output | Should -Not -Match 'No queued edits'
         $Output | Should -Not -Match 'committed, .* accepted, .* skipped'
     }

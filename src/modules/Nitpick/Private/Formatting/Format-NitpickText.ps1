@@ -4,16 +4,29 @@ using namespace System.Text
 
 <#
 .SYNOPSIS
-    Formats findings for one Nitpick target as console-friendly text.
+    Formats findings and corrections for one Nitpick target as console-friendly text.
 
 .DESCRIPTION
-    Formats findings for one Nitpick target as console-friendly text.
+    Formats one target as a single section: the target path as a header, its findings
+    sorted as given, and, when CorrectionResult is provided, the correction section
+    from Format-NitpickCorrection. Returns nothing when there are no findings and no
+    correction activity to report. Spacing between targets is left to the caller.
 
     ANSI OSC 8 hyperlinks are used by default when supported but can be explicitly
     enabled or disabled using `$env:FORCE_HYPERLINK` and `$env:NO_HYPERLINK`
     respectively. Hyperlinks allow multiple findings to be succintly aggregated
     beneath the file URI, making it easier to review findings without giving up
     the linking afforded by standard `filepath:line:column` references.
+
+.PARAMETER Ast
+    The parsed target. Its file path, or '<ScriptBlock>' for in-memory input, is the
+    section header.
+
+.PARAMETER Finding
+    The findings to list beneath the header.
+
+.PARAMETER CorrectionResult
+    The Nitpick.CorrectionResult for the target, when corrections were requested.
 
 .EXAMPLE
     Format findings for a specific AST and display them as console-friendly text
@@ -37,9 +50,21 @@ function Format-NitpickText {
         [Parameter(Mandatory)]
         [ScriptBlockAst] $Ast,
 
-        [Parameter(Mandatory)]
-        [object[]] $Finding
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [object[]] $Finding = @(),
+
+        [Parameter()]
+        [psobject] $CorrectionResult
     )
+
+    $CorrectionText = if ($CorrectionResult) {
+        Format-NitpickCorrection -CorrectionResult $CorrectionResult
+    }
+
+    if ($Finding.Count -eq 0 -and -not $CorrectionText) {
+        return
+    }
 
     if ($Ast.Extent.File) {
         $FilePath = $Ast.Extent.File
@@ -75,9 +100,12 @@ function Format-NitpickText {
         }
     }
 
-    $PositionWidth = ($Rows.Position | Measure-Object -Property Length -Maximum).Maximum
-    $SeverityWidth = ($Rows.Severity | Measure-Object -Property Length -Maximum).Maximum
-    $MessageWidth = ($Rows.Message | Measure-Object -Property Length -Maximum).Maximum
+    $Rows = @($Rows)
+    if ($Rows.Count -gt 0) {
+        $PositionWidth = ($Rows.Position | Measure-Object -Property Length -Maximum).Maximum
+        $SeverityWidth = ($Rows.Severity | Measure-Object -Property Length -Maximum).Maximum
+        $MessageWidth = ($Rows.Message | Measure-Object -Property Length -Maximum).Maximum
+    }
 
     foreach ($Row in $Rows) {
         $Builder.AppendLine(('  {0}  {1}  {2}  {3}' -f `
@@ -86,6 +114,13 @@ function Format-NitpickText {
             $Row.Message.PadRight($MessageWidth),
             $Row.RuleLabel
         )) | Out-Null
+    }
+
+    if ($CorrectionText) {
+        if ($Finding.Count -gt 0) {
+            $Builder.AppendLine() | Out-Null
+        }
+        $Builder.AppendLine($CorrectionText) | Out-Null
     }
 
     # Drop the final AppendLine terminator so callers control block spacing.

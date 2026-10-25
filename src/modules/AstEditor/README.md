@@ -44,7 +44,7 @@ Resolve-AstDocument -Document $document
 - `New-AstCollectionEdit`: creates the same detached edit contract for a structural collection removal
 - `Add-AstTextEdit`: atomically validates and queues one or more detached edits
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
-- `Show-AstDiff`: displays all or selected queued edits by index as whole-line hunks; edits on the same or adjacent lines are grouped, identical reasons within a hunk share a label, and `-Context` adds surrounding unchanged lines (default `0`)
+- `Show-AstDiff`: displays all or selected queued edits as whole-line hunks; edits on the same or adjacent lines are grouped, identical reasons within a hunk share a label, `-Label` chooses edit indexes (`Index`, default) or the first edit's `line:column` (`Position`), and `-Context` adds surrounding unchanged lines (default `0`)
 - `Save-AstDocument`: validates and transactionally saves output with a structured write result
 - `Set-AstFunction`: queues replacement of one structurally selected function
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file

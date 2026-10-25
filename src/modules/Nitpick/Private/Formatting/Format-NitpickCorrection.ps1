@@ -1,20 +1,20 @@
-using namespace System
+using namespace System.Collections.Generic
 
 <#
 .SYNOPSIS
     Formats one Nitpick correction result as console-friendly text.
 
 .DESCRIPTION
-    Formats the correction block that Start-Nitpicking -Fix writes for one target in
-    text output: a status-aware heading naming the target, the proposal diff, and a
-    trailer summarizing the outcome. Spacing between blocks is left to the caller.
+    Formats the correction section that Start-Nitpicking -Fix writes for one target in
+    text output: the proposal diff, labeled by the line:column where each correction
+    starts, followed by a trailer stating the outcome once. Lines are indented to sit
+    beneath the target header written by Format-NitpickText, which lets editors such
+    as VS Code resolve each line:column against that header. The header itself and
+    spacing between targets are left to the caller.
 
     Returns nothing when there is nothing worth reporting, meaning no accepted,
     committed, skipped, or conflicting corrections and no failure. Counts of accepted
     and committed corrections treat each change set as one correction.
-
-    The target path in the heading uses an ANSI OSC 8 hyperlink when appropriate; see
-    Format-NitpickHyperlink.
 
 .PARAMETER CorrectionResult
     The Nitpick.CorrectionResult for one target, as produced by
@@ -61,53 +61,40 @@ function Format-NitpickCorrection {
         return
     }
 
-    $Path = if ($CorrectionResult.Path) { $CorrectionResult.Path } else { '<ScriptBlock>' }
-    $FileUri = $null
-    $PathText = if ([Uri]::TryCreate($Path, [UriKind]::Absolute, [ref] $FileUri) -and $FileUri.IsFile) {
-        Format-NitpickHyperlink -Uri $FileUri -Text $Path
-    } else {
-        $Path
-    }
-
-    $IsCleanOutcome = $AcceptedEditCount -gt 0 -and
-        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasFailure
-
-    $StatusHeading = if ($IsCleanOutcome) {
-        switch ($ApplicationStatus) {
-            'Preview' { 'Proposed corrections for {0} (preview):' }
-            'WhatIf' { 'Proposed corrections for {0} (WhatIf):' }
-            'Written' { 'Applied corrections for {0}:' }
-            'InMemory' { 'Proposed corrections for {0} (in-memory):' }
-            'Declined' { 'Proposed corrections for {0} (not applied):' }
+    $Indent = '  '
+    $Lines = [List[string]]::new()
+    if ($AcceptedEditCount -gt 0 -and $Proposal.Diff) {
+        foreach ($Line in ([string] $Proposal.Diff) -split '\r?\n') {
+            $Lines.Add($(if ($Line) { "$Indent$Line" } else { '' }))
         }
-    }
-    if (-not $StatusHeading) {
-        $StatusHeading = 'Corrections for {0} (proposal: {1}; application: {2}):'
-    }
-    Write-Output ($StatusHeading -f $PathText, $ProposalStatus, $ApplicationStatus)
-
-    if ($AcceptedEditCount -gt 0) {
-        Write-Output $Proposal.Diff
+        $Lines.Add('')
     }
 
     $CorrectionNoun = if ($AcceptedCount -eq 1) { 'correction' } else { 'corrections' }
+    $IsCleanOutcome = $AcceptedEditCount -gt 0 -and
+        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasFailure
+
     $Trailer = if ($IsCleanOutcome) {
+        # Preview and WhatIf share wording: "proposed" already implies the file is unchanged.
         switch ($ApplicationStatus) {
-            'Preview' { '{0} proposed {1}. No files changed (preview).' -f $AcceptedCount, $CorrectionNoun }
-            'WhatIf' { '{0} proposed {1}. No files changed (WhatIf).' -f $AcceptedCount, $CorrectionNoun }
-            'Written' { '{0} {1} applied.' -f $CommittedCount, $CorrectionNoun }
-            'InMemory' {
-                '{0} proposed {1} applied to in-memory text only.' -f $AcceptedCount, $CorrectionNoun
+            'Preview' { '{0} proposed {1}.' -f $AcceptedCount, $CorrectionNoun }
+            'WhatIf' { '{0} proposed {1}.' -f $AcceptedCount, $CorrectionNoun }
+            'Declined' { '{0} proposed {1} declined.' -f $AcceptedCount, $CorrectionNoun }
+            'InMemory' { '{0} {1} applied in memory.' -f $AcceptedCount, $CorrectionNoun }
+            'Written' {
+                $CommittedNoun = if ($CommittedCount -eq 1) { 'correction' } else { 'corrections' }
+                '{0} {1} applied.' -f $CommittedCount, $CommittedNoun
             }
-            'Declined' { '{0} proposed {1} were not applied.' -f $AcceptedCount, $CorrectionNoun }
         }
-    } else {
+    }
+    if (-not $Trailer) {
         $SkippedNoun = if ($SkippedCount -eq 1) { 'edit' } else { 'edits' }
         $ConflictNoun = if ($ConflictCount -eq 1) { 'conflict' } else { 'conflicts' }
-        '{0} corrections committed, {1} corrections accepted, {2} {3} skipped, {4} {5}.' -f
+        $Trailer = '{0} corrections committed, {1} corrections accepted, {2} {3} skipped, {4} {5} (proposal: {6}; application: {7}).' -f
             $CommittedCount, $AcceptedCount, $SkippedCount, $SkippedNoun,
-            $ConflictCount, $ConflictNoun
+            $ConflictCount, $ConflictNoun, $ProposalStatus, $ApplicationStatus
     }
+    $Lines.Add("$Indent$Trailer")
 
-    Write-Output "`n$Trailer"
+    Write-Output ($Lines -join [Environment]::NewLine)
 }

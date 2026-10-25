@@ -682,8 +682,8 @@ Describe 'Start-Nitpicking' {
                 -Output Text `
                 -NoSummary
         ) -join "`n"
-        $Text | Should -Match 'Corrections for <ScriptBlock> \(proposal: Rejected; application: NotAttempted\):'
-        $Text | Should -Match '0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict\.'
+        $Text | Should -Match '(?m)^<ScriptBlock>\r?$'
+        $Text | Should -Match '  0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict \(proposal: Rejected; application: NotAttempted\)\.'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {

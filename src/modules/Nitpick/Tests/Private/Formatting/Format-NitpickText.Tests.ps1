@@ -38,4 +38,57 @@ Describe 'Format-NitpickText' {
         $Text.Contains($ExpectedLink) |
             Should -BeTrue -Because 'the link target and visible text should both include line:column'
     }
+
+    It 'renders findings and corrections beneath one target header' {
+        $PreviousNoHyperlink = $env:NO_HYPERLINK
+        try {
+            $env:NO_HYPERLINK = '1'
+            $Text = InModuleScope Nitpick -Parameters @{ FilePath = $PSCommandPath } {
+                param ($FilePath)
+
+                $Tokens = $null
+                $Errors = $null
+                $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
+                    '$Value = 1', $FilePath, [ref] $Tokens, [ref] $Errors
+                )
+                $Finding = New-NitpickFinding -RuleName TestRule -RuleSuppressionID TestRule `
+                    -Message 'Test message' -Severity Warning `
+                    -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
+                    -ScriptPath $FilePath -Explanation 'Test finding'
+                $CorrectionResult = [pscustomobject]@{
+                    Path = $FilePath
+                    Proposal = [pscustomobject]@{
+                        Status = 'Ready'
+                        AcceptedCorrections = @([pscustomobject]@{ ChangeSetId = $null })
+                        SkippedCorrections = @()
+                        Conflicts = @()
+                        Diff = "1:1  Reason`n  1 - old`n    + new"
+                    }
+                    Application = [pscustomobject]@{
+                        Status = 'Preview'
+                        CommittedCorrections = @()
+                        ErrorRecord = $null
+                    }
+                }
+
+                Format-NitpickText -Ast $Ast -Finding $Finding -CorrectionResult $CorrectionResult
+            }
+        } finally {
+            $env:NO_HYPERLINK = $PreviousNoHyperlink
+        }
+
+        $Lines = $Text -split '\r?\n'
+        $Lines[0] | Should -BeExactly $PSCommandPath
+        $Lines[1] | Should -Match '^  1:1  warning  Test message  '
+        $Lines[2..($Lines.Count - 1)] | Should -BeExactly @(
+            '', '  1:1  Reason', '    1 - old', '      + new', '', '  1 proposed correction.'
+        )
+        @($Lines | Where-Object { $_ -eq $PSCommandPath }).Count | Should -Be 1
+    }
+
+    It 'returns nothing without findings or correction activity' {
+        InModuleScope Nitpick {
+            Format-NitpickText -Ast {}.Ast -Finding @()
+        } | Should -BeNullOrEmpty
+    }
 }

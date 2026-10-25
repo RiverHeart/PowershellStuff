@@ -233,7 +233,8 @@ function Start-Nitpicking {
                         Write-Output $ReadFailure
                     } else {
                         if ($HasWrittenTextBlock) { Write-Host '' }
-                        Write-Output "Corrections (FailedRead): $($ReadFailure.Path)"
+                        Write-Output ("{0}`n  Corrections not attempted: the target could not be read." -f
+                            $ReadFailure.Path)
                         $HasWrittenTextBlock = $true
                     }
                 }
@@ -329,26 +330,22 @@ function Start-Nitpicking {
                 Write-Output $CorrectionResult
             }
 
-            if ($Output -eq 'Text' -and $CorrectionResult) {
-                $CorrectionText = @(Format-NitpickCorrection -CorrectionResult $CorrectionResult)
-                if ($CorrectionText.Count -gt 0) {
+            if ($Output -eq 'Text') {
+                [array] $SortedFindings = $FinalFindings | Sort-Object `
+                    -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
+                              @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
+
+                $TargetText = Format-NitpickText -Ast $Ast -Finding $SortedFindings -CorrectionResult $CorrectionResult
+
+                if ($TargetText) {
                     if ($HasWrittenTextBlock) { Write-Host '' }
-                    Write-Output $CorrectionText
+                    Write-Output $TargetText
                     $HasWrittenTextBlock = $true
                 }
             }
 
             if ($CorrectionResult -and $CorrectionResult.Application.ErrorRecord) {
                 $PSCmdlet.WriteError($CorrectionResult.Application.ErrorRecord)
-            }
-
-            if ($Output -eq 'Text' -and $FinalFindings.Count -gt 0) {
-                $SortedFindings = $FinalFindings | Sort-Object `
-                    -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
-                              @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
-                if ($HasWrittenTextBlock) { Write-Host '' }
-                Format-NitpickText -Ast $Ast -Finding $SortedFindings
-                $HasWrittenTextBlock = $true
             }
         }
         $Stopwatch.Stop()

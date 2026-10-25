@@ -311,6 +311,6 @@ function Resolve-NitpickCorrection {
         Conflicts = $Conflicts.ToArray()
         ParseErrors = @($Resolution.ParseErrors)
         CandidateText = $CandidateText
-        Diff = Show-AstDiff -Document $Document
+        Diff = Show-AstDiff -Document $Document -Label Position
     }
 }

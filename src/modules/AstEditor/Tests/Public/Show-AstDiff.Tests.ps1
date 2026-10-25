@@ -118,12 +118,19 @@ function Greet {
         $OperatorStart = $Source.IndexOf('-is')
         $Reason = "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
         $null = Add-AstTextEdit -Document $Document -TextEdit @(
-            New-AstTextEdit -Document $Document `
-                -StartOffset $NegationStart -EndOffset ($NegationStart + 4) `
-                -ReplacementText '' -Reason $Reason
-            New-AstTextEdit -Document $Document `
-                -StartOffset $OperatorStart -EndOffset ($OperatorStart + 3) `
-                -ReplacementText '-isnot' -Reason $Reason
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset $NegationStart `
+                -EndOffset ($NegationStart + 4) `
+                -ReplacementText '' `
+                -Reason $Reason
+
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset $OperatorStart `
+                -EndOffset ($OperatorStart + 3) `
+                -ReplacementText '-isnot' `
+                -Reason $Reason
         )
 
         $Diff = Show-AstDiff -Document $Document -NoColor
@@ -132,6 +139,47 @@ function Greet {
             "[0, 1] $Reason",
             '  1 - -not ($Value -is [int])',
             '    +  ($Value -isnot [int])'
+        ) -join [Environment]::NewLine)
+    }
+
+    It 'labels each reason with the line:column of its first edit when Label is Position' {
+        $Source = "`$a = 1`n  -not (`$Value -is [int])`n"
+        $Document = New-AstDocument -InputObject $Source
+        $NegationStart = $Source.IndexOf('-not')
+        $OperatorStart = $Source.IndexOf('-is ')
+        $Reason = "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
+        $null = Add-AstTextEdit -Document $Document -TextEdit @(
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset 0 `
+                -EndOffset 2 `
+                -ReplacementText '$b' `
+                -Reason 'Rename'
+
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset $OperatorStart `
+                -EndOffset ($OperatorStart + 3) `
+                -ReplacementText '-isnot' `
+                -Reason $Reason
+
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset $NegationStart `
+                -EndOffset ($NegationStart + 4) `
+                -ReplacementText '' `
+                -Reason $Reason
+        )
+
+        $Diff = Show-AstDiff -Document $Document -NoColor -Label Position
+
+        $Diff | Should -BeExactly ((
+            '1:1  Rename',
+            "2:3  $Reason",
+            '  1 - $a = 1',
+            '  2 -   -not ($Value -is [int])',
+            '    + $b = 1',
+            '    +    ($Value -isnot [int])'
         ) -join [Environment]::NewLine)
     }
 

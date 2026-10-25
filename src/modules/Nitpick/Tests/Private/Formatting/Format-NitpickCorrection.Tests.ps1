@@ -1,9 +1,6 @@
 BeforeAll {
     Import-Module -Name "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
 
-    $PreviousNoHyperlink = $env:NO_HYPERLINK
-    $PreviousForceHyperlink = $env:FORCE_HYPERLINK
-
     function New-TestCorrectionResult {
         param (
             [string] $Path = 'C:\Scripts\Example.ps1',
@@ -23,7 +20,7 @@ BeforeAll {
                 AcceptedCorrections = $Accepted
                 SkippedCorrections = $Skipped
                 Conflicts = $Conflicts
-                Diff = 'DIFF'
+                Diff = "29:13  Reason`n  29 - old`n     + new"
             }
         }
 
@@ -50,15 +47,11 @@ BeforeAll {
 }
 
 AfterAll {
-    $env:NO_HYPERLINK = $PreviousNoHyperlink
-    $env:FORCE_HYPERLINK = $PreviousForceHyperlink
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
 }
 
 Describe 'Format-NitpickCorrection' {
     BeforeEach {
-        $env:NO_HYPERLINK = '1'
-        $env:FORCE_HYPERLINK = $null
         $ChangeSet = @(
             [pscustomobject]@{ ChangeSetId = 'Set1' }
             [pscustomobject]@{ ChangeSetId = 'Set1' }
@@ -71,76 +64,59 @@ Describe 'Format-NitpickCorrection' {
         Format-TestCorrection $Result | Should -BeNullOrEmpty
     }
 
-    It 'names the target in the <Status> heading' -ForEach @(
-        @{ Status = 'Preview'; Heading = 'Proposed corrections for C:\Scripts\Example.ps1 (preview):' }
-        @{ Status = 'WhatIf'; Heading = 'Proposed corrections for C:\Scripts\Example.ps1 (WhatIf):' }
-        @{ Status = 'InMemory'; Heading = 'Proposed corrections for C:\Scripts\Example.ps1 (in-memory):' }
-        @{ Status = 'Declined'; Heading = 'Proposed corrections for C:\Scripts\Example.ps1 (not applied):' }
+    It 'indents the diff without a heading and leaves outer spacing to the caller' {
+        $Result = New-TestCorrectionResult -Accepted $ChangeSet
+
+        Format-TestCorrection $Result | Should -BeExactly (@(
+            '  29:13  Reason'
+            '    29 - old'
+            '       + new'
+            ''
+            '  1 proposed correction.'
+        ) -join [Environment]::NewLine)
+    }
+
+    It 'states the <Status> outcome once in the trailer' -ForEach @(
+        @{ Status = 'Preview'; Trailer = '1 proposed correction.' }
+        @{ Status = 'WhatIf'; Trailer = '1 proposed correction.' }
+        @{ Status = 'Declined'; Trailer = '1 proposed correction declined.' }
+        @{ Status = 'InMemory'; Trailer = '1 correction applied in memory.' }
     ) {
         $Result = New-TestCorrectionResult -ApplicationStatus $Status -Accepted $ChangeSet
 
         $Text = Format-TestCorrection $Result
 
-        $Text | Should -Match ('^' + [regex]::Escape($Heading) + '\nDIFF\n')
+        $Text | Should -Match ('\n  ' + [regex]::Escape($Trailer) + '$')
+        $Text | Should -Not -Match 'preview|WhatIf|No files changed'
     }
 
-    It 'counts a change set as one correction in the trailer' {
-        $Result = New-TestCorrectionResult -Accepted $ChangeSet
+    It 'pluralizes proposed corrections by change set' {
+        $Accepted = @($ChangeSet) + [pscustomobject]@{ ChangeSetId = $null }
+        $Result = New-TestCorrectionResult -Accepted $Accepted
 
-        Format-TestCorrection $Result |
-            Should -Match '\n1 proposed correction\. No files changed \(preview\)\.$'
-    }
-
-    It 'leaves spacing between blocks to the caller' {
-        $Result = New-TestCorrectionResult -Accepted $ChangeSet
-
-        Format-TestCorrection $Result | Should -Not -Match '\n$'
+        Format-TestCorrection $Result | Should -Match '\n  2 proposed corrections\.$'
     }
 
     It 'reports applied corrections by committed change sets' {
         $Result = New-TestCorrectionResult -ApplicationStatus Written -Accepted $ChangeSet -Committed $ChangeSet
 
-        $Text = Format-TestCorrection $Result
-
-        $Text | Should -Match '^Applied corrections for C:\\Scripts\\Example\.ps1:'
-        $Text | Should -Match '1 correction applied\.'
+        Format-TestCorrection $Result | Should -Match '\n  1 correction applied\.$'
     }
 
-    It 'uses the status heading and full counts when edits are skipped or conflicting' {
+    It 'reports full counts and statuses when edits are skipped or conflicting' {
         $Result = New-TestCorrectionResult -ProposalStatus Rejected -ApplicationStatus NotAttempted `
             -Skipped @(1, 2) -Conflicts @(1)
 
-        $Text = Format-TestCorrection $Result
-
-        $Text | Should -Match '^Corrections for C:\\Scripts\\Example\.ps1 \(proposal: Rejected; application: NotAttempted\):'
-        $Text | Should -Not -Match 'DIFF'
-        $Text | Should -Match '0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict\.'
+        Format-TestCorrection $Result | Should -BeExactly (
+            '  0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict ' +
+            '(proposal: Rejected; application: NotAttempted).'
+        )
     }
 
     It 'reports a failure without a proposal' {
         $Result = New-TestCorrectionResult -NoProposal -ApplicationStatus FailedRead
 
         Format-TestCorrection $Result |
-            Should -Match '^Corrections for C:\\Scripts\\Example\.ps1 \(proposal: Unavailable; application: FailedRead\):'
-    }
-
-    It 'names script block targets without a link' {
-        $env:NO_HYPERLINK = $null
-        $env:FORCE_HYPERLINK = '1'
-        $Result = New-TestCorrectionResult -Path '<ScriptBlock>' -Accepted $ChangeSet
-
-        Format-TestCorrection $Result | Should -Match '^Proposed corrections for <ScriptBlock> \(preview\):'
-    }
-
-    It 'links the target path to its file URI when hyperlinks are enabled' {
-        $env:NO_HYPERLINK = $null
-        $env:FORCE_HYPERLINK = '1'
-        $Result = New-TestCorrectionResult -Accepted $ChangeSet
-
-        $Esc = [char] 27
-        $Link = @(
-            $Esc, ']8;;file:///C:/Scripts/Example.ps1', $Esc, '\', 'C:\Scripts\Example.ps1', $Esc, ']8;;', $Esc, '\'
-        ) -join ''
-        (Format-TestCorrection $Result).Contains("Proposed corrections for $Link (preview):") | Should -BeTrue
+            Should -Match '\(proposal: Unavailable; application: FailedRead\)\.$'
     }
 }

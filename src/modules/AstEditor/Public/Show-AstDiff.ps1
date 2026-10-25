@@ -1,3 +1,7 @@
+using namespace System
+using namespace System.Text
+using namespace System.Collections.Generic
+
 <#
 .SYNOPSIS
     Shows a text diff for all or selected queued edits in an AstDocument.
@@ -5,9 +9,10 @@
 .DESCRIPTION
     Formats queued edits as line-oriented hunks. Edits touching the same or
     adjacent lines are grouped, so related edits are shown together as complete
-    original ('-') and corrected ('+') lines. Each hunk lists the zero-based
-    indexes and reasons of its edits. Identical reasons within a hunk share one
-    label. Removed and context lines are numbered by their position in the original text.
+    original ('-') and corrected ('+') lines. Each hunk lists the reasons of its
+    edits, labeled as described for Label. Identical reasons within a hunk share
+    one label. Removed and context lines are numbered by their position in the
+    original text.
 
     When EditIndex is provided, only those positions in the sorted edit list are
     shown. Context adds that many unchanged lines around each hunk; hunks whose
@@ -18,6 +23,12 @@
     The number of unchanged lines to show before and after each hunk. Defaults to
     zero, which shows only the lines spanning the grouped edits.
 
+.PARAMETER Label
+    How each reason is labeled. 'Index' (default) lists the zero-based edit
+    indexes, such as '[0, 1]'. 'Position' shows the one-based line:column where
+    the reason's first edit starts, such as '29:13', which editors can resolve
+    against a preceding file path.
+
 .EXAMPLE
     Show-AstDiff -Document $doc
 
@@ -27,6 +38,11 @@
     Show-AstDiff -Document $doc -EditIndex 0,2 -Context 3
 
     Displays only the first and third queued edits with three lines of context.
+
+.EXAMPLE
+    Show-AstDiff -Document $doc -Label Position
+
+    Labels each reason with the line:column where its first edit starts.
 #>
 function Show-AstDiff {
     [CmdletBinding()]
@@ -40,6 +56,9 @@ function Show-AstDiff {
 
         [ValidateRange(0, 2147483647)]
         [int] $Context = 0,
+
+        [ValidateSet('Index', 'Position')]
+        [string] $Label = 'Index',
 
         [switch] $NoColor
     )
@@ -100,7 +119,7 @@ function Show-AstDiff {
     }
 
     # Group selected edits into blocks of contiguous changed lines.
-    $Blocks = [System.Collections.Generic.List[hashtable]]::new()
+    $Blocks = [List[hashtable]]::new()
     foreach ($Index in $SelectedIndexes) {
         $Edit = $SortedEdits[$Index]
         $StartLine = & $GetLineIndex $Edit.StartOffset
@@ -129,14 +148,14 @@ function Show-AstDiff {
             $Previous.EndLine = [Math]::Max($Previous.EndLine, $EndLine)
             $Previous.Items.Add(@{ Index = $Index; Edit = $Edit })
         } else {
-            $Items = [System.Collections.Generic.List[hashtable]]::new()
+            $Items = [List[hashtable]]::new()
             $Items.Add(@{ Index = $Index; Edit = $Edit })
             $Blocks.Add(@{ StartLine = $StartLine; EndLine = $EndLine; Items = $Items })
         }
     }
 
     # Combine blocks into hunks when their context lines would touch or overlap.
-    $Hunks = [System.Collections.Generic.List[object]]::new()
+    $Hunks = [List[object]]::new()
     foreach ($Block in $Blocks) {
         $PreviousHunk = $null
         if ($Hunks.Count -gt 0) {
@@ -148,13 +167,13 @@ function Show-AstDiff {
         ) {
             $PreviousHunk.Add($Block)
         } else {
-            $Hunk = [System.Collections.Generic.List[hashtable]]::new()
+            $Hunk = [List[hashtable]]::new()
             $Hunk.Add($Block)
             $Hunks.Add($Hunk)
         }
     }
 
-    $Builder = [System.Text.StringBuilder]::new()
+    $Builder = [StringBuilder]::new()
     $AppendLine = {
         param ([object] $LineNumber, [string] $Marker, [string] $Content, [string] $Color)
         $Gutter = if ($null -eq $LineNumber) { ' ' * $NumberWidth } else { ([string] $LineNumber).PadLeft($NumberWidth) }
@@ -176,15 +195,15 @@ function Show-AstDiff {
             [void] $Builder.AppendLine('')
         }
 
-        $ReasonGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[int]]]::new(
-            [System.StringComparer]::Ordinal
+        $ReasonGroups = [Dictionary[string, List[int]]]::new(
+            [StringComparer]::Ordinal
         )
-        $ReasonOrder = [System.Collections.Generic.List[string]]::new()
+        $ReasonOrder = [List[string]]::new()
         foreach ($Block in $Hunk) {
             foreach ($Item in $Block.Items) {
                 $Reason = [string] $Item.Edit.Reason
                 if (-not $ReasonGroups.ContainsKey($Reason)) {
-                    $ReasonGroups[$Reason] = [System.Collections.Generic.List[int]]::new()
+                    $ReasonGroups[$Reason] = [List[int]]::new()
                     $ReasonOrder.Add($Reason)
                 }
                 $ReasonGroups[$Reason].Add($Item.Index)
@@ -192,8 +211,15 @@ function Show-AstDiff {
         }
 
         foreach ($Reason in $ReasonOrder) {
-            $Indexes = $ReasonGroups[$Reason] -join ', '
-            [void] $Builder.AppendLine("${Bold}[$Indexes] $Reason${Reset}")
+            $ReasonLabel = if ($Label -eq 'Position') {
+                # Edits are sorted by offset, so the first index marks where the reason starts.
+                $StartOffset = $SortedEdits[$ReasonGroups[$Reason][0]].StartOffset
+                $StartLineIndex = & $GetLineIndex $StartOffset
+                '{0}:{1} ' -f ($StartLineIndex + 1), ($StartOffset - $Lines[$StartLineIndex].Start + 1)
+            } else {
+                '[{0}]' -f ($ReasonGroups[$Reason] -join ', ')
+            }
+            [void] $Builder.AppendLine("${Bold}$ReasonLabel $Reason${Reset}")
         }
 
         $FirstLine = $Hunk[0].StartLine
