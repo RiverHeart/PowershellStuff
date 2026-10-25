@@ -147,6 +147,7 @@ function Start-Nitpicking {
             } else {
                 Get-Item -LiteralPath $Path -ErrorAction Stop
             }
+
             $Files = @(
                 foreach ($Root in $Roots) {
                     if ($Root.PSIsContainer) {
@@ -156,9 +157,11 @@ function Start-Nitpicking {
                     }
                 }
             )
+
             foreach ($File in $Files) {
                 [void] $CandidatePaths.Add($File.FullName)
             }
+
             $Files |
                 Where-NitpickIncluded `
                     -PropertyPath FullName `
@@ -168,6 +171,7 @@ function Start-Nitpicking {
         } else {
             $Script
         }
+
         foreach ($Target in $Targets) {
             $ResolvedTargets.Add($Target)
         }
@@ -183,14 +187,18 @@ function Start-Nitpicking {
                     }
                 }
             )
+
             if ($UnmatchedPaths.Count -gt 0) {
                 throw "No file targets match the literal IncludePath selector(s): $($UnmatchedPaths -join ', '). Use full file paths or wildcard filters."
             }
+
             if ($ResolvedTargets.Count -eq 0) {
                 throw 'No file targets remain after resolving paths and applying Filter, IncludePath, and ExcludePath.'
             }
         }
 
+        # Text blocks are separated with host-only blank lines to keep the pipeline clean.
+        $HasWrittenTextBlock = $false
         foreach ($Target in $ResolvedTargets) {
             $Document = $null
             $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
@@ -198,6 +206,7 @@ function Start-Nitpicking {
             } else {
                 '<ScriptBlock>'
             }
+
             try {
                 $Document = if ($PSCmdlet.ParameterSetName -eq 'Path') {
                     New-AstDocument -Path $Target.FullName
@@ -219,10 +228,13 @@ function Start-Nitpicking {
                     $ReadFailure = New-NitpickCorrectionResult `
                         -Path $TargetPath `
                         -Application @{ Status = 'FailedRead'; ErrorRecord = $_ }
+
                     if ($Output -eq 'Object') {
                         Write-Output $ReadFailure
                     } else {
+                        if ($HasWrittenTextBlock) { Write-Host '' }
                         Write-Output "Corrections (FailedRead): $($ReadFailure.Path)"
+                        $HasWrittenTextBlock = $true
                     }
                 }
                 $PSCmdlet.WriteError($_)
@@ -318,69 +330,11 @@ function Start-Nitpicking {
             }
 
             if ($Output -eq 'Text' -and $CorrectionResult) {
-                $Proposal = $CorrectionResult.Proposal
-                $ProposalStatus = if ($Proposal) { $Proposal.Status } else { 'Unavailable' }
-                $AcceptedCount = if ($Proposal) { $Proposal.AcceptedCorrections.Count } else { 0 }
-                $CommittedCount = $CorrectionResult.Application.CommittedCorrections.Count
-                $SkippedCount = if ($Proposal) { $Proposal.SkippedCorrections.Count } else { 0 }
-                $ConflictCount = if ($Proposal) { $Proposal.Conflicts.Count } else { 0 }
-                $HasCorrectionFailure = $CorrectionResult.Application.ErrorRecord -or
-                    $ProposalStatus -in 'Rejected', 'FailedValidation' -or
-                    $CorrectionResult.Application.Status -in @(
-                        'FailedRead', 'FailedValidation', 'StaleSource', 'StaleTarget', 'InvalidTarget', 'FailedWrite'
-                    )
-
-                if ($AcceptedCount -gt 0 -or $CommittedCount -gt 0 -or
-                    $SkippedCount -gt 0 -or $ConflictCount -gt 0 -or $HasCorrectionFailure
-                ) {
-                    $ApplicationStatus = $CorrectionResult.Application.Status
-                    $CorrectionHeading = if ($AcceptedCount -gt 0 -and
-                        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasCorrectionFailure
-                    ) {
-                        switch ($ApplicationStatus) {
-                            'Preview' { 'Proposed corrections (preview):' }
-                            'WhatIf' { 'Proposed corrections (WhatIf):' }
-                            'Written' { 'Applied corrections:' }
-                            'InMemory' { 'Proposed corrections (in-memory):' }
-                            'Declined' { 'Proposed corrections (not applied):' }
-                            default {
-                                "Corrections (proposal: {0}; application: {1}):" -f
-                                    $ProposalStatus, $ApplicationStatus
-                            }
-                        }
-                    } else {
-                        "Corrections (proposal: {0}; application: {1}):" -f
-                            $ProposalStatus, $ApplicationStatus
-                    }
-
-                    Write-Output $CorrectionHeading
-                    if ($AcceptedCount -gt 0) {
-                        Write-Output $Proposal.Diff
-                    }
-
-                    $EditNoun = if ($AcceptedCount -eq 1) { 'edit' } else { 'edits' }
-                    $CorrectionTrailer = if ($AcceptedCount -gt 0 -and
-                        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasCorrectionFailure
-                    ) {
-                        switch ($ApplicationStatus) {
-                            'Preview' { '{0} proposed {1}. No files changed (preview).' -f $AcceptedCount, $EditNoun }
-                            'WhatIf' { '{0} proposed {1}. No files changed (WhatIf).' -f $AcceptedCount, $EditNoun }
-                            'Written' {
-                                $CorrectionNoun = if ($CommittedCount -eq 1) { 'correction' } else { 'corrections' }
-                                '{0} {1} applied.' -f $CommittedCount, $CorrectionNoun
-                            }
-                            'InMemory' {
-                                '{0} proposed {1} applied to in-memory text only.' -f $AcceptedCount, $EditNoun
-                            }
-                            'Declined' { '{0} proposed {1} were not applied.' -f $AcceptedCount, $EditNoun }
-                        }
-                    } else {
-                        '{0} committed, {1} accepted, {2} skipped, {3} conflicts.' -f
-                            $CommittedCount, $AcceptedCount, $SkippedCount, $ConflictCount
-                    }
-
-                    # Trailing blank line separates this block from the next target's output.
-                    Write-Output "`n$CorrectionTrailer`n"
+                $CorrectionText = @(Format-NitpickCorrection -CorrectionResult $CorrectionResult)
+                if ($CorrectionText.Count -gt 0) {
+                    if ($HasWrittenTextBlock) { Write-Host '' }
+                    Write-Output $CorrectionText
+                    $HasWrittenTextBlock = $true
                 }
             }
 
@@ -392,7 +346,9 @@ function Start-Nitpicking {
                 $SortedFindings = $FinalFindings | Sort-Object `
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
+                if ($HasWrittenTextBlock) { Write-Host '' }
                 Format-NitpickText -Ast $Ast -Finding $SortedFindings
+                $HasWrittenTextBlock = $true
             }
         }
         $Stopwatch.Stop()

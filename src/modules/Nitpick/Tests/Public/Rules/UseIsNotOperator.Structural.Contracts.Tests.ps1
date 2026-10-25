@@ -169,8 +169,11 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
             )
 
            @($Finding.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount 1
+           @($Finding.Corrections.Description | Select-Object -Unique) | Should -HaveCount 1
+           $Finding.Corrections[0].Description |
+               Should -BeExactly "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
 
-            foreach ($Correction in $Finding.Corrections) {
+           foreach ($Correction in $Finding.Corrections) {
                 $Correction.Applicability | Should -Be 'Safe'
                 $Correction.RuleName | Should -Be 'UseIsNotOperator'
                 $Correction.TextEdit.GetType().Name | Should -Be 'AstTextEdit'

@@ -6,8 +6,8 @@
     Formats queued edits as line-oriented hunks. Edits touching the same or
     adjacent lines are grouped, so related edits are shown together as complete
     original ('-') and corrected ('+') lines. Each hunk lists the zero-based
-    index and reason of its edits. Removed and context lines are numbered by
-    their position in the original text.
+    indexes and reasons of its edits. Identical reasons within a hunk share one
+    label. Removed and context lines are numbered by their position in the original text.
 
     When EditIndex is provided, only those positions in the sorted edit list are
     shown. Context adds that many unchanged lines around each hunk; hunks whose
@@ -176,10 +176,24 @@ function Show-AstDiff {
             [void] $Builder.AppendLine('')
         }
 
+        $ReasonGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[int]]]::new(
+            [System.StringComparer]::Ordinal
+        )
+        $ReasonOrder = [System.Collections.Generic.List[string]]::new()
         foreach ($Block in $Hunk) {
             foreach ($Item in $Block.Items) {
-                [void] $Builder.AppendLine("${Bold}[$($Item.Index)] $($Item.Edit.Reason)${Reset}")
+                $Reason = [string] $Item.Edit.Reason
+                if (-not $ReasonGroups.ContainsKey($Reason)) {
+                    $ReasonGroups[$Reason] = [System.Collections.Generic.List[int]]::new()
+                    $ReasonOrder.Add($Reason)
+                }
+                $ReasonGroups[$Reason].Add($Item.Index)
             }
+        }
+
+        foreach ($Reason in $ReasonOrder) {
+            $Indexes = $ReasonGroups[$Reason] -join ', '
+            [void] $Builder.AppendLine("${Bold}[$Indexes] $Reason${Reset}")
         }
 
         $FirstLine = $Hunk[0].StartLine

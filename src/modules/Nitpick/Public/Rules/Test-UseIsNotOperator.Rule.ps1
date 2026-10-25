@@ -144,15 +144,16 @@ function Test-UseIsNotOperator {
                     }
 
                     $ChangeSetId = '{0}:{1}:{2}' -f $Metadata.Name, $BadNode.Extent.StartOffset, $BadNode.Extent.EndOffset
+                    $ChangeReason = "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
                     $Edits = @(
                         New-AstTextEdit `
                             -Extent $Negation[0].Extent `
                             -ReplacementText '' `
-                            -Reason 'Remove unary negation from the type test.'
+                            -Reason $ChangeReason
                         New-AstTextEdit `
                             -Extent $Operator[0].Extent `
                             -ReplacementText '-isnot' `
-                            -Reason "Use '-isnot' to negate the type test."
+                            -Reason $ChangeReason
                     )
                     $Corrections = @(
                         foreach ($Edit in $Edits) {

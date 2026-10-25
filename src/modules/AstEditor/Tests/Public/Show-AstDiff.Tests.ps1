@@ -111,6 +111,30 @@ function Greet {
         ) -join [Environment]::NewLine)
     }
 
+    It 'prints identical reasons once with all edit indexes in a hunk' {
+        $Source = '-not ($Value -is [int])'
+        $Document = New-AstDocument -InputObject $Source
+        $NegationStart = $Source.IndexOf('-not')
+        $OperatorStart = $Source.IndexOf('-is')
+        $Reason = "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
+        $null = Add-AstTextEdit -Document $Document -TextEdit @(
+            New-AstTextEdit -Document $Document `
+                -StartOffset $NegationStart -EndOffset ($NegationStart + 4) `
+                -ReplacementText '' -Reason $Reason
+            New-AstTextEdit -Document $Document `
+                -StartOffset $OperatorStart -EndOffset ($OperatorStart + 3) `
+                -ReplacementText '-isnot' -Reason $Reason
+        )
+
+        $Diff = Show-AstDiff -Document $Document -NoColor
+
+        $Diff | Should -BeExactly ((
+            "[0, 1] $Reason",
+            '  1 - -not ($Value -is [int])',
+            '    +  ($Value -isnot [int])'
+        ) -join [Environment]::NewLine)
+    }
+
     It 'shows <Context> unchanged lines around hunks and merges overlapping context' -ForEach @(
         @{
             Context = 0

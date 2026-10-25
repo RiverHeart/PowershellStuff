@@ -529,6 +529,29 @@ Describe 'Start-Nitpicking' {
         $Results[1] | Should -Match '^1 finding \(0 errors, 0 warnings, 1 information\) across 1 target in [\d,]+ ms$'
     }
 
+    It 'separates consecutive target findings with host-only blank lines' {
+        $Directory = New-Item -Path (Join-Path $TestDrive 'SeparatedFindings') -ItemType Directory
+        foreach ($Name in 'First.ps1', 'Second.ps1') {
+            [System.IO.File]::WriteAllText(
+                (Join-Path $Directory $Name),
+                'param([Parameter(Mandatory=$true)] [string] $Name)'
+            )
+        }
+
+        $Results = @(
+            Start-Nitpicking `
+                -Path $Directory.FullName `
+                -IncludeRule Nitpick/AvoidParameterAttributeBool `
+                -NoSummary 6>&1
+        )
+
+        $Results.Count | Should -Be 3
+        $Results[0] | Should -BeOfType ([string])
+        $Results[1] | Should -BeOfType ([System.Management.Automation.InformationRecord])
+        "$($Results[1])" | Should -BeExactly ''
+        $Results[2] | Should -BeOfType ([string])
+    }
+
     It 'sorts text findings by source position within each target' {
         $Rule = {
             param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
@@ -659,8 +682,8 @@ Describe 'Start-Nitpicking' {
                 -Output Text `
                 -NoSummary
         ) -join "`n"
-        $Text | Should -Match 'Corrections \(proposal: Rejected; application: NotAttempted\):'
-        $Text | Should -Match '0 committed, 0 accepted, 2 skipped, 1 conflicts\.'
+        $Text | Should -Match 'Corrections for <ScriptBlock> \(proposal: Rejected; application: NotAttempted\):'
+        $Text | Should -Match '0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict\.'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {

@@ -41,8 +41,12 @@ Start-Nitpicking -Path .\Example.ps1 -Fix -WhatIf
 confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
 for a correction envelope with `Proposal`, `Application`, and `Report` groups.
 Text output shows diffs for proposed or applied edits and reports skipped or failed corrections;
-it omits the correction block when a target has no correction activity. Use `-Verbose` for
-per-target no-op diagnostics.
+each correction block's heading names its target, linked with an OSC 8 hyperlink under the same
+`FORCE_HYPERLINK`/`NO_HYPERLINK` rules as findings. It omits the correction block when a target
+has no correction activity. Use `-Verbose` for
+per-target no-op diagnostics. Text output counts accepted edits with the same `ChangeSetId` as
+one correction; edits without a `ChangeSetId` count individually. Object output retains the
+individual edits in `Proposal.AcceptedCorrections` and `Application.CommittedCorrections`.
 `Proposal` retains candidate text, reanalysis, skipped corrections, and conflicts regardless
 of application outcome. Only `Application.CommittedCorrections` describes committed edits;
 `Application.Status` records whether writing succeeded, failed, or was not requested.

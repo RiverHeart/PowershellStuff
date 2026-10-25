@@ -1,5 +1,5 @@
 BeforeAll {
-    Import-Module -Name "$PSScriptRoot\..\..\Nitpick.psd1" -Force
+    Import-Module -Name "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
 }
 
 AfterAll {

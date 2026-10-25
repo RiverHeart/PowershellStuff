@@ -41,8 +41,6 @@ function Format-NitpickText {
         [object[]] $Finding
     )
 
-    $Esc = [char] 27
-
     if ($Ast.Extent.File) {
         $FilePath = $Ast.Extent.File
         $UriPath = [Uri]::new($Ast.Extent.File)
@@ -50,30 +48,6 @@ function Format-NitpickText {
         $FilePath = '<ScriptBlock>'
         $UriPath = $null
     }
-
-    $IsVSCode = $env:TERM_PROGRAM -eq 'vscode'
-
-    # Determine if ANSI OSC 8 hyperlinks are supported or required
-    $SupportsAnsiLinks = $Host.UI.SupportsVirtualTerminal -or $IsVSCode
-
-    # VSCode link detection supports contextual lookahead, meaning
-    # it can infer a position (line:column) as belonging to the last link it
-    # found. With this, ANSI hyperlinks aren't necessary.
-    # https://code.visualstudio.com/docs/terminal/basics#_links
-    $SupportsContextualLookahead = $IsVSCode
-
-    $ShouldUseAnsiLinks =
-        $UriPath -and (
-            # Force hyperlink if explicitly requested
-            $env:FORCE_HYPERLINK -eq '1' -or
-            (
-                # Links are supported and not explicitly disabled
-                $SupportsAnsiLinks -and
-                -not $SupportsContextualLookahead -and
-                $env:FORCE_HYPERLINK -ne '0' -and
-                $env:NO_HYPERLINK -ne '1'
-            )
-        )
 
     $Builder = [StringBuilder]::new()
     $Builder.AppendLine($FilePath) | Out-Null
@@ -85,13 +59,12 @@ function Format-NitpickText {
         # the typical path:line:column format when aggregating multiple findings.
         $Position = "$($Item.ViolationExtent.StartLineNumber):$($Item.ViolationExtent.StartColumnNumber)"
 
-        if ($ShouldUseAnsiLinks) {
-            # A colon cannot be used to separate the file from the position because the URI
-            # format reserves it for the scheme (e.g., file://) or port specification.
-            # To workaround this, a hash (#) is used to create a fragment identifier so
-            # the parser can correctly interpret the position within the file.
-            $Position = [string] $Esc + ']8;;' + $UriPath.AbsoluteUri + '#' + $Position +
-                [string] $Esc + '\' + $Position + [string] $Esc + ']8;;' + [string] $Esc + '\'
+        # A colon cannot be used to separate the file from the position because the URI
+        # format reserves it for the scheme (e.g., file://) or port specification.
+        # To workaround this, a hash (#) is used to create a fragment identifier so
+        # the parser can correctly interpret the position within the file.
+        if ($UriPath) {
+            $Position = Format-NitpickHyperlink -Uri "$($UriPath.AbsoluteUri)#$Position" -Text $Position
         }
 
         [pscustomobject]@{
@@ -115,5 +88,6 @@ function Format-NitpickText {
         )) | Out-Null
     }
 
-    return $Builder.ToString()
+    # Drop the final AppendLine terminator so callers control block spacing.
+    return $Builder.ToString().TrimEnd("`r", "`n")
 }

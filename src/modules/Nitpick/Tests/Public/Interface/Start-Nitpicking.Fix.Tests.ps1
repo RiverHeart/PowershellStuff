@@ -1,9 +1,17 @@
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
+
+    # Keep text assertions independent of the host terminal's hyperlink support.
+    $PreviousNoHyperlink = $env:NO_HYPERLINK
+    $PreviousForceHyperlink = $env:FORCE_HYPERLINK
+    $env:NO_HYPERLINK = '1'
+    $env:FORCE_HYPERLINK = $null
 }
 
 AfterAll {
+    $env:NO_HYPERLINK = $PreviousNoHyperlink
+    $env:FORCE_HYPERLINK = $PreviousForceHyperlink
     Remove-Module Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -134,26 +142,48 @@ Describe 'Start-Nitpicking transactional fixes' {
                 -Output Text -NoSummary -ErrorAction Stop
         ) -join "`n"
 
-        $Output | Should -Match 'Proposed corrections \(preview\):'
+        $Output | Should -Match ('Proposed corrections for ' + [regex]::Escape($Path) + ' \(preview\):')
         $Output | Should -Match '1 - \$Value = 1'
         $Output | Should -Match '\+ \$Value = 2'
         $Output | Should -Match '\$Value = 2'
-        $Output | Should -Match '1 proposed edit\. No files changed \(preview\)\.'
-        $Output | Should -Match 'No files changed \(preview\)\.\r?\n\r?\n'
+        $Output | Should -Match '1 proposed correction\. No files changed \(preview\)\.'
         $Output | Should -Not -Match 'committed'
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
     }
 
-    It 'separates consecutive target correction blocks with a blank line' {
+    It 'counts a coordinated change set as one proposed correction in text output' {
+        $Path = Join-Path $TestDrive 'CoordinatedPreview.ps1'
+        [System.IO.File]::WriteAllText($Path, '-not ($Value -is [int])')
+
+        $Output = @(
+            Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+                -Output Text -NoSummary -ErrorAction Stop
+        ) -join "`n"
+
+        $Output | Should -Match '\[0, 1\] Replace .* with '
+        $Output | Should -Match '1 proposed correction\. No files changed \(preview\)\.'
+        $Output | Should -Not -Match '2 proposed edits'
+    }
+
+    It 'separates consecutive target blocks with host-only blank lines' {
         $Directory = New-Item -Path (Join-Path $TestDrive 'Separated') -ItemType Directory
         foreach ($Name in 'First.ps1', 'Second.ps1') {
             [System.IO.File]::WriteAllText((Join-Path $Directory $Name), '-not ($Value -is [int])')
         }
 
-        $Output = (Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
-            -Output Text -NoSummary -ErrorAction Stop | Out-String)
+        $Output = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+            -Output Text -NoSummary -ErrorAction Stop 6>$null)
+        $Combined = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+            -Output Text -NoSummary -ErrorAction Stop 6>&1)
 
-        $Output | Should -Match 'No files changed \(preview\)\.\r?\n\r?\nProposed corrections \(preview\):'
+        $Output | Where-Object { $_ -eq '' } | Should -BeNullOrEmpty
+        $SecondPath = [regex]::Escape((Join-Path $Directory.FullName 'Second.ps1'))
+        $SecondIndex = @(0..($Combined.Count - 1) | Where-Object {
+            "$($Combined[$_])" -match "^Proposed corrections for $SecondPath \(preview\):"
+        })[0]
+        $SecondIndex | Should -BeGreaterThan 0
+        "$($Combined[$SecondIndex - 1])" | Should -BeExactly ''
+        $Combined[$SecondIndex - 1] | Should -BeOfType ([System.Management.Automation.InformationRecord])
     }
 
     It 'omits the correction block when there are no edits but retains findings' {
@@ -166,7 +196,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         ) -join "`n"
 
         $Output | Should -Match 'Transaction finding'
-        $Output | Should -Not -Match 'Corrections \(proposal:'
+        $Output | Should -Not -Match 'Corrections for .* \(proposal:'
         $Output | Should -Not -Match 'No queued edits'
         $Output | Should -Not -Match 'committed, .* accepted, .* skipped'
     }
