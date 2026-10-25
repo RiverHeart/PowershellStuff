@@ -47,7 +47,7 @@ function New-AstDocument {
         [string] $Path,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline, ValueFromPipelineByPropertyName)]
-        [ValidateNotNullOrEmpty()]
+        [AllowEmptyString()]
         [object] $InputObject
     )
 
