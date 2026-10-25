@@ -37,17 +37,22 @@ Describe 'Start-Nitpicking' {
         }
     }
 
-    It 'terminates before reading targets for an unmatched selector: <Selector>, Fix: <Fix>' -ForEach @(
-        @{ Selector = 'Test-UseIsNotOperator'; Fix = $false }
-        @{ Selector = 'MissingRule'; Fix = $false }
-        @{ Selector = 'MissingRule'; Fix = $true }
+    It 'terminates before reading targets for an unmatched selector: <Selector>, FixMode: <FixMode>' -ForEach @(
+        @{ Selector = 'Test-UseIsNotOperator'; FixMode = 'Off' }
+        @{ Selector = 'MissingRule'; FixMode = 'Off' }
+        @{ Selector = 'MissingRule'; FixMode = 'Apply' }
     ) {
         Mock Get-ChildItem -ModuleName Nitpick { throw 'Targets must not be enumerated.' }
         Mock New-AstDocument -ModuleName Nitpick { throw 'Targets must not be parsed.' }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Targets must not be written.' }
 
         {
-            Start-Nitpicking -Path $TestDrive -IncludeRule $Selector -Fix:$Fix -Output Object -ErrorAction Continue
+            Start-Nitpicking `
+                -Path $TestDrive `
+                -IncludeRule $Selector `
+                -FixMode $FixMode `
+                -Output Object `
+                -ErrorAction Continue
         } | Should -Throw "*No Nitpick rules match the IncludeRule selector(s): $Selector.*"
 
         Should -Invoke Get-ChildItem -ModuleName Nitpick -Times 0 -Exactly -Scope It
@@ -116,7 +121,11 @@ Describe 'Start-Nitpicking' {
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Fixes must not start.' }
         {
             @($Valid, (Join-Path $TestDrive 'Missing.ps1')) |
-                Start-Nitpicking -IncludeRule Nitpick/UseIsNotOperator -Fix -Output Object -ErrorAction Continue
+                Start-Nitpicking `
+                    -IncludeRule Nitpick/UseIsNotOperator `
+                    -FixMode Apply `
+                    -Output Object `
+                    -ErrorAction Continue
         } | Should -Throw
 
         Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
@@ -588,17 +597,13 @@ Describe 'Start-Nitpicking' {
 
     It 'previews corrections and summarizes final findings for in-memory input' {
         $Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
-        $Results = @(
-            Start-Nitpicking `
-                -Script $Source `
-                -IncludeRule Nitpick/AvoidParameterAttributeBool `
-                -Fix `
-                -Preview `
-                -Output Object
-        )
-        $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
-        }
+        [array] $Results = Start-Nitpicking `
+            -Script $Source `
+            -IncludeRule Nitpick/AvoidParameterAttributeBool `
+            -FixMode Preview `
+            -Output Object
+
+        $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Preview | Should -Not -BeNullOrEmpty
@@ -610,15 +615,6 @@ Describe 'Start-Nitpicking' {
 
         $Summary.FindingCount | Should -Be 0
         $Summary.InformationCount | Should -Be 0
-    }
-
-    It 'requires Fix when Preview is specified' {
-        {
-            Start-Nitpicking `
-                -Script '$Value = 1' `
-                -Preview `
-                -NoSummary
-        } | Should -Throw 'The Preview switch requires Fix.'
     }
 
     It 'reports rejected corrections and conflicts in object and text output' {
@@ -655,15 +651,14 @@ Describe 'Start-Nitpicking' {
         }
         Register-Nitpick -Callable $Rule -Name ConflictingRule -Source Tests
 
-        $Results = @(
+        [array] $Results =
             Start-Nitpicking `
                 -Script '$Value = 123' `
                 -IncludeRule Local/ConflictingRule `
-                -Fix `
-                -Preview `
+                -FixMode Preview `
                 -Output Object `
                 -NoSummary
-        )
+
         $Preview = $Results | Where-Object {
             $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
         }
@@ -673,12 +668,11 @@ Describe 'Start-Nitpicking' {
         $Preview.Proposal.Diff | Should -BeNullOrEmpty
         $Preview.Report.EffectiveText | Should -Be '$Value = 123'
 
-        $Text = @(
+        [string[]] ($Text =
             Start-Nitpicking `
                 -Script '$Value = 123' `
                 -IncludeRule Local/ConflictingRule `
-                -Fix `
-                -Preview `
+                -FixMode Preview `
                 -Output Text `
                 -NoSummary
         ) -join "`n"

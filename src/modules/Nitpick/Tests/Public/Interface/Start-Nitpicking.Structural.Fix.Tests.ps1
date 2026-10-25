@@ -13,11 +13,18 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Rules = @('Nitpick/UseIsNotOperator', 'Nitpick/AvoidParameterAttributeBool')
         $Initial = @(Start-Nitpicking -Script $Source -IncludeRule $Rules -Output Object -NoSummary)
         $Initial | Should -HaveCount 2
+
         foreach ($Finding in $Initial) {
             $Finding.GetType().Name | Should -Be 'NitpickFinding'
         }
 
-        $Output = @(Start-Nitpicking -Script $Source -IncludeRule $Rules -Fix -Output Object -NoSummary)
+        [array] $Output = Start-Nitpicking `
+            -Script $Source `
+            -IncludeRule $Rules `
+            -FixMode Apply `
+            -Output Object `
+            -NoSummary
+
         $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Result.Proposal.OriginalFindings | Should -HaveCount 2
         $Result.Proposal.AcceptedCorrections | Should -HaveCount 3
@@ -29,9 +36,14 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
     It 'retains nested diagnostic-only findings during fix reanalysis' {
         $Source = 'function Test-Value { -not ($Name -is [string]); -not ($Name -is [string] > $null) }'
-        $Output = @(Start-Nitpicking -Script $Source -IncludeRule Nitpick/UseIsNotOperator -Fix -Output Object -NoSummary)
-        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        [array] $Output = Start-Nitpicking `
+            -Script $Source `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -Output Object `
+            -NoSummary
 
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Result.Proposal.OriginalFindings | Should -HaveCount 2
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 1
@@ -57,8 +69,13 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Ast = Import-ScriptBlockAst -FilePath $Path
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Memory input must not be saved.' }
 
-        $Results = @(Start-Nitpicking -Script $Ast -IncludeRule Nitpick/UseIsNotOperator -Fix `
-            -Output Object -ErrorOn Information -ErrorAction Stop)
+        [array] $Results = Start-Nitpicking `
+            -Script $Ast `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -Output Object `
+            -ErrorOn Information `
+            -ErrorAction Stop
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
@@ -85,8 +102,13 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
     }
 
     It 'previews and commits equivalent groups with final counts and preserved bytes' {
-        $PreviewOutput = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
-            -Output Object -ErrorOn Information -ErrorAction Stop)
+        [array] $PreviewOutput = Start-Nitpicking `
+            -Path $Path `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Preview `
+            -Output Object `
+            -ErrorOn Information `
+            -ErrorAction Stop
 
         $Preview = $PreviewOutput | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $PreviewSummary = $PreviewOutput | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
@@ -103,8 +125,14 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) | Should -BeExactly $OriginalBytes
 
-        $ApplyOutput = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix `
-            -Output Object -ErrorOn Information -Confirm:$false -ErrorAction Stop)
+        [array] $ApplyOutput = Start-Nitpicking `
+            -Path $Path `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -Output Object `
+            -ErrorOn Information `
+            -Confirm:$false `
+            -ErrorAction Stop
 
         $Applied = $ApplyOutput | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Summary = $ApplyOutput | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
@@ -143,8 +171,14 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) |
             Should -BeExactly ([Convert]::ToBase64String($ExpectedBytes))
 
-        $SecondOutput = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix `
-            -Output Object -ErrorOn Information -Confirm:$false -ErrorAction Stop)
+        [array] $SecondOutput = Start-Nitpicking `
+            -Path $Path `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -Output Object `
+            -ErrorOn Information `
+            -Confirm:$false `
+            -ErrorAction Stop
 
         $Second = $SecondOutput | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Second.Proposal.Status | Should -Be 'NoChanges'
@@ -157,8 +191,14 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
     It 'uses candidate findings under WhatIf without reporting either group committed' {
         Mock Save-AstDocument -ModuleName Nitpick { throw 'WhatIf must not call Save.' }
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix -WhatIf `
-            -Output Object -ErrorOn Information -ErrorAction Stop)
+        [array] $Results = Start-Nitpicking `
+            -Path $Path `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -WhatIf `
+            -Output Object `
+            -ErrorOn Information `
+            -ErrorAction Stop
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
@@ -189,9 +229,15 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         $Errors = @()
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix `
-            -Output Object -ErrorOn Information -Confirm:$false `
-            -ErrorAction SilentlyContinue -ErrorVariable Errors)
+        [array] $Results = Start-Nitpicking `
+            -Path $Path `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -Output Object `
+            -ErrorOn Information `
+            -Confirm:$false `
+            -ErrorAction SilentlyContinue `
+            -ErrorVariable Errors
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
@@ -237,9 +283,15 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         [System.IO.File]::WriteAllText($Path, $MixedSource)
         $Errors = @()
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix `
-            -Output Object -ErrorOn Information -Confirm:$false `
-            -ErrorAction SilentlyContinue -ErrorVariable Errors)
+        [array] $Results = Start-Nitpicking `
+            -Path $Path `
+            -IncludeRule Nitpick/UseIsNotOperator `
+            -FixMode Apply `
+            -Output Object `
+            -ErrorOn Information `
+            -Confirm:$false `
+            -ErrorAction SilentlyContinue `
+            -ErrorVariable Errors
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }

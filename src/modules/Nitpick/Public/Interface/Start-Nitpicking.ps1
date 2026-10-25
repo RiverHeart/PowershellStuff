@@ -57,18 +57,33 @@ using namespace System.Management.Automation.Language
     Excludes matching rule IDs. Unmatched exclusions are allowed. If no eligible
     rules remain after exclusions and editor-mode filtering, execution terminates.
 
-.PARAMETER Fix
-    Applies safe corrections against one immutable source snapshot per file. Use Preview
-    or WhatIf to inspect the transaction without modifying files. In-memory inputs return
-    candidate text in object output under Report.EffectiveText.
+.PARAMETER FixMode
+    Specifies the mode for applying corrections.
+    'Off'     - Do not apply any corrections.
+    'Preview' - Preview safe corrections without modifying files.
+    'Guided'  - Interactive correction process (not yet implemented).
+    'Apply'   - Apply safe corrections.
 
-.PARAMETER Preview
-    Previews safe corrections against one immutable source snapshot per target. Final
-    findings and severity counts reflect reanalysis when the rendered source parses. Use
-    with Fix to explicitly request preview-only behavior; Preview without Fix is invalid.
+    NOTE: Applying against in-memory inputs returns candidate text
+    in object output under `Report.EffectiveText`.
 
 .PARAMETER EditorMode
     Runs only rules whose EditorEnabled metadata is true.
+
+.EXAMPLE
+    Run Start-Nitpicking against a script with the specified rule.
+
+    Start-Nitpicking `
+        -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool
+
+.EXAMPLE
+    Run Start-Nitpicking against a script and apply safe corrections.
+
+    Start-Nitpicking `
+        -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool `
+        -FixMode Apply
 
 .EXAMPLE
     Run Start-Nitpicking against a script and preview safe corrections.
@@ -76,8 +91,13 @@ using namespace System.Management.Automation.Language
     Start-Nitpicking `
         -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
         -IncludeRule Nitpick/AvoidParameterAttributeBool `
-        -Fix `
-        -Preview
+        -FixMode Preview
+
+.EXAMPLE
+    Run Start-Nitpicking using rules sourced from a module against
+    a specified path with preview mode for corrections.
+
+    Start-Nitpicking -Module WPF -Path src/modules/WPF/Public/DSL -FixMode Preview
 #>
 function Start-Nitpicking {
     [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
@@ -108,24 +128,23 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
+        # TODO: Implement guided mode as an interactive correction process.
+        [ValidateSet('Off', 'Preview', 'Guided', 'Apply')]
+        [string] $FixMode = 'Off',
+
         [switch] $ExcludeDefaults,
         [switch] $EditorMode,
-        [switch] $NoSummary,
-        [switch] $Fix,
-        [switch] $Preview
+        [switch] $NoSummary
     )
 
+    # MARK: BEGIN BLK
     begin {
-        if ($Preview -and -not $Fix) {
-            throw 'The Preview switch requires Fix.'
-        }
-
-        [object[]] $Rules = @(Resolve-NitpickEffectiveRuleSet `
+        [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
             -Module $Module `
             -IncludeRule $IncludeRule `
             -ExcludeRule $ExcludeRule `
             -ExcludeDefaults:$ExcludeDefaults `
-            -EditorMode:$EditorMode)
+            -EditorMode:$EditorMode
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
@@ -140,6 +159,7 @@ function Start-Nitpicking {
         $CandidatePaths = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     }
 
+    # MARK: PROCESS BLK
     process {
         $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
             $Roots = if ([WildcardPattern]::ContainsWildcardCharacters($Path)) {
@@ -162,12 +182,11 @@ function Start-Nitpicking {
                 [void] $CandidatePaths.Add($File.FullName)
             }
 
-            $Files |
-                Where-NitpickIncluded `
-                    -PropertyPath FullName `
-                    -Include $IncludePath `
-                    -Exclude $ExcludePath `
-                    -Wildcard
+            $Files | Where-NitpickIncluded `
+                -PropertyPath FullName `
+                -Include $IncludePath `
+                -Exclude $ExcludePath `
+                -Wildcard
         } else {
             $Script
         }
@@ -177,6 +196,7 @@ function Start-Nitpicking {
         }
     }
 
+    # MARK: END BLK
     end {
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
             $UnmatchedPaths = @(
@@ -197,6 +217,8 @@ function Start-Nitpicking {
             }
         }
 
+        # MARK: NITPICK
+
         # Text blocks are separated with host-only blank lines to keep the pipeline clean.
         $HasWrittenTextBlock = $false
         foreach ($Target in $ResolvedTargets) {
@@ -215,7 +237,7 @@ function Start-Nitpicking {
                 }
 
                 # WARNING: Keep original extent context for rules; reparsing memory input resets it.
-                $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and -not $Fix) {
+                $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and $FixMode -eq 'Off') {
                     $Target
                 } else {
                     $Document.Ast
@@ -224,7 +246,8 @@ function Start-Nitpicking {
             } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
                 $Summary.TargetCount++
                 $Summary.FailedTargetCount++
-                if ($Fix) {
+
+                if ($FixMode -ne 'Off') {
                     $ReadFailure = New-NitpickCorrectionResult `
                         -Path $TargetPath `
                         -Application @{ Status = 'FailedRead'; ErrorRecord = $_ }
@@ -238,6 +261,7 @@ function Start-Nitpicking {
                         $HasWrittenTextBlock = $true
                     }
                 }
+
                 $PSCmdlet.WriteError($_)
                 continue
             }
@@ -281,9 +305,9 @@ function Start-Nitpicking {
 
             $CorrectionResult = $null
             $FinalFindings = $TargetFindings.ToArray()
-            if ($Fix) {
+            if ($FixMode -ne 'Off') {
                 $CorrectionResult = Resolve-NitpickTargetCorrection `
-                    -Preview:$Preview `
+                    -Preview:($FixMode -eq 'Preview') `
                     -Document $Document `
                     -Finding $TargetFindings.ToArray() `
                     -Rule $ApplicableRules.ToArray() `
