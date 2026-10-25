@@ -72,9 +72,12 @@ Describe 'Start-Nitpicking' {
     }
 
     It 'accepts matching wildcard, case-insensitive, and overlapping selectors' {
-        $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
-            -IncludeRule 'nitpick/useisnotoperator','*IsNot*','Missing*' -Output Object -ErrorAction Stop)
-        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+        $Summary = Start-Nitpicking `
+         -Script '-not ($Value -is [int])' `
+            -IncludeRule 'nitpick/useisnotoperator','*IsNot*','Missing*' `
+            -Output Object `
+            -ErrorAction Stop |
+            Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Summary.RuleCount | Should -Be 1
         $Summary.FindingCount | Should -Be 1
@@ -595,7 +598,7 @@ Describe 'Start-Nitpicking' {
         } | Should -Throw 'The Preview switch requires Fix.'
     }
 
-    It 'exposes rejected corrections and conflicts in object output' {
+    It 'reports rejected corrections and conflicts in object and text output' {
         $Rule = {
             param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
 
@@ -644,8 +647,20 @@ Describe 'Start-Nitpicking' {
 
         $Preview.Proposal.SkippedCorrections | Should -HaveCount 2
         $Preview.Proposal.Conflicts | Should -HaveCount 1
-        $Preview.Proposal.Diff | Should -Be 'No queued edits.'
+        $Preview.Proposal.Diff | Should -BeNullOrEmpty
         $Preview.Report.EffectiveText | Should -Be '$Value = 123'
+
+        $Text = @(
+            Start-Nitpicking `
+                -Script '$Value = 123' `
+                -IncludeRule Local/ConflictingRule `
+                -Fix `
+                -Preview `
+                -Output Text `
+                -NoSummary
+        ) -join "`n"
+        $Text | Should -Match 'Corrections \(proposal: Rejected; application: NotAttempted\):'
+        $Text | Should -Match '0 committed, 0 accepted, 2 skipped, 1 conflicts\.'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {

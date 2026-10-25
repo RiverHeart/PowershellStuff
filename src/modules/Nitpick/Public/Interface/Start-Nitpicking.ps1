@@ -318,17 +318,70 @@ function Start-Nitpicking {
             }
 
             if ($Output -eq 'Text' -and $CorrectionResult) {
-                Write-Output (
-                    "Corrections (proposal: {0}; application: {1}):`n" -f
-                    $CorrectionResult.Proposal.Status, $CorrectionResult.Application.Status
-                )
-                Write-Output $CorrectionResult.Proposal.Diff
-                Write-Output (
-                    "`n{0} committed, {1} accepted, {2} skipped." -f
-                    $CorrectionResult.Application.CommittedCorrections.Count,
-                    $CorrectionResult.Proposal.AcceptedCorrections.Count,
-                    $CorrectionResult.Proposal.SkippedCorrections.Count
-                )
+                $Proposal = $CorrectionResult.Proposal
+                $ProposalStatus = if ($Proposal) { $Proposal.Status } else { 'Unavailable' }
+                $AcceptedCount = if ($Proposal) { $Proposal.AcceptedCorrections.Count } else { 0 }
+                $CommittedCount = $CorrectionResult.Application.CommittedCorrections.Count
+                $SkippedCount = if ($Proposal) { $Proposal.SkippedCorrections.Count } else { 0 }
+                $ConflictCount = if ($Proposal) { $Proposal.Conflicts.Count } else { 0 }
+                $HasCorrectionFailure = $CorrectionResult.Application.ErrorRecord -or
+                    $ProposalStatus -in 'Rejected', 'FailedValidation' -or
+                    $CorrectionResult.Application.Status -in @(
+                        'FailedRead', 'FailedValidation', 'StaleSource', 'StaleTarget', 'InvalidTarget', 'FailedWrite'
+                    )
+
+                if ($AcceptedCount -gt 0 -or $CommittedCount -gt 0 -or
+                    $SkippedCount -gt 0 -or $ConflictCount -gt 0 -or $HasCorrectionFailure
+                ) {
+                    $ApplicationStatus = $CorrectionResult.Application.Status
+                    $CorrectionHeading = if ($AcceptedCount -gt 0 -and
+                        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasCorrectionFailure
+                    ) {
+                        switch ($ApplicationStatus) {
+                            'Preview' { 'Proposed corrections (preview):' }
+                            'WhatIf' { 'Proposed corrections (WhatIf):' }
+                            'Written' { 'Applied corrections:' }
+                            'InMemory' { 'Proposed corrections (in-memory):' }
+                            'Declined' { 'Proposed corrections (not applied):' }
+                            default {
+                                "Corrections (proposal: {0}; application: {1}):" -f
+                                    $ProposalStatus, $ApplicationStatus
+                            }
+                        }
+                    } else {
+                        "Corrections (proposal: {0}; application: {1}):" -f
+                            $ProposalStatus, $ApplicationStatus
+                    }
+
+                    Write-Output $CorrectionHeading
+                    if ($AcceptedCount -gt 0) {
+                        Write-Output $Proposal.Diff
+                    }
+
+                    $EditNoun = if ($AcceptedCount -eq 1) { 'edit' } else { 'edits' }
+                    $CorrectionTrailer = if ($AcceptedCount -gt 0 -and
+                        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasCorrectionFailure
+                    ) {
+                        switch ($ApplicationStatus) {
+                            'Preview' { '{0} proposed {1}. No files changed (preview).' -f $AcceptedCount, $EditNoun }
+                            'WhatIf' { '{0} proposed {1}. No files changed (WhatIf).' -f $AcceptedCount, $EditNoun }
+                            'Written' {
+                                $CorrectionNoun = if ($CommittedCount -eq 1) { 'correction' } else { 'corrections' }
+                                '{0} {1} applied.' -f $CommittedCount, $CorrectionNoun
+                            }
+                            'InMemory' {
+                                '{0} proposed {1} applied to in-memory text only.' -f $AcceptedCount, $EditNoun
+                            }
+                            'Declined' { '{0} proposed {1} were not applied.' -f $AcceptedCount, $EditNoun }
+                        }
+                    } else {
+                        '{0} committed, {1} accepted, {2} skipped, {3} conflicts.' -f
+                            $CommittedCount, $AcceptedCount, $SkippedCount, $ConflictCount
+                    }
+
+                    # Trailing blank line separates this block from the next target's output.
+                    Write-Output "`n$CorrectionTrailer`n"
+                }
             }
 
             if ($CorrectionResult -and $CorrectionResult.Application.ErrorRecord) {

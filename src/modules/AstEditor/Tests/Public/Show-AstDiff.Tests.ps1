@@ -86,4 +86,71 @@ function Greet {
         $Diff | Should -Match '\[0\] Insert greeting before Write-Host'
         $Diff | Should -Not -Match '\[1\] Replace Write-Host with Write-Output'
     }
+
+    It 'groups edits on the same line into one hunk of complete lines' {
+        $Source = "`$a = 1`nif (-not (`$Value -is [int])) {`n    'x'`n}`n"
+        $Document = New-AstDocument -InputObject $Source
+        $NotStart = $Source.IndexOf('-not ')
+        $IsStart = $Source.IndexOf('-is ')
+
+        $null = Add-AstTextEdit -Document $Document -TextEdit @(
+            New-AstTextEdit -Document $Document -StartOffset $NotStart -EndOffset ($NotStart + 5) `
+                -ReplacementText '' -Reason 'Remove unary negation.'
+
+            New-AstTextEdit -Document $Document -StartOffset $IsStart -EndOffset ($IsStart + 3) `
+                -ReplacementText '-isnot' -Reason 'Use -isnot.'
+        )
+
+        $Diff = Show-AstDiff -Document $Document -NoColor
+
+        $Diff | Should -BeExactly ((
+            '[0] Remove unary negation.',
+            '[1] Use -isnot.',
+            '  2 - if (-not ($Value -is [int])) {',
+            '    + if (($Value -isnot [int])) {'
+        ) -join [Environment]::NewLine)
+    }
+
+    It 'shows <Context> unchanged lines around hunks and merges overlapping context' -ForEach @(
+        @{
+            Context = 0
+            Expected = @(
+                '[0] Change two', '  2 - two', '    + TWO', '',
+                '[1] Change five', '  5 - five', '    + FIVE'
+            )
+        }
+        @{
+            Context = 1
+            Expected = @(
+                '[0] Change two', '[1] Change five',
+                '  1   one', '  2 - two', '    + TWO', '  3   three', '  4   four', '  5 - five', '    + FIVE'
+            )
+        }
+    ) {
+        $Source = "one`ntwo`nthree`nfour`nfive`n"
+        $Document = New-AstDocument -InputObject $Source
+        $null = Add-AstTextEdit -Document $Document -TextEdit @(
+            New-AstTextEdit -Document $Document -StartOffset 4 -EndOffset 7 -ReplacementText 'TWO' -Reason 'Change two'
+            New-AstTextEdit -Document $Document -StartOffset 19 -EndOffset 23 -ReplacementText 'FIVE' -Reason 'Change five'
+        )
+
+        Show-AstDiff -Document $Document -NoColor -Context $Context |
+            Should -BeExactly ($Expected -join [Environment]::NewLine)
+    }
+
+    It 'shows joined lines and whole-line removals without placeholder text' {
+        $Source = "one`ntwo`nthree`nfour`n"
+        $Document = New-AstDocument -InputObject $Source
+        $null = Add-AstTextEdit -Document $Document -TextEdit @(
+            New-AstTextEdit -Document $Document -StartOffset 2 -EndOffset 4 -ReplacementText 'E' -Reason 'Join'
+            New-AstTextEdit -Document $Document -StartOffset 8 -EndOffset 14 -ReplacementText '' -Reason 'Remove three'
+        )
+
+        $Diff = Show-AstDiff -Document $Document -NoColor
+
+        $Diff | Should -BeExactly ((
+            '[0] Join', '[1] Remove three',
+            '  1 - one', '  2 - two', '  3 - three', '    + onEtwo'
+        ) -join [Environment]::NewLine)
+    }
 }

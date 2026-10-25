@@ -32,8 +32,9 @@ Describe 'Format-NitpickText' {
 
         $Esc = [char] 27
         $Uri = [Uri]::new($PSCommandPath).AbsoluteUri
-        $ExpectedLink = [string] $Esc + ']8;;' + $Uri + '#1:3' + [string] $Esc + '\' +
-            '1:3' + [string] $Esc + ']8;;' + [string] $Esc + '\'
+        $ExpectedLink = @(
+            $Esc, ']8;;', $Uri, '#1:3', $Esc, '\', '1:3', $Esc, ']8;;', $Esc, '\'
+        ) -join ''
         $Text.Contains($ExpectedLink) |
             Should -BeTrue -Because 'the link target and visible text should both include line:column'
     }

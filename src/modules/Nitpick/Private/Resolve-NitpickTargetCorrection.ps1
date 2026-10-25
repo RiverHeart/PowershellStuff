@@ -104,8 +104,8 @@ function Resolve-NitpickTargetCorrection {
     }
 
     Write-Verbose (
-        "Correction proposal for '{0}': {1} accepted, {2} skipped; application: {3}." -f
-        $Proposal.Path, $Proposal.AcceptedCorrections.Count,
+        "Correction proposal for '{0}': {1}; {2} accepted, {3} skipped; application: {4}." -f
+        $Proposal.Path, $Proposal.Status, $Proposal.AcceptedCorrections.Count,
         $Proposal.SkippedCorrections.Count, $Application.Status
     )
 

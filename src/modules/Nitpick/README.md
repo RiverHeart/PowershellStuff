@@ -40,6 +40,9 @@ Start-Nitpicking -Path .\Example.ps1 -Fix -WhatIf
 `-Fix` now writes file-backed `-Path` targets unless `-Preview`, `-WhatIf`, or a declined
 confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
 for a correction envelope with `Proposal`, `Application`, and `Report` groups.
+Text output shows diffs for proposed or applied edits and reports skipped or failed corrections;
+it omits the correction block when a target has no correction activity. Use `-Verbose` for
+per-target no-op diagnostics.
 `Proposal` retains candidate text, reanalysis, skipped corrections, and conflicts regardless
 of application outcome. Only `Application.CommittedCorrections` describes committed edits;
 `Application.Status` records whether writing succeeded, failed, or was not requested.

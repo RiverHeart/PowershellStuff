@@ -125,6 +125,52 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
     }
 
+    It 'shows proposed edits in text output without claiming they were committed' {
+        $Path = Join-Path $TestDrive 'PreviewText.ps1'
+        [System.IO.File]::WriteAllText($Path, '$Value = 1')
+
+        $Output = @(
+            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix -Preview `
+                -Output Text -NoSummary -ErrorAction Stop
+        ) -join "`n"
+
+        $Output | Should -Match 'Proposed corrections \(preview\):'
+        $Output | Should -Match '1 - \$Value = 1'
+        $Output | Should -Match '\+ \$Value = 2'
+        $Output | Should -Match '\$Value = 2'
+        $Output | Should -Match '1 proposed edit\. No files changed \(preview\)\.'
+        $Output | Should -Match 'No files changed \(preview\)\.\r?\n\r?\n'
+        $Output | Should -Not -Match 'committed'
+        [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
+    }
+
+    It 'separates consecutive target correction blocks with a blank line' {
+        $Directory = New-Item -Path (Join-Path $TestDrive 'Separated') -ItemType Directory
+        foreach ($Name in 'First.ps1', 'Second.ps1') {
+            [System.IO.File]::WriteAllText((Join-Path $Directory $Name), '-not ($Value -is [int])')
+        }
+
+        $Output = (Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+            -Output Text -NoSummary -ErrorAction Stop | Out-String)
+
+        $Output | Should -Match 'No files changed \(preview\)\.\r?\n\r?\nProposed corrections \(preview\):'
+    }
+
+    It 'omits the correction block when there are no edits but retains findings' {
+        $Path = Join-Path $TestDrive 'NoCorrectionText.ps1'
+        [System.IO.File]::WriteAllText($Path, '$Value = 2')
+
+        $Output = @(
+            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix `
+                -Output Text -NoSummary -Confirm:$false -ErrorAction Stop
+        ) -join "`n"
+
+        $Output | Should -Match 'Transaction finding'
+        $Output | Should -Not -Match 'Corrections \(proposal:'
+        $Output | Should -Not -Match 'No queued edits'
+        $Output | Should -Not -Match 'committed, .* accepted, .* skipped'
+    }
+
     It 'honors WhatIf and restores native rule invocation context' {
         $Path = Join-Path $TestDrive 'WhatIf.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
