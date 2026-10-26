@@ -55,21 +55,17 @@ Describe 'Format-NitpickText' {
                     -Message 'Test message' -Severity Warning `
                     -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
                     -ScriptPath $FilePath -Explanation 'Test finding'
-                $CorrectionResult = [pscustomobject]@{
-                    Path = $FilePath
-                    Proposal = [pscustomobject]@{
-                        Status = 'Ready'
-                        AcceptedCorrections = @([pscustomobject]@{ ChangeSetId = $null })
-                        SkippedCorrections = @()
-                        Conflicts = @()
-                        Diff = "1:1  Reason`n  1 - old`n    + new"
-                    }
-                    Application = [pscustomobject]@{
-                        Status = 'Preview'
-                        CommittedCorrections = @()
-                        ErrorRecord = $null
-                    }
+                $Correction = New-NitpickCorrection -ViolationExtent $Ast.Extent `
+                    -ReplacementText '$Value = 2' -FilePathOrContext $FilePath -Description 'Reason'
+                $Proposal = [NitpickCorrectionProposal]@{
+                    Status = 'Ready'
+                    AcceptedCorrections = @($Correction)
+                    SkippedCorrections = @()
+                    Conflicts = @()
+                    Diff = "1:1  Reason`n  1 - old`n    + new"
                 }
+                $CorrectionResult = New-NitpickCorrectionResult -Path $FilePath -Proposal $Proposal `
+                    -Application @{ Status = 'Preview' }
 
                 Format-NitpickText -Ast $Ast -Finding $Finding -CorrectionResult $CorrectionResult
             }

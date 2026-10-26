@@ -25,7 +25,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -Output Object `
             -NoSummary
 
-        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.OriginalFindings | Should -HaveCount 2
         $Result.Proposal.AcceptedCorrections | Should -HaveCount 3
         $Result.Proposal.WasReanalyzed | Should -BeTrue
@@ -43,7 +43,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -Output Object `
             -NoSummary
 
-        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.OriginalFindings | Should -HaveCount 2
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 1
@@ -77,7 +77,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -ErrorOn Information `
             -ErrorAction Stop
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Result.Application.Status | Should -Be 'InMemory'
@@ -110,7 +110,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -ErrorOn Information `
             -ErrorAction Stop
 
-        $Preview = $PreviewOutput | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Preview = $PreviewOutput | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $PreviewSummary = $PreviewOutput | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Preview.Application.Status | Should -Be 'Preview'
@@ -134,7 +134,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -Confirm:$false `
             -ErrorAction Stop
 
-        $Applied = $ApplyOutput | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Applied = $ApplyOutput | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $ApplyOutput | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Applied.Application.Status | Should -Be 'Written'
@@ -180,7 +180,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -Confirm:$false `
             -ErrorAction Stop
 
-        $Second = $SecondOutput | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Second = $SecondOutput | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Second.Proposal.Status | Should -Be 'NoChanges'
         $Second.Proposal.AcceptedCorrections | Should -HaveCount 0
         $Second.Application.Status | Should -Be 'NotAttempted'
@@ -200,7 +200,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -ErrorOn Information `
             -ErrorAction Stop
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Result.Application.Status | Should -Be 'WhatIf'
@@ -239,7 +239,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -ErrorAction SilentlyContinue `
             -ErrorVariable Errors
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
         $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
 
@@ -293,7 +293,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             -ErrorAction SilentlyContinue `
             -ErrorVariable Errors
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Result.Application.WriteResult.WasWritten | Should -BeTrue

@@ -13,15 +13,16 @@ AfterAll {
 
 Describe 'New-NitpickCorrectionResult' {
     BeforeEach {
-        $Correction = [pscustomobject]@{ Description = 'Replace value' }
-        $Finding = [pscustomobject]@{ Message = 'Original finding' }
-        $Proposal = [pscustomobject]@{
-            PSTypeName = 'Nitpick.CorrectionProposal'
-            Status = 'Ready'
-            WasReanalyzed = $true
-            AcceptedCorrections = @($Correction)
-            ParseErrors = @()
-        }
+        $Extent = [scriptblock]::Create('$Value = 1').Ast.EndBlock.Statements[0].Extent
+        $Correction = New-NitpickCorrection -ViolationExtent $Extent -ReplacementText '$Value = 2' `
+            -FilePathOrContext '<ScriptBlock>' -Description 'Replace value'
+        $Finding = New-NitpickFinding -ViolationExtent $Extent -Message 'Original finding' `
+            -RuleName TestRule -RuleSuppressionID TestRule -Severity Information `
+            -ScriptPath '<ScriptBlock>' -Explanation 'Constructor fixture'
+        $Proposal = & (Get-Module Nitpick) { [NitpickCorrectionProposal]::new() }
+        $Proposal.Status = 'Ready'
+        $Proposal.WasReanalyzed = $true
+        $Proposal.AcceptedCorrections = @($Correction)
         $WriteResult = [pscustomobject]@{ WriteStatus = 'Written'; WasWritten = $true }
         $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
             [System.IO.IOException]::new('Read failed.'),
@@ -34,12 +35,12 @@ Describe 'New-NitpickCorrectionResult' {
     It 'exports the factory and declares its output type' {
         $Command = Get-Command New-NitpickCorrectionResult -Module Nitpick
 
-        $Command.OutputType.Name | Should -Contain 'Nitpick.CorrectionResult'
+        $Command.OutputType.Name | Should -Contain 'NitpickCorrectionResult'
         foreach ($Parameter in @('Path', 'Proposal', 'Application', 'Report')) {
             $Command.Parameters.Keys | Should -Contain $Parameter
         }
         $Command.Parameters.Path.ParameterType | Should -Be ([string])
-        $Command.Parameters.Proposal.ParameterType | Should -Be ([psobject])
+        $Command.Parameters.Proposal.ParameterType.Name | Should -Be 'NitpickCorrectionProposal'
         $Command.Parameters.Application.ParameterType | Should -Be ([hashtable])
         $Command.Parameters.Report.ParameterType | Should -Be ([hashtable])
     }
@@ -47,7 +48,10 @@ Describe 'New-NitpickCorrectionResult' {
     It 'creates exactly the envelope schema with empty arrays and null diagnostics' {
         $Result = New-NitpickCorrectionResult
 
-        $Result.PSTypeNames[0] | Should -Be 'Nitpick.CorrectionResult'
+        $Result.PSTypeNames[0] | Should -Be 'NitpickCorrectionResult'
+        $Result.GetType().Name | Should -Be 'NitpickCorrectionResult'
+        $Result.Application.GetType().Name | Should -Be 'NitpickCorrectionApplication'
+        $Result.Report.GetType().Name | Should -Be 'NitpickCorrectionReport'
         $Result.Path | Should -Be '<ScriptBlock>'
         $Result.Proposal | Should -BeNullOrEmpty
 
@@ -101,6 +105,22 @@ Describe 'New-NitpickCorrectionResult' {
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
         $Result.Report.EffectiveFindings[0] | Should -Be $Finding
         $Result.Report.FindingsWithCommittedCorrections[0] | Should -Be $Finding
+    }
+
+    It 'rejects a result passed as a proposal during parameter binding' {
+        $Result = New-NitpickCorrectionResult
+
+        { New-NitpickCorrectionResult -Proposal $Result -ErrorAction Stop } |
+            Should -Throw '*NitpickCorrectionProposal*'
+    }
+
+    It 'rejects invalid collection element types' {
+        { New-NitpickCorrectionResult -Proposal $Proposal `
+            -Application @{ CommittedCorrections = @('not a correction') } -ErrorAction Stop } |
+            Should -Throw '*NitpickCorrection*'
+        { New-NitpickCorrectionResult -Proposal $Proposal `
+            -Report @{ AnalysisSource = 'Original'; EffectiveFindings = @('not a finding') } -ErrorAction Stop } |
+            Should -Throw '*NitpickFinding*'
     }
 
     It 'normalizes zero and single supplied collections to arrays' -ForEach @(
@@ -213,10 +233,12 @@ Describe 'New-NitpickCorrectionResult' {
     }
 
     It 'rejects committing a correction outside the accepted proposal' {
+        $OtherCorrection = New-NitpickCorrection -ViolationExtent $Extent -ReplacementText '$Value = 3' `
+            -FilePathOrContext '<ScriptBlock>' -Description 'Unrelated edit'
         { New-NitpickCorrectionResult -Proposal $Proposal -Application @{
             Status = 'Written'
             WriteResult = $WriteResult
-            CommittedCorrections = @([pscustomobject]@{ Description = 'Unrelated edit' })
+            CommittedCorrections = @($OtherCorrection)
         } } | Should -Throw '*proposal accepted corrections*'
     }
 
@@ -275,10 +297,11 @@ Describe 'New-NitpickCorrectionResult' {
 
     It 'rejects report content when AnalysisSource is None: <Property>' -ForEach @(
         @{ Property = 'EffectiveText'; Value = '' }
-        @{ Property = 'EffectiveFindings'; Value = @('Finding') }
-        @{ Property = 'FindingsWithCommittedCorrections'; Value = @('Finding') }
+        @{ Property = 'EffectiveFindings'; Value = $null }
+        @{ Property = 'FindingsWithCommittedCorrections'; Value = $null }
     ) {
-        { New-NitpickCorrectionResult -Report @{ $Property = $Value } } |
+        $Content = if ($Property -eq 'EffectiveText') { $Value } else { @($Finding) }
+        { New-NitpickCorrectionResult -Report @{ $Property = $Content } } |
             Should -Throw '*no analysis*'
     }
 
@@ -307,9 +330,9 @@ Describe 'New-NitpickCorrectionResult' {
         $First = New-NitpickCorrectionResult
         $Second = New-NitpickCorrectionResult
 
-        $First.Application.CommittedCorrections += 'committed'
+        $First.Application.CommittedCorrections += $Correction
         $First.Application.Status = 'Written'
-        $First.Report.EffectiveFindings += 'finding'
+        $First.Report.EffectiveFindings += $Finding
         $First.Report.AnalysisSource = 'Candidate'
 
         $Second.Application.CommittedCorrections | Should -HaveCount 0

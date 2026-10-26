@@ -661,6 +661,59 @@ class ScriptBlockAstTransform : ArgumentTransformationAttribute {
     }
 }
 
+class NitpickCorrectionProposal {
+    [string] $Path = '<ScriptBlock>'
+    [psobject] $Document
+    [string] $OriginalFingerprint
+    [string] $Status = 'NoChanges'
+    [string] $OriginalText
+    [NitpickFinding[]] $OriginalFindings = @()
+    [string] $CandidateText
+    [NitpickFinding[]] $CandidateFindings = @()
+    [bool] $WasReanalyzed
+    [NitpickCorrection[]] $AcceptedCorrections = @()
+    [object[]] $SkippedCorrections = @()
+    [object[]] $Conflicts = @()
+    [object[]] $ParseErrors = @()
+    [string] $Diff
+}
+
+class NitpickCorrectionApplication {
+    [string] $Status = 'NotAttempted'
+    [NitpickCorrection[]] $CommittedCorrections = @()
+    [psobject] $WriteResult
+    [ErrorRecord] $ErrorRecord
+}
+
+class NitpickCorrectionReport {
+    [string] $AnalysisSource = 'None'
+    [string] $EffectiveText
+    [NitpickFinding[]] $EffectiveFindings = @()
+    [NitpickFinding[]] $FindingsWithCommittedCorrections = @()
+}
+
+class NitpickCorrectionResult {
+    [string] $Path
+    [NitpickCorrectionProposal] $Proposal
+    [NitpickCorrectionApplication] $Application
+    [NitpickCorrectionReport] $Report
+
+    NitpickCorrectionResult(
+        [string] $Path,
+        [NitpickCorrectionProposal] $Proposal,
+        [NitpickCorrectionApplication] $Application,
+        [NitpickCorrectionReport] $Report
+    ) {
+        if ($null -eq $Application -or $null -eq $Report) {
+            throw 'A correction result requires application and report data.'
+        }
+        $this.Path = $Path
+        $this.Proposal = $Proposal
+        $this.Application = $Application
+        $this.Report = $Report
+    }
+}
+
 $Paths = @(
     'Private'
     'Public'

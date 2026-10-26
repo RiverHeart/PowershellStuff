@@ -100,7 +100,7 @@ Describe 'Test-AvoidParameterAttributeBool' {
         $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
         $Findings = $Rule.Invoke($ScriptBlockAst)
 
-        $Result = Resolve-NitpickCorrection `
+        $Result = Resolve-NitpickCorrectionProposal `
             -Script $Source `
             -Finding $Findings `
             -Rule $Rule

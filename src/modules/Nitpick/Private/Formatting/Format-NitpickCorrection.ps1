@@ -5,7 +5,7 @@ using namespace System.Collections.Generic
     Formats one Nitpick correction result as console-friendly text.
 
 .DESCRIPTION
-    Formats the correction section that Start-Nitpicking -Fix writes for one target in
+    Formats the correction section that Start-Nitpicking -FixMode Apply writes for one target in
     text output: the proposal diff, labeled by the line:column where each correction
     starts, followed by a trailer stating the outcome once. Lines are indented to sit
     beneath the target header written by Format-NitpickText, which lets editors such
@@ -17,22 +17,38 @@ using namespace System.Collections.Generic
     and committed corrections treat each change set as one correction.
 
 .PARAMETER CorrectionResult
-    The Nitpick.CorrectionResult for one target, as produced by
+    The NitpickCorrectionResult for one target, as produced by
     New-NitpickCorrectionResult.
 
 .EXAMPLE
-    Format the correction result returned for one target.
+    Format a correction result.
 
-    $CorrectionResult = Resolve-NitpickTargetCorrection -Preview `
-        -Document $Document -Finding $Findings -Rule $Rules -Ast $Document.Ast
-    Format-NitpickCorrection -CorrectionResult $CorrectionResult
+    $NitpickModule = Get-Module -Name Nitpick
+    $NitpickModule.NewBoundScriptBlock({
+        $Source = 'param([Parameter(Mandatory=$true)] [string] $Foo)'
+        $SourceAst = [scriptblock]::Create($Source).Ast
+
+        $Finding = Test-AvoidParameterAttributeBool `
+            -ScriptBlockAst $SourceAst `
+            -Context @{ RuleBehavior = @{ OutputType = 'NitpickFinding' } }
+
+        $Proposal = Resolve-NitpickCorrectionProposal `
+            -Script $Source `
+            -Finding $Finding
+
+        $CorrectionResult = New-NitpickCorrectionResult `
+            -Proposal $Proposal `
+            -Application @{ Status = 'Preview' }
+
+        Format-NitpickCorrection -CorrectionResult $CorrectionResult
+    }).Invoke()
 #>
 function Format-NitpickCorrection {
     [CmdletBinding()]
     [OutputType([string])]
     param (
         [Parameter(Mandatory)]
-        [psobject] $CorrectionResult
+        [NitpickCorrectionResult] $CorrectionResult
     )
 
     $Proposal = $CorrectionResult.Proposal

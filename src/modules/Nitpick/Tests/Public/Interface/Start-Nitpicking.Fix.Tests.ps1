@@ -66,9 +66,9 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Path = Join-Path $TestDrive 'Apply.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -Confirm:$false -ErrorAction Stop)
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
         $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
 
@@ -98,9 +98,9 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Expected = "# $([char]0x00E9)`r`nparam([Parameter(Mandatory, ValueFromPipeline)] [string] `$Name)`r`n"
         [System.IO.File]::WriteAllText($Path, $Source, $Encoding)
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/AvoidParameterAttributeBool -Fix `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Nitpick/AvoidParameterAttributeBool -FixMode Apply `
             -Output Object -Confirm:$false -ErrorAction Stop)
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
         $ExpectedBytes = [byte[]](@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))
 
@@ -121,10 +121,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Path = Join-Path $TestDrive 'Preview.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix -Preview `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Preview `
             -Output Object -NoSummary -ErrorAction Stop)
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'Preview'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
         $Result.Application.CommittedCorrections | Should -HaveCount 0
@@ -138,7 +138,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
         $Output = @(
-            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix -Preview `
+            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Preview `
                 -Output Text -NoSummary -ErrorAction Stop
         ) -join "`n"
 
@@ -159,7 +159,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '-not ($Value -is [int])')
 
         $Output = @(
-            Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+            Start-Nitpicking -Path $Path -IncludeRule Nitpick/UseIsNotOperator -FixMode Preview `
                 -Output Text -NoSummary -ErrorAction Stop
         ) -join "`n"
 
@@ -175,9 +175,9 @@ Describe 'Start-Nitpicking transactional fixes' {
             [System.IO.File]::WriteAllText((Join-Path $Directory $Name), '-not ($Value -is [int])')
         }
 
-        $Output = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+        $Output = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -FixMode Preview `
             -Output Text -NoSummary -ErrorAction Stop 6>$null)
-        $Combined = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview `
+        $Combined = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -FixMode Preview `
             -Output Text -NoSummary -ErrorAction Stop 6>&1)
 
         $Output | Where-Object { $_ -eq '' } | Should -BeNullOrEmpty
@@ -195,7 +195,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 2')
 
         $Output = @(
-            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix `
+            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply `
                 -Output Text -NoSummary -Confirm:$false -ErrorAction Stop
         ) -join "`n"
 
@@ -210,10 +210,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         Remove-Variable NitpickInvocationContext -Scope Global -ErrorAction SilentlyContinue
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix -WhatIf `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply -WhatIf `
             -Output Object -NoSummary -ErrorAction Stop)
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'WhatIf'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
@@ -228,10 +228,10 @@ Describe 'Start-Nitpicking transactional fixes' {
     It 'returns corrected in-memory text without a destination even under WhatIf' {
         $Source = [scriptblock]::Create('$Value = 1')
 
-        $Results = @(Start-Nitpicking -Script $Source -IncludeRule Local/TransactionRule -Fix -WhatIf `
+        $Results = @(Start-Nitpicking -Script $Source -IncludeRule Local/TransactionRule -FixMode Apply -WhatIf `
             -Output Object -NoSummary -ErrorAction Stop)
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'InMemory'
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
@@ -243,10 +243,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         $Ast = Import-ScriptBlockAst -FilePath $Path
 
-        $Results = @(Start-Nitpicking -Script $Ast -IncludeRule Local/TransactionRule -Fix `
+        $Results = @(Start-Nitpicking -Script $Ast -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -NoSummary -ErrorAction Stop)
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'InMemory'
         $Result.Application.CommittedCorrections | Should -HaveCount 0
 
@@ -258,9 +258,9 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         $Errors = @()
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -Confirm:$false -ErrorAction SilentlyContinue -ErrorVariable Errors)
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Result.Application.Status | Should -Be 'StaleSource'
@@ -289,10 +289,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($ValidPath, '$Value = 1')
 
         $Results = @(Start-Nitpicking -Path $TestDrive -IncludePath $InvalidPath, $ValidPath `
-            -IncludeRule Local/TransactionRule -Fix `
+            -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -Confirm:$false -ErrorAction SilentlyContinue)
         $Transactions = @($Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
+            $_.PSTypeNames -contains 'NitpickCorrectionResult'
         })
         $Invalid = $Transactions | Where-Object Path -eq $InvalidPath
         $Valid = $Transactions | Where-Object Path -eq $ValidPath
@@ -328,10 +328,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         }
         $Errors = @()
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -NoSummary -Confirm:$false -ErrorAction SilentlyContinue -ErrorVariable Errors)
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'FailedWrite'
         $Result.Application.CommittedCorrections | Should -HaveCount 0
         $Result.Application.WriteResult.WasWritten | Should -BeFalse
@@ -356,11 +356,11 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Errors = @()
 
         $Results = @(Start-Nitpicking -Path $TestDrive -IncludePath $InvalidPath, $ValidPath `
-            -IncludeRule Local/TransactionRule -Fix `
+            -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -Confirm:$false -ErrorAction SilentlyContinue -ErrorVariable Errors)
 
         $Transactions = @($Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
+            $_.PSTypeNames -contains 'NitpickCorrectionResult'
         })
 
         $Invalid = $Transactions | Where-Object Path -eq $InvalidPath
@@ -395,10 +395,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 2')
         Mock Save-AstDocument -ModuleName Nitpick { throw 'An unchanged target must not be saved.' }
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -Fix `
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply `
             -Output Object -NoSummary -Confirm:$false -ErrorAction Stop)
 
-        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.Status | Should -Be 'NoChanges'
         $Result.Application.Status | Should -Be 'NotAttempted'
         $Result.Application.CommittedCorrections | Should -HaveCount 0

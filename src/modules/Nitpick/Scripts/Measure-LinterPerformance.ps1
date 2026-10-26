@@ -182,16 +182,16 @@ try {
     [System.IO.File]::WriteAllText($FixPath, $Source, $Encoding)
     $Original = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
 
-    $Preview = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -Fix -Preview -Output Object -NoSummary) |
-        Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+    $Preview = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -FixMode Preview -Output Object -NoSummary) |
+        Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
 
     $PreviewUnchanged = $Original -ceq [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($FixPath))
 
-    $Applied = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
-        Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+    $Applied = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -FixMode Apply -Confirm:$false -Output Object -NoSummary) |
+        Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
 
-    $Second = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -Fix -Confirm:$false -Output Object -NoSummary) |
-        Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+    $Second = @(Start-Nitpicking -Path $FixPath -IncludeRule Nitpick/UseIsNotOperator -FixMode Apply -Confirm:$false -Output Object -NoSummary) |
+        Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
 
     $Expected = "# fixture`r`nif ( (`$x -isnot [int])) {}`r`n"
     $ExpectedBytes = [byte[]] (@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))

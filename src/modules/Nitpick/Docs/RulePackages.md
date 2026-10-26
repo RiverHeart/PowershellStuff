@@ -601,8 +601,8 @@ removing the separate `RuleName`/`RuleSuppressionID` fields in a later explicit 
 ### Baseline Before Phase 5
 
 The correction lifecycle described in [SimplifyResolveCorrection.md](SimplifyResolveCorrection.md)
-is implemented. `Resolve-NitpickCorrection` returns a `Nitpick.CorrectionProposal`;
-`Resolve-NitpickTargetCorrection` wraps it in a `Nitpick.CorrectionResult` with separate
+is implemented. `Resolve-NitpickCorrectionProposal` returns a `NitpickCorrectionProposal`;
+`Resolve-NitpickTargetCorrection` wraps it in a `NitpickCorrectionResult` with separate
 `Proposal`, `Application`, and `Report` owners. Phase 5 adds execution attribution to this
 contract; it does not restore the old grouped result schema or change application policy.
 

@@ -192,7 +192,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         }
 
         @($Findings.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount $Count
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
 
         $Result.CandidateText | Should -BeExactly $Expected
         $Result.AcceptedCorrections | Should -HaveCount ($Count * 2)
@@ -238,7 +238,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
             )
         }
 
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings
         $Result.CandidateText | Should -BeExactly (
             "# prefix`nfunction Test-Value {  ('literal -is' -isnot [string]) }"
         )
@@ -284,7 +284,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Findings | Should -HaveCount 1
         $Findings[0].Corrections | Should -HaveCount 2
 
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Result.CandidateText | Should -BeExactly $Expected
         $Result.AcceptedCorrections | Should -HaveCount 2
         $Result.CandidateFindings | Should -HaveCount 0

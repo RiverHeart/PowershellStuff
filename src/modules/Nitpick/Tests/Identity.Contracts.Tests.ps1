@@ -89,12 +89,13 @@ Describe 'Native execution identity contracts' {
         $Path = Join-Path $TestDrive "$Status.ps1"
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         $Parameters = @{
-            IncludeRule = 'Local/AssignmentStyle'; Fix = $true; Output = 'Object'
-            Preview = $Preview; WhatIf = $WhatIf; Confirm = $false; ErrorAction = 'Stop'
+            IncludeRule = 'Local/AssignmentStyle'; Output = 'Object'
+            FixMode = if ($Preview) { 'Preview' } else { 'Apply' }
+            WhatIf = $WhatIf; Confirm = $false; ErrorAction = 'Stop'
         }
         if ($ScriptInput) { $Parameters.Script = '$Value = 1' } else { $Parameters.Path = $Path }
         $Output = @(Start-Nitpicking @Parameters)
-        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
 
         $Result.Application.Status | Should -Be $Status
         $Result.Proposal.WasReanalyzed | Should -BeTrue
@@ -130,8 +131,8 @@ Describe 'Native execution identity contracts' {
         )
         $Rules | Register-Nitpick
         $Output = @(Start-Nitpicking -Script '$Value = 1' -IncludeRule '*/AssignmentStyle' `
-            -Fix -Output Object -Verbose 4>&1)
-        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+            -FixMode Apply -Output Object -Verbose 4>&1)
+        $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.Status | Should -Be Rejected
         $Result.Proposal.Conflicts | Should -HaveCount 1
         $Conflict = $Result.Proposal.Conflicts[0]
@@ -156,7 +157,7 @@ Describe 'Native execution identity contracts' {
         )
         $Findings = @($Rules[0].Invoke($Ast)) + @($Rules[1].Invoke($Ast))
         $Findings[0].Corrections[0].Applicability = 'Review'
-        $Proposal = Resolve-NitpickCorrection -Script '$Value = 1' -Finding $Findings
+        $Proposal = Resolve-NitpickCorrectionProposal -Script '$Value = 1' -Finding $Findings
         $Proposal.AcceptedCorrections | Should -HaveCount 0
         $Proposal.SkippedCorrections | Should -HaveCount 2
         foreach ($Skipped in $Proposal.SkippedCorrections) {
@@ -202,7 +203,7 @@ Describe 'Native execution identity contracts' {
         $Text | Should -Not -Match '(Local|_)/Standalone'
         ($Findings | Format-Table | Out-String -Width 240) | Should -Match Standalone
         $Findings[0].ToString() | Should -Match 'Information Standalone:'
-        $Proposal = Resolve-NitpickCorrection -Script '$Value = 1' -Finding $Findings
+        $Proposal = Resolve-NitpickCorrectionProposal -Script '$Value = 1' -Finding $Findings
         $Proposal.Conflicts[0].Reason | Should -Match "rule 'Standalone'"
         foreach ($Finding in $Findings) {
             $Finding.RuleId | Should -BeNullOrEmpty

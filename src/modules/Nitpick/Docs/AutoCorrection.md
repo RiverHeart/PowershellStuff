@@ -176,7 +176,7 @@ Implement useful autocorrection without writing files or first coupling the comp
 
 ### Work
 
-- Introduce a file-level orchestration command such as `Resolve-NitpickCorrection`.
+- Introduce a file-level orchestration command such as `Resolve-NitpickCorrectionProposal`.
 - Accept one file path or one in-memory script and either run selected rules or accept findings produced from the same snapshot.
 - Create one `AstDocument` per target and run rules against its AST.
 - Normalize native and PSScriptAnalyzer corrections into validated offset ranges.
@@ -234,7 +234,7 @@ Establish one authoritative AstEditor edit model and reduce Nitpick corrections 
 - Preserve conversion to PSScriptAnalyzer `CorrectionExtent` by projecting from the wrapped edit.
 - Keep extent-based correction construction as a convenience that creates an AstEditor edit internally.
 - Deprecate direct offset construction in Nitpick; callers needing offsets create a validated AstEditor edit first.
-- Remove duplicate range, stale-text, and overlap validation from `Resolve-NitpickCorrection`.
+- Remove duplicate range, stale-text, and overlap validation from `Resolve-NitpickCorrectionProposal`.
 - Select complete eligible change sets in Nitpick, then submit the selected target batch to AstEditor atomically.
 - Translate AstEditor batch failures into skipped corrections and conflicts with rule-aware diagnostics.
 
@@ -275,14 +275,14 @@ Connect the proven preview engine to Nitpick's user-facing command without chang
 ### Work
 
 - Refactor `Start-Nitpicking` to collect all findings for a target before emitting output or calculating summaries.
-- Route fix mode through `Resolve-NitpickCorrection`.
+- Route fix mode through `Resolve-NitpickCorrectionProposal`.
 - Submit the selected target batch through AstEditor's atomic batch API rather than prevalidating edits in Nitpick.
-- Expose preview through `Start-Nitpicking -Fix -Preview`; during Phase 4, `-Fix` alone also remains preview-only.
+- Expose preview through `Start-Nitpicking -FixMode Preview`; during Phase 4, `-FixMode Apply` alone also remains preview-only.
 - Emit and count final findings after correction and reanalysis.
 - Include rejected corrections, conflicts, rendered text, and the diff in object output.
 - Return rendered text for in-memory inputs without modifying files.
 - Keep text output concise and direct detailed consumers to object or verbose output.
-- Preserve existing behavior when `-Fix` is absent.
+- Preserve existing behavior when `-FixMode` is `Off`.
 
 ### Tests
 
@@ -314,7 +314,7 @@ Allow the previewed correction transaction to be committed safely.
 
 ### Nitpick Work
 
-- Make `Start-Nitpicking -Fix` apply the same transaction produced by preview.
+- Make `Start-Nitpicking -FixMode Apply` apply the same transaction produced by preview.
 - Require file-backed targets for direct writes; in-memory inputs return rendered text.
 - Calculate summary counts and `ErrorOn` behavior from the final analysis pass.
 - Distinguish fixed, skipped, conflicted, failed-validation, and remaining findings.
@@ -331,15 +331,15 @@ Allow the previewed correction transaction to be committed safely.
 
 ### Exit Criteria
 
-`Start-Nitpicking -Fix` can safely update file-backed targets using the same observable transaction produced by preview.
+`Start-Nitpicking -FixMode Apply` can safely update file-backed targets using the same observable transaction produced by preview.
 
 ### Implemented Contract
 
 - `New-AstDocument -Path` captures one byte snapshot, its SHA-256 fingerprint, source
   encoding, and a path-bearing AST. Nitpick analyzes that document and submits its
   detached correction batch to the same document for preview and application.
-- `Start-Nitpicking -Fix` applies safe, validated corrections to `-Path` targets.
-  `-Fix -Preview` and `-Fix -WhatIf` return candidate analysis without writing.
+- `Start-Nitpicking -FixMode Apply` applies safe, validated corrections to `-Path` targets.
+  `-FixMode Preview` and `-FixMode Apply -WhatIf` return candidate analysis without writing.
   `-Confirm` controls approval per target. `-Script` inputs remain in-memory even
   when the supplied AST originally came from a file.
 - BOM-less files must be valid UTF-8. BOM-marked UTF-8, UTF-16 LE/BE, and UTF-32
@@ -354,10 +354,10 @@ Allow the previewed correction transaction to be committed safely.
 - `Save-AstDocument` returns `AstEditor.WriteResult` with `WasWritten`,
   `WriteStatus`, `ParseErrors`, and `ErrorRecord`. Expected validation/I/O failures
   are explicit structured outcomes, not success. Callers must inspect the result.
-- Nitpick returns one `Nitpick.CorrectionResult` envelope per correction-mode target.
+- Nitpick returns one `NitpickCorrectionResult` envelope per correction-mode target.
   `New-NitpickCorrectionResult` constructs its `Proposal`, `Application`, and `Report`
   groups, including read-failure results. The resolver returns a stable
-  `Nitpick.CorrectionProposal` directly; application never rewrites its facts.
+  `NitpickCorrectionProposal` directly; application never rewrites its facts.
 - `Proposal.CandidateText`, `CandidateFindings`, and `WasReanalyzed` retain candidate
   diagnostics even after a failed or declined write. Effective findings and threshold
   counts then use the original snapshot. A stale file is not overwritten or represented
@@ -458,7 +458,7 @@ conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 a
   Token lookup includes expandable-string `NestedTokens` so recognized interpolation
   subexpressions retain fixes without changing the surrounding literal text.
 - Each eligible finding carries two `Safe` corrections in its occurrence-specific
-  change set. Preview uses the existing `Resolve-NitpickCorrection` pipeline.
+  change set. Preview uses the existing `Resolve-NitpickCorrectionProposal` pipeline.
 - Redirected/background matches keep their diagnostics with no corrections.
 - The minimal ScriptAnalyzer boundary was pulled forward from chunk 6.3 because
   migration otherwise exposes unsafe independent suggestions. Finding conversion
@@ -490,7 +490,7 @@ conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 a
   changes neither tokenization nor source-integrity ownership.
 
 The focused contracts live in
-`Tests/Public/Interface/Resolve-NitpickCorrection.ChangeSets.Tests.ps1`.
+`Tests/Public/Interface/Resolve-NitpickCorrectionProposal.ChangeSets.Tests.ps1`.
 
 ### Chunk 6.5: Real-Rule Transaction Proof
 
@@ -590,7 +590,7 @@ multiple correction passes remain proposed in Phase 7.
 
 ## Implemented Result Model
 
-Correction workflows return one `Nitpick.CorrectionResult` per target, constructed
+Correction workflows return one `NitpickCorrectionResult` per target, constructed
 by `New-NitpickCorrectionResult`:
 
 ```text
@@ -622,8 +622,13 @@ Report
   FindingsWithCommittedCorrections
 ```
 
-`Resolve-NitpickCorrection` returns just the proposal above, with type name
-`Nitpick.CorrectionProposal`. Its document retains the queued transaction; its facts
+`Resolve-NitpickCorrectionProposal` returns just the proposal above as a
+`NitpickCorrectionProposal` class instance. `New-NitpickCorrectionResult` returns a
+`NitpickCorrectionResult` with typed `NitpickCorrectionApplication` and
+`NitpickCorrectionReport` groups. Corrections and findings remain typed arrays, including
+empty and singleton collections. Text formatters require a result, not a proposal.
+Lifecycle validation remains in the result factory; classes are not immutable.
+The proposal's document retains the queued transaction; its facts
 are not mutated by application or reporting.
 The document is a mutable transaction handle, not an immutable diagnostic value.
 Consumers must not change queued edits between resolution and application. Apply the
@@ -647,7 +652,7 @@ candidate reanalysis can still be used, but application is `NotAttempted`.
 identify the source of `EffectiveText`.
 
 Read failures have a null proposal, application status `FailedRead`, an error record,
-and no report analysis. No-Fix invocations do not emit correction envelopes.
+and no report analysis. No-FixMode Apply invocations do not emit correction envelopes.
 Arrays remain arrays, including empty and singleton collections; absent optional
 records are null.
 

@@ -18,7 +18,7 @@ guarantees.
 
 ## 1. Define the new contract
 
-Keep one `Nitpick.CorrectionResult` envelope per target in correction-mode output.
+Keep one `NitpickCorrectionResult` envelope per target in correction-mode output.
 Separate its information into three groups:
 
 ```text
@@ -133,7 +133,7 @@ not a fresh analysis of externally changed disk contents.
 
 ### Resolution
 
-Change [Resolve-NitpickCorrection](../Public/Interface/Resolve-NitpickCorrection.ps1)
+Change [Resolve-NitpickCorrectionProposal](../Public/Interface/Resolve-NitpickCorrectionProposal.ps1)
 to return the proposal contract directly. Preserve selection, conflict detection,
 change-set atomicity, validation, and caller-selected reanalysis.
 
@@ -210,7 +210,7 @@ Load the `pwsh-test-runner` skill before test discovery or execution and use the
 repository [test runner](../../../../tools/Invoke-Test.ps1). Start with:
 
 - [Correction-result constructor tests](../Tests/Public/Helpers/New-NitpickCorrectionResult.Tests.ps1).
-- [Resolver change-set tests](../Tests/Public/Interface/Resolve-NitpickCorrection.ChangeSets.Tests.ps1).
+- [Resolver change-set tests](../Tests/Public/Interface/Resolve-NitpickCorrectionProposal.ChangeSets.Tests.ps1).
 - [Private target-correction tests](../Tests/Private/Resolve-NitpickTargetCorrection.Tests.ps1).
 - [Public fix tests](../Tests/Public/Interface/Start-Nitpicking.Fix.Tests.ps1).
 - [Public structural-fix tests](../Tests/Public/Interface/Start-Nitpicking.Structural.Fix.Tests.ps1).

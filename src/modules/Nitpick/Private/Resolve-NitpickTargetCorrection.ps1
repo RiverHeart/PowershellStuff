@@ -31,7 +31,7 @@ using namespace System.Management.Automation.Language
 #>
 function Resolve-NitpickTargetCorrection {
     [CmdletBinding(SupportsShouldProcess)]
-    [OutputType('Nitpick.CorrectionResult')]
+    [OutputType('NitpickCorrectionResult')]
     param (
         [Parameter(Mandatory)]
         [psobject] $Document,
@@ -58,7 +58,7 @@ function Resolve-NitpickTargetCorrection {
     if ($Ast.Extent.File) {
         $ResolveParameters.Path = $Ast.Extent.File
     }
-    $Proposal = Resolve-NitpickCorrection @ResolveParameters
+    $Proposal = Resolve-NitpickCorrectionProposal @ResolveParameters
 
     $Application = @{ Status = 'NotAttempted' }
     if ($Proposal.Status -eq 'Ready') {

@@ -2,6 +2,17 @@ BeforeAll {
     Import-Module -Name "$PSScriptRoot\..\..\..\AstEditor\AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot\..\..\Nitpick.psd1" -Force
 
+    function Get-TargetProposalSnapshot {
+        param ([psobject] $Proposal)
+
+        # CLR class serialization lazily caches nested adapters; snapshot the public values instead.
+        $Properties = [ordered]@{}
+        foreach ($Property in $Proposal.PSObject.Properties) {
+            $Properties[$Property.Name] = $Property.Value
+        }
+        [System.Management.Automation.PSSerializer]::Serialize([pscustomobject] $Properties, 3)
+    }
+
     function New-TargetCorrectionFixture {
         param (
             [string] $Path,
@@ -40,7 +51,7 @@ BeforeAll {
                 -RuleName ConflictRule
         }
         $Rules = if ($NoReanalysis) { @() } else { @($Rule) }
-        $Proposal = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rules
+        $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rules
         [pscustomobject]@{
             Document = $Document
             Findings = $Findings
@@ -58,7 +69,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     It 'declares the direct envelope contract without obsolete orchestration parameters' {
         InModuleScope Nitpick {
             $Command = Get-Command Resolve-NitpickTargetCorrection
-            $Command.OutputType.Name | Should -Contain 'Nitpick.CorrectionResult'
+            $Command.OutputType.Name | Should -Contain 'NitpickCorrectionResult'
             foreach ($Parameter in @('Document', 'Finding', 'Rule', 'Ast', 'Preview', 'WhatIf', 'Confirm')) {
                 $Command.Parameters.Keys | Should -Contain $Parameter
             }
@@ -68,18 +79,21 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     }
 
     It 'uses AnalysisSource for findings rather than effective text when reanalysis is unavailable' {
+        #===  ARRANGE  ===#
         $Fixture = New-TargetCorrectionFixture -NoReanalysis
-        $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'In-memory targets must not be saved.' }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -WhatIf
         }
 
-        $Result.PSTypeNames[0] | Should -Be 'Nitpick.CorrectionResult'
+        #===  ASSERT  ===#
+        $Result.PSTypeNames[0] | Should -Be 'NitpickCorrectionResult'
         $Result.Application.Status | Should -Be 'InMemory'
         $Result.Application.CommittedCorrections | Should -HaveCount 0
 
@@ -92,24 +106,27 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
 
         $Result.Proposal.WasReanalyzed | Should -BeFalse
-        [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
+        (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
 
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 
     It 'preserves the same proposal after a successful write and counts each original finding once' {
+        #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive 'Written.ps1'
         $Fixture = New-TargetCorrectionFixture -Path $Path
-        $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
         }
 
+        #===  ASSERT  ===#
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
 
         $Result.Application.Status | Should -Be 'Written'
@@ -128,7 +145,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         $Fixture.Proposal.WasReanalyzed | Should -BeTrue
 
-        [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
+        (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
 
         [System.IO.File]::ReadAllText($Path) | Should -Be $Result.Proposal.CandidateText
@@ -138,12 +155,14 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         @{ Status = 'Preview'; Preview = $true; WhatIf = $false }
         @{ Status = 'WhatIf'; Preview = $false; WhatIf = $true }
     ) {
+        #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive "$Status.ps1"
         $Fixture = New-TargetCorrectionFixture -Path $Path -NoReanalysis
-        $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Preview targets must not be saved.' }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{
             Fixture = $Fixture
             Preview = $Preview
@@ -154,6 +173,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Preview:$Preview -WhatIf:$WhatIf -Confirm:$false
         }
 
+        #===  ASSERT  ===#
         $Result.Application.Status | Should -Be $Status
         $Result.Application.CommittedCorrections | Should -HaveCount 0
 
@@ -162,7 +182,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
 
-        [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
+        (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
 
         [System.IO.File]::ReadAllText($Path) | Should -Be $Fixture.Proposal.OriginalText
@@ -173,10 +193,11 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         @{ Status = 'FailedWrite' }
         @{ Status = 'StaleSource' }
     ) {
+        #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive "$Status.ps1"
         $Fixture = New-TargetCorrectionFixture -Path $Path -RemainingFinding
-        $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         if ($Status -eq 'FailedWrite') {
             Mock Invoke-AstFileReplacement -ModuleName AstEditor {
                 throw [System.IO.IOException]::new('Simulated commit failure.')
@@ -185,12 +206,14 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
             [System.IO.File]::WriteAllText($Path, '$External = 3')
         }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
         }
 
+        #===  ASSERT  ===#
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
         $Result.Application.Status | Should -Be $Status
         $Result.Application.ErrorRecord | Should -Not -BeNullOrEmpty
@@ -213,19 +236,21 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
-        [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
+        (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
         $ExpectedDiskText = if ($Status -eq 'StaleSource') { '$External = 3' } else { $Fixture.Proposal.OriginalText }
         [System.IO.File]::ReadAllText($Path) | Should -Be $ExpectedDiskText
     }
 
     It 'preserves the proposal after a noninteractive decline and reports the original snapshot' {
+        #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive 'Declined.ps1'
         $Fixture = New-TargetCorrectionFixture -Path $Path -RemainingFinding
-        $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Declined targets must not be saved.' }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             $Command = Get-Command Resolve-NitpickTargetCorrection
@@ -248,6 +273,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
             }
         }
 
+        #===  ASSERT  ===#
         $Result.Application.Status | Should -Be 'Declined'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
         $Result.Application.CommittedCorrections | Should -HaveCount 0
@@ -269,7 +295,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         }
 
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
-        [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
+        (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
 
         [System.IO.File]::ReadAllText($Path) | Should -Be $Fixture.Proposal.OriginalText
@@ -277,18 +303,21 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     }
 
     It 'uses candidate analysis for NoChanges but never attempts a write' {
+        #===  ARRANGE  ===#
         $Fixture = New-TargetCorrectionFixture -Path (Join-Path $TestDrive 'NoChanges.ps1') `
             -Source '($Value -isnot [int])'
 
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Unchanged targets must not be saved.' }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
         }
 
+        #===  ASSERT  ===#
         $Result.Proposal.Status | Should -Be 'NoChanges'
         $Result.Application.Status | Should -Be 'NotAttempted'
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
@@ -301,20 +330,23 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         @{ Status = 'FailedValidation'; Invalid = $true; Conflict = $false }
         @{ Status = 'Rejected'; Invalid = $false; Conflict = $true }
     ) {
+        #===  ARRANGE  ===#
         $Fixture = New-TargetCorrectionFixture -Path (Join-Path $TestDrive "$Status.ps1") `
             -Invalid:$Invalid -Conflict:$Conflict
 
-        $Before = [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3)
+        $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
 
-        Mock Resolve-NitpickCorrection -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Rejected targets must not be saved.' }
 
+        #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
         }
 
+        #===  ASSERT  ===#
         $Result.Proposal.Status | Should -Be $Status
 
         $Result.Application.Status | Should -Be 'NotAttempted'
@@ -324,7 +356,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
 
-        [System.Management.Automation.PSSerializer]::Serialize($Fixture.Proposal, 3) |
+        (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
 
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly

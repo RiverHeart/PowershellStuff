@@ -9,7 +9,7 @@
     target that could not be read. Validation does not freeze returned objects.
 
 .PARAMETER Proposal
-    The stable Nitpick.CorrectionProposal returned by Resolve-NitpickCorrection.
+    The stable NitpickCorrectionProposal returned by Resolve-NitpickCorrectionProposal.
     Its Document is a mutable transaction handle, not an immutable diagnostic value;
     consumers must not modify queued edits between resolution and application.
 
@@ -31,12 +31,12 @@
 #>
 function New-NitpickCorrectionResult {
     [CmdletBinding()]
-    [OutputType('Nitpick.CorrectionResult')]
+    [OutputType('NitpickCorrectionResult')]
     param (
         [string] $Path = '<ScriptBlock>',
 
         [AllowNull()]
-        [psobject] $Proposal,
+        [NitpickCorrectionProposal] $Proposal,
 
         [hashtable] $Application = @{},
 
@@ -55,40 +55,8 @@ function New-NitpickCorrectionResult {
         }
     }
 
-    $Result = [pscustomobject]@{
-        PSTypeName = 'Nitpick.CorrectionResult'
-        Path = $Path
-        Proposal = $Proposal
-
-        Application = [pscustomobject]@{
-            Status = if ($Application.ContainsKey('Status')) { $Application.Status } else { 'NotAttempted' }
-            CommittedCorrections = @(
-                if ($Application.ContainsKey('CommittedCorrections')) { $Application.CommittedCorrections }
-            )
-            WriteResult = $Application['WriteResult']
-            ErrorRecord = $Application['ErrorRecord']
-        }
-
-        Report = [pscustomobject]@{
-            AnalysisSource = if ($Report.ContainsKey('AnalysisSource')) { $Report.AnalysisSource } else { 'None' }
-            EffectiveText = $Report['EffectiveText']
-            EffectiveFindings = @(
-                if ($Report.ContainsKey('EffectiveFindings')) { $Report.EffectiveFindings }
-            )
-            FindingsWithCommittedCorrections = @(
-                if ($Report.ContainsKey('FindingsWithCommittedCorrections')) {
-                    $Report.FindingsWithCommittedCorrections
-                }
-            )
-        }
-    }
-
-    #--------------
-    # VALIDATION
-    #--------------
-
-    $ApplicationStatus = $Result.Application.Status
-    $AnalysisSource = $Result.Report.AnalysisSource
+    $ApplicationStatus = if ($Application.ContainsKey('Status')) { $Application.Status } else { 'NotAttempted' }
+    $AnalysisSource = if ($Report.ContainsKey('AnalysisSource')) { $Report.AnalysisSource } else { 'None' }
 
     if ($ApplicationStatus -isnot [string] -or
         $ApplicationStatus -notin @(
@@ -105,6 +73,35 @@ function New-NitpickCorrectionResult {
     ) {
         throw 'Report.AnalysisSource must be None, Original, or Candidate.'
     }
+
+    $ApplicationData = [NitpickCorrectionApplication]@{
+        Status = $ApplicationStatus
+        CommittedCorrections = @(
+            if ($Application.ContainsKey('CommittedCorrections')) { $Application.CommittedCorrections }
+        )
+        WriteResult = $Application['WriteResult']
+        ErrorRecord = $Application['ErrorRecord']
+    }
+
+    $ReportData = [NitpickCorrectionReport]@{
+        AnalysisSource = $AnalysisSource
+        EffectiveFindings = @(
+            if ($Report.ContainsKey('EffectiveFindings')) { $Report.EffectiveFindings }
+        )
+        FindingsWithCommittedCorrections = @(
+            if ($Report.ContainsKey('FindingsWithCommittedCorrections')) {
+                $Report.FindingsWithCommittedCorrections
+            }
+        )
+    }
+    if ($null -ne $Report['EffectiveText']) {
+        $ReportData.EffectiveText = $Report['EffectiveText']
+    }
+    $Result = [NitpickCorrectionResult]::new($Path, $Proposal, $ApplicationData, $ReportData)
+
+    #--------------
+    # VALIDATION
+    #--------------
 
     if ($null -ne $Proposal -and (
             $Proposal.Status -isnot [string] -or

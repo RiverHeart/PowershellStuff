@@ -27,23 +27,23 @@ rewriting proposal facts or changing target-wide `ChangeSetId` grouping.
 Preview safe corrections and view the diff without modifying files:
 
 ```powershell
-Start-Nitpicking -Path .\Example.ps1 -Fix -Preview
+Start-Nitpicking -Path .\Example.ps1 -FixMode Preview
 ```
 
 Apply the same validated transaction, or preview using standard PowerShell confirmation semantics:
 
 ```powershell
-Start-Nitpicking -Path .\Example.ps1 -Fix -Confirm
-Start-Nitpicking -Path .\Example.ps1 -Fix -WhatIf
+Start-Nitpicking -Path .\Example.ps1 -FixMode Apply -Confirm
+Start-Nitpicking -Path .\Example.ps1 -FixMode Apply -WhatIf
 ```
 
-`-Fix` now writes file-backed `-Path` targets unless `-Preview`, `-WhatIf`, or a declined
+`-FixMode Apply` writes file-backed `-Path` targets unless `-WhatIf` or a declined
 confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
 for a correction envelope with `Proposal`, `Application`, and `Report` groups.
 Text output groups each target into one section: the target path as a header, its findings,
 then a diff of proposed or applied edits. Each correction is labeled by the `line:column` where
 it starts, so editors such as VS Code can link it against the header. A one-line trailer states
-the outcome once, for example `1 proposed correction.` for `-Preview` and `-WhatIf`, or
+the outcome once, for example `1 proposed correction.` for `-FixMode Preview` and `-WhatIf`, or
 `1 correction applied.` after writing. Skipped, conflicting, or failed corrections report full
 counts with their proposal and application statuses. It omits the correction section when a target
 has no correction activity. Use `-Verbose` for
@@ -64,6 +64,22 @@ Proposal diagnostics are stable by ownership, not enforced immutability.
 edits between resolution and application. The result constructor rejects contradictory
 lifecycle states instead of repairing them. See the
 [ownership boundaries](CONTEXT.md#correction-lifecycle-ownership) for maintainer responsibilities.
+
+The default `-FixMode Off` performs ordinary linting without emitting a correction result.
+Replace the former `-Fix -Preview` switches with `-FixMode Preview`, and `-Fix` with
+`-FixMode Apply`.
+
+For direct correction workflows, `Resolve-NitpickCorrectionProposal` replaces
+`Resolve-NitpickCorrection` and returns a `NitpickCorrectionProposal`, not a result.
+`New-NitpickCorrectionResult` wraps a proposal with application and reporting data.
+These are now PowerShell classes defined in the module, including typed
+`NitpickCorrectionApplication` and `NitpickCorrectionReport` groups. Their runtime
+type names replace the former `Nitpick.CorrectionProposal` and `Nitpick.CorrectionResult`
+labels. Update object-output filters accordingly. Helpers work with `Import-Module`;
+scripts naming these classes in type literals require `using module` at parse time.
+Formatters require a `NitpickCorrectionResult`, so passing a proposal fails at parameter
+binding rather than on a missing nested property. Classes preserve the existing mutable
+transaction ownership and constructor validation; they do not enforce immutability.
 
 The result contract intentionally breaks the earlier flat schema: use
 `Proposal.AcceptedCorrections` instead of `Corrections.Accepted`,

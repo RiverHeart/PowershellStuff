@@ -12,7 +12,7 @@ using namespace System.Management.Automation.Language
 
 .DESCRIPTION
     Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
-    Ordinary lint behavior is unchanged unless Fix is specified. Fix applies safe,
+    Ordinary lint behavior is unchanged when FixMode is Off. FixMode Apply applies safe,
     validated corrections to file-backed targets using transactional AstEditor saves.
     In-memory inputs return candidate text without writing. Correction output separates
     stable proposal facts, application outcomes, and effective reporting. PowerShell
@@ -103,7 +103,7 @@ function Start-Nitpicking {
     [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
     [Alias('nitpick', 'np')]
     [OutputType([string])]
-    [OutputType('NitpickFinding', 'NitpickSummary', 'Nitpick.CorrectionResult')]
+    [OutputType('NitpickFinding', 'NitpickSummary', 'NitpickCorrectionResult')]
     param(
         [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
         [string] $Path,

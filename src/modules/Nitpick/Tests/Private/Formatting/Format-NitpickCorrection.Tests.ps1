@@ -15,24 +15,28 @@ BeforeAll {
 
         $Proposal = $null
         if (-not $NoProposal) {
-            $Proposal = [pscustomobject]@{
-                Status = $ProposalStatus
-                AcceptedCorrections = $Accepted
-                SkippedCorrections = $Skipped
-                Conflicts = $Conflicts
-                Diff = "29:13  Reason`n  29 - old`n     + new"
-            }
+            $Proposal = & (Get-Module Nitpick) { [NitpickCorrectionProposal]::new() }
+            $Proposal.Status = $ProposalStatus
+            $Proposal.AcceptedCorrections = $Accepted
+            $Proposal.SkippedCorrections = $Skipped
+            $Proposal.Conflicts = $Conflicts
+            $Proposal.Diff = "29:13  Reason`n  29 - old`n     + new"
         }
 
-        [pscustomobject]@{
-            Path = $Path
-            Proposal = $Proposal
-            Application = [pscustomobject]@{
-                Status = $ApplicationStatus
-                CommittedCorrections = $Committed
-                ErrorRecord = $null
-            }
+        $Application = @{
+            Status = $ApplicationStatus
+            CommittedCorrections = $Committed
         }
+        if ($ApplicationStatus -eq 'Written') {
+            $Application.WriteResult = [pscustomobject]@{ WasWritten = $true; WriteStatus = 'Written' }
+        }
+        if ($ApplicationStatus -eq 'FailedRead') {
+            $Application.ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
+                [System.IO.IOException]::new('Read failed.'), 'ReadFailure',
+                [System.Management.Automation.ErrorCategory]::ReadError, $Path
+            )
+        }
+        New-NitpickCorrectionResult -Path $Path -Proposal $Proposal -Application $Application
     }
 
     function Format-TestCorrection {
@@ -53,9 +57,32 @@ AfterAll {
 Describe 'Format-NitpickCorrection' {
     BeforeEach {
         $ChangeSet = @(
-            [pscustomobject]@{ ChangeSetId = 'Set1' }
-            [pscustomobject]@{ ChangeSetId = 'Set1' }
+            New-NitpickCorrection -ViolationExtent ([scriptblock]::Create('$Value = 1').Ast.Extent) `
+                -ReplacementText '$Value = 2' -FilePathOrContext '<ScriptBlock>' -Description 'First edit' -ChangeSetId Set1
+            New-NitpickCorrection -ViolationExtent ([scriptblock]::Create('$Other = 1').Ast.Extent) `
+                -ReplacementText '$Other = 2' -FilePathOrContext '<ScriptBlock>' -Description 'Second edit' -ChangeSetId Set1
         )
+    }
+
+    It '<Command> rejects a proposal before executing formatter logic' -ForEach @(
+        @{ Command = 'Format-NitpickCorrection' }
+        @{ Command = 'Format-NitpickText' }
+    ) {
+        InModuleScope Nitpick -Parameters @{ Command = $Command } {
+            param ($Command)
+
+            Mock Get-NitpickCorrectionCount { throw 'Counting must not be reached.' }
+            $Parameters = @{
+                CorrectionResult = [NitpickCorrectionProposal]::new()
+                ErrorAction = 'Stop'
+            }
+            if ($Command -eq 'Format-NitpickText') {
+                $Parameters.Ast = {}.Ast
+            }
+
+            { & $Command @Parameters } | Should -Throw '*NitpickCorrectionResult*'
+            Should -Invoke Get-NitpickCorrectionCount -Times 0 -Exactly
+        }
     }
 
     It 'returns nothing when there is no correction activity' {
@@ -91,7 +118,9 @@ Describe 'Format-NitpickCorrection' {
     }
 
     It 'pluralizes proposed corrections by change set' {
-        $Accepted = @($ChangeSet) + [pscustomobject]@{ ChangeSetId = $null }
+        $Independent = New-NitpickCorrection -ViolationExtent ([scriptblock]::Create('$Third = 1').Ast.Extent) `
+            -ReplacementText '$Third = 2' -FilePathOrContext '<ScriptBlock>' -Description 'Independent edit'
+        $Accepted = @($ChangeSet) + $Independent
         $Result = New-TestCorrectionResult -Accepted $Accepted
 
         Format-TestCorrection $Result | Should -Match '\n  2 proposed corrections\.$'

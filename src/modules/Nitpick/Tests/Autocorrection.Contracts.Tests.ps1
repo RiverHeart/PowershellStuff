@@ -166,7 +166,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Explanation 'Exercises all-or-nothing correction change sets.' `
             -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
         $Result.CandidateText | Should -Be $Source
         $Result.AcceptedCorrections | Should -HaveCount 0
@@ -204,7 +204,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Explanation 'Exercises independent corrections.' `
             -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
         $Result.CandidateText | Should -Be '$First = 100; $Second = 200'
         $Result.AcceptedCorrections | Should -HaveCount 2
@@ -248,7 +248,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Explanation 'Exercises target-level conflict rejection.' `
             -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
         $Result.CandidateText | Should -Be $Source
         $Result.AcceptedCorrections | Should -HaveCount 0
@@ -267,13 +267,12 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             Start-Nitpicking `
                 -Path $Path `
                 -IncludeRule Nitpick/AvoidParameterAttributeBool `
-                -Fix `
-                -Preview `
+                -FixMode Preview `
                 -Output Object `
                 -NoSummary
         )
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
+            $_.PSTypeNames -contains 'NitpickCorrectionResult'
         }
 
         $Preview.Path | Should -Be (Resolve-Path -LiteralPath $Path).Path
@@ -306,7 +305,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Explanation 'Exercises in-memory correction preview.' `
             -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
         $Result.CandidateText | Should -Be '$Value = 2'
         $Result.AcceptedCorrections | Should -HaveCount 1
@@ -349,7 +348,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             }
         $InitialFindings = @($Rule.Invoke($Ast))
 
-        $Result = Resolve-NitpickCorrection `
+        $Result = Resolve-NitpickCorrectionProposal `
             -Script $Source `
             -Finding $InitialFindings `
             -Rule $Rule
@@ -386,7 +385,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Explanation 'Exercises rejected candidate text.' `
             -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
         $Result.OriginalText | Should -Be $Source
         $Result.CandidateText | Should -Be 'if ('
@@ -444,7 +443,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             Start-Nitpicking `
                 -Script '$Value = 1' `
                 -IncludeRule Local/FinalSeverityRule `
-                -Fix `
+                -FixMode Apply `
                 -ErrorOn Error `
                 -Output Object `
                 -ErrorAction SilentlyContinue `
@@ -452,7 +451,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         )
         $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
+            $_.PSTypeNames -contains 'NitpickCorrectionResult'
         }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
@@ -531,12 +530,12 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -Path $TestDrive `
                 -IncludePath $ConflictPath, $ValidPath `
                 -IncludeRule Local/PerTargetRule `
-                -Fix `
+                -FixMode Apply `
                 -Output Object
         )
 
         $Previews = @($Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
+            $_.PSTypeNames -contains 'NitpickCorrectionResult'
         })
 
         $ValidPreview = $Previews | Where-Object Path -eq $ValidPath

@@ -13,6 +13,8 @@
     and nested corrections, and assigns the same local name to findings' RuleSuppressionID.
 
 .EXAMPLE
+    Creates a new Nitpick finding object with the specified properties.
+
     $Finding = New-NitpickFinding `
         -RuleName 'MyRule' `
         -Message 'This is a test message' `
@@ -24,7 +26,7 @@
 #>
 function New-NitpickFinding {
     [CmdletBinding()]
-    [OutputType([object])]
+    [OutputType('NitpickFinding')]
     param(
         [Parameter(Mandatory)]
         [string] $RuleName,

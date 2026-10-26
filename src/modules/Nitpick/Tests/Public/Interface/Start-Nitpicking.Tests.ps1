@@ -88,14 +88,14 @@ Describe 'Start-Nitpicking' {
         $Summary.FindingCount | Should -Be 1
     }
 
-    It 'does ordinary lint without invoking target correction or emitting an envelope when Fix is omitted' {
+    It 'does ordinary lint without invoking target correction or emitting an envelope when FixMode is omitted' {
         Mock Resolve-NitpickTargetCorrection -ModuleName Nitpick { throw 'Lint must not resolve corrections.' }
 
         $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
             -IncludeRule Nitpick/UseIsNotOperator -Output Object -ErrorAction Stop)
 
         @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' }) | Should -HaveCount 1
-        @($Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }) | Should -HaveCount 0
+        @($Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }) | Should -HaveCount 0
         Should -Invoke Resolve-NitpickTargetCorrection -ModuleName Nitpick -Times 0 -Exactly
     }
 
@@ -603,7 +603,7 @@ Describe 'Start-Nitpicking' {
             -FixMode Preview `
             -Output Object
 
-        $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+        $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Preview | Should -Not -BeNullOrEmpty
@@ -660,7 +660,7 @@ Describe 'Start-Nitpicking' {
                 -NoSummary
 
         $Preview = $Results | Where-Object {
-            $_.PSTypeNames -contains 'Nitpick.CorrectionResult'
+            $_.PSTypeNames -contains 'NitpickCorrectionResult'
         }
 
         $Preview.Proposal.SkippedCorrections | Should -HaveCount 2

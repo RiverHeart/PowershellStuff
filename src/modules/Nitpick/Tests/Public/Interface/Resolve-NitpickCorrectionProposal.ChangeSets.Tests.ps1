@@ -25,7 +25,7 @@ BeforeAll {
     }
 }
 
-Describe 'Structural change-set selection and failure diagnostics' -Tag 'AutocorrectionContract' {
+Describe 'Correction proposal change-set selection and failure diagnostics' -Tag 'AutocorrectionContract' {
     BeforeEach {
         $Source = '-not ($Value -is [int]); -not ($Other -is [string])'
         $Document = New-AstDocument -InputObject $Source
@@ -36,15 +36,18 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
     }
 
     It 'returns exactly the proposal schema without application or derived finding groups' {
-        $Proposal = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Properties = @(
             'Path', 'Document', 'OriginalFingerprint', 'Status', 'OriginalText',
             'OriginalFindings', 'CandidateText', 'CandidateFindings', 'WasReanalyzed',
             'AcceptedCorrections', 'SkippedCorrections', 'Conflicts', 'ParseErrors', 'Diff'
         )
 
-        (Get-Command Resolve-NitpickCorrection).OutputType.Name | Should -Contain 'Nitpick.CorrectionProposal'
-        $Proposal.PSTypeNames[0] | Should -Be 'Nitpick.CorrectionProposal'
+        (Get-Command Resolve-NitpickCorrectionProposal).OutputType.Name | Should -Contain 'NitpickCorrectionProposal'
+        $Proposal.PSTypeNames[0] | Should -Be 'NitpickCorrectionProposal'
+        $Proposal.GetType().Name | Should -Be 'NitpickCorrectionProposal'
+        (Get-Module Nitpick).ExportedFunctions.Keys | Should -Contain 'Resolve-NitpickCorrectionProposal'
+        (Get-Module Nitpick).ExportedFunctions.Keys | Should -Not -Contain 'Resolve-NitpickCorrection'
         $Proposal.PSObject.Properties.Name | Should -HaveCount $Properties.Count
 
         foreach ($Property in $Properties) {
@@ -74,7 +77,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
         $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
         $Findings = @($Rule.Invoke($Document.Ast))
 
-        $Proposal = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Proposal.Status | Should -Be $Status
 
         foreach ($Property in @('OriginalFindings', 'AcceptedCorrections')) {
@@ -94,7 +97,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
     ) {
         $FirstGroup[1].Applicability = $Applicability
 
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
 
         $Result.Status | Should -Be 'Ready'
         $Result.AcceptedCorrections | Should -HaveCount 2
@@ -130,7 +133,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
             -ChangeSetId $Original.ChangeSetId `
             -RuleName $Original.RuleName
 
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Result.AcceptedCorrections | Should -HaveCount 2
         $Result.SkippedCorrections | Should -HaveCount 2
         $Result.SkippedCorrections.Reason | Should -Contain 'Correction does not contain an AstEditor text edit.'
@@ -142,7 +145,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
     It 'rejects all selected groups when one authoritative edit is stale' {
         $FirstGroup[1].TextEdit.ExpectedText = '-IS'
 
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
 
         $Result.Status | Should -Be 'Rejected'
         $Result.AcceptedCorrections | Should -HaveCount 0
@@ -193,7 +196,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
             @($Findings) + $CompetingFinding
         }
 
-        $Result = Resolve-NitpickCorrection `
+        $Result = Resolve-NitpickCorrectionProposal `
             -Document $Document `
             -Finding $OrderedFindings `
             -Rule $Rule
@@ -234,7 +237,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
 
         $Competing = New-CompetingFinding -Extent $Findings[1].ViolationExtent -Correction $Correction
 
-        $Result = Resolve-NitpickCorrection -Document $Document `
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document `
             -Finding @($Findings[0], $Competing)
 
         $Result.AcceptedCorrections | Should -HaveCount 0
@@ -258,7 +261,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
 
         $Competing = New-CompetingFinding -Extent $Findings[1].ViolationExtent -Correction $Correction
 
-        $Result = Resolve-NitpickCorrection -Document $Document `
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document `
             -Finding @($Findings[0], $Competing)
 
         $Result.AcceptedCorrections | Should -HaveCount 2
@@ -271,7 +274,7 @@ Describe 'Structural change-set selection and failure diagnostics' -Tag 'Autocor
     It 'rejects the complete rendered batch when a group produces parse errors' {
         $FirstGroup[1].TextEdit.ReplacementText = '('
 
-        $Result = Resolve-NitpickCorrection -Document $Document -Finding $Findings -Rule $Rule
+        $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Result.Status | Should -Be 'FailedValidation'
         $Result.AcceptedCorrections | Should -HaveCount 0
         $Result.SkippedCorrections | Should -HaveCount 4

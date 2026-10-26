@@ -71,7 +71,7 @@ later helper-signature migration.
 
 | Component | Owns | Must not do |
 | --- | --- | --- |
-| [Correction resolver](Public/Interface/Resolve-NitpickCorrection.ps1) | Selection policy, candidate validation and analysis, proposal diagnostics | Save files or choose effective reporting |
+| [Correction resolver](Public/Interface/Resolve-NitpickCorrectionProposal.ps1) | Selection policy, candidate validation and analysis, proposal diagnostics | Save files or choose effective reporting |
 | [Target coordinator](Private/Resolve-NitpickTargetCorrection.ps1) | ShouldProcess, application policy, effective report selection | Rewrite proposal facts or update invocation totals |
 | [Invocation coordinator](Public/Interface/Start-Nitpicking.ps1) | Output, error emission, summaries, severity thresholds | Redo correction selection or reinterpret candidate validity |
 | [Result constructor](Public/Helpers/New-NitpickCorrectionResult.ps1) | Envelope shape and lifecycle consistency checks | Repair contradictions, resolve corrections, or perform I/O |
@@ -80,6 +80,13 @@ later helper-signature migration.
 The resolver delegates edit-range, stale-text, conflict, and parsing checks to
 AstEditor; it owns the Nitpick policy applied to those results, not a second source
 validation implementation.
+
+`Resolve-NitpickCorrectionProposal` returns a `NitpickCorrectionProposal`.
+`New-NitpickCorrectionResult` constructs a `NitpickCorrectionResult` with typed
+`NitpickCorrectionApplication` and `NitpickCorrectionReport` groups. The result
+constructor's Proposal parameter and both text formatters' CorrectionResult parameters
+enforce these class contracts. OutputType declarations use string class names because
+the classes are defined in the separately parsed root module.
 
 Proposal diagnostics are stable by ownership, not enforced immutability.
 `Proposal.Document` is a mutable transaction handle containing the queued edits.

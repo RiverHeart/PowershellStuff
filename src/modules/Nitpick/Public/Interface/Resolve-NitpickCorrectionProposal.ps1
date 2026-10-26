@@ -2,7 +2,7 @@ using namespace System.Collections.Generic
 
 <#
 .SYNOPSIS
-    Previews native Nitpick corrections against one source snapshot.
+    Resolves a native Nitpick correction proposal against one source snapshot.
 
 .DESCRIPTION
     Selects safe corrections and delegates atomic source validation and queueing to
@@ -38,7 +38,7 @@ using namespace System.Collections.Generic
     Optional source path used to retain file identity during final rule analysis.
 
 .EXAMPLE
-    $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
     $Result.CandidateText
 
     Previews all independent safe corrections attached to the findings. Every correction
@@ -61,13 +61,13 @@ using namespace System.Collections.Generic
             -Description 'Replace the second assignment.' `
             -ChangeSetId 'CoupledAssignments'
     )
-    $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
     When $Finding contains $Corrections, both corrections are accepted or skipped together.
     For example, stale ExpectedText on either correction skips the complete change set.
 
 .EXAMPLE
-    $Result = Resolve-NitpickCorrection -Script $Source -Finding $Finding
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
     $Result.Conflicts
     $Result.CandidateText -eq $Source
 
@@ -75,7 +75,7 @@ using namespace System.Collections.Generic
     policy, an overlap rejects the complete preview batch and leaves candidate text unchanged.
 
 .EXAMPLE
-    $Result = Resolve-NitpickCorrection `
+    $Result = Resolve-NitpickCorrectionProposal `
         -Script $Source `
         -Finding $Finding `
         -Rule $SelectedRules
@@ -85,10 +85,10 @@ using namespace System.Collections.Generic
     corrected findings disappear and report findings that remain after rendering. Omit Rule
     when only correction selection, validation, and rendered text are needed.
 #>
-function Resolve-NitpickCorrection {
+function Resolve-NitpickCorrectionProposal {
     [CmdletBinding(DefaultParameterSetName = 'Script')]
-    [OutputType('Nitpick.CorrectionProposal')]
-    param (
+    [OutputType('NitpickCorrectionProposal')]
+    param(
         [Parameter(Mandatory, ParameterSetName = 'Script')]
         [AllowEmptyString()]
         [string] $Script,
@@ -286,8 +286,7 @@ function Resolve-NitpickCorrection {
         $WasReanalyzed = $true
     }
 
-    [pscustomobject]@{
-        PSTypeName = 'Nitpick.CorrectionProposal'
+    return [NitpickCorrectionProposal]@{
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint

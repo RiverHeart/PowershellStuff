@@ -26,7 +26,7 @@ using namespace System.Text
     The findings to list beneath the header.
 
 .PARAMETER CorrectionResult
-    The Nitpick.CorrectionResult for the target, when corrections were requested.
+    The NitpickCorrectionResult for the target, when corrections were requested.
 
 .EXAMPLE
     Format findings for a specific AST and display them as console-friendly text
@@ -55,7 +55,7 @@ function Format-NitpickText {
         [object[]] $Finding = @(),
 
         [Parameter()]
-        [psobject] $CorrectionResult
+        [NitpickCorrectionResult] $CorrectionResult
     )
 
     $CorrectionText = if ($CorrectionResult) {

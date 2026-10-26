@@ -149,7 +149,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             Mock Save-AstDocument -ModuleName Nitpick { throw 'Targets must not be written.' }
             {
                 Start-Nitpicking -Path $ContractRoot -IncludeRule MissingContractRule `
-                    -Fix -Output Object -ErrorAction Continue
+                    -FixMode Apply -Output Object -ErrorAction Continue
             } | Should -Throw '*No Nitpick rules match*'
 
             Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
@@ -191,9 +191,9 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Path = Join-Path $ContractRoot 'Source.ps1'
             $Source = '-not ($Value -is [int])'
             Set-Content -LiteralPath $Path -Value $Source -NoNewline
-            $Results = @(Start-Nitpicking -Path $Path -Fix -Preview -Output Object -ErrorAction Stop)
+            $Results = @(Start-Nitpicking -Path $Path -FixMode Preview -Output Object -ErrorAction Stop)
 
-            $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+            $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
             $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
             $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
             $Preview.Application.CommittedCorrections | Should -HaveCount 0
@@ -669,9 +669,9 @@ Export-ModuleMember -Function Test-ContractRule
 
         It 'retains qualified IDs through preview and corrected-source reanalysis' {
             $Results = @(Start-Nitpicking -Script '-not ($Value -is [int])' `
-                -IncludeRule 'Nitpick/UseIsNotOperator' -Fix -Preview -Output Object)
+                -IncludeRule 'Nitpick/UseIsNotOperator' -FixMode Preview -Output Object)
 
-            $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'Nitpick.CorrectionResult' }
+            $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
             $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
             $Preview.Report.EffectiveFindings | Should -HaveCount 0
             $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
