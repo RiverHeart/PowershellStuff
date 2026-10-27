@@ -34,15 +34,15 @@
     }
 
     ExcludeRules = @(
-        # Well meaning but antiquated and dogmatic to a fault.
+        # Well meaning but too strict.
         #
         # Verb conventions are good and should be followed when applicable, but modern-day
-        # cmdlet discovery is driven by internet searches rather than `Get-Command`, so strict
-        # adherence to this rule is more posturing than practical.
+        # cmdlet discovery is driven by internet searches rather than `Get-Command`, so
+        # stringently following approved verbs leads to awkward or forced verb choices.
         #
-        # The lack of an exhaustive list of approved verbs also contributes to hacks such as
-        # using 'Invoke' for everything or using the semantic meaning of a verb over its
-        # official meaning.
+        # The lack of an exhaustive list of approved verbs and refusal to update it
+        # contributes to hacks such as using 'Invoke' for everything or using the
+        # semantic meaning of a verb over its official meaning.
         'PSUseApprovedVerbs'
 
         # Used to be an issue in earlier versions of PowerShell, but is no longer a problem in modern versions.
@@ -72,6 +72,20 @@
         'TypeNotFound',
 
         # Produces false positive for the 'Command' DSL keyword.
-        'PSAvoidUsingCmdletAliases'
+        'PSAvoidUsingCmdletAliases',
+
+        # Sometimes named parameters are redundant and positional parameters improve
+        # readability by reducing noise. `Test-Path <path>` doesn't need an explicit
+        # `-Path` parameter to be understood.
+        #
+        # While there is a `CommandAllowList` knob for this rule, I'm not sure it's
+        # practical to use across a large number of commands and just because `-Path`
+        # is redundant doesn't mean `-LongComplexParameter` should be omitted on the
+        # same command.
+        #
+        # Really, if anything the concern should be with having too many positional
+        # parameters rather than avoiding them altogether. 3 is probably a reasonable
+        # limit and can be enforced at the function level rather than at call sites.
+        'PSAvoidUsingPositionalParameters'
     )
 }
