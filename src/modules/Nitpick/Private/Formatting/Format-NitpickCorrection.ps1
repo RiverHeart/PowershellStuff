@@ -23,7 +23,7 @@ using namespace System.Collections.Generic
 .EXAMPLE
     Format a correction result.
 
-    $NitpickModule = Get-Module -Name Nitpick
+    $NitpickModule = Import-Module Nitpick -PassThru
     $NitpickModule.NewBoundScriptBlock({
         $Source = 'param([Parameter(Mandatory=$true)] [string] $Foo)'
         $SourceAst = [scriptblock]::Create($Source).Ast
