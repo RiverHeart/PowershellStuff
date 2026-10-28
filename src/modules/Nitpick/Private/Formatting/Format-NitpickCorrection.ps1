@@ -62,17 +62,22 @@ function Format-NitpickCorrection {
     } else {
         0
     }
+
     $CommittedCount = Get-NitpickCorrectionCount -Corrections $Application.CommittedCorrections
     $SkippedCount = if ($Proposal) { $Proposal.SkippedCorrections.Count } else { 0 }
     $ConflictCount = if ($Proposal) { $Proposal.Conflicts.Count } else { 0 }
-    $HasFailure = $Application.ErrorRecord -or
+    $HasFailure =
+        $Application.ErrorRecord -or
         $ProposalStatus -in 'Rejected', 'FailedValidation' -or
         $ApplicationStatus -in @(
             'FailedRead', 'FailedValidation', 'StaleSource', 'StaleTarget', 'InvalidTarget', 'FailedWrite'
         )
 
-    if ($AcceptedEditCount -eq 0 -and $CommittedCount -eq 0 -and
-        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasFailure
+    if ($AcceptedEditCount -eq 0 -and
+        $CommittedCount -eq 0 -and
+        $SkippedCount -eq 0 -and
+        $ConflictCount -eq 0 -and
+        -not $HasFailure
     ) {
         return
     }
@@ -87,8 +92,11 @@ function Format-NitpickCorrection {
     }
 
     $CorrectionNoun = if ($AcceptedCount -eq 1) { 'correction' } else { 'corrections' }
-    $IsCleanOutcome = $AcceptedEditCount -gt 0 -and
-        $SkippedCount -eq 0 -and $ConflictCount -eq 0 -and -not $HasFailure
+    $IsCleanOutcome =
+        $AcceptedEditCount -gt 0 -and
+        $SkippedCount -eq 0 -and
+        $ConflictCount -eq 0 -and
+        -not $HasFailure
 
     $Trailer = if ($IsCleanOutcome) {
         # Preview and WhatIf share wording: "proposed" already implies the file is unchanged.

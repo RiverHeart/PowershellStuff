@@ -721,6 +721,7 @@ $Paths = @(
 
 foreach ($Path in $Paths) {
     Get-ChildItem -Path "$ModuleRoot/$Path" -Recurse -Filter '*.ps1' |
+        Where-Object { $_ -notlike '*.kicker.ps1'} |
         ForEach-Object {
             . $_.FullName
         }
