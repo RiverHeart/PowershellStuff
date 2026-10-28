@@ -85,6 +85,7 @@ FunctionsToExport = @(
     'Resolve-NitpickCorrectionProposal'
     'Start-Nitpicking'
     'Test-AvoidParameterAttributeBool'
+    'Test-AvoidAmbiguousPipelineContinuation'
     'Test-UseIsNotOperator'
     'Unregister-Nitpick'
 )
