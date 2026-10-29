@@ -7,8 +7,9 @@ using namespace System.Collections.Generic
     Renders diff hunks as one string with reason labels and numbered source lines.
 
 .DESCRIPTION
-    Consumes the nested hunk/block lists produced by Get-AstDiffHunk. Formatting
-    scriptblocks share only this function's builder, source, and display settings.
+    Consumes the nested hunk/block lists produced by Get-AstDiffHunk. Renders
+    reason labels, leading context, edited blocks, and trailing context in order.
+    Private helpers handle line splitting and appending with explicit inputs.
 #>
 function Format-AstDiff {
     [OutputType([string])]
@@ -46,48 +47,25 @@ function Format-AstDiff {
 
     $LastLineIndex = $LineRecords.Count - 1
     # A trailing terminator produces an empty final line that should never appear as context.
-    $LastContentLineIndex = if ($LastLineIndex -gt 0 -and $LineRecords[$LastLineIndex].Start -eq $Text.Length) {
+    $LastContentLineIndex = if (
+        $LastLineIndex -gt 0 -and
+        $LineRecords[$LastLineIndex].Start -eq $Text.Length
+    ) {
         $LastLineIndex - 1
     } else {
         $LastLineIndex
     }
 
-    $NumberWidth = ([string] ($LastContentLineIndex + 1)).Length
-    $LineTerminatorPattern = '\r\n|\n|\r'
-    $SplitDisplayLines = {
-        param ([string] $Value)
-        if ($Value.Length -eq 0) {
-            return , @()
-        }
-        $Trimmed = [regex]::Replace($Value, "(?:$LineTerminatorPattern)\z", '')
-        return , [regex]::Split($Trimmed, $LineTerminatorPattern)
-    }
-
+    $NumberWidth = ($LastContentLineIndex + 1).ToString().Length
     $Builder = [StringBuilder]::new()
-    $AppendLine = {
-        param ([object] $LineNumber, [string] $Marker, [string] $Content, [string] $Color)
-        $Gutter = if ($null -eq $LineNumber) { ' ' * $NumberWidth } else { ([string] $LineNumber).PadLeft($NumberWidth) }
-        $Prefix = if ($Color) { $Color } else { '' }
-        $Suffix = if ($Color) { $Reset } else { '' }
-        [void] $Builder.AppendLine("$Prefix  $Gutter $Marker $Content$Suffix")
-    }
-
-    $AppendContextLines = {
-        param ([int] $From, [int] $To)
-        for ($LineIndex = $From; $LineIndex -le $To; $LineIndex++) {
-            $LineRecord = $LineRecords[$LineIndex]
-            & $AppendLine ($LineIndex + 1) ' ' $Text.Substring($LineRecord.Start, $LineRecord.ContentEnd - $LineRecord.Start) $null
-        }
-    }
 
     foreach ($Hunk in $Hunks) {
         if ($Builder.Length -gt 0) {
             [void] $Builder.AppendLine('')
         }
 
-        $ReasonGroups = [Dictionary[string, List[int]]]::new(
-            [StringComparer]::Ordinal
-        )
+        # Group edits by reason for display purposes.
+        $ReasonGroups = [Dictionary[string, List[int]]]::new([StringComparer]::Ordinal)
         $ReasonOrder = [List[string]]::new()
         foreach ($Block in $Hunk) {
             foreach ($Item in $Block.Items) {
@@ -100,6 +78,7 @@ function Format-AstDiff {
             }
         }
 
+        # Display reason groups in the order they were encountered.
         foreach ($Reason in $ReasonOrder) {
             $ReasonLabel = if ($Label -eq 'Position') {
                 # Edits are sorted by offset, so the first index marks where the reason starts.
@@ -113,12 +92,24 @@ function Format-AstDiff {
         }
 
         $FirstLine = $Hunk[0].StartLine
-        & $AppendContextLines ([Math]::Max(0, $FirstLine - $Context)) ($FirstLine - 1)
+        Add-AstDiffContext `
+            -Builder $Builder `
+            -Text $Text `
+            -LineRecords $LineRecords `
+            -From ([Math]::Max(0, $FirstLine - $Context)) `
+            -To ($FirstLine - 1) `
+            -NumberWidth $NumberWidth
 
         $PreviousEndLine = $null
         foreach ($Block in $Hunk) {
             if ($null -ne $PreviousEndLine) {
-                & $AppendContextLines ($PreviousEndLine + 1) ($Block.StartLine - 1)
+                Add-AstDiffContext `
+                    -Builder $Builder `
+                    -Text $Text `
+                    -LineRecords $LineRecords `
+                    -From ($PreviousEndLine + 1) `
+                    -To ($Block.StartLine - 1) `
+                    -NumberWidth $NumberWidth
             }
 
             $SpanStart = $LineRecords[$Block.StartLine].Start
@@ -134,20 +125,36 @@ function Format-AstDiff {
             }
 
             $LineNumber = $Block.StartLine + 1
-            foreach ($Line in (& $SplitDisplayLines $Original)) {
-                & $AppendLine $LineNumber '-' $Line $Red
+            foreach ($Line in (Split-AstDiffDisplayLine -Value $Original)) {
+                Add-AstDiffLine `
+                    -Builder $Builder `
+                    -NumberWidth $NumberWidth `
+                    -LineNumber $LineNumber `
+                    -Marker '-' `
+                    -Content $Line
+
                 $LineNumber++
             }
 
-            foreach ($Line in (& $SplitDisplayLines $Candidate)) {
-                & $AppendLine $null '+' $Line $Green
+            foreach ($Line in (Split-AstDiffDisplayLine -Value $Candidate)) {
+                Add-AstDiffLine `
+                    -Builder $Builder `
+                    -NumberWidth $NumberWidth `
+                    -Marker '+' `
+                    -Content $Line
             }
 
             $PreviousEndLine = $Block.EndLine
         }
 
         $TrailingEnd = [Math]::Min($PreviousEndLine + $Context, $LastContentLineIndex)
-        & $AppendContextLines ($PreviousEndLine + 1) $TrailingEnd
+        Add-AstDiffContext `
+            -Builder $Builder `
+            -Text $Text `
+            -LineRecords $LineRecords `
+            -From ($PreviousEndLine + 1) `
+            -To $TrailingEnd `
+            -NumberWidth $NumberWidth
     }
 
     return $Builder.ToString().TrimEnd("`r", "`n")
