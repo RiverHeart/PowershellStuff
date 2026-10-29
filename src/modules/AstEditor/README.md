@@ -16,10 +16,20 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 - `AstEditor.psm1`: module loader
 - `Classes/`: internal document and text-edit classes
 - `Private/`: internal rewrite planning and emission helpers
+- `Private/AstDiffing/`: diff grouping, rendering, and shared offset-to-line lookup helpers
 - `Public/`: exported editing commands
 - `Run-SimpleExample.ps1`: minimal demo showing prepend/replace/append line edits
 - `Run-ImageViewerMutation.ps1`: end-to-end demo against the WPF ImageViewer DSL script
 - `Tests/AstEditor.tests.ps1`: Pester coverage for document parsing, line helpers, diff output, and WPF transform behavior
+
+`Show-AstDiff` handles edit selection and validation, then calls `Get-AstDiffHunk`
+and `Format-AstDiff`. A block groups contiguous changed lines into one
+original/replacement pair; a hunk groups blocks connected by displayed context.
+Grouping and rendering receive line records (`Start`, `ContentEnd`, and `End`)
+from `Get-AstTextLine`. They share `Get-AstLineIndexFromOffset`, which binary-searches
+the records directly without a separate array of start offsets.
+Formatting scriptblocks remain local to the renderer rather than adding more
+module-level helpers.
 
 ## Import
 

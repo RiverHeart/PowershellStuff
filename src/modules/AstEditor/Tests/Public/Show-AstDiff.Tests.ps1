@@ -9,6 +9,113 @@ AfterAll {
 }
 
 Describe 'Show-AstDiff' {
+    It 'emits no output when there are no queued edits' {
+        $Document = New-AstDocument -InputObject 'one'
+
+        @(Show-AstDiff -Document $Document -NoColor).Count | Should -Be 0
+    }
+
+    It 'returns an empty string for an explicitly empty selection' {
+        $Document = New-AstDocument -InputObject 'one'
+        $Document.ReplaceRange(0, 3, 'ONE', 'Change')
+
+        $Output = @(Show-AstDiff -Document $Document -EditIndex @() -NoColor)
+
+        $Output.Count | Should -Be 1
+        $Output[0] | Should -BeExactly ''
+    }
+
+    It 'rejects out-of-range edit index <Index>' -ForEach @(
+        @{ Index = -1 }
+        @{ Index = 1 }
+    ) {
+        $Document = New-AstDocument -InputObject 'one'
+        $Document.ReplaceRange(0, 3, 'ONE', 'Change')
+
+        { Show-AstDiff -Document $Document -EditIndex $Index -NoColor } |
+            Should -Throw "Edit index $Index is out of range. Valid range is 0..0."
+    }
+
+    It 'sorts and deduplicates selected edit indexes' {
+        $Document = New-AstDocument -InputObject "one`ntwo"
+        $Document.ReplaceRange(4, 7, 'TWO', 'Second')
+        $Document.ReplaceRange(0, 3, 'ONE', 'First')
+
+        $Output = @(Show-AstDiff -Document $Document -EditIndex 1,0,1 -NoColor)
+
+        $Output.Count | Should -Be 1
+        $Output[0] | Should -BeExactly ((
+            '[0] First', '[1] Second',
+            '  1 - one', '  2 - two', '    + ONE', '    + TWO'
+        ) -join [Environment]::NewLine)
+    }
+
+    It 'handles <Name> line terminators without displaying a phantom context line' -ForEach @(
+        @{ Name = 'LF'; NewLine = "`n" }
+        @{ Name = 'CRLF'; NewLine = "`r`n" }
+        @{ Name = 'CR'; NewLine = "`r" }
+    ) {
+        $Source = "one${NewLine}two${NewLine}three${NewLine}"
+        $Document = New-AstDocument -InputObject $Source
+        $Start = $Source.IndexOf('two')
+        $Document.ReplaceRange($Start, $Start + 3, "TWO${NewLine}EXTRA", 'Change')
+
+        Show-AstDiff -Document $Document -NoColor -Context 1 -Label Position |
+            Should -BeExactly ((
+                '2:1  Change', '  1   one', '  2 - two',
+                '    + TWO', '    + EXTRA', '  3   three'
+            ) -join [Environment]::NewLine)
+    }
+
+    It 'handles an end-of-file insertion in <Name>' -ForEach @(
+        @{
+            Name = 'empty text'
+            Source = ''
+            Expected = @('1:1  Append', '    + MORE')
+        }
+        @{
+            Name = 'an unterminated line'
+            Source = 'one'
+            Expected = @('1:4  Append', '  1 - one', '    + oneMORE')
+        }
+        @{
+            Name = 'terminated text'
+            Source = "one`n"
+            Expected = @('2:1  Append', '  1   one', '    + MORE')
+        }
+    ) {
+        $Document = New-AstDocument -InputObject $Source
+        $Document.Insert($Source.Length, 'MORE', 'Append')
+
+        Show-AstDiff -Document $Document -NoColor -Context 1 -Label Position |
+            Should -BeExactly ($Expected -join [Environment]::NewLine)
+    }
+
+    It 'preserves color output with NoColor=<DisableColor> and NO_COLOR=<EnvironmentValue>' -ForEach @(
+        @{ DisableColor = $false; EnvironmentValue = $null; ExpectColor = $true }
+        @{ DisableColor = $true; EnvironmentValue = $null; ExpectColor = $false }
+        @{ DisableColor = $false; EnvironmentValue = '1'; ExpectColor = $false }
+        @{ DisableColor = $false; EnvironmentValue = '0'; ExpectColor = $false }
+    ) {
+        $OriginalNoColor = $env:NO_COLOR
+        try {
+            $env:NO_COLOR = $EnvironmentValue
+            $Document = New-AstDocument -InputObject 'one'
+            $Document.ReplaceRange(0, 3, 'ONE', 'Change')
+            $Esc = [char]27
+            $Expected = if ($ExpectColor) {
+                @("${Esc}[1m[0] Change${Esc}[0m", "${Esc}[31m  1 - one${Esc}[0m", "${Esc}[32m    + ONE${Esc}[0m")
+            } else {
+                @('[0] Change', '  1 - one', '    + ONE')
+            }
+
+            Show-AstDiff -Document $Document -NoColor:$DisableColor |
+                Should -BeExactly ($Expected -join [Environment]::NewLine)
+        } finally {
+            $env:NO_COLOR = $OriginalNoColor
+        }
+    }
+
     It 'shows all queued edits in sorted order' {
         $Source = @'
 function Greet {
