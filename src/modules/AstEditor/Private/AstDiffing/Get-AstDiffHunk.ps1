@@ -14,6 +14,9 @@ using namespace System.Collections.Generic
     outer list without enumeration to preserve empty and single-hunk results.
 
 .NOTES
+    A "block" is a contiguous group of changed lines within the file, such as
+    lines 1-2 in the example below, which are part of Changed block A.
+
     A "hunk" is a group of changed-line blocks whose context lines touch or
     overlap. To visualize, think of each block as a cluster of changed lines,
     and a hunk as a collection of these clusters that are close enough to be
