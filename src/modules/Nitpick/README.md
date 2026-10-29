@@ -304,4 +304,4 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 ## Notes
 
 - ScriptAnalyzer searches for functions named `Measure-*` and `Test-*` so we should be safe to export any helper functions from this module that do not use those verbs.
-- ScriptAnalyzer's `PSUseOutputTypeCorrectly` doesn't take into account strings so `[OutputType('CustomClass')]` fails even though that's the only way it can be expressed due to parse time constraints.
+- ScriptAnalyzer's `PSUseOutputTypeCorrectly` doesn't seem to take strings into account for `[OutputType('CustomClass')]` when the `return` keyword is missing from a `[CustomClass]::new()` output. Is there some metadata exposed by `return` or does the check require `return` and `[OutputType()]` together?
