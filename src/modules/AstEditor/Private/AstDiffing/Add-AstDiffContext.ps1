@@ -23,17 +23,16 @@ function Add-AstDiffContext {
         [int] $To,
 
         [Parameter(Mandatory)]
-        [int] $NumberWidth
+        [int] $GutterWidth
     )
 
     for ($LineIndex = $From; $LineIndex -le $To; $LineIndex++) {
         $LineRecord = $LineRecords[$LineIndex]
-        $Content = $Text.Substring($LineRecord.Start, $LineRecord.ContentEnd - $LineRecord.Start)
-        Add-AstDiffLine `
+        $Content = $Text.Substring($LineRecord.Start, $LineRecord.End - $LineRecord.Start)
+        $Content | Add-AstDiffLine `
             -Builder $Builder `
-            -NumberWidth $NumberWidth `
+            -GutterWidth $GutterWidth `
             -LineNumber ($LineIndex + 1) `
-            -Marker ' ' `
-            -Content $Content
+            -Marker ' '
     }
 }

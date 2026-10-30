@@ -39,11 +39,14 @@ function Format-AstDiff {
     )
 
     $ColorIsDisabled = $NoColor -or $env:NO_COLOR
-    $Esc = if (-not $ColorIsDisabled) { [char]27 }
-    $Red = if (-not $ColorIsDisabled) { "$Esc[31m" }
-    $Green = if (-not $ColorIsDisabled) { "$Esc[32m" }
-    $Reset = if (-not $ColorIsDisabled) { "$Esc[0m" }
-    $Bold = if (-not $ColorIsDisabled) { "$Esc[1m" }
+    if (-not $ColorIsDisabled) {
+        $Esc = [char]27
+        $Reset = "$Esc[0m"
+        $Bold = "$Esc[1m"
+    } else {
+        $Reset = ''
+        $Bold = ''
+    }
 
     $LastLineIndex = $LineRecords.Count - 1
     # A trailing terminator produces an empty final line that should never appear as context.
@@ -70,10 +73,12 @@ function Format-AstDiff {
         foreach ($Block in $Hunk) {
             foreach ($Item in $Block.Items) {
                 $Reason = [string] $Item.Edit.Reason
+
                 if (-not $ReasonGroups.ContainsKey($Reason)) {
                     $ReasonGroups[$Reason] = [List[int]]::new()
                     $ReasonOrder.Add($Reason)
                 }
+
                 $ReasonGroups[$Reason].Add($Item.Index)
             }
         }
@@ -88,6 +93,7 @@ function Format-AstDiff {
             } else {
                 '[{0}]' -f ($ReasonGroups[$Reason] -join ', ')
             }
+
             [void] $Builder.AppendLine("${Bold}$ReasonLabel $Reason${Reset}")
         }
 
@@ -98,7 +104,7 @@ function Format-AstDiff {
             -LineRecords $LineRecords `
             -From ([Math]::Max(0, $FirstLine - $Context)) `
             -To ($FirstLine - 1) `
-            -NumberWidth $NumberWidth
+            -GutterWidth $NumberWidth
 
         $PreviousEndLine = $null
         foreach ($Block in $Hunk) {
@@ -109,40 +115,41 @@ function Format-AstDiff {
                     -LineRecords $LineRecords `
                     -From ($PreviousEndLine + 1) `
                     -To ($Block.StartLine - 1) `
-                    -NumberWidth $NumberWidth
+                    -GutterWidth $NumberWidth
             }
 
-            $SpanStart = $LineRecords[$Block.StartLine].Start
-            $Original = $Text.Substring($SpanStart, $LineRecords[$Block.EndLine].End - $SpanStart)
+            $BlockStartOffset = $LineRecords[$Block.StartLine].Start
+            $OriginalBlockText = $Text.Substring(
+                $BlockStartOffset,
+                $LineRecords[$Block.EndLine].End - $BlockStartOffset
+            )
 
             # Apply edits from last to first so earlier relative offsets remain valid.
-            $Candidate = $Original
+            $EditedBlockText = $OriginalBlockText
             for ($ItemIndex = $Block.Items.Count - 1; $ItemIndex -ge 0; $ItemIndex--) {
                 $Edit = $Block.Items[$ItemIndex].Edit
-                $RelativeStart = $Edit.StartOffset - $SpanStart
-                $Candidate = $Candidate.Remove($RelativeStart, $Edit.EndOffset - $Edit.StartOffset)
-                $Candidate = $Candidate.Insert($RelativeStart, [string] $Edit.ReplacementText)
+                $EditOffsetInBlock = $Edit.StartOffset - $BlockStartOffset
+                $EditedBlockText = $EditedBlockText.Remove($EditOffsetInBlock, $Edit.EndOffset - $Edit.StartOffset)
+                $EditedBlockText = $EditedBlockText.Insert($EditOffsetInBlock, [string] $Edit.ReplacementText)
             }
 
             $LineNumber = $Block.StartLine + 1
-            foreach ($Line in (Split-AstDiffDisplayLine -Value $Original)) {
-                Add-AstDiffLine `
-                    -Builder $Builder `
-                    -NumberWidth $NumberWidth `
-                    -LineNumber $LineNumber `
-                    -Marker '-' `
-                    -Content $Line
 
-                $LineNumber++
-            }
+            $OriginalBlockText | Add-AstDiffLine `
+                -Builder $Builder `
+                -GutterWidth $NumberWidth `
+                -LineNumber $LineNumber `
+                -Marker '-' `
+                -Color 'Red' `
+                -NoColor:$ColorIsDisabled
 
-            foreach ($Line in (Split-AstDiffDisplayLine -Value $Candidate)) {
-                Add-AstDiffLine `
-                    -Builder $Builder `
-                    -NumberWidth $NumberWidth `
-                    -Marker '+' `
-                    -Content $Line
-            }
+            # Replacement lines have no original source line number.
+            $EditedBlockText | Add-AstDiffLine `
+                -Builder $Builder `
+                -GutterWidth $NumberWidth `
+                -Marker '+' `
+                -Color 'Green' `
+                -NoColor:$ColorIsDisabled
 
             $PreviousEndLine = $Block.EndLine
         }
@@ -154,7 +161,7 @@ function Format-AstDiff {
             -LineRecords $LineRecords `
             -From ($PreviousEndLine + 1) `
             -To $TrailingEnd `
-            -NumberWidth $NumberWidth
+            -GutterWidth $NumberWidth
     }
 
     return $Builder.ToString().TrimEnd("`r", "`n")

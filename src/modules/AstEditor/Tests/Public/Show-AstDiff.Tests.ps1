@@ -9,6 +9,45 @@ AfterAll {
 }
 
 Describe 'Show-AstDiff' {
+    It 'preserves blank changed and context lines with <Name> terminators' -ForEach @(
+        @{ Name = 'LF'; NewLine = "`n" }
+        @{ Name = 'CRLF'; NewLine = "`r`n" }
+        @{ Name = 'CR'; NewLine = "`r" }
+    ) {
+        $Source = "${NewLine}one${NewLine}${NewLine}two${NewLine}${NewLine}"
+        $Document = New-AstDocument -InputObject $Source
+        $Start = $Source.IndexOf('one')
+        $End = $Source.IndexOf('two') + 3
+        $Document.ReplaceRange($Start, $End, "ONE${NewLine}${NewLine}TWO", 'Change')
+
+        $Output = @(Show-AstDiff -Document $Document -Context 1 -NoColor)
+
+        $Output.Count | Should -Be 1
+        $Output[0] | Should -BeExactly ((@(
+            '[0] Change', '  1   ', '  2 - one', '  3 - ', '  4 - two',
+            '    + ONE', '    + ', '    + TWO', '  5   '
+        )) -join [Environment]::NewLine)
+    }
+
+    It 'does not add color resets to context lines when colors are enabled' {
+        $OriginalNoColor = $env:NO_COLOR
+        try {
+            $env:NO_COLOR = $null
+            $Document = New-AstDocument -InputObject "one`ntwo`nthree"
+            $Document.ReplaceRange(4, 7, 'TWO', 'Change')
+            $Esc = [char]27
+
+            Show-AstDiff -Document $Document -Context 1 |
+                Should -BeExactly ((@(
+                    "${Esc}[1m[0] Change${Esc}[0m", '  1   one',
+                    "${Esc}[31m  2 - two${Esc}[0m", "${Esc}[32m    + TWO${Esc}[0m",
+                    '  3   three'
+                )) -join [Environment]::NewLine)
+        } finally {
+            $env:NO_COLOR = $OriginalNoColor
+        }
+    }
+
     It 'emits no output when there are no queued edits' {
         $Document = New-AstDocument -InputObject 'one'
 
