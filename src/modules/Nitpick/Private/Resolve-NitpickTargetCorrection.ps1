@@ -26,15 +26,20 @@ using namespace System.Management.Automation.Language
     Reports candidate corrections without writing.
 
 .EXAMPLE
-    Resolve-NitpickTargetCorrection -Document $Document -Finding $Findings `
-        -Rule $Rules -Ast $Ast -Preview
+    Resolves, applies, and reports corrections for one analyzed target.
+
+    Resolve-NitpickTargetCorrection `
+        -Document $Document `
+        -Finding $Findings `
+        -Rule $Rules `
+        -Preview
 #>
 function Resolve-NitpickTargetCorrection {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType('NitpickCorrectionResult')]
     param (
         [Parameter(Mandatory)]
-        [psobject] $Document,
+        [AstDocument] $Document,
 
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
@@ -44,9 +49,6 @@ function Resolve-NitpickTargetCorrection {
         [AllowEmptyCollection()]
         [NitpickRule[]] $Rule,
 
-        [Parameter(Mandatory)]
-        [Ast] $Ast,
-
         [switch] $Preview
     )
 
@@ -54,9 +56,6 @@ function Resolve-NitpickTargetCorrection {
         Document = $Document
         Finding = $Finding
         Rule = $Rule
-    }
-    if ($Ast.Extent.File) {
-        $ResolveParameters.Path = $Ast.Extent.File
     }
     $Proposal = Resolve-NitpickCorrectionProposal @ResolveParameters
 
@@ -68,9 +67,11 @@ function Resolve-NitpickTargetCorrection {
             $Application.Status = 'InMemory'
         } elseif ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
             $WriteResult = Save-AstDocument -Document $Document -Confirm:$false -WhatIf:$false
+
             $Application.Status = $WriteResult.WriteStatus
             $Application.WriteResult = $WriteResult
             $Application.ErrorRecord = $WriteResult.ErrorRecord
+
             if ($WriteResult.WasWritten) {
                 $Application.CommittedCorrections = $Proposal.AcceptedCorrections
             }
@@ -79,8 +80,10 @@ function Resolve-NitpickTargetCorrection {
         }
     }
 
-    $UseCandidateText = $Proposal.Status -eq 'NoChanges' -or
+    $UseCandidateText =
+        $Proposal.Status -eq 'NoChanges' -or
         $Application.Status -in 'InMemory', 'Preview', 'WhatIf', 'Written'
+
     $UseCandidateFindings = $UseCandidateText -and $Proposal.WasReanalyzed
     $Report = @{
         AnalysisSource = if ($UseCandidateFindings) { 'Candidate' } else { 'Original' }
@@ -112,10 +115,14 @@ function Resolve-NitpickTargetCorrection {
     foreach ($SkippedCorrection in $Proposal.SkippedCorrections) {
         Write-Verbose (
             "Skipped correction from '{0}': {1}" -f
-            (Get-NitpickRuleLabel -InputObject $SkippedCorrection.Correction), $SkippedCorrection.Reason
+            (Get-NitpickRuleLabel -InputObject $SkippedCorrection.Correction),
+            $SkippedCorrection.Reason
         )
     }
 
-    New-NitpickCorrectionResult -Path $Proposal.Path -Proposal $Proposal `
-        -Application $Application -Report $Report
+    New-NitpickCorrectionResult `
+        -Path $Proposal.Path `
+        -Proposal $Proposal `
+        -Application $Application `
+        -Report $Report
 }

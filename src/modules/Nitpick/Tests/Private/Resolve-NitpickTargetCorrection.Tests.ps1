@@ -70,7 +70,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         InModuleScope Nitpick {
             $Command = Get-Command Resolve-NitpickTargetCorrection
             $Command.OutputType.Name | Should -Contain 'NitpickCorrectionResult'
-            foreach ($Parameter in @('Document', 'Finding', 'Rule', 'Ast', 'Preview', 'WhatIf', 'Confirm')) {
+            foreach ($Parameter in @('Document', 'Finding', 'Rule', 'Preview', 'WhatIf', 'Confirm')) {
                 $Command.Parameters.Keys | Should -Contain $Parameter
             }
             $Command.Parameters.Keys | Should -Not -Contain 'Fix'
@@ -88,8 +88,11 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -WhatIf
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -WhatIf
         }
 
         #===  ASSERT  ===#
@@ -125,8 +128,12 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; Preview = $Preview } {
             param ($Fixture, $Preview)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Preview:$Preview -Confirm:$false
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -Preview:$Preview `
+                -Confirm:$false
         }
 
         $Result.Application.Status | Should -Be $Status
@@ -152,8 +159,11 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#
@@ -199,8 +209,13 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
             WhatIf = $WhatIf
         } {
             param ($Fixture, $Preview, $WhatIf)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Preview:$Preview -WhatIf:$WhatIf -Confirm:$false
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -Preview:$Preview `
+                -WhatIf:$WhatIf `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#
@@ -239,8 +254,11 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#
@@ -284,20 +302,26 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
             $Command = Get-Command Resolve-NitpickTargetCorrection
+
             $ShouldProcessCall = $Command.ScriptBlock.Ast.Find({
                 param ($Node)
                 $Node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and
                     $Node.Member.Value -eq 'ShouldProcess'
             }, $true)
+
             # Replace only this invocation's decision, without prompting or changing production code.
             $Breakpoint = Set-PSBreakpoint -Script $Command.ScriptBlock.File `
                 -Line $ShouldProcessCall.Extent.StartLineNumber -Action {
                     $Invocation = (Get-Variable -Name PSCmdlet -Scope 1).Value
                     $Invocation | Add-Member -MemberType ScriptMethod -Name ShouldProcess -Value { $false } -Force
                 }
+
             try {
-                Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                    -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
+                Resolve-NitpickTargetCorrection `
+                    -Document $Fixture.Document `
+                    -Finding $Fixture.Findings `
+                    -Rule $Fixture.Rules `
+                    -Confirm:$false
             } finally {
                 $Breakpoint | Remove-PSBreakpoint
             }
@@ -343,8 +367,11 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#
@@ -372,8 +399,11 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
-                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Confirm:$false
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#

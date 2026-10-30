@@ -310,8 +310,7 @@ function Start-Nitpicking {
                     -Preview:($FixMode -eq 'Preview') `
                     -Document $Document `
                     -Finding $TargetFindings.ToArray() `
-                    -Rule $ApplicableRules.ToArray() `
-                    -Ast $Ast
+                    -Rule $ApplicableRules.ToArray()
 
                 $FinalFindings = $CorrectionResult.Report.EffectiveFindings
                 $Summary.FindingsWithCommittedCorrectionsCount +=
