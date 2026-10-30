@@ -9,11 +9,13 @@ using namespace System.Collections.Generic
     AstEditor. Corrections sharing a ChangeSetId are selected or skipped together. A
     correction without a ChangeSetId forms its own independent change set. IDs are
     target-wide; producers should include their rule identity and occurrence in IDs
-    unless they intentionally coordinate across findings or rules. If the
-    selected batch is stale or conflicting, AstEditor rejects it without queueing any
+    unless they intentionally coordinate across findings or rules.
+
+    If the selected batch is stale or conflicting, AstEditor rejects it without queueing any
     member. Returns a stable proposal containing candidate text, validation diagnostics,
     and candidate findings when rules are supplied. Application never changes these
     facts; a proposal does not claim that edits were written.
+
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
     findings without RuleId retain their producer labels in conflict diagnostics.
@@ -67,26 +69,25 @@ using namespace System.Collections.Generic
     For example, stale ExpectedText on either correction skips the complete change set.
 
 .EXAMPLE
+    Inspect conflicts when independent change sets overlap. Under the target-level conflict
+    policy, an overlap rejects the complete preview batch and leaves candidate text unchanged.
+
     $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
     $Result.Conflicts
     $Result.CandidateText -eq $Source
 
-    Inspects conflicts when independent change sets overlap. Under the target-level conflict
-    policy, an overlap rejects the complete preview batch and leaves candidate text unchanged.
-
 .EXAMPLE
+    Returns candidate findings after applying the selected rules to the source snapshot.
+
     $Result = Resolve-NitpickCorrectionProposal `
         -Script $Source `
         -Finding $Finding `
         -Rule $SelectedRules
     $Result.CandidateFindings
-
-    Passes the rules that produced the original findings when the preview must verify that
-    corrected findings disappear and report findings that remain after rendering. Omit Rule
-    when only correction selection, validation, and rendered text are needed.
 #>
 function Resolve-NitpickCorrectionProposal {
     [CmdletBinding(DefaultParameterSetName = 'Script')]
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSUseOutputTypeCorrectly', '')]
     [OutputType('NitpickCorrectionProposal')]
     param(
         [Parameter(Mandatory, ParameterSetName = 'Script')]
@@ -94,8 +95,7 @@ function Resolve-NitpickCorrectionProposal {
         [string] $Script,
 
         [Parameter(Mandatory, ParameterSetName = 'Document')]
-        [ValidateScript({ $_.GetType().Name -eq 'AstDocument' -and $_.Edits.Count -eq 0 })]
-        [psobject] $Document,
+        [AstDocument] $Document,
 
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
@@ -107,6 +107,10 @@ function Resolve-NitpickCorrectionProposal {
         [string] $Path
     )
 
+    if ($Document.IsFileBacked -and $Path) {
+        Write-Warning "Both `-Path` and a file-backed `-Document` are specified. The `-Path` parameter will be ignored."
+    }
+
     if ($PSCmdlet.ParameterSetName -eq 'Script') {
         $Document = New-AstDocument -InputObject $Script
     } else {
@@ -114,6 +118,10 @@ function Resolve-NitpickCorrectionProposal {
         if ($Document.IsFileBacked) {
             $Path = $Document.Path
         }
+    }
+
+    if ($Document.Edits.Count -gt 0) {
+        Write-Error "The provided AstDocument contains edits and cannot be used."
     }
 
     $AcceptedCorrections = [List[NitpickCorrection]]::new()
