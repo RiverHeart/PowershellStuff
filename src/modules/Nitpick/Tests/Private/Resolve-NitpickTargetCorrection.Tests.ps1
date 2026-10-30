@@ -112,6 +112,36 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 
+    It 'reports in-memory <Status> with NoReanalysis=<NoReanalysis> without saving or changing the proposal' -ForEach @(
+        @{ Status = 'Preview'; Preview = $true; NoReanalysis = $false }
+        @{ Status = 'Preview'; Preview = $true; NoReanalysis = $true }
+        @{ Status = 'InMemory'; Preview = $false; NoReanalysis = $false }
+        @{ Status = 'InMemory'; Preview = $false; NoReanalysis = $true }
+    ) {
+        $Fixture = New-TargetCorrectionFixture -NoReanalysis:$NoReanalysis
+        $Before = Get-TargetProposalSnapshot $Fixture.Proposal
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        Mock Save-AstDocument -ModuleName Nitpick { throw 'In-memory targets must not be saved.' }
+
+        $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; Preview = $Preview } {
+            param ($Fixture, $Preview)
+            Resolve-NitpickTargetCorrection -Document $Fixture.Document -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules -Ast $Fixture.Document.Ast -Preview:$Preview -Confirm:$false
+        }
+
+        $Result.Application.Status | Should -Be $Status
+        $Result.Application.WriteResult | Should -BeNullOrEmpty
+        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.EffectiveText | Should -BeExactly $Fixture.Proposal.CandidateText
+        $ExpectedAnalysis = if ($NoReanalysis) { 'Original' } else { 'Candidate' }
+        $Result.Report.AnalysisSource | Should -Be $ExpectedAnalysis
+        $ExpectedFindingCount = if ($NoReanalysis) { 1 } else { 0 }
+        $Result.Report.EffectiveFindings | Should -HaveCount $ExpectedFindingCount
+        (Get-TargetProposalSnapshot $Fixture.Proposal) | Should -BeExactly $Before
+        Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
+    }
+
     It 'preserves the same proposal after a successful write and counts each original finding once' {
         #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive 'Written.ps1'

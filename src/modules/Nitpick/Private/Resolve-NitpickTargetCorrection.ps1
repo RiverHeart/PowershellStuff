@@ -62,10 +62,10 @@ function Resolve-NitpickTargetCorrection {
 
     $Application = @{ Status = 'NotAttempted' }
     if ($Proposal.Status -eq 'Ready') {
-        if (-not $Document.IsFileBacked) {
-            $Application.Status = 'InMemory'
-        } elseif ($Preview) {
+        if ($Preview) {
             $Application.Status = 'Preview'
+        } elseif (-not $Document.IsFileBacked) {
+            $Application.Status = 'InMemory'
         } elseif ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
             $WriteResult = Save-AstDocument -Document $Document -Confirm:$false -WhatIf:$false
             $Application.Status = $WriteResult.WriteStatus

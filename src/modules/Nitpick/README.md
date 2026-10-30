@@ -40,6 +40,9 @@ Start-Nitpicking -Path .\Example.ps1 -FixMode Apply -WhatIf
 `-FixMode Apply` writes file-backed `-Path` targets unless `-WhatIf` or a declined
 confirmation prevents it. `-Script` inputs always return in-memory output. Use `-Output Object`
 for a correction envelope with `Proposal`, `Application`, and `Report` groups.
+For `-Script` inputs, `-FixMode Preview` reports `Application.Status = 'Preview'` and
+proposed corrections; only `-FixMode Apply` reports `InMemory` and corrections applied in
+memory. Both modes return candidate text without modifying the supplied input.
 Text output groups each target into one section: the target path as a header, its findings,
 then a diff of proposed or applied edits. Each correction is labeled by the `line:column` where
 it starts, so editors such as VS Code can link it against the header. A one-line trailer states

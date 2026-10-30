@@ -225,6 +225,47 @@ Describe 'Start-Nitpicking transactional fixes' {
             Should -BeNullOrEmpty
     }
 
+    It 'reports <Status> for script input in <FixMode> mode while returning candidate analysis' -ForEach @(
+        @{ FixMode = 'Preview'; Status = 'Preview' }
+        @{ FixMode = 'Apply'; Status = 'InMemory' }
+    ) {
+        $Source = [scriptblock]::Create('$Value = 1')
+        $Results = @(Start-Nitpicking -Script $Source -IncludeRule Local/TransactionRule -FixMode $FixMode `
+            -Output Object -ErrorAction Stop)
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+        $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
+
+        $Result.Application.Status | Should -Be $Status
+        $Result.Application.WriteResult | Should -BeNullOrEmpty
+        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Report.AnalysisSource | Should -Be 'Candidate'
+        $Result.Report.EffectiveText | Should -Be '$Value = 2'
+        $Result.Report.EffectiveFindings[0].Severity | Should -Be 'Warning'
+        $Summary.ErrorCount | Should -Be 0
+        $Summary.WarningCount | Should -Be 1
+        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 0
+        $Source.ToString() | Should -Be '$Value = 1'
+    }
+
+    It 'uses the <FixMode> trailer for built-in script-block corrections' -ForEach @(
+        @{ FixMode = 'Preview'; Trailer = '  1 proposed correction.' }
+        @{ FixMode = 'Apply'; Trailer = '  1 correction applied in memory.' }
+    ) {
+        $Source = {
+            param([Parameter(Mandatory=$true)] $MyParam)
+        }
+        $OriginalText = $Source.ToString()
+        $Output = @(Start-Nitpicking -Script $Source -IncludeRule Nitpick/AvoidParameterAttributeBool `
+            -FixMode $FixMode -Output Text -NoSummary -ErrorAction Stop) -join "`n"
+
+        ($Output -split '\r?\n')[-1] | Should -BeExactly $Trailer
+        $Output | Should -Match '\+.*param\(\[Parameter\(Mandatory\)\] \$MyParam\)'
+        $Source.ToString() | Should -BeExactly $OriginalText
+        if ($FixMode -eq 'Preview') {
+            $Output | Should -Not -Match 'applied|committed'
+        }
+    }
+
     It 'returns corrected in-memory text without a destination even under WhatIf' {
         $Source = [scriptblock]::Create('$Value = 1')
 

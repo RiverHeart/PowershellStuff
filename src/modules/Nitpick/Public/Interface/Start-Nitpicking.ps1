@@ -60,12 +60,12 @@ using namespace System.Management.Automation.Language
 .PARAMETER FixMode
     Specifies the mode for applying corrections.
     'Off'     - Do not apply any corrections.
-    'Preview' - Preview safe corrections without modifying files.
+    'Preview' - Report safe corrections as proposals for file-backed or in-memory inputs.
     'Guided'  - Interactive correction process (not yet implemented).
     'Apply'   - Apply safe corrections.
 
-    NOTE: Applying against in-memory inputs returns candidate text
-    in object output under `Report.EffectiveText`.
+    NOTE: Previewing or applying against in-memory inputs returns candidate text
+    in object output under `Report.EffectiveText` without modifying the input.
 
 .PARAMETER EditorMode
     Runs only rules whose EditorEnabled metadata is true.
