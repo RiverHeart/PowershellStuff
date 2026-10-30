@@ -86,6 +86,11 @@
         # Really, if anything the concern should be with having too many positional
         # parameters rather than avoiding them altogether. 3 is probably a reasonable
         # limit and can be enforced at the function level rather than at call sites.
-        'PSAvoidUsingPositionalParameters'
+        'PSAvoidUsingPositionalParameters',
+
+        # Just because `ShouldProcess` isn't called explicitly doesn't mean we aren't
+        # relying on the ambient variable `$WhatIfPreference` for downstream cmdlets
+        # which do.
+        'PSShouldProcess'
     )
 }
