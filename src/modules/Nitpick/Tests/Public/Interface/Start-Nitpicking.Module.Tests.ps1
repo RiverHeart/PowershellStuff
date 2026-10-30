@@ -28,8 +28,11 @@ function Test-HiddenPathRule { param ($ScriptBlockAst) }
 function Test-InvalidPathRule { param ($FilePath) }
 Export-ModuleMember -Function Test-PathRule, Test-InvalidPathRule
 '@
-        New-ModuleManifest -Path $ManifestPath -RootModule ($ModuleName + '.psm1') `
-            -FunctionsToExport Test-PathRule,Test-InvalidPathRule -ModuleVersion '1.0.0'
+        New-ModuleManifest `
+            -Path $ManifestPath `
+            -RootModule ($ModuleName + '.psm1') `
+            -FunctionsToExport Test-PathRule, Test-InvalidPathRule `
+            -ModuleVersion '1.0.0'
     }
 
     AfterEach {
@@ -87,9 +90,10 @@ Export-ModuleMember -Function Test-PathRule, Test-InvalidPathRule
     }
 
     It 'discovers only exported valid rules and retains additive built-in discovery' {
+        $BuiltInRuleCount = (Find-Nitpick).Count
         $Results = @(Start-Nitpicking -Script {} -Module $ManifestPath -Output Object)
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
-        $Summary.RuleCount | Should -Be 3
+        $Summary.RuleCount | Should -Be ($BuiltInRuleCount + 1)
         @(Get-Nitpick) | Should -HaveCount 0
         @(Get-Nitpick -Id "$ModuleName/HiddenPathRule", "$ModuleName/InvalidPathRule") | Should -HaveCount 0
     }
