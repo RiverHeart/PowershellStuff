@@ -145,9 +145,9 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Lines = $Output -split '\r?\n'
         $Lines[0] | Should -BeExactly $Path
         @($Lines | Where-Object { $_ -eq $Path }).Count | Should -Be 1
-        $Output | Should -Match '1 - \$Value = 1'
-        $Output | Should -Match '\+ \$Value = 2'
-        $Output | Should -Match '\$Value = 2'
+        $Output | Should -Match '1 \| - \$Value = 1'
+        $Output | Should -Match '\| \+ \$Value = 2'
+        [regex]::Matches($Output, '\|   \^{10}').Count | Should -Be 2
         $Lines[-1] | Should -BeExactly '  1 proposed correction.'
         $Output | Should -Not -MatchExactly '\(preview\)|No files changed'
         $Output | Should -Not -Match 'committed'

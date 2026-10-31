@@ -1,4 +1,5 @@
 using namespace System.Text
+using namespace System.Collections.Generic
 
 <#
 .SYNOPSIS
@@ -12,6 +13,8 @@ using namespace System.Text
     omitted.
 
     Appends to the builder without emitting pipeline output.
+    Optional block-relative, end-exclusive AnnotationSpans add one
+    caret row per affected start line, merging spans and preserving prefix tabs.
 
 .NOTES
     Empty text is different from a blank line. Per the table
@@ -78,6 +81,8 @@ function Add-AstDiffLine {
         [ValidateSet('Red', 'Green')]
         [string] $Color,
 
+        [object[]] $AnnotationSpans = @(),
+
         [switch] $NoColor
     )
 
@@ -105,13 +110,63 @@ function Add-AstDiffLine {
 
     process {
         if ($Text.Length -gt 0) {
+            $Annotations = [Dictionary[int, List[object]]]::new()
+            if ($AnnotationSpans.Count -gt 0) {
+                $Records = Get-AstTextLine -Text $Text
+                foreach ($Span in $AnnotationSpans) {
+                    if ($Span.End -le $Span.Start) {
+                        continue
+                    }
+
+                    $StartLine = Get-AstLineIndexFromOffset -LineRecords $Records -Offset $Span.Start
+                    $Record = $Records[$StartLine]
+                    $Column = [Math]::Min($Span.Start, $Record.ContentEnd) - $Record.Start
+                    $EndColumn = [Math]::Max(
+                        $Column + 1,
+                        [Math]::Min($Span.End, $Record.ContentEnd) - $Record.Start
+                    )
+                    if (-not $Annotations.ContainsKey($StartLine)) {
+                        $Annotations[$StartLine] = [List[object]]::new()
+                    }
+                    $Annotations[$StartLine].Add(@{ Start = $Column; End = $EndColumn })
+                }
+            }
+
             $Trimmed = $Text -replace "(?:$LineTerminatorPattern)\z", ''
+            $LineIndex = 0
             foreach ($Line in ($Trimmed -split $LineTerminatorPattern)) {
                 $Gutter =
                     if ($null -eq $LineNumber) { ' ' * $GutterWidth }
                     else { ($LineNumber).ToString().PadLeft($GutterWidth) }
 
-                [void] $Builder.AppendLine("$ColorCode  $Gutter $Marker ${Line}$Reset")
+                [void] $Builder.AppendLine("$ColorCode  $Gutter | $Marker ${Line}$Reset")
+
+                if ($Annotations.ContainsKey($LineIndex)) {
+                    $Spans = $Annotations[$LineIndex]
+                    $Width = 0
+
+                    foreach ($Span in $Spans) {
+                        $Width = [Math]::Max($Width, $Span.End)
+                    }
+
+                    $Underline = (' ' * $Width).ToCharArray()
+
+                    for ($Column = 0; $Column -lt [Math]::Min($Width, $Line.Length); $Column++) {
+                        if ($Line[$Column] -eq "`t") {
+                            $Underline[$Column] = [char]9
+                        }
+                    }
+
+                    foreach ($Span in $Spans) {
+                        for ($Column = $Span.Start; $Column -lt $Span.End; $Column++) {
+                            $Underline[$Column] = '^'
+                        }
+                    }
+
+                    [void] $Builder.AppendLine("  $(' ' * $GutterWidth) |   $(-join $Underline)")
+                }
+
+                $LineIndex++
 
                 if ($null -ne $LineNumber) {
                     $LineNumber++

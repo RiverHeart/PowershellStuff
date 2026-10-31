@@ -45,7 +45,10 @@ proposed corrections; only `-FixMode Apply` reports `InMemory` and corrections a
 memory. Both modes return candidate text without modifying the supplied input.
 Text output groups each target into one section: the target path as a header, its findings,
 then a diff of proposed or applied edits. Each correction is labeled by the `line:column` where
-it starts, so editors such as VS Code can link it against the header. A one-line trailer states
+it starts, so editors such as VS Code can link it against the header. Bare, uncolored
+carets beneath removed and added lines narrow down the queued edit spans without
+changing those reason headers. Multiline spans annotate their first line only;
+carets show edit ranges, not minimal textual differences. A one-line trailer states
 the outcome once, for example `1 proposed correction.` for `-FixMode Preview` and `-WhatIf`, or
 `1 correction applied.` after writing. Skipped, conflicting, or failed corrections report full
 counts with their proposal and application statuses. It omits the correction section when a target

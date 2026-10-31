@@ -34,6 +34,43 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
     }
 
+    It 'annotates previews while preserving navigable reason headers and formatter alignment' {
+        $Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
+        $OriginalNoColor = $env:NO_COLOR
+        try {
+            $env:NO_COLOR = '1'
+            $Result = Start-Nitpicking `
+                -Script $Source `
+                -IncludeRule Nitpick/AvoidParameterAttributeBool `
+                -FixMode Preview `
+                -Output Object `
+                -NoSummary
+
+            $Proposal = $Result.Proposal
+            $Edit = $Proposal.AcceptedCorrections[0].TextEdit
+            $Proposal.Diff | Should -BeExactly (@(
+                ('1:{0}  {1}' -f ($Edit.StartOffset + 1), $Edit.Reason),
+                "  1 | - $Source",
+                ('    |   ' + (' ' * $Edit.StartOffset) + ('^' * ($Edit.EndOffset - $Edit.StartOffset))),
+                '    | + param([Parameter(Mandatory)] [string] $Name)',
+                ('    |   ' + (' ' * 17) + ('^' * 9))
+            ) -join [Environment]::NewLine)
+            $Proposal.AcceptedCorrections | Should -HaveCount 1
+            $Proposal.CandidateFindings | Should -HaveCount 0
+
+            $Formatted = InModuleScope Nitpick -Parameters @{ Result = $Result } {
+                param ($Result)
+                Format-NitpickCorrection -CorrectionResult $Result
+            }
+
+            $Expected = @($Proposal.Diff -split '\r?\n' | ForEach-Object { "  $_" })
+            $Expected += '', '  1 proposed correction.'
+            $Formatted | Should -BeExactly ($Expected -join [Environment]::NewLine)
+        } finally {
+            $env:NO_COLOR = $OriginalNoColor
+        }
+    }
+
     It 'retains nested diagnostic-only findings during fix reanalysis' {
         $Source = 'function Test-Value { -not ($Name -is [string]); -not ($Name -is [string] > $null) }'
         [array] $Output = Start-Nitpicking `

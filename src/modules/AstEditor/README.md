@@ -2,6 +2,9 @@
 
 PowerShell module for editing source through immutable ASTs and validated text overlays.
 
+Preview annotations: [caret annotations for edit ranges](Docs/CaretAnnotations.md)
+(opt-in rendering with Nitpick integration).
+
 This project demonstrates a practical approach to AST manipulation in PowerShell:
 
 - Keep native AST immutable
@@ -60,6 +63,14 @@ Resolve-AstDocument -Document $document
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
 - `Extract-AstFunction`: queues removal of one function and returns its source text
 - `Split-PSFunction`: previews or applies extraction of top-level functions into individual files
+
+Use `Show-AstDiff -Document $document -Annotate` to add caret rows under removed
+and added edit spans. Multiple spans on one line share a row; insertions annotate
+only the added side, deletions only the removed side, and replacements both.
+Reason headers remain unchanged. Multiline spans annotate their first line only.
+Carets describe queued edit ranges, not minimal textual differences. Prefix tabs are
+preserved; highlighted widths count UTF-16 units rather than terminal display cells,
+so highlighted tabs and wide/combining characters may not align visually.
 
 ## Generic Text Edits
 

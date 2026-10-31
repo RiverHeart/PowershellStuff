@@ -51,6 +51,20 @@ Nitpick owns lint and correction policy:
 
 `NitpickCorrection` is a metadata envelope around one AstEditor text edit. Existing edit properties may remain as compatibility projections, but the wrapped AstEditor edit is authoritative. Nitpick does not independently validate ranges, stale text, or overlaps.
 
+### Diff presentation
+
+The correction resolver creates `Proposal.Diff` with AstEditor's
+`Show-AstDiff -Label Position -Annotate`. Navigable `line:column reason` headers
+retain their existing grouping. Caret rows highlight modified edit spans, merging
+spans on the same line. Multiline spans annotate only their first line. The
+correction formatter indents this stored diff without recalculating spans or
+changing correction counts and application outcomes.
+
+Carets reflect queued edit ranges, not a minimal character diff; a broad
+replacement can underline unchanged text within its range. Alignment uses
+UTF-16 units with preserved prefix tabs, not universal terminal display widths.
+See the [AstEditor annotation design](../../AstEditor/Docs/CaretAnnotations.md).
+
 ## Phase 0: Freeze the Contracts (Complete)
 
 ### Objective

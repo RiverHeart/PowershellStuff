@@ -35,6 +35,8 @@ function Format-AstDiff {
         [ValidateSet('Index', 'Position')]
         [string] $Label,
 
+        [switch] $Annotate,
+
         [switch] $NoColor
     )
 
@@ -135,12 +137,28 @@ function Format-AstDiff {
 
             $LineNumber = $Block.StartLine + 1
 
+            $OriginalSpans = [List[object]]::new()
+            $ReplacementSpans = [List[object]]::new()
+            if ($Annotate) {
+                $Delta = 0
+                foreach ($Item in $Block.Items) {
+                    $Edit = $Item.Edit
+                    $Start = $Edit.StartOffset - $BlockStartOffset
+                    $RemovedLength = $Edit.EndOffset - $Edit.StartOffset
+                    $AddedLength = ([string] $Edit.ReplacementText).Length
+                    $OriginalSpans.Add(@{ Start = $Start; End = $Start + $RemovedLength })
+                    $ReplacementSpans.Add(@{ Start = $Start + $Delta; End = $Start + $Delta + $AddedLength })
+                    $Delta += $AddedLength - $RemovedLength
+                }
+            }
+
             $OriginalBlockText | Add-AstDiffLine `
                 -Builder $Builder `
                 -GutterWidth $NumberWidth `
                 -LineNumber $LineNumber `
                 -Marker '-' `
                 -Color 'Red' `
+                -AnnotationSpans $OriginalSpans.ToArray() `
                 -NoColor:$ColorIsDisabled
 
             # Replacement lines have no original source line number.
@@ -149,6 +167,7 @@ function Format-AstDiff {
                 -GutterWidth $NumberWidth `
                 -Marker '+' `
                 -Color 'Green' `
+                -AnnotationSpans $ReplacementSpans.ToArray() `
                 -NoColor:$ColorIsDisabled
 
             $PreviousEndLine = $Block.EndLine

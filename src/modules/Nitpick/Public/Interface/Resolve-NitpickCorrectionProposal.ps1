@@ -16,6 +16,10 @@ using namespace System.Collections.Generic
     and candidate findings when rules are supplied. Application never changes these
     facts; a proposal does not claim that edits were written.
 
+    Diff includes navigable line:column reason headers and caret rows
+    beneath removed and added edit spans. Multiline spans annotate their first
+    line only; carets reflect queued ranges rather than minimal text differences.
+
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
     findings without RuleId retain their producer labels in conflict diagnostics.
@@ -318,6 +322,6 @@ function Resolve-NitpickCorrectionProposal {
         Conflicts = $Conflicts.ToArray()
         ParseErrors = @($Resolution.ParseErrors)
         CandidateText = $CandidateText
-        Diff = Show-AstDiff -Document $Document -Label Position
+        Diff = Show-AstDiff -Document $Document -Label Position -Annotate
     }
 }

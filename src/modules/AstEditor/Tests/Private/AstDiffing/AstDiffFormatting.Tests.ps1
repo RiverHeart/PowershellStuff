@@ -28,7 +28,7 @@ Describe 'Add-AstDiffLine splitting' {
             )
             $ExpectedText = ''
             foreach ($Line in $Expected) {
-                $ExpectedText += "    + $Line" + [Environment]::NewLine
+                $ExpectedText += "    | + $Line" + [Environment]::NewLine
             }
 
             $Output.Count | Should -Be 0
@@ -41,8 +41,12 @@ Describe 'Add-AstDiffLine splitting' {
 Describe 'Add-AstDiffLine' {
     It 'continues numbering across pipeline text chunks, including empty input' {
         InModuleScope AstEditor {
-            $Expected = (@('  3 - one', '  4 - ', '  5 - two', '  6 - three') -join [Environment]::NewLine) +
-                [Environment]::NewLine
+            $Expected = (@(
+                '  3 | - one',
+                '  4 | - ',
+                '  5 | - two',
+                '  6 | - three'
+            ) -join [Environment]::NewLine) + [Environment]::NewLine
             $Texts = @("one`n`n", '', "two`r`nthree`r`n")
             $PipelineBuilder = [System.Text.StringBuilder]::new()
 
@@ -75,8 +79,11 @@ Describe 'Add-AstDiffLine' {
 
             $Output.Count | Should -Be 0
             $Builder.ToString() | Should -BeExactly ((@(
-                "${Esc}[31m   3 - old${Esc}[0m", "${Esc}[31m   4 - older${Esc}[0m",
-                '     + new', '     + newer', '  10   '
+                "${Esc}[31m   3 | - old${Esc}[0m",
+                "${Esc}[31m   4 | - older${Esc}[0m",
+                '     | + new',
+                '     | + newer',
+                '  10 |   '
             ) -join [Environment]::NewLine) + [Environment]::NewLine)
         }
     }
@@ -98,7 +105,7 @@ Describe 'Add-AstDiffContext' {
 
             $Output.Count | Should -Be 0
             $Builder.ToString() | Should -BeExactly (
-                '   2   ' + [Environment]::NewLine + '   3   three' + [Environment]::NewLine
+                '   2 |   ' + [Environment]::NewLine + '   3 |   three' + [Environment]::NewLine
             )
         }
     }

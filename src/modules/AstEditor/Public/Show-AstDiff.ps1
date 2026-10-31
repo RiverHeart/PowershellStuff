@@ -25,20 +25,31 @@
     the reason's first edit starts, such as '29:13', which editors can resolve
     against a preceding file path.
 
+.PARAMETER Annotate
+    Adds caret rows beneath removed and added edit spans. Spans on the
+    same line share one row. Multi-line spans annotate only their first line.
+    Carets describe queued edit ranges, not minimal character differences.
+    Prefix tabs are preserved; widths use UTF-16 units, not terminal display cells.
+
 .EXAMPLE
+    Display every queued edit, grouped by the lines it changes.
+
     Show-AstDiff -Document $doc
 
-    Displays every queued edit, grouped by the lines it changes.
-
 .EXAMPLE
+    Display only the first and third queued edits with three lines of context.
+
     Show-AstDiff -Document $doc -EditIndex 0,2 -Context 3
 
-    Displays only the first and third queued edits with three lines of context.
-
 .EXAMPLE
+    Label each reason with the line:column where its first edit starts.
+
     Show-AstDiff -Document $doc -Label Position
 
-    Labels each reason with the line:column where its first edit starts.
+.EXAMPLE
+    Add caret rows beneath removed and added edit spans without ANSI colors.
+
+    Show-AstDiff -Document $doc -Annotate -NoColor
 #>
 function Show-AstDiff {
     [CmdletBinding()]
@@ -55,6 +66,8 @@ function Show-AstDiff {
 
         [ValidateSet('Index', 'Position')]
         [string] $Label = 'Index',
+
+        [switch] $Annotate,
 
         [switch] $NoColor
     )
@@ -92,5 +105,6 @@ function Show-AstDiff {
         -Hunks $Hunks `
         -Context $Context `
         -Label $Label `
+        -Annotate:$Annotate `
         -NoColor:$NoColor
 }

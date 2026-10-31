@@ -24,9 +24,365 @@ Describe 'Show-AstDiff' {
 
         $Output.Count | Should -Be 1
         $Output[0] | Should -BeExactly ((@(
-            '[0] Change', '  1   ', '  2 - one', '  3 - ', '  4 - two',
-            '    + ONE', '    + ', '    + TWO', '  5   '
+            '[0] Change',
+            '  1 |   ',
+            '  2 | - one',
+            '  3 | - ',
+            '  4 | - two',
+            '    | + ONE',
+            '    | + ',
+            '    | + TWO',
+            '  5 |   '
         )) -join [Environment]::NewLine)
+    }
+
+    Describe 'Show-AstDiff caret annotations' {
+        It 'annotates <Name> only on its nonempty sides' -ForEach @(
+            @{
+                Name = 'insertion'; Start = 14; End = 14; Replacement = ' world'
+                Expected = @(
+                    '[0] Change',
+                    '  1 | - $name = "hello"',
+                    '    | + $name = "hello world"',
+                    '    |                 ^^^^^^'
+                )
+            }
+            @{
+                Name = 'deletion'; Start = 9; End = 14; Replacement = ''
+                Expected = @(
+                    '[0] Change',
+                    '  1 | - $name = "hello"',
+                    '    |            ^^^^^',
+                    '    | + $name = ""'
+                )
+            }
+            @{
+                Name = 'replacement'; Start = 9; End = 14; Replacement = 'hi'
+                Expected = @(
+                    '[0] Change',
+                    '  1 | - $name = "hello"',
+                    '    |            ^^^^^',
+                    '    | + $name = "hi"',
+                    '    |            ^^'
+                )
+            }
+        ) {
+            $Document = New-AstDocument -InputObject '$name = "hello"'
+            $Document.ReplaceRange($Start, $End, $Replacement, 'Change')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly ($Expected -join [Environment]::NewLine)
+        }
+
+        It 'merges disjoint spans and adjusts later replacements after a length change' {
+            $Document = New-AstDocument -InputObject 'abc def ghi'
+            $Document.ReplaceRange(8, 11, 'GHI!!', 'Last')
+            $Document.ReplaceRange(0, 3, 'A', 'First')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] First',
+                    '[1] Last',
+                    '  1 | - abc def ghi',
+                    '    |   ^^^     ^^^',
+                    '    | + A def GHI!!',
+                    '    |   ^     ^^^^^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'merges adjacent spans without gaps' {
+            $Document = New-AstDocument -InputObject 'abcd'
+            $Document.ReplaceRange(0, 2, 'X', 'Change')
+            $Document.ReplaceRange(2, 4, 'YZ', 'Change')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0, 1] Change',
+                    '  1 | - abcd',
+                    '    |   ^^^^',
+                    '    | + XYZ',
+                    '    |   ^^^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'keeps repeated reason headers unchanged with Label=<Label>' -ForEach @(
+            @{ Label = 'Index'; Header = '[0, 1] Change' }
+            @{ Label = 'Position'; Header = '1:1  Change' }
+        ) {
+            $Document = New-AstDocument -InputObject '-not ($Value -is [int])'
+            $Document.ReplaceRange(0, 4, '', 'Change')
+            $Document.ReplaceRange(13, 16, '-isnot', 'Change')
+
+            $Diff = Show-AstDiff -Document $Document -Annotate -Label $Label -NoColor
+            $Diff | Should -BeExactly (@(
+                $Header,
+                '  1 | - -not ($Value -is [int])',
+                '    |   ^^^^         ^^^',
+                '    | +  ($Value -isnot [int])',
+                '    |            ^^^^^^'
+            ) -join [Environment]::NewLine)
+            ($Diff -split '\r?\n' | Where-Object { $_ -notmatch '\^' }) -join [Environment]::NewLine |
+                Should -BeExactly (Show-AstDiff -Document $Document -Label $Label -NoColor)
+        }
+
+        It 'does not apply unselected edits to replacement span positions' {
+            $Document = New-AstDocument -InputObject 'abc def ghi'
+            $Document.ReplaceRange(0, 3, 'A', 'First')
+            $Document.ReplaceRange(8, 11, 'GHI!!', 'Last')
+
+            Show-AstDiff -Document $Document -Annotate -EditIndex 1,1 -NoColor |
+                Should -BeExactly (@(
+                    '[1] Last',
+                    '  1 | - abc def ghi',
+                    '    |           ^^^',
+                    '    | + abc def GHI!!',
+                    '    |           ^^^^^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'maps replacements after inserted <Name> newlines and annotates only span start lines' -ForEach @(
+            @{ Name = 'LF'; NewLine = "`n" }
+            @{ Name = 'CRLF'; NewLine = "`r`n" }
+            @{ Name = 'CR'; NewLine = "`r" }
+        ) {
+            $Document = New-AstDocument -InputObject 'aa bb cc'
+            $Document.ReplaceRange(0, 2, "A${NewLine}B", 'First')
+            $Document.ReplaceRange(6, 8, 'CCC', 'Last')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] First',
+                    '[1] Last',
+                    '  1 | - aa bb cc',
+                    '    |   ^^    ^^',
+                    '    | + A',
+                    '    |   ^',
+                    '    | + B bb CCC',
+                    '    |        ^^^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'clips multiline removal spans before <Name> terminators and preserves blank context' -ForEach @(
+            @{ Name = 'LF'; NewLine = "`n" }
+            @{ Name = 'CRLF'; NewLine = "`r`n" }
+            @{ Name = 'CR'; NewLine = "`r" }
+        ) {
+            $Source = "${NewLine}one${NewLine}${NewLine}two${NewLine}${NewLine}"
+            $Document = New-AstDocument -InputObject $Source
+            $Document.ReplaceRange($Source.IndexOf('one'), $Source.IndexOf('two') + 3, 'ONE', 'Change')
+
+            Show-AstDiff -Document $Document -Annotate -Context 1 -NoColor |
+                Should -BeExactly (@(
+                    '[0] Change',
+                    '  1 |   ',
+                    '  2 | - one',
+                    '    |   ^^^',
+                    '  3 | - ',
+                    '  4 | - two',
+                    '    | + ONE',
+                    '    |   ^^^',
+                    '  5 |   '
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'annotates an EOF insertion in <Name> without an original-side anchor' -ForEach @(
+            @{
+                Name = 'empty text'; Source = ''
+                Expected = @(
+                    '1:1  Append',
+                    '    | + MORE',
+                    '    |   ^^^^'
+                )
+            }
+            @{
+                Name = 'an unterminated line'; Source = 'one'
+                Expected = @(
+                    '1:4  Append',
+                    '  1 | - one',
+                    '    | + oneMORE',
+                    '    |      ^^^^'
+                )
+            }
+            @{
+                Name = 'terminated text'; Source = "one`n"
+                Expected = @(
+                    '2:1  Append',
+                    '  1 |   one',
+                    '    | + MORE',
+                    '    |   ^^^^'
+                )
+            }
+        ) {
+            $Document = New-AstDocument -InputObject $Source
+            $Document.Insert($Source.Length, 'MORE', 'Append')
+
+            Show-AstDiff `
+                -Document $Document `
+                -Annotate `
+                -Context 1 `
+                -Label Position `
+                -NoColor |
+                Should -BeExactly ($Expected -join [Environment]::NewLine)
+        }
+
+        It 'marks a removed <Name> terminator without underlining the joined replacement' -ForEach @(
+            @{ Name = 'LF'; NewLine = "`n" }
+            @{ Name = 'CRLF'; NewLine = "`r`n" }
+            @{ Name = 'CR'; NewLine = "`r" }
+        ) {
+            $Document = New-AstDocument -InputObject "one${NewLine}two"
+            $Document.ReplaceRange(3, 3 + $NewLine.Length, '', 'Join')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] Join',
+                    '  1 | - one',
+                    '    |      ^',
+                    '  2 | - two',
+                    '    | + onetwo'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'maps a later replacement into a joined line' {
+            $Document = New-AstDocument -InputObject "one`ntwo"
+            $Document.ReplaceRange(3, 4, '', 'Join')
+            $Document.ReplaceRange(4, 7, 'TWO', 'Uppercase')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] Join',
+                    '[1] Uppercase',
+                    '  1 | - one',
+                    '    |      ^',
+                    '  2 | - two',
+                    '    |   ^^^',
+                    '    | + oneTWO',
+                    '    |      ^^^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'marks inserted terminators and removed blank lines as boundaries' {
+            $Document = New-AstDocument -InputObject 'one'
+            $Document.Insert(3, "`n", 'Terminate')
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] Terminate',
+                    '  1 | - one',
+                    '    | + one',
+                    '    |      ^'
+                ) -join [Environment]::NewLine)
+
+            $Document = New-AstDocument -InputObject "`none"
+            $Document.ReplaceRange(0, 1, '', 'Remove blank')
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] Remove blank',
+                    '  1 | - ',
+                    '    |   ^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'preserves tabs before and between merged spans with a multi-digit gutter' {
+            $Source = ("line`n" * 9) + "`tab`tcd"
+            $Document = New-AstDocument -InputObject $Source
+            $Document.ReplaceRange($Source.IndexOf('ab'), $Source.IndexOf('ab') + 1, 'A', 'Change')
+            $Document.ReplaceRange($Source.IndexOf('cd'), $Source.IndexOf('cd') + 1, 'C', 'Change')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0, 1] Change',
+                    "  10 | - `tab`tcd",
+                    "     |   `t^ `t^",
+                    "     | + `tAb`tCd",
+                    "     |   `t^ `t^"
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'uses UTF-16 span widths for surrogate pairs rather than display-cell widths' {
+            $Source = "x$([char]0xD83D)$([char]0xDE00)z"
+            $Document = New-AstDocument -InputObject $Source
+            $Document.ReplaceRange(1, 3, 'y', 'Change')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] Change',
+                    "  1 | - $Source",
+                    '    |    ^^',
+                    '    | + xyz',
+                    '    |    ^'
+                ) -join [Environment]::NewLine)
+        }
+
+        It 'retains hunk boundaries and never annotates context' {
+            $Document = New-AstDocument -InputObject "one`ntwo`nthree`nfour`nfive"
+            $Document.ReplaceRange(4, 7, 'TWO', 'Second')
+            $Document.ReplaceRange(19, 23, 'FIVE', 'Fifth')
+
+            Show-AstDiff -Document $Document -Annotate -NoColor |
+                Should -BeExactly (@(
+                    '[0] Second',
+                    '  2 | - two',
+                    '    |   ^^^',
+                    '    | + TWO',
+                    '    |   ^^^',
+                    '',
+                    '[1] Fifth',
+                    '  5 | - five',
+                    '    |   ^^^^',
+                    '    | + FIVE',
+                    '    |   ^^^^'
+                ) -join [Environment]::NewLine)
+            $Diff = Show-AstDiff -Document $Document -Annotate -Context 1 -NoColor
+            ($Diff -split '\r?\n' |
+                Where-Object { $_ -notmatch '\^' }) -join [Environment]::NewLine |
+                Should -BeExactly (Show-AstDiff -Document $Document -Context 1 -NoColor)
+        }
+
+        It 'preserves empty outputs and rejects invalid selections in annotation mode' {
+            $Document = New-AstDocument -InputObject 'one'
+            @(Show-AstDiff -Document $Document -Annotate).Count | Should -Be 0
+            $Document.ReplaceRange(0, 3, 'ONE', 'Change')
+            $Output = @(Show-AstDiff -Document $Document -Annotate -EditIndex @())
+            $Output.Count | Should -Be 1
+            $Output[0] | Should -BeExactly ''
+            { Show-AstDiff -Document $Document -Annotate -EditIndex 1 } | Should -Throw '*out of range*'
+        }
+
+        It 'keeps annotation rows uncolored with NoColor=<DisableColor> and NO_COLOR=<EnvironmentValue>' -ForEach @(
+            @{ DisableColor = $false; EnvironmentValue = $null; ExpectColor = $true }
+            @{ DisableColor = $true; EnvironmentValue = $null; ExpectColor = $false }
+            @{ DisableColor = $false; EnvironmentValue = '1'; ExpectColor = $false }
+            @{ DisableColor = $false; EnvironmentValue = '0'; ExpectColor = $false }
+        ) {
+            $OriginalNoColor = $env:NO_COLOR
+            try {
+                $env:NO_COLOR = $EnvironmentValue
+                $Document = New-AstDocument -InputObject 'one'
+                $Document.ReplaceRange(0, 3, 'ONE', 'Change')
+                $Esc = [char]27
+                $Expected = if ($ExpectColor) {
+                    @(
+                        "${Esc}[1m[0] Change${Esc}[0m",
+                        "${Esc}[31m  1 | - one${Esc}[0m",
+                        '    |   ^^^',
+                        "${Esc}[32m    | + ONE${Esc}[0m",
+                        '    |   ^^^'
+                    )
+                } else {
+                    @(
+                        '[0] Change',
+                        '  1 | - one',
+                        '    |   ^^^',
+                        '    | + ONE',
+                        '    |   ^^^'
+                    )
+                }
+                Show-AstDiff -Document $Document -Annotate -NoColor:$DisableColor |
+                    Should -BeExactly ($Expected -join [Environment]::NewLine)
+            } finally {
+                $env:NO_COLOR = $OriginalNoColor
+            }
+        }
     }
 
     It 'does not add color resets to context lines when colors are enabled' {
@@ -39,9 +395,11 @@ Describe 'Show-AstDiff' {
 
             Show-AstDiff -Document $Document -Context 1 |
                 Should -BeExactly ((@(
-                    "${Esc}[1m[0] Change${Esc}[0m", '  1   one',
-                    "${Esc}[31m  2 - two${Esc}[0m", "${Esc}[32m    + TWO${Esc}[0m",
-                    '  3   three'
+                    "${Esc}[1m[0] Change${Esc}[0m",
+                    '  1 |   one',
+                    "${Esc}[31m  2 | - two${Esc}[0m",
+                    "${Esc}[32m    | + TWO${Esc}[0m",
+                    '  3 |   three'
                 )) -join [Environment]::NewLine)
         } finally {
             $env:NO_COLOR = $OriginalNoColor
@@ -85,7 +443,10 @@ Describe 'Show-AstDiff' {
         $Output.Count | Should -Be 1
         $Output[0] | Should -BeExactly ((
             '[0] First', '[1] Second',
-            '  1 - one', '  2 - two', '    + ONE', '    + TWO'
+            '  1 | - one',
+            '  2 | - two',
+            '    | + ONE',
+            '    | + TWO'
         ) -join [Environment]::NewLine)
     }
 
@@ -101,8 +462,12 @@ Describe 'Show-AstDiff' {
 
         Show-AstDiff -Document $Document -NoColor -Context 1 -Label Position |
             Should -BeExactly ((
-                '2:1  Change', '  1   one', '  2 - two',
-                '    + TWO', '    + EXTRA', '  3   three'
+                '2:1  Change',
+                '  1 |   one',
+                '  2 | - two',
+                '    | + TWO',
+                '    | + EXTRA',
+                '  3 |   three'
             ) -join [Environment]::NewLine)
     }
 
@@ -110,17 +475,17 @@ Describe 'Show-AstDiff' {
         @{
             Name = 'empty text'
             Source = ''
-            Expected = @('1:1  Append', '    + MORE')
+            Expected = @('1:1  Append', '    | + MORE')
         }
         @{
             Name = 'an unterminated line'
             Source = 'one'
-            Expected = @('1:4  Append', '  1 - one', '    + oneMORE')
+            Expected = @('1:4  Append', '  1 | - one', '    | + oneMORE')
         }
         @{
             Name = 'terminated text'
             Source = "one`n"
-            Expected = @('2:1  Append', '  1   one', '    + MORE')
+            Expected = @('2:1  Append', '  1 |   one', '    | + MORE')
         }
     ) {
         $Document = New-AstDocument -InputObject $Source
@@ -143,9 +508,13 @@ Describe 'Show-AstDiff' {
             $Document.ReplaceRange(0, 3, 'ONE', 'Change')
             $Esc = [char]27
             $Expected = if ($ExpectColor) {
-                @("${Esc}[1m[0] Change${Esc}[0m", "${Esc}[31m  1 - one${Esc}[0m", "${Esc}[32m    + ONE${Esc}[0m")
+                @(
+                    "${Esc}[1m[0] Change${Esc}[0m",
+                    "${Esc}[31m  1 | - one${Esc}[0m",
+                    "${Esc}[32m    | + ONE${Esc}[0m"
+                )
             } else {
-                @('[0] Change', '  1 - one', '    + ONE')
+                @('[0] Change', '  1 | - one', '    | + ONE')
             }
 
             Show-AstDiff -Document $Document -NoColor:$DisableColor |
@@ -165,10 +534,10 @@ function Greet {
 
         $Overlay = New-AstDocument -InputObject $Source
         $WriteHostCall = $Overlay.Ast.Find({
-                param($Node)
-                $Node -is [System.Management.Automation.Language.CommandAst] -and
-                $Node.GetCommandName() -eq 'Write-Host'
-            }, $true)
+            param($Node)
+            $Node -is [System.Management.Automation.Language.CommandAst] -and
+            $Node.GetCommandName() -eq 'Write-Host'
+        }, $true)
 
         $Overlay.PrependLine($WriteHostCall, 'Write-Output "prepended"', 'Insert greeting before Write-Host')
         $Overlay.Replace($WriteHostCall, 'Write-Output "Hello, $Name!"', 'Replace Write-Host with Write-Output')
@@ -193,10 +562,10 @@ function Greet {
 
         $Overlay = New-AstDocument -InputObject $Source
         $WriteHostCall = $Overlay.Ast.Find({
-                param($Node)
-                $Node -is [System.Management.Automation.Language.CommandAst] -and
-                $Node.GetCommandName() -eq 'Write-Host'
-            }, $true)
+            param($Node)
+            $Node -is [System.Management.Automation.Language.CommandAst] -and
+            $Node.GetCommandName() -eq 'Write-Host'
+        }, $true)
 
         $Overlay.PrependLine($WriteHostCall, 'Write-Output "prepended"', 'Insert greeting before Write-Host')
         $Overlay.Replace($WriteHostCall, 'Write-Output "Hello, $Name!"', 'Replace Write-Host with Write-Output')
@@ -219,10 +588,10 @@ function Greet {
 
         $Overlay = New-AstDocument -InputObject $Source
         $WriteHostCall = $Overlay.Ast.Find({
-                param($Node)
-                $Node -is [System.Management.Automation.Language.CommandAst] -and
-                $Node.GetCommandName() -eq 'Write-Host'
-            }, $true)
+            param($Node)
+            $Node -is [System.Management.Automation.Language.CommandAst] -and
+            $Node.GetCommandName() -eq 'Write-Host'
+        }, $true)
 
         $Overlay.PrependLine($WriteHostCall, 'Write-Output "prepended"', 'Insert greeting before Write-Host')
         $Overlay.Replace($WriteHostCall, 'Write-Output "Hello, $Name!"', 'Replace Write-Host with Write-Output')
@@ -252,8 +621,8 @@ function Greet {
         $Diff | Should -BeExactly ((
             '[0] Remove unary negation.',
             '[1] Use -isnot.',
-            '  2 - if (-not ($Value -is [int])) {',
-            '    + if (($Value -isnot [int])) {'
+            '  2 | - if (-not ($Value -is [int])) {',
+            '    | + if (($Value -isnot [int])) {'
         ) -join [Environment]::NewLine)
     }
 
@@ -283,8 +652,8 @@ function Greet {
 
         $Diff | Should -BeExactly ((
             "[0, 1] $Reason",
-            '  1 - -not ($Value -is [int])',
-            '    +  ($Value -isnot [int])'
+            '  1 | - -not ($Value -is [int])',
+            '    | +  ($Value -isnot [int])'
         ) -join [Environment]::NewLine)
     }
 
@@ -322,10 +691,10 @@ function Greet {
         $Diff | Should -BeExactly ((
             '1:1  Rename',
             "2:3  $Reason",
-            '  1 - $a = 1',
-            '  2 -   -not ($Value -is [int])',
-            '    + $b = 1',
-            '    +    ($Value -isnot [int])'
+            '  1 | - $a = 1',
+            '  2 | -   -not ($Value -is [int])',
+            '    | + $b = 1',
+            '    | +    ($Value -isnot [int])'
         ) -join [Environment]::NewLine)
     }
 
@@ -333,15 +702,26 @@ function Greet {
         @{
             Context = 0
             Expected = @(
-                '[0] Change two', '  2 - two', '    + TWO', '',
-                '[1] Change five', '  5 - five', '    + FIVE'
+                '[0] Change two',
+                '  2 | - two',
+                '    | + TWO',
+                '',
+                '[1] Change five',
+                '  5 | - five',
+                '    | + FIVE'
             )
         }
         @{
             Context = 1
             Expected = @(
                 '[0] Change two', '[1] Change five',
-                '  1   one', '  2 - two', '    + TWO', '  3   three', '  4   four', '  5 - five', '    + FIVE'
+                '  1 |   one',
+                '  2 | - two',
+                '    | + TWO',
+                '  3 |   three',
+                '  4 |   four',
+                '  5 | - five',
+                '    | + FIVE'
             )
         }
     ) {
@@ -368,7 +748,10 @@ function Greet {
 
         $Diff | Should -BeExactly ((
             '[0] Join', '[1] Remove three',
-            '  1 - one', '  2 - two', '  3 - three', '    + onEtwo'
+            '  1 | - one',
+            '  2 | - two',
+            '  3 | - three',
+            '    | + onEtwo'
         ) -join [Environment]::NewLine)
     }
 }
