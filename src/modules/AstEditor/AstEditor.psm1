@@ -64,6 +64,31 @@ class AstTextEdit {
     }
 }
 
+class AstTextEditResult {
+    [string] $Status
+    [string] $Path
+    [AstTextEdit] $TextEdit
+    [int] $StartOffset
+    [int] $EndOffset
+    [string] $ReplacementText
+    [string] $Reason
+    [string] $ExpectedText
+
+    AstTextEditResult(
+        [string] $Path,
+        [AstTextEdit] $TextEdit
+    ) {
+        $this.Status = 'Queued'
+        $this.Path = $Path
+        $this.TextEdit = $TextEdit
+        $this.StartOffset = $TextEdit.StartOffset
+        $this.EndOffset = $TextEdit.EndOffset
+        $this.ReplacementText = $TextEdit.ReplacementText
+        $this.Reason = $TextEdit.Reason
+        $this.ExpectedText = $TextEdit.ExpectedText
+    }
+}
+
 class AstDocument {
     # Preserves source provenance and gives Save-AstDocument a default target path.
     [string] $Path
@@ -307,7 +332,6 @@ Export-ModuleMember `
     -Cmdlet $Manifest.CmdletsToExport `
     -Variable $Manifest.VariablesToExport `
     -Alias $Manifest.AliasesToExport
-
 
 
 

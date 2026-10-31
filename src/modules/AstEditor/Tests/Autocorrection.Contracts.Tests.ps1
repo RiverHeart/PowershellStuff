@@ -19,6 +19,7 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Extent $Extent `
             -ReplacementText '$Second = 3' `
             -Reason 'Replace the second assignment'
+
         $OffsetEdit = New-AstTextEdit `
             -Document $Document `
             -StartOffset $Extent.StartOffset `
@@ -58,6 +59,7 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
             -EndOffset 5 `
             -ReplacementText 'ABC' `
             -Reason 'Replace [2, 5)'
+
         $Result = Resolve-AstDocument -Document $Document -PassThruText
 
         $Result.RenderedText | Should -Be '01ABC56789'
@@ -93,10 +95,21 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
 
     It 'rejects a stale detached batch without queueing any member' {
         $Document = New-AstDocument -InputObject 'abcdef'
-        $ValidEdit = New-AstTextEdit -Document $Document -StartOffset 0 -EndOffset 1 -ReplacementText 'A' -Reason 'Valid edit'
+        $ValidEdit = New-AstTextEdit `
+            -Document $Document `
+            -StartOffset 0 `
+            -EndOffset 1 `
+            -ReplacementText 'A' `
+            -Reason 'Valid edit'
 
         $StaleDocument = New-AstDocument -InputObject 'abxdef'
-        $StaleEdit = New-AstTextEdit -Document $StaleDocument -StartOffset 2 -EndOffset 3 -ReplacementText 'C' -Reason 'Stale edit' -ExpectedText 'x'
+        $StaleEdit = New-AstTextEdit `
+            -Document $StaleDocument `
+            -StartOffset 2 `
+            -EndOffset 3 `
+            -ReplacementText 'C' `
+            -Reason 'Stale edit' `
+            -ExpectedText 'x'
 
         { Add-AstTextEdit -Document $Document -TextEdit @($ValidEdit, $StaleEdit) } |
             Should -Throw '*Expected source text mismatch*'
@@ -120,23 +133,49 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'accepts ranges that meet at an end-exclusive boundary' {
         $Document = New-AstDocument -InputObject 'abcdef'
 
-        $null = Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 3 -ReplacementText 'BC' -Reason 'Replace [1, 3)'
-        { Add-AstTextEdit -Document $Document -StartOffset 3 -EndOffset 5 -ReplacementText 'DE' -Reason 'Replace [3, 5)' } |
-            Should -Not -Throw
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 3 `
+            -ReplacementText 'BC' `
+            -Reason 'Replace [1, 3)'
+
+        { Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 3 `
+            -EndOffset 5 `
+            -ReplacementText 'DE' `
+            -Reason 'Replace [3, 5)'
+        } | Should -Not -Throw
     }
 
     It 'rejects overlapping ranges from the same source snapshot' {
         $Document = New-AstDocument -InputObject 'abcdef'
 
-        $null = Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 4 -ReplacementText 'first' -Reason 'First correction'
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 4 `
+            -ReplacementText 'first' `
+            -Reason 'First correction'
 
-        { Add-AstTextEdit -Document $Document -StartOffset 3 -EndOffset 5 -ReplacementText 'second' -Reason 'Second correction' } |
-            Should -Throw '*First correction*Second correction*offsets [[]3, 5)*'
+        { Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 3 `
+            -EndOffset 5 `
+            -ReplacementText 'second' `
+            -Reason 'Second correction'
+        } | Should -Throw '*First correction*Second correction*offsets [[]3, 5)*'
     }
 
     It 'reports parse errors introduced by rendered edits' {
         $Document = New-AstDocument -InputObject '$Value = 1'
-        $null = Add-AstTextEdit -Document $Document -StartOffset 9 -EndOffset 10 -ReplacementText '(' -Reason 'Introduce an incomplete expression'
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 9 `
+            -EndOffset 10 `
+            -ReplacementText '(' `
+            -Reason 'Introduce an incomplete expression'
 
         $Result = Resolve-AstDocument -Document $Document -PassThruText
 
@@ -155,18 +194,27 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Reason 'Rename the variable' `
             -ExpectedText '$Value'
 
-        $Queued.PSTypeNames | Should -Contain 'AstEditor.TextEditResult'
+        $Queued.GetType().Name | Should -Be 'AstTextEditResult'
         $Queued.Status | Should -Be 'Queued'
+        $Queued.Path | Should -Be $Document.Path
+        $Queued.TextEdit.Reason | Should -Be $Document.Edits[0].Reason
         $Queued.StartOffset | Should -Be $Extent.StartOffset
         $Queued.EndOffset | Should -Be $Extent.EndOffset
+        $Queued.ReplacementText | Should -Be '$Result'
+        $Queued.Reason | Should -Be 'Rename the variable'
+        $Queued.ExpectedText | Should -Be '$Value'
         $Document.Edits.Count | Should -Be 1
     }
 
     It 'rejects an out-of-range edit' {
         $Document = New-AstDocument -InputObject 'abc'
 
-        {
-            Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 4 -ReplacementText 'x' -Reason 'Out of range'
+        { Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 4 `
+            -ReplacementText 'x' `
+            -Reason 'Out of range'
         } | Should -Throw '*EndOffset 4 exceeds document length 3*'
 
         $Document.Edits.Count | Should -Be 0
@@ -174,10 +222,19 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
 
     It 'rejects multiple zero-width insertions at the same offset' {
         $Document = New-AstDocument -InputObject 'abc'
-        $null = Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 1 -ReplacementText 'first' -Reason 'First insertion'
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 1 `
+            -ReplacementText 'first' `
+            -Reason 'First insertion'
 
-        {
-            Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 1 -ReplacementText 'second' -Reason 'Second insertion'
+        { Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 1 `
+            -ReplacementText 'second' `
+            -Reason 'Second insertion'
         } | Should -Throw '*First insertion*Second insertion*'
 
         $Document.Edits.Count | Should -Be 1
@@ -186,14 +243,13 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'rejects an edit when expected source text does not match' {
         $Document = New-AstDocument -InputObject 'abc'
 
-        {
-            Add-AstTextEdit `
-                -Document $Document `
-                -StartOffset 1 `
-                -EndOffset 2 `
-                -ReplacementText 'B' `
-                -Reason 'Replace b' `
-                -ExpectedText 'x'
+        { Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 2 `
+            -ReplacementText 'B' `
+            -Reason 'Replace b' `
+            -ExpectedText 'x'
         } | Should -Throw '*Expected source text mismatch at offsets [[]1, 2)*'
 
         $Document.Edits.Count | Should -Be 0
