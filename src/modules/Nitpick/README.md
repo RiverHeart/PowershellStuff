@@ -1,3 +1,50 @@
+# Nitpick
+
+
+## Example
+
+```powershell
+Start-Nitpicking -Script {
+	param([Parameter(Mandatory=$true)] $MyParam)
+} -FixMode Apply
+```
+
+**Output**
+```plaintext
+<ScriptBlock>
+  2:35  Use '[Parameter(Mandatory)]' instead of assigning it $true.
+    2 | -         param([Parameter(Mandatory=$true)] $MyParam)
+      |                                     ^^^^^^
+      | +         param([Parameter(Mandatory)] $MyParam)
+
+  1 correction applied in memory.
+```
+
+## Why Not Use PSScriptAnalyzer?
+
+"Stop reinventing the wheel", "contribute to ScriptAnalyzer instead," I hear you cry. Listen, ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unlikely that I can fully replicate all the functionality it offers, however, PSScriptAnalyzer doesn't possess the ergonomics I look for in a CLI tool. Contributing to the ScriptAnalyzer project is out of the question as I'm neither a C# dev nor would I be able to convince the maintainers to make sweeping changes just to satisfy my vision and I'm not going to put in the effort to make those changes just to be told no at merge time. ScriptAnalyzer has been around long enough that compatibility is going to be one of their core concerns and that is going to complicate any changes that might be accepted.
+
+Moving on to more targeted points, the inability to limit a test to certain file types/names is problematic since rule suppression doesn't behave well in Pester where tests may run against purposefully incorrect code. More over, tests shouldn't be limited to files so much as scoped to them. There isn't a compelling reason why the ScriptAnalyzer should be limited to Powershell at this stage in its life. If ScriptAnalyzer runs against a Powershell file and is given a test which exposes a ScriptBlockAst parameter then the calling contract is obviously "get the Powershell AST and pass it to the test" but if given a SQL file why not just run the test and retrieve a DiagnosticRecord? Just because Powershell can't readily obtain an AST of say, SQL, doesn't mean it can't detect SQL issues by other means. The ScriptDom class from the SqlServer module can create SQL ASTs and supports vistors for analysis. Sure, there may be a better tool for the job, but it won't be PowerShell based.
+
+Another low hanging fruit problem is the inability to have ScriptAnalyzer throw an error for a given severity. This means that using it for CI tasks or from task runners (Psake, InvokeBuild, PleaseWork) requires manually parsing the results and throwing an error yourself. Clearly this is a bad developer experience as it's manual, unintuitive, and makes the code noisy. This friction should be easy to eliminate but because ScriptAnalyzer was designed as a C# project, the people most likely to use it are forced to become C# devs to contribute back and with C#, you must compile the entire project to test that change which is another source of friction.
+
+## Comparison
+
+Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick.
+
+| Criterion | PSScriptAnalyzer | Nitpick | Explanation |
+| :---      | :------: | :--------: | :--- |
+| **Core Language** | C# | PowerShell |  |
+| **Built-In Ruleset** | 75 Rules | 3 Rules |  |
+| **VSCode Integration** | Yes | No |  |
+| **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
+| **Configuration File** | Yes | No | |
+| **Rule Categories** | No | Yes |  |
+| **Rule Scoping** | No | Working on it |  |
+| **Nested Module Support** | No | Yes |  |
+| **Errors On Failures** | No | Yes | ScriptAnalyzer doesn't throw for failures so Powershell task runners have to call it from a subprocess with `-EnableExit` or sort through the objects and throw itself. |
+| **Text Mode** | No | Yes | Text mode returns text instead of objects, formatted like regular linter output. |
+
 ## Dependencies
 
 Nitpick requires AstEditor to be installed on `PSModulePath`. Its manifest declares
@@ -7,6 +54,36 @@ or sibling installation path is required for installed modules.
 
 For repository development, `tools/Invoke-Test.ps1` temporarily adds `src/modules`
 to the test process's `PSModulePath` and restores it afterward.
+
+**TODO:**
+  - Fix this README
+  - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
+  - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
+  - Explore VSCode integration via `$PSEditor` (see [EditorTextManipulation.md](./src/modules/AstEditor/Docs/EditorTextManipulation.md)) for violation review/fixes. Nitpick could drive the editor from the terminal by opening the file at the occurence of the offending code and apply the fix before the user, and changes could be reverted before moving on. Sort of like a code review. Application of manual fixes would be nice but not sure how that would work. This could serve as a nice alternative to yet another editor extension. Probably won't be as straight forward as I imagine though.
+  - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
+  - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.
+
+### PowerShell engine quirks worth their own rules
+
+A few language/engine quirks surfaced during the [Rule Packages](Docs/RulePackages.md) Phase 4 work that are easy to reintroduce elsewhere in this repository, and are not currently caught by anything:
+
+- Member-access on a zero-element array (`@($EmptyArray.Property)`) does not enumerate per item
+  the way it does for two or more elements; it falls back to a direct property lookup on the
+  array itself and yields one `$null`, not zero results. `ForEach-Object { $_.Property }` behaves
+  correctly at every count and should be preferred.
+- `ForEach-Object <MemberName>` (the single-positional-argument member-name shorthand) itself
+  honors `$WhatIfPreference` and silently returns nothing under `-WhatIf`, unlike
+  `ForEach-Object { $_.MemberName }`. This is easy to hit whenever that shorthand is used inside
+  a `SupportsShouldProcess` command, even far from any actual `ShouldProcess` call.
+- `Select-Object -First`/`-Last` leaks a spurious `StopUpstreamCommandsException` into a caller's
+  `-ErrorVariable` on Windows PowerShell 5.1 whenever that caller also specifies `-ErrorAction`
+  (any value, not just `Stop`). This one stayed latent in the Phase 2 module resolvers for an
+  entire session; it only surfaced once Phase 4 made that code path universally reachable.
+
+## Notes
+
+- ScriptAnalyzer searches for functions named `Measure-*` and `Test-*` so we should be safe to export any helper functions from this module that do not use those verbs.
+- ScriptAnalyzer's `PSUseOutputTypeCorrectly` doesn't seem to take strings into account for `[OutputType('CustomClass')]` when the `return` keyword is missing from a `[CustomClass]::new()` output. Is there some metadata exposed by `return` or does the check require `return` and `[OutputType()]` together?
 
 ## Native finding identity
 
@@ -259,65 +336,3 @@ PSScriptAnalyzer combines custom rule paths from its discovered settings file wi
 For example, configuring `./src/modules/Nitpick` in `PSScriptAnalyzerSettings.psd1` while also passing `./src/modules/Nitpick/Nitpick.psd1` to `Invoke-ScriptAnalyzer` duplicates Nitpick findings. Use only one source, or pass `-Settings @{}` when an isolated invocation supplies its own custom rule path.
 
 Nitpick should not emulate this behavior. When Nitpick accepts rules from multiple configuration or command-line sources, it should deduplicate them by resolved module identity, not by the original path strings.
-
-**TODO:**
-  - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
-  - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
-  - Explore VSCode integration via `$PSEditor` (see [EditorTextManipulation.md](./src/modules/AstEditor/Docs/EditorTextManipulation.md)) for violation review/fixes. Nitpick could drive the editor from the terminal by opening the file at the occurence of the offending code and apply the fix before the user, and changes could be reverted before moving on. Sort of like a code review. Application of manual fixes would be nice but not sure how that would work. This could serve as a nice alternative to yet another editor extension. Probably won't be as straight forward as I imagine though.
-
-### PowerShell engine quirks worth their own rules
-
-A few language/engine quirks surfaced during the [Rule Packages](Docs/RulePackages.md) Phase 4
-work that are easy to reintroduce elsewhere in this repository, and are not currently caught by
-anything:
-
-- Member-access on a zero-element array (`@($EmptyArray.Property)`) does not enumerate per item
-  the way it does for two or more elements; it falls back to a direct property lookup on the
-  array itself and yields one `$null`, not zero results. `ForEach-Object { $_.Property }` behaves
-  correctly at every count and should be preferred.
-- `ForEach-Object <MemberName>` (the single-positional-argument member-name shorthand) itself
-  honors `$WhatIfPreference` and silently returns nothing under `-WhatIf`, unlike
-  `ForEach-Object { $_.MemberName }`. This is easy to hit whenever that shorthand is used inside
-  a `SupportsShouldProcess` command, even far from any actual `ShouldProcess` call.
-- `Select-Object -First`/`-Last` leaks a spurious `StopUpstreamCommandsException` into a caller's
-  `-ErrorVariable` on Windows PowerShell 5.1 whenever that caller also specifies `-ErrorAction`
-  (any value, not just `Stop`). This one stayed latent in the Phase 2 module resolvers for an
-  entire session; it only surfaced once Phase 4 made that code path universally reachable.
-
-**TODO:**
-  - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` /
-    `-WhatIf` pitfalls above.
-  - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete
-    test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule
-    category) that flags constructs known to behave differently, or outright break, across
-    supported PowerShell versions/editions.
-
-## Why Not Use PSScriptAnalyzer?
-
-"Stop reinventing the wheel", "contribute to ScriptAnalyzer instead," I hear you cry. Listen, ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unlikely that I can fully replicate all the functionality it offers, however, PSScriptAnalyzer doesn't possess the ergonomics I look for in a CLI tool. Contributing to the ScriptAnalyzer project is out of the question as I'm neither a C# dev nor would I be able to convince the maintainers to make sweeping changes just to satisfy my vision and I'm not going to put in the effort to make those changes just to be told no at merge time. ScriptAnalyzer has been around long enough that compatibility is going to be one of their core concerns and that is going to complicate any changes that might be accepted.
-
-Moving on to more targeted points, the inability to limit a test to certain file types/names is problematic since rule suppression doesn't behave well in Pester where tests may run against purposefully incorrect code. More over, tests shouldn't be limited to files so much as scoped to them. There isn't a compelling reason why the ScriptAnalyzer should be limited to Powershell at this stage in its life. If ScriptAnalyzer runs against a Powershell file and is given a test which exposes a ScriptBlockAst parameter then the calling contract is obviously "get the Powershell AST and pass it to the test" but if given a SQL file why not just run the test and retrieve a DiagnosticRecord? Just because Powershell can't readily obtain an AST of say, SQL, doesn't mean it can't detect SQL issues by other means. The ScriptDom class from the SqlServer module can create SQL ASTs and supports vistors for analysis. Sure, there may be a better tool for the job, but it won't be PowerShell based.
-
-Another low hanging fruit problem is the inability to have ScriptAnalyzer throw an error for a given severity. This means that using it for CI tasks or from task runners (Psake, InvokeBuild, PleaseWork) requires manually parsing the results and throwing an error yourself. Clearly this is a bad developer experience as it's manual, unintuitive, and makes the code noisy. This friction should be easy to eliminate but because ScriptAnalyzer was designed as a C# project, the people most likely to use it are forced to become C# devs to contribute back and with C#, you must compile the entire project to test that change which is another source of friction.
-
-## Comparison
-
-Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick.
-
-| Criterion | PSScriptAnalyzer | Nitpick | Explanation |
-| :---      | :------: | :--------: | :--- |
-| **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 2 Rules |  |
-| **VSCode Integration** | Yes | No |  |
-| **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
-| **Configuration File** | Yes | No | |
-| **Rule Categories** | No | Yes |  |
-| **Rule Scoping** | No | Yes |  |
-| **Nested Module Support** | No | Yes |  |
-| **Errors On Failures** | No | Yes | ScriptAnalyzer doesn't throw for failures so Powershell task runners have to call it from a subprocess with `-EnableExit` or sort through the objects and throw itself. |
-| **Text Mode** | No | Yes | Text mode returns text instead of objects, formatted like regular linter output. |
-
-## Notes
-
-- ScriptAnalyzer searches for functions named `Measure-*` and `Test-*` so we should be safe to export any helper functions from this module that do not use those verbs.
-- ScriptAnalyzer's `PSUseOutputTypeCorrectly` doesn't seem to take strings into account for `[OutputType('CustomClass')]` when the `return` keyword is missing from a `[CustomClass]::new()` output. Is there some metadata exposed by `return` or does the check require `return` and `[OutputType()]` together?
