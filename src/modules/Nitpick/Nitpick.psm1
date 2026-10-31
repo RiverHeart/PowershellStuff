@@ -3,7 +3,6 @@ using namespace System.Collections.Generic
 using namespace System.Collections.ObjectModel
 using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
-using module AstEditor
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 $AstEditorManifest = Join-Path -Path $ModuleRoot -ChildPath '../AstEditor/AstEditor.psd1'
