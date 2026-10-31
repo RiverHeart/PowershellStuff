@@ -95,6 +95,29 @@ Describe 'Test-AvoidParameterAttributeBool' {
         $Result.Count | Should -Be 0
     }
 
+    It 'removes only the value suffix from a true argument' -ForEach @(
+        @{
+            Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
+            ExpectedText = '=$true'
+            Expected = 'param([Parameter(Mandatory)] [string] $Name)'
+        }
+        @{
+            Source = 'param([Parameter(Mandatory = $true)] [string] $Name)'
+            ExpectedText = ' = $true'
+            Expected = 'param([Parameter(Mandatory)] [string] $Name)'
+        }
+    ) {
+        $ScriptBlockAst = [scriptblock]::Create($Source).Ast
+        $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
+        $Findings = $Rule.Invoke($ScriptBlockAst)
+        $Edit = $Findings[0].Corrections[0].TextEdit
+        $Edit.StartOffset | Should -Be ($Source.IndexOf('Mandatory') + 'Mandatory'.Length)
+        $Edit.ExpectedText | Should -BeExactly $ExpectedText
+        $Edit.ReplacementText | Should -BeExactly ''
+        $Candidate = $Source.Remove($Edit.StartOffset, $Edit.EndOffset - $Edit.StartOffset)
+        $Candidate | Should -BeExactly $Expected
+    }
+
     It 'safely removes a false argument in the <Position> position' -ForEach $FalseArgumentCases {
         $ScriptBlockAst = [scriptblock]::Create($Source).Ast
         $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool

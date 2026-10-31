@@ -89,8 +89,20 @@ function Test-AvoidParameterAttributeBool {
                 # True: argument should have no explicit value
                 if ($BadNode.Argument.Extent.Text -eq '$true') {
                     $Description = "Use '[Parameter($ArgumentName)]' instead of assigning it `$true`."
-                    $CorrectionParams.ViolationExtent = $BadNode.Extent
-                    $CorrectionParams.ReplacementText = $ArgumentName
+                    # NOTE: This is a lot but was required to produce the correct extent
+                    # for carets in the ast diff.
+                    $StartOffset = $BadNode.Extent.StartOffset + $ArgumentName.Length
+                    $EndOffset = $BadNode.Argument.Extent.EndOffset
+                    $CorrectionParams.TextEdit = New-AstTextEdit `
+                        -StartLineNumber $BadNode.Extent.StartLineNumber `
+                        -EndLineNumber $BadNode.Argument.Extent.EndLineNumber `
+                        -StartColumnNumber ($BadNode.Extent.StartColumnNumber + $ArgumentName.Length) `
+                        -EndColumnNumber $BadNode.Argument.Extent.EndColumnNumber `
+                        -StartOffset $StartOffset `
+                        -EndOffset $EndOffset `
+                        -ExpectedText $BadNode.Extent.Text.Substring($ArgumentName.Length) `
+                        -ReplacementText '' `
+                        -Reason $Description
                 } elseif ($BadNode.Argument.Extent.Text -eq '$false') {
                     $Description = "Omit the '$ArgumentName' argument instead of assigning it `$false`."
                     $CorrectionParams.TextEdit = New-AstCollectionEdit `

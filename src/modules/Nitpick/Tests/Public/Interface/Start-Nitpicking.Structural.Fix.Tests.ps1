@@ -48,12 +48,13 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
             $Proposal = $Result.Proposal
             $Edit = $Proposal.AcceptedCorrections[0].TextEdit
+            $Edit.ExpectedText | Should -BeExactly '=$true'
+            $Edit.ReplacementText | Should -BeExactly ''
             $Proposal.Diff | Should -BeExactly (@(
                 ('1:{0}  {1}' -f ($Edit.StartOffset + 1), $Edit.Reason),
                 "  1 | - $Source",
                 ('    |   ' + (' ' * $Edit.StartOffset) + ('^' * ($Edit.EndOffset - $Edit.StartOffset))),
-                '    | + param([Parameter(Mandatory)] [string] $Name)',
-                ('    |   ' + (' ' * 17) + ('^' * 9))
+                '    | + param([Parameter(Mandatory)] [string] $Name)'
             ) -join [Environment]::NewLine)
             $Proposal.AcceptedCorrections | Should -HaveCount 1
             $Proposal.CandidateFindings | Should -HaveCount 0
