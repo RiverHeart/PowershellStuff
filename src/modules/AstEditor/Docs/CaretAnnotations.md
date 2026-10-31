@@ -97,7 +97,14 @@ shares the source-text origin without independently changing gutter formatting.
    Reuse or narrowly extend
    [Add-AstDiffLine](../Private/AstDiffing/Add-AstDiffLine.ps1) so splitting,
    blank-line preservation, gutters, and color resets do not diverge. Keep
-   source-line rendering and the no-switch path equivalent.
+   source-line rendering and the no-switch path equivalent. Its annotated parameter
+   set requires explicit `-Text` and `-AnnotationSpans` for one complete block,
+   including an empty span collection when appropriate. Pipeline text remains
+   supported only for unannotated calls, preventing spans from being reused across
+   independent text chunks.
+   When spans are present, the renderer reuses its line records to extract display
+   text rather than splitting again, excluding only the final empty record after
+   a trailing terminator.
 3. Original spans are the edits' nonempty `[StartOffset, EndOffset)` ranges.
    Compute replacement spans within each edited block in ascending edit order:
    its start is `StartOffset - BlockStartOffset + cumulativeDelta`, its length

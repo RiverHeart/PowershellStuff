@@ -22,9 +22,12 @@ Describe 'Add-AstDiffLine splitting' {
 
             $Builder = [System.Text.StringBuilder]::new()
             $DirectBuilder = [System.Text.StringBuilder]::new()
+            $AnnotatedBuilder = [System.Text.StringBuilder]::new()
             $Output = @(
                 $Value | Add-AstDiffLine -Builder $Builder -GutterWidth 1 -Marker '+'
                 Add-AstDiffLine -Text $Value -Builder $DirectBuilder -GutterWidth 1 -Marker '+'
+                Add-AstDiffLine -Text $Value -Builder $AnnotatedBuilder -GutterWidth 1 -Marker '+' `
+                    -AnnotationSpans @(@{ Start = 0; End = 0 })
             )
             $ExpectedText = ''
             foreach ($Line in $Expected) {
@@ -34,11 +37,66 @@ Describe 'Add-AstDiffLine splitting' {
             $Output.Count | Should -Be 0
             $Builder.ToString() | Should -BeExactly $ExpectedText
             $DirectBuilder.ToString() | Should -BeExactly $ExpectedText
+            $AnnotatedBuilder.ToString() | Should -BeExactly $ExpectedText
         }
     }
 }
 
 Describe 'Add-AstDiffLine' {
+    It 'renders explicit block text with annotation spans without emitting output' {
+        InModuleScope AstEditor {
+            $Builder = [System.Text.StringBuilder]::new()
+            $Output = Add-AstDiffLine `
+                -Builder $Builder `
+                -GutterWidth 1 -Marker '+' `
+                -Text 'abc' `
+                -AnnotationSpans @(@{ Start = 1; End = 3 }) `
+                -NoColor
+
+            $Output.Count | Should -Be 0
+            $Builder.ToString() | Should -BeExactly ((@(
+                '    | + abc'
+                '    |    ^^'
+            ) -join [Environment]::NewLine) + [Environment]::NewLine)
+        }
+    }
+
+    It 'accepts an empty annotation collection for explicit text' {
+        InModuleScope AstEditor {
+            $Builder = [System.Text.StringBuilder]::new()
+            Add-AstDiffLine `
+                -Builder $Builder `
+                -GutterWidth 1 `
+                -Marker '+' `
+                -Text 'abc' `
+                -AnnotationSpans @() `
+                -NoColor
+
+            $Builder.ToString() | Should -BeExactly ('    | + abc' + [Environment]::NewLine)
+        }
+    }
+
+    It 'rejects pipeline input when annotation spans are supplied' -ForEach @(
+        @{ Texts = @('one') }
+        @{ Texts = @('one', 'two') }
+    ) {
+        InModuleScope AstEditor -Parameters @{ Texts = $Texts } {
+            param ($Texts)
+
+            $Builder = [System.Text.StringBuilder]::new()
+            {
+                $Texts | Add-AstDiffLine `
+                    -Builder $Builder `
+                    -GutterWidth 1 `
+                    -Marker '+' `
+                    -Text 'abc' `
+                    -AnnotationSpans @(@{ Start = 1; End = 3 }) `
+                    -ErrorAction Stop
+            } | Should -Throw -ErrorId 'InputObjectNotBound,Add-AstDiffLine'
+            $Builder.Length | Should -Be 0
+        }
+    }
+
     It 'continues numbering across pipeline text chunks, including empty input' {
         InModuleScope AstEditor {
             $Expected = (@(
@@ -50,9 +108,11 @@ Describe 'Add-AstDiffLine' {
             $Texts = @("one`n`n", '', "two`r`nthree`r`n")
             $PipelineBuilder = [System.Text.StringBuilder]::new()
 
-            $Output = @(
-                $Texts | Add-AstDiffLine -Builder $PipelineBuilder -GutterWidth 1 -LineNumber 3 -Marker '-'
-            )
+            $Output = $Texts | Add-AstDiffLine `
+                -Builder $PipelineBuilder `
+                -GutterWidth 1 `
+                -LineNumber 3 `
+                -Marker '-'
 
             $Output.Count | Should -Be 0
             $PipelineBuilder.ToString() | Should -BeExactly $Expected
@@ -68,10 +128,23 @@ Describe 'Add-AstDiffLine' {
             try {
                 $env:NO_COLOR = $null
                 $Output = @(
-                    "old`nolder" | Add-AstDiffLine -Builder $Builder -GutterWidth 2 -LineNumber 3 `
-                        -Marker '-' -Color Red
-                    "new`nnewer" | Add-AstDiffLine -Builder $Builder -GutterWidth 2 -Marker '+'
-                    "`n" | Add-AstDiffLine -Builder $Builder -GutterWidth 2 -LineNumber 10 -Marker ' '
+                    "old`nolder" | Add-AstDiffLine `
+                        -Builder $Builder `
+                        -GutterWidth 2 `
+                        -LineNumber 3 `
+                        -Marker '-' `
+                        -Color Red
+
+                    "new`nnewer" | Add-AstDiffLine `
+                        -Builder $Builder `
+                        -GutterWidth 2 `
+                        -Marker '+'
+
+                    "`n" | Add-AstDiffLine `
+                        -Builder $Builder `
+                        -GutterWidth 2 `
+                        -LineNumber 10 `
+                        -Marker ' '
                 )
             } finally {
                 $env:NO_COLOR = $OriginalNoColor
@@ -97,15 +170,27 @@ Describe 'Add-AstDiffContext' {
             $LineRecords = Get-AstTextLine -Text $Text
 
             $Output = @(
-                Add-AstDiffContext -Builder $Builder -Text $Text -LineRecords $LineRecords `
-                    -From 1 -To 2 -GutterWidth 2
-                Add-AstDiffContext -Builder $Builder -Text $Text -LineRecords $LineRecords `
-                    -From 1 -To 0 -GutterWidth 2
+                Add-AstDiffContext `
+                    -Builder $Builder `
+                    -Text $Text `
+                    -LineRecords $LineRecords `
+                    -From 1 `
+                    -To 2 `
+                    -GutterWidth 2
+
+                Add-AstDiffContext `
+                    -Builder $Builder `
+                    -Text $Text `
+                    -LineRecords $LineRecords `
+                    -From 1 `
+                    -To 0 `
+                    -GutterWidth 2
             )
 
             $Output.Count | Should -Be 0
             $Builder.ToString() | Should -BeExactly (
-                '   2 |   ' + [Environment]::NewLine + '   3 |   three' + [Environment]::NewLine
+                '   2 |   ' + [Environment]::NewLine +
+                '   3 |   three' + [Environment]::NewLine
             )
         }
     }

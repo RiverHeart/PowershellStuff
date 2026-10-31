@@ -152,7 +152,8 @@ function Format-AstDiff {
                 }
             }
 
-            $OriginalBlockText | Add-AstDiffLine `
+            Add-AstDiffLine `
+                -Text $OriginalBlockText `
                 -Builder $Builder `
                 -GutterWidth $NumberWidth `
                 -LineNumber $LineNumber `
@@ -162,7 +163,8 @@ function Format-AstDiff {
                 -NoColor:$ColorIsDisabled
 
             # Replacement lines have no original source line number.
-            $EditedBlockText | Add-AstDiffLine `
+            Add-AstDiffLine `
+                -Text $EditedBlockText `
                 -Builder $Builder `
                 -GutterWidth $NumberWidth `
                 -Marker '+' `

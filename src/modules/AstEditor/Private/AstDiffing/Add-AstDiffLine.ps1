@@ -16,6 +16,11 @@ using namespace System.Collections.Generic
     Optional block-relative, end-exclusive AnnotationSpans add one
     caret row per affected start line, merging spans and preserving prefix tabs.
 
+    Supplying AnnotationSpans requires explicit -Text for one complete block;
+    annotated calls do not accept pipeline input. Pipeline text remains
+    supported only for unannotated calls, preventing spans from being reused
+    across independent text chunks.
+
 .NOTES
     Empty text is different from a blank line. Per the table
     below, the distinction is whether the input contains a line
@@ -61,6 +66,7 @@ using namespace System.Collections.Generic
     'one' plus an extra phantom line.
 #>
 function Add-AstDiffLine {
+    [CmdletBinding(DefaultParameterSetName = 'Unannotated')]
     [OutputType([void])]
     param (
         [Parameter(Mandatory)]
@@ -72,7 +78,8 @@ function Add-AstDiffLine {
         [Parameter(Mandatory)]
         [string] $Marker,
 
-        [Parameter(Mandatory,ValueFromPipeline)]
+        [Parameter(Mandatory,ValueFromPipeline,ParameterSetName='Unannotated')]
+        [Parameter(Mandatory,ParameterSetName='Annotated')]
         [AllowEmptyString()]
         [string] $Text,
 
@@ -81,6 +88,8 @@ function Add-AstDiffLine {
         [ValidateSet('Red', 'Green')]
         [string] $Color,
 
+        [Parameter(Mandatory,ParameterSetName='Annotated')]
+        [AllowEmptyCollection()]
         [object[]] $AnnotationSpans = @(),
 
         [switch] $NoColor
@@ -132,9 +141,23 @@ function Add-AstDiffLine {
                 }
             }
 
-            $Trimmed = $Text -replace "(?:$LineTerminatorPattern)\z", ''
+            # When spans are present, reuse them to extract display text rather
+            # than splitting again, excluding only the final empty record after
+            # a trailing terminator.
+            $Lines = if ($AnnotationSpans.Count -gt 0) {
+                foreach ($Record in $Records) {
+                    # The final empty record after a terminator is not a display line.
+                    if ($Record.Start -lt $Text.Length) {
+                        $Text.Substring($Record.Start, $Record.ContentEnd - $Record.Start)
+                    }
+                }
+            } else {
+                $Trimmed = $Text -replace "(?:$LineTerminatorPattern)\z", ''
+                $Trimmed -split $LineTerminatorPattern
+            }
+
             $LineIndex = 0
-            foreach ($Line in ($Trimmed -split $LineTerminatorPattern)) {
+            foreach ($Line in $Lines) {
                 $Gutter =
                     if ($null -eq $LineNumber) { ' ' * $GutterWidth }
                     else { ($LineNumber).ToString().PadLeft($GutterWidth) }
