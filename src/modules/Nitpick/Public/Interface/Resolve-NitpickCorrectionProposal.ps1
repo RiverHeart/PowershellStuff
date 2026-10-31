@@ -1,0 +1,328 @@
+using namespace System.Collections.Generic
+using module AstEditor
+
+<#
+.SYNOPSIS
+    Resolves a native Nitpick correction proposal against one source snapshot.
+
+.DESCRIPTION
+    Selects safe corrections and delegates atomic source validation and queueing to
+    AstEditor. Corrections sharing a ChangeSetId are selected or skipped together. A
+    correction without a ChangeSetId forms its own independent change set. IDs are
+    target-wide; producers should include their rule identity and occurrence in IDs
+    unless they intentionally coordinate across findings or rules.
+
+    If the selected batch is stale or conflicting, AstEditor rejects it without queueing any
+    member. Returns a stable proposal containing candidate text, validation diagnostics,
+    and candidate findings when rules are supplied. Application never changes these
+    facts; a proposal does not claim that edits were written.
+
+    Diff includes navigable line:column reason headers and caret rows
+    beneath removed and added edit spans. Multiline spans annotate their first
+    line only; carets reflect queued ranges rather than minimal text differences.
+
+    Execution attribution is retained from the supplied findings and corrections.
+    Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
+    findings without RuleId retain their producer labels in conflict diagnostics.
+
+.PARAMETER Script
+    The exact source snapshot from which the correction offsets were calculated.
+
+.PARAMETER Document
+    The AstEditor document analyzed by Nitpick. Its snapshot and queued transaction
+    are retained in the result so preview and file application use the same edits.
+    This is a mutable transaction handle: consumers must not modify its queued edits
+    between resolution and application. Proposal diagnostics are stable by ownership.
+
+.PARAMETER Finding
+    Native Nitpick findings containing corrections produced from the source snapshot.
+
+.PARAMETER Rule
+    Selected Nitpick rules to rerun against valid rendered text. When omitted, the
+    correction preview is returned without final reanalysis.
+
+.PARAMETER Path
+    Optional source path used to retain file identity during final rule analysis.
+
+.EXAMPLE
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
+    $Result.CandidateText
+
+    Previews all independent safe corrections attached to the findings. Every correction
+    without a ChangeSetId is evaluated independently, and all accepted corrections are
+    rendered against the original source snapshot in one pass.
+
+.EXAMPLE
+    $Corrections = @(
+        New-NitpickCorrection `
+            -ViolationExtent $FirstExtent `
+            -ReplacementText '$First = 2' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the first assignment.' `
+            -ChangeSetId 'CoupledAssignments'
+
+        New-NitpickCorrection `
+            -ViolationExtent $SecondExtent `
+            -ReplacementText '$Second = 3' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the second assignment.' `
+            -ChangeSetId 'CoupledAssignments'
+    )
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
+
+    When $Finding contains $Corrections, both corrections are accepted or skipped together.
+    For example, stale ExpectedText on either correction skips the complete change set.
+
+.EXAMPLE
+    Inspect conflicts when independent change sets overlap. Under the target-level conflict
+    policy, an overlap rejects the complete preview batch and leaves candidate text unchanged.
+
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
+    $Result.Conflicts
+    $Result.CandidateText -eq $Source
+
+.EXAMPLE
+    Returns candidate findings after applying the selected rules to the source snapshot.
+
+    $Result = Resolve-NitpickCorrectionProposal `
+        -Script $Source `
+        -Finding $Finding `
+        -Rule $SelectedRules
+    $Result.CandidateFindings
+#>
+function Resolve-NitpickCorrectionProposal {
+    [CmdletBinding(DefaultParameterSetName = 'Script')]
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSUseOutputTypeCorrectly', '')]
+    [OutputType('NitpickCorrectionProposal')]
+    param(
+        [Parameter(Mandatory, ParameterSetName = 'Script')]
+        [AllowEmptyString()]
+        [string] $Script,
+
+        [Parameter(Mandatory, ParameterSetName = 'Document')]
+        [AstDocument] $Document,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [NitpickFinding[]] $Finding,
+
+        [NitpickRule[]] $Rule,
+
+        [AllowNull()]
+        [string] $Path
+    )
+
+    if ($Document.IsFileBacked -and $Path) {
+        Write-Warning "Both `-Path` and a file-backed `-Document` are specified. The `-Path` parameter will be ignored."
+    }
+
+    if ($PSCmdlet.ParameterSetName -eq 'Script') {
+        $Document = New-AstDocument -InputObject $Script
+    } else {
+        $Script = $Document.OriginalText
+        if ($Document.IsFileBacked) {
+            $Path = $Document.Path
+        }
+    }
+
+    if ($Document.Edits.Count -gt 0) {
+        Write-Error "The provided AstDocument contains edits and cannot be used."
+    }
+
+    $AcceptedCorrections = [List[NitpickCorrection]]::new()
+    $SkippedCorrections = [List[object]]::new()
+    $SelectedCorrections = [List[NitpickCorrection]]::new()
+    $Conflicts = [List[object]]::new()
+    $FinalFindings = [List[object]]::new()
+    $ChangeSets = [ordered]@{}
+    $StandaloneCorrectionId = 0
+
+    # MARK: CHANGE SET GROUPING
+    # Build all-or-nothing change sets while keeping ungrouped corrections independent.
+    foreach ($Correction in $Finding.Corrections) {
+        if ($null -eq $Correction) {
+            continue
+        }
+        $ChangeSetKey = if ($Correction.ChangeSetId) {
+            "ChangeSet:$($Correction.ChangeSetId)"
+        } else {
+            "Correction:$StandaloneCorrectionId"
+        }
+
+        if (-not $ChangeSets.Contains($ChangeSetKey)) {
+            $ChangeSets[$ChangeSetKey] = [List[NitpickCorrection]]::new()
+        }
+
+        $ChangeSets[$ChangeSetKey].Add($Correction)
+        $StandaloneCorrectionId++
+    }
+
+    # MARK: CHANGE SET SELECTION
+    # Select only complete change sets that satisfy Nitpick correction policy.
+    foreach ($ChangeSetKey in $ChangeSets.Keys) {
+        $ChangeSet = $ChangeSets[$ChangeSetKey]
+        $RejectionReason = $null
+
+        foreach ($Correction in $ChangeSet) {
+            if ($Correction.Applicability -ne 'Safe') {
+                $RejectionReason = "Applicability '$($Correction.Applicability)' is not selected."
+                break
+            }
+
+            if (-not $Correction.TextEdit) {
+                $RejectionReason = 'Correction does not contain an AstEditor text edit.'
+                break
+            }
+        }
+
+        if ($RejectionReason) {
+            foreach ($Correction in $ChangeSet) {
+                $SkippedCorrections.Add([pscustomobject]@{
+                    Correction = $Correction
+                    Reason = $RejectionReason
+                })
+            }
+            continue
+        }
+
+        foreach ($Correction in $ChangeSet) {
+            $SelectedCorrections.Add($Correction)
+        }
+    }
+
+    # MARK: ATOMIC QUEUEING
+    # AstEditor exclusively validates source ranges, stale text, and conflicts.
+    if ($SelectedCorrections.Count -gt 0) {
+        try {
+            $null = Add-AstTextEdit `
+                -Document $Document `
+                -TextEdit @($SelectedCorrections.TextEdit)
+
+            foreach ($Correction in $SelectedCorrections) {
+                $AcceptedCorrections.Add($Correction)
+            }
+        } catch {
+            $FailureKind = $_.Exception.Data['FailureKind']
+            if ($FailureKind -eq 'Conflict') {
+                $ExistingEdit = $_.Exception.Data['ExistingEdit']
+                $IncomingEdit = $_.Exception.Data['IncomingEdit']
+
+                $ExistingCorrection = $SelectedCorrections |
+                    Where-Object {
+                        $_.TextEdit.StartOffset -eq $ExistingEdit.StartOffset -and
+                        $_.TextEdit.EndOffset -eq $ExistingEdit.EndOffset -and
+                        $_.TextEdit.Reason -ceq $ExistingEdit.Reason -and
+                        $_.TextEdit.ReplacementText -ceq $ExistingEdit.ReplacementText
+                    } |
+                    Select-Object -First 1
+
+                $IncomingCorrection = $SelectedCorrections |
+                    Where-Object {
+                        $_.TextEdit.StartOffset -eq $IncomingEdit.StartOffset -and
+                        $_.TextEdit.EndOffset -eq $IncomingEdit.EndOffset -and
+                        $_.TextEdit.Reason -ceq $IncomingEdit.Reason -and
+                        $_.TextEdit.ReplacementText -ceq $IncomingEdit.ReplacementText -and
+                        -not [object]::ReferenceEquals($_, $ExistingCorrection)
+                    } |
+                    Select-Object -First 1
+
+                $Conflicts.Add([pscustomobject]@{
+                    ExistingCorrection = $ExistingCorrection
+                    IncomingCorrection = $IncomingCorrection
+                    Reason = (
+                        "{0} Existing rule '{1}', change set '{2}'; incoming rule '{3}', change set '{4}'." -f
+                            $_.Exception.Message,
+                            (Get-NitpickRuleLabel -InputObject $ExistingCorrection),
+                            $ExistingCorrection.ChangeSetId,
+                            (Get-NitpickRuleLabel -InputObject $IncomingCorrection),
+                            $IncomingCorrection.ChangeSetId
+                    )
+                })
+            }
+
+            $RejectionReason = if ($FailureKind -eq 'Conflict') {
+                'AstEditor rejected the target because the selected edits conflict.'
+            } elseif ($FailureKind -eq 'ExpectedTextMismatch') {
+                'AstEditor rejected the target because an edit is stale.'
+            } else {
+                "AstEditor rejected the target batch: $($_.Exception.Message)"
+            }
+
+            foreach ($Correction in $SelectedCorrections) {
+                $SkippedCorrections.Add([pscustomobject]@{
+                    Correction = $Correction
+                    Reason = $RejectionReason
+                })
+            }
+        }
+    }
+
+    # MARK: RENDERING
+    # Render and parse the selected batch without changing the source file.
+    $Resolution = Resolve-AstDocument -Document $Document -PassThruText
+    $CandidateText = $Resolution.RenderedText
+
+    if ($AcceptedCorrections.Count -gt 0 -and $Resolution.ParseErrorCount -gt 0) {
+        foreach ($Correction in $AcceptedCorrections) {
+            $SkippedCorrections.Add([pscustomobject]@{
+                Correction = $Correction
+                Reason = 'The rendered correction batch contains parse errors.'
+            })
+        }
+
+        $AcceptedCorrections.Clear()
+    }
+
+    # MARK: FINAL REANALYSIS
+    # Rerun only the caller-selected rules, and only after rendered text passes validation.
+    $WasReanalyzed = $false
+    if ($Rule.Count -gt 0 -and $Resolution.ParseErrorCount -eq 0) {
+        $RenderedAst = if ($Path) {
+            $Tokens = $null
+            $ParseErrors = $null
+            [Parser]::ParseInput(
+                $CandidateText,
+                $Path,
+                [ref] $Tokens,
+                [ref] $ParseErrors
+            )
+        } else {
+            (New-AstDocument -InputObject $CandidateText).Ast
+        }
+
+        foreach ($SelectedRule in $Rule) {
+            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedAst)) {
+                $FinalFindings.Add($FinalFinding)
+            }
+        }
+
+        $WasReanalyzed = $true
+    }
+
+    return [NitpickCorrectionProposal]@{
+        Path = if ($Path) { $Path } else { '<ScriptBlock>' }
+        Document = $Document
+        OriginalFingerprint = $Document.OriginalFingerprint
+        OriginalText = $Script
+        OriginalFindings = @($Finding)
+        WasReanalyzed = $WasReanalyzed
+
+        Status = if ($Resolution.ParseErrorCount -gt 0) {
+            'FailedValidation'
+        } elseif ($SelectedCorrections.Count -gt 0 -and $AcceptedCorrections.Count -eq 0) {
+            'Rejected'
+        } elseif ($AcceptedCorrections.Count -eq 0) {
+            'NoChanges'
+        } else {
+            'Ready'
+        }
+
+        CandidateFindings = $FinalFindings.ToArray()
+        AcceptedCorrections = $AcceptedCorrections.ToArray()
+        SkippedCorrections = $SkippedCorrections.ToArray()
+        Conflicts = $Conflicts.ToArray()
+        ParseErrors = @($Resolution.ParseErrors)
+        CandidateText = $CandidateText
+        Diff = Show-AstDiff -Document $Document -Label Position -Annotate
+    }
+}

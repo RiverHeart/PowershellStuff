@@ -1,0 +1,11 @@
+{
+  "TestSuite": "MarkdownExtractor",
+  "Run": {
+    "Path": [
+      "."
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  }
+}

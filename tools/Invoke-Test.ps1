@@ -10,6 +10,8 @@
     Tests Passed: X, Failed: Y, Skipped: Z, Inconclusive: A, NotRun: B
 
     Debug preference is scoped to this script invocation and restored in a finally block.
+    Adds the repository's src\modules directory to PSModulePath before test discovery,
+    restoring the original value afterward so module dependencies do not require a profile.
 
 .NOTES
     This is geared towards agent use to reduce token consumption and provide a clear
@@ -52,6 +54,11 @@
 .PARAMETER PassThru
     Returns the full Pester result object after printing the summary.
 
+.PARAMETER ExitOnError
+    Exits the hosting PowerShell process with code 2 when Pester reports one or
+    more failed tests. Errors outside completed test results retain their normal
+    error behavior.
+
 .EXAMPLE
     ./tools/Invoke-Test.ps1 -TestSuite Example
 
@@ -69,6 +76,18 @@
 
 .EXAMPLE
     ./tools/Invoke-Test.ps1 -TestSuite Example -ListTags
+
+.EXAMPLE
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/Invoke-Test.ps1 -Suite Example
+
+    Runs the Example suite under Windows PowerShell. The host used to launch this
+    script selects the PowerShell runtime; Invoke-Test restores that edition's
+    CurrentUser module path before discovering Pester.
+
+.EXAMPLE
+    ./tools/Invoke-Test.ps1 -Suite Example -ExitOnError
+
+    Returns process exit code 2 when the completed test run contains failures.
 #>
 [CmdletBinding()]
 
@@ -98,7 +117,10 @@ param (
     [switch] $DebugOutput,
     [switch] $DetailedOutput,
     [switch] $ShowPassed,
-    [switch] $PassThru
+    [switch] $PassThru,
+
+    [Parameter(ParameterSetName = 'Run')]
+    [switch] $ExitOnError
 )
 
 $script:LocationPushed = $false
@@ -388,6 +410,21 @@ function Convert-SingleSuiteManifestToSuiteList {
     Push-Location -Path $RepoRoot
     $script:LocationPushed = $true
 
+    $RepositoryModulePath = Join-Path $RepoRoot 'src\modules'
+    if ((Test-Path -LiteralPath $RepositoryModulePath -PathType Container) -and
+        $RepositoryModulePath -notin ($env:PSModulePath -split [IO.Path]::PathSeparator)
+    ) {
+        $env:PSModulePath = $RepositoryModulePath + [IO.Path]::PathSeparator + $env:PSModulePath
+    }
+
+    $LoadedPester = Get-Module -Name Pester |
+        Where-Object { $_.Version.Major -ge 5 } |
+        Sort-Object -Property Version -Descending |
+        Select-Object -First 1
+
+    Write-Host ("PowerShell: {0} ({1})" -f $PSVersionTable.PSVersion, $PSEdition)
+    Write-Host ("Pester: {0}" -f $LoadedPester.Version)
+
     $RootConfigPath = Join-Path $RepoRoot 'pester.json'
 
     try {
@@ -669,6 +706,10 @@ function Convert-SingleSuiteManifestToSuiteList {
     }
 
     if ($Result.FailedCount -gt 0) {
+        if ($ExitOnError) {
+            exit 2
+        }
+
         Write-Error 'One or more tests failed.'
         return
     }
