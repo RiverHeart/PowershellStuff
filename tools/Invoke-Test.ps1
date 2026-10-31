@@ -10,6 +10,8 @@
     Tests Passed: X, Failed: Y, Skipped: Z, Inconclusive: A, NotRun: B
 
     Debug preference is scoped to this script invocation and restored in a finally block.
+    Adds the repository's src\modules directory to PSModulePath before test discovery,
+    restoring the original value afterward so module dependencies do not require a profile.
 
 .NOTES
     This is geared towards agent use to reduce token consumption and provide a clear
@@ -407,6 +409,13 @@ function Convert-SingleSuiteManifestToSuiteList {
 
     Push-Location -Path $RepoRoot
     $script:LocationPushed = $true
+
+    $RepositoryModulePath = Join-Path $RepoRoot 'src\modules'
+    if ((Test-Path -LiteralPath $RepositoryModulePath -PathType Container) -and
+        $RepositoryModulePath -notin ($env:PSModulePath -split [IO.Path]::PathSeparator)
+    ) {
+        $env:PSModulePath = $RepositoryModulePath + [IO.Path]::PathSeparator + $env:PSModulePath
+    }
 
     $LoadedPester = Get-Module -Name Pester |
         Where-Object { $_.Version.Major -ge 5 } |

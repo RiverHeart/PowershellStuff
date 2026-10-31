@@ -5,10 +5,6 @@ using namespace System.Management.Automation
 using namespace System.Management.Automation.Language
 
 $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
-$AstEditorManifest = Join-Path -Path $ModuleRoot -ChildPath '../AstEditor/AstEditor.psd1'
-if (-not (Get-Module -Name AstEditor)) {
-    Import-Module -Name $AstEditorManifest -ErrorAction Stop
-}
 
 # MARK: NP_CORRECT
 #----------------------

@@ -1,3 +1,13 @@
+## Dependencies
+
+Nitpick requires AstEditor to be installed on `PSModulePath`. Its manifest declares
+the dependency, and functions with AstEditor type annotations use
+`using module AstEditor` for parse-time class visibility. No profile configuration
+or sibling installation path is required for installed modules.
+
+For repository development, `tools/Invoke-Test.ps1` temporarily adds `src/modules`
+to the test process's `PSModulePath` and restores it afterward.
+
 ## Native finding identity
 
 Coordinated native findings and corrections carry a qualified `RuleId`, such as

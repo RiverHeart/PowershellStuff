@@ -233,6 +233,30 @@ exit /b 0
     }
 
     Context 'Invoke-Test execution options' {
+        It 'makes repository modules discoverable before parsing test files' -Tag RepositoryModulePath {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path $TestDrive 'repository-module-path')
+            $moduleDirectory = Join-Path $sandbox.RootPath 'src\modules\RunnerDependency'
+            New-Item -Path $moduleDirectory -ItemType Directory -Force | Out-Null
+            'class RunnerDependencyType {}' |
+                Set-Content -Path (Join-Path $moduleDirectory 'RunnerDependency.psm1') -NoNewline
+            @'
+using module RunnerDependency
+Describe 'Repository dependency' {
+    It 'resolves dependency classes without a profile' {
+        [RunnerDependencyType]::new().GetType().Name | Should -Be 'RunnerDependencyType'
+    }
+}
+'@ | Set-Content -Path (Join-Path $sandbox.RootPath 'suite\Tests\Selected.tests.ps1') -NoNewline
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1', '-ExitOnError')
+
+            $run.ExitCode | Should -Be 0
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
+        }
+
         It 'accepts Suite as an alias and limits execution to a suite-relative path' {
             $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'focused-run')
 

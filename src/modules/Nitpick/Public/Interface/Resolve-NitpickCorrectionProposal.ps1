@@ -1,4 +1,5 @@
 using namespace System.Collections.Generic
+using module AstEditor
 
 <#
 .SYNOPSIS
