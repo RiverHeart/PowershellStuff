@@ -44,6 +44,14 @@ a namespace. No standalone `RuleId` input parameter is introduced yet.
 Identity is retained across the correction proposal, application, and report without
 rewriting proposal facts or changing target-wide `ChangeSetId` grouping.
 
+### Proposed native comment suppression
+
+[ADR 0002](adr/0002-comment-based-rule-suppression.md) drafts coordinator-owned
+comment suppression using qualified Rule IDs, including whole-target, regional,
+and line directives. It covers correction change-set atomicity, candidate reanalysis,
+and in-memory source coordinates. The proposal is not yet accepted or implemented;
+it does not change the current compatibility behavior described above.
+
 ## Autocorrection
 
 Preview safe corrections and view the diff without modifying files:
