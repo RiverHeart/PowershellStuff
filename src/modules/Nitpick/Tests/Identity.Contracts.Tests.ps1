@@ -19,17 +19,15 @@ BeforeAll {
                 if ($Assignment.Extent.Text -eq '$Value = 1') {
                     New-NitpickCorrection -ViolationExtent $Assignment.Extent `
                         -ReplacementText $Replacement -FilePathOrContext '<ScriptBlock>' `
-                        -Description 'Replace assignment' -RuleName WrongCorrection
+                        -Description 'Replace assignment' -RuleId 'WrongOwner/WrongCorrection'
                 }
             )
             foreach ($Correction in $Corrections) {
-                $Correction.RuleId = 'WrongOwner/WrongCorrection'
                 $Correction.ChangeSetId = $ChangeSetId
             }
-            $Finding = New-NitpickFinding -RuleName WrongFinding -RuleSuppressionID WrongSuppression `
+            $Finding = New-NitpickFinding -RuleId 'WrongOwner/WrongFinding' `
                 -Message 'Assignment finding' -Severity Information -ViolationExtent $Assignment.Extent `
                 -ScriptPath '<ScriptBlock>' -Explanation 'Identity contract' -Corrections $Corrections
-            $Finding.RuleId = 'WrongOwner/WrongFinding'
             $Finding
         }.GetNewClosure()
         New-Nitpick -Callable $Producer -Name AssignmentStyle -Namespace $Namespace -Source Tests
@@ -208,6 +206,40 @@ Describe 'Native execution identity contracts' {
         foreach ($Finding in $Findings) {
             $Finding.RuleId | Should -BeNullOrEmpty
             $Finding.Corrections[0].RuleId | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'retains explicit standalone identity in display and resolver diagnostics' {
+        $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
+            '$Value = 1', [ref] $null, [ref] $null
+        )
+        $Findings = @(
+            foreach ($Namespace in 'First', 'Second') {
+                $Correction = New-NitpickCorrection -RuleId "$Namespace/Standalone" `
+                    -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
+                    -ReplacementText "$Namespace = 2" -FilePathOrContext '<ScriptBlock>' `
+                    -Description 'Replace assignment.'
+                New-NitpickFinding -RuleId "$Namespace/Standalone" `
+                    -Message 'Standalone finding' -Severity Information -ViolationExtent $Ast.Extent `
+                    -ScriptPath '<ScriptBlock>' -Explanation 'Standalone' -Corrections $Correction
+            }
+        )
+        $Text = InModuleScope Nitpick -Parameters @{ Ast = $Ast; Findings = $Findings } {
+            param ($Ast, $Findings)
+            Format-NitpickText -Ast $Ast -Finding $Findings
+        }
+        $Table = $Findings | Format-Table | Out-String -Width 240
+        $Proposal = Resolve-NitpickCorrectionProposal -Script '$Value = 1' -Finding $Findings
+
+        $Proposal.Conflicts | Should -HaveCount 1
+        foreach ($Finding in $Findings) {
+            $Text | Should -Match ([regex]::Escape($Finding.RuleId))
+            $Table | Should -Match ([regex]::Escape($Finding.RuleId))
+            $Finding.ToString() | Should -Match ([regex]::Escape($Finding.RuleId))
+            $Proposal.Conflicts[0].Reason | Should -Match ([regex]::Escape($Finding.RuleId))
+            $Finding.RuleName | Should -Be Standalone
+            $Finding.RuleSuppressionID | Should -Be Standalone
+            $Finding.Corrections[0].RuleId | Should -BeExactly $Finding.RuleId
         }
     }
 

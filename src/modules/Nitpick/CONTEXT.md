@@ -61,11 +61,17 @@ can differ.
 Nitpick assigns its parser findings `Nitpick/PowerShellParseError`. An owned diagnostic
 ID does not imply a discoverable/selectable rule or a registry entry.
 
-Standalone producer/helper invocation bypasses coordinated attribution. In Phase 5,
-display the supplied `RuleName` when `RuleId` is absent without inventing a namespace.
-This display fallback does not establish identity and must not conceal missing stamping
-in coordinated execution. An explicit standalone `RuleId` input API is deferred to the
-later helper-signature migration.
+Standalone producer/helper invocation bypasses coordinated attribution. Helpers accept
+an explicit `RuleId` in `Namespace/Name` form and validate its segments with the same
+rules as descriptor identity. For that input, legacy local fields are projections of
+the qualified ID. Helper calls cannot combine `RuleId` with legacy identity parameters.
+Finding identity does not implicitly stamp nested corrections outside coordinated
+execution; callers can supply each correction's identity explicitly.
+
+The additive helper migration retains legacy signatures. When `RuleId` is absent,
+display the supplied `RuleName` without inventing a namespace. This display fallback
+does not establish identity and must not conceal missing stamping in coordinated
+execution. Removing legacy fields and migrating existing producers remain separate work.
 
 ## Correction lifecycle ownership
 

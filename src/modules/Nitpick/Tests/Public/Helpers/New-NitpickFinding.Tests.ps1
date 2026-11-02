@@ -71,6 +71,89 @@ Describe 'New-NitpickFinding' {
         $Finding.GetType().Name | Should -Be 'NitpickFinding'
     }
 
+    It 'creates a qualified standalone finding with local compatibility fields' {
+        $Finding = New-NitpickFinding -RuleId 'Example/TestRule' `
+            -Message 'A problem was found.' -ViolationExtent $Extent -Severity Warning `
+            -ScriptPath '<ScriptBlock>' -Explanation 'Test explanation.' -Corrections $Correction
+
+        $Finding.RuleId | Should -BeExactly 'Example/TestRule'
+        $Finding.RuleName | Should -BeExactly 'TestRule'
+        $Finding.RuleSuppressionID | Should -BeExactly 'TestRule'
+        $Finding.ToString() | Should -Match 'Warning Example/TestRule:'
+        [object]::ReferenceEquals($Finding.Corrections[0], $Correction) | Should -BeTrue
+        $Correction.RuleId | Should -BeNullOrEmpty
+    }
+
+    It 'converts explicit identity to local diagnostic compatibility fields using <OutputAs>' -ForEach @(
+        @{ OutputAs = 'NitpickFinding' }
+        @{ OutputAs = 'DiagnosticRecord' }
+    ) {
+        $Finding = New-NitpickFinding -RuleId 'Example/TestRule' `
+            -Message 'A problem was found.' -ViolationExtent $Extent -Severity Warning `
+            -ScriptPath '<ScriptBlock>' -Explanation 'Test explanation.' `
+            -Corrections $Correction -OutputAs $OutputAs
+        $Diagnostic = if ($OutputAs -eq 'NitpickFinding') { $Finding.ToDiagnosticRecord() } else { $Finding }
+
+        $Diagnostic.GetType().FullName |
+            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
+        $Diagnostic.RuleName | Should -BeExactly 'TestRule'
+        $Diagnostic.RuleSuppressionID | Should -BeExactly 'TestRule'
+        $Diagnostic.SuggestedCorrections | Should -HaveCount 1
+    }
+
+    It 'rejects malformed standalone identity <RuleId>' -ForEach @(
+        @{ RuleId = $null }
+        @{ RuleId = '' }
+        @{ RuleId = ' ' }
+        @{ RuleId = 'TestRule' }
+        @{ RuleId = '/TestRule' }
+        @{ RuleId = 'Example/' }
+        @{ RuleId = ' /TestRule' }
+        @{ RuleId = 'Example/ ' }
+        @{ RuleId = 'Example/Test/Rule' }
+        @{ RuleId = 'Example\TestRule' }
+        @{ RuleId = 'Example/*' }
+        @{ RuleId = '*/TestRule' }
+        @{ RuleId = 'Example/Test?' }
+        @{ RuleId = 'Example/[Test]' }
+    ) {
+        {
+            New-NitpickFinding -RuleId $RuleId -Message 'Invalid identity.' `
+                -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Invalid identity.'
+        } | Should -Throw
+    }
+
+    It 'rejects mixing explicit identity with either legacy identity parameter' -ForEach @(
+        @{ Legacy = @{ RuleName = 'LegacyRule' } }
+        @{ Legacy = @{ RuleSuppressionID = 'LegacySuppression' } }
+        @{ Legacy = @{ RuleName = 'LegacyRule'; RuleSuppressionID = 'LegacySuppression' } }
+    ) {
+        {
+            New-NitpickFinding -RuleId 'Example/TestRule' @Legacy -Message 'Mixed identity.' `
+                -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Mixed identity.'
+        } | Should -Throw
+    }
+
+    It 'validates explicit identity in the finding hashtable constructor' {
+        InModuleScope Nitpick -Parameters @{ Extent = $Extent } {
+            param ($Extent)
+
+            $Properties = @{
+                RuleId = 'Example/TestRule'; RuleName = 'LegacyRule'
+                RuleSuppressionID = 'LegacySuppression'; ViolationExtent = $Extent
+                Message = 'Constructor identity.'; Severity = 'Warning'
+            }
+            $Finding = [NitpickFinding]::new($Properties)
+            $Finding.RuleId | Should -BeExactly 'Example/TestRule'
+            $Finding.RuleName | Should -BeExactly 'TestRule'
+            $Finding.RuleSuppressionID | Should -BeExactly 'TestRule'
+            $Properties.RuleId = 'Unqualified'
+            { [NitpickFinding]::new($Properties) } | Should -Throw '*Namespace/Name*'
+        }
+    }
+
     It 'omits coordinated corrections while preserving ungrouped suggestions' -ForEach @(
         @{ OutputAs = 'NitpickFinding' }
         @{ OutputAs = 'DiagnosticRecord' }

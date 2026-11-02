@@ -39,7 +39,20 @@ that behavior.
 Parser findings use `Nitpick/PowerShellParseError`; that attribution does not create a
 selectable rule or registry entry. Direct producer/helper invocation bypasses coordinated
 attribution: when `RuleId` is absent, display uses the supplied `RuleName` without inventing
-a namespace. No standalone `RuleId` input parameter is introduced yet.
+a namespace.
+
+The first additive helper migration now accepts explicit `-RuleId Namespace/Name` on
+`New-NitpickFinding` and `New-NitpickCorrection`. Namespace and local-name validation
+reuse descriptor identity rules; wildcard IDs are invalid. Explicit IDs populate the
+legacy local-name fields for diagnostic conversion. Helpers reject mixing qualified
+and legacy identity parameters. Hashtable constructors likewise validate explicit IDs
+and derive compatibility fields from them, even if legacy keys are also present.
+
+Legacy helper calls and fields remain supported unchanged in this increment. Existing
+producers are not yet migrated. A standalone finding does not assign identity to its
+nested corrections; those can receive explicit IDs separately. Coordinated invocation
+still replaces all producer attribution. Field removal and the eventual diagnostic
+conversion cutover remain separate migration steps.
 
 Identity is retained across the correction proposal, application, and report without
 rewriting proposal facts or changing target-wide `ChangeSetId` grouping.

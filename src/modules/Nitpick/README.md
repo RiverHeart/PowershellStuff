@@ -63,10 +63,37 @@ or sibling installation path is required for installed modules.
 For repository development, `tools/Invoke-Test.ps1` temporarily adds `src/modules`
 to the test process's `PSModulePath` and restores it afterward.
 
+## Standalone finding identity
+
+Standalone helper calls can supply a qualified `RuleId` without inventing a namespace
+from the implementing command. Choose the actual owning namespace, including `Local`
+when appropriate:
+
+```powershell
+$Extent = { $Value = 1 }.Ast.EndBlock.Statements[0].Extent
+$Correction = New-NitpickCorrection -RuleId 'Local/AssignmentStyle' `
+    -ViolationExtent $Extent -ReplacementText '$Value = 2' `
+    -FilePathOrContext '<ScriptBlock>' -Description 'Replace the assignment.'
+New-NitpickFinding -RuleId 'Local/AssignmentStyle' `
+    -ViolationExtent $Extent -Message 'Prefer the replacement.' -Severity Information `
+    -ScriptPath '<ScriptBlock>' -Explanation 'Standalone example.' -Corrections $Correction
+```
+
+IDs must contain exactly a namespace and a local name separated by `/`, with neither
+segment empty or containing path separators or wildcard syntax. The local name populates
+legacy `RuleName` and finding `RuleSuppressionID` fields, including for diagnostic conversion.
+Do not combine `-RuleId` with legacy identity parameters.
+
+Legacy finding calls using `-RuleName` and `-RuleSuppressionID`, and correction calls
+using optional `-RuleName`, still work. Without explicit `RuleId`, no namespace is inferred.
+A standalone finding does not stamp its corrections; supply their IDs separately as
+shown above. During coordinated execution, Nitpick replaces producer-supplied identity
+with the executing rule descriptor's identity on both findings and corrections.
+This is the first additive migration step; legacy field removal is deferred.
+
 **TODO:**
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
   - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
   - Explore VSCode integration via `$PSEditor` (see [EditorTextManipulation.md](./src/modules/AstEditor/Docs/EditorTextManipulation.md)) for violation review/fixes. Nitpick could drive the editor from the terminal by opening the file at the occurence of the offending code and apply the fix before the user, and changes could be reverted before moving on. Sort of like a code review. Application of manual fixes would be nice but not sure how that would work. This could serve as a nice alternative to yet another editor extension. Probably won't be as straight forward as I imagine though.
   - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
   - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.
-

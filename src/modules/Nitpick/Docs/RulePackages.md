@@ -671,6 +671,9 @@ Before this phase, `NitpickFinding` had `RuleName` and `RuleSuppressionID`;
 - **Standalone explicit-ID API:** defer a producer-facing `RuleId` parameter to the
   later helper-signature migration. Phase 5 neither overloads `RuleName` with a
   qualification contract nor adds conditional module-ownership validation.
+  The subsequent additive helper migration now supplies that explicit parameter;
+  see [Standalone finding identity](../README.md#standalone-finding-identity).
+  Phase 5's legacy invocation contract remains supported until a separate cutover.
 - **Long-term identity:** `RuleId` is the rule name and the intended single identity.
   `RuleName` and `RuleSuppressionID` are transitional compatibility fields, not independent
   identities to extend. Their eventual removal requires an explicit migration of helper

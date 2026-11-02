@@ -79,7 +79,11 @@ class NitpickCorrection {
         if ($properties.ContainsKey('ChangeSetId')) {
             $this.ChangeSetId = $properties.ChangeSetId
         }
-        if ($properties.ContainsKey('RuleName')) {
+        if ($properties.ContainsKey('RuleId')) {
+            Assert-NitpickRuleId -Value $properties.RuleId
+            $this.RuleId = $properties.RuleId
+            $this.RuleName = $this.RuleId.Split('/')[1]
+        } elseif ($properties.ContainsKey('RuleName')) {
             $this.RuleName = $properties.RuleName
         }
         if (-not $this.TextEdit) {
@@ -178,6 +182,12 @@ class NitpickFinding {
         $this.Message = $properties.Message
         $this.RuleName = $properties.RuleName
         $this.RuleSuppressionID = $properties.RuleSuppressionID
+        if ($properties.ContainsKey('RuleId')) {
+            Assert-NitpickRuleId -Value $properties.RuleId
+            $this.RuleId = $properties.RuleId
+            $this.RuleName = $this.RuleId.Split('/')[1]
+            $this.RuleSuppressionID = $this.RuleName
+        }
         $this.Severity = $properties.Severity
         $this.Corrections = $properties.Corrections
         $LocationPath = if ($this.ViolationExtent.File) {

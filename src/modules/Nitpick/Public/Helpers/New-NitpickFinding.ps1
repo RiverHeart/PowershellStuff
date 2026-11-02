@@ -8,27 +8,35 @@
     ScriptAnalyzer-compatible rules must explicitly request DiagnosticRecord output.
     Diagnostic conversion omits corrections with a ChangeSetId because ScriptAnalyzer
     cannot preserve their all-or-nothing selection. Ungrouped suggestions remain available.
-    Standalone findings retain producer-supplied local labels and have no qualified RuleId.
-    NitpickRule. Invoke assigns descriptor-owned RuleId and RuleName to native findings
-    and nested corrections, and assigns the same local name to findings' RuleSuppressionID.
+    Standalone callers can supply a qualified RuleId instead of the legacy RuleName and
+    RuleSuppressionID parameters. Its local name populates both compatibility fields.
+    Legacy calls retain their supplied labels without inventing a qualified identity.
+    NitpickRule.Invoke replaces producer-supplied identity on native findings and nested
+    corrections with the executing descriptor's identity.
+
+.PARAMETER RuleId
+    Explicit standalone identity in Namespace/Name form, without wildcard syntax.
+    Mutually exclusive with RuleName and RuleSuppressionID. It does not infer or assign
+    identity to nested corrections; supply their RuleId separately when needed.
 
 .EXAMPLE
     Creates a new Nitpick finding object with the specified properties.
 
     $Finding = New-NitpickFinding `
-        -RuleName 'MyRule' `
+        -RuleId 'Local/MyRule' `
         -Message 'This is a test message' `
         -ViolationExtent $extent `
         -Severity 'Warning' `
-        -RuleSuppressionID 'None' `
+        -ScriptPath '<ScriptBlock>' `
+        -Explanation 'Why this rule applies.' `
         -Corrections @() `
         -OutputAs 'NitpickFinding'
 #>
 function New-NitpickFinding {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Legacy')]
     [OutputType('NitpickFinding')]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Legacy')]
         [string] $RuleName,
 
         [Parameter(Mandatory)]
@@ -41,7 +49,7 @@ function New-NitpickFinding {
         [ValidateSet('Information', 'Warning', 'Error')]
         [string] $Severity,
 
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Legacy')]
         [string] $RuleSuppressionID,
 
         [Parameter(Mandatory)]
@@ -57,18 +65,26 @@ function New-NitpickFinding {
 
         [Parameter(HelpMessage = "Specifies the output format for the finding.")]
         [ValidateSet('NitpickFinding', 'DiagnosticRecord')]
-        [string] $OutputAs = 'NitpickFinding'
+        [string] $OutputAs = 'NitpickFinding',
+
+        [Parameter(Mandatory, ParameterSetName = 'ByRuleId')]
+        [ValidateNotNullOrEmpty()]
+        [string] $RuleId
     )
 
     $Finding = $null
     $FindingParams = @{
         ViolationExtent = $ViolationExtent
         Message = $Message
-        RuleName = $RuleName
-        RuleSuppressionID = $RuleSuppressionID
         Severity = $Severity
         ScriptPath = $ScriptPath
         Explanation = $Explanation
+    }
+    if ($PSCmdlet.ParameterSetName -eq 'ByRuleId') {
+        $FindingParams.RuleId = $RuleId
+    } else {
+        $FindingParams.RuleName = $RuleName
+        $FindingParams.RuleSuppressionID = $RuleSuppressionID
     }
     if ($Corrections) { $FindingParams.Corrections = $Corrections }
     if ($RunCondition) { $FindingParams.RunCondition = $RunCondition }
