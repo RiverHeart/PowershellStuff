@@ -17,7 +17,7 @@
             <TableColumnItems>
               <TableColumnItem><PropertyName>Location</PropertyName></TableColumnItem>
               <TableColumnItem>
-                <ScriptBlock>if ($_.RuleId) { $_.RuleId } else { $_.RuleName }</ScriptBlock>
+                <PropertyName>RuleId</PropertyName>
               </TableColumnItem>
               <TableColumnItem><PropertyName>Message</PropertyName></TableColumnItem>
             </TableColumnItems>

@@ -29,27 +29,29 @@ candidate reanalysis. Ownership follows the declaring package or registration, n
 necessarily the module implementing the callable.
 
 Text output, default finding tables, string conversion, and correction diagnostics use
-qualified IDs. `RuleName` remains the coordinator-assigned local name; findings'
-`RuleSuppressionID` carries that same local value for diagnostic conversion. Corrections
-have no suppression field. These are transitional fields: the long-term direction is a
-single `RuleId`, but this phase does not change helper signatures or suppression semantics.
-Suppression remains local-name based, so equally named rules in different namespaces share
-that behavior.
+qualified IDs. Native findings and corrections carry only `RuleId`; the legacy
+`RuleName` and `RuleSuppressionID` properties and helper parameters have been removed.
+Descriptors still retain `Name` and `Namespace` as identity components.
+`ToDiagnosticRecord()` validates the current ID and derives both external local-name
+fields at conversion time. PSScriptAnalyzer compatibility remains local-name based;
+native comment suppression is not yet implemented.
 
 Parser findings use `Nitpick/PowerShellParseError`; that attribution does not create a
 selectable rule or registry entry. Direct producer/helper invocation bypasses coordinated
-attribution: when `RuleId` is absent, display uses the supplied `RuleName` without inventing
-a namespace.
+attribution: finding constructors and `New-NitpickFinding` require qualified identity,
+while detached corrections may remain unattributed until coordinated execution.
+Display never infers a namespace or falls back to a legacy local label; conflict and
+skipped-correction diagnostics label unattributed detached corrections `unattributed`.
 
-The first additive helper migration now accepts explicit `-RuleId Namespace/Name` on
+The helper migration accepts explicit `-RuleId Namespace/Name` on
 `New-NitpickFinding` and `New-NitpickCorrection`. Namespace and local-name validation
-reuse descriptor identity rules; wildcard IDs are invalid. Explicit IDs populate the
-legacy local-name fields for diagnostic conversion. Helpers reject mixing qualified
-and legacy identity parameters. Hashtable constructors likewise validate explicit IDs
-and derive compatibility fields from them, even if legacy keys are also present.
+reuse descriptor identity rules; wildcard IDs are invalid. Removed legacy identity
+parameters no longer bind on the helpers. Hashtable constructors reject unknown keys,
+including the removed legacy identity fields, even when a valid `RuleId` is also
+present. The old positional finding constructor, which
+could not supply qualified identity, has been removed.
 
-Legacy helper calls and fields remain supported unchanged. Built-in native producers
-now use explicit `Nitpick/...` IDs for standalone findings and corrections; WPF's
+Built-in native producers use explicit `Nitpick/...` IDs for standalone findings and corrections; WPF's
 supporting-module producer uses `WPF/AvoidBlockingUI`, not `WPFRules/AvoidBlockingUI`.
 Parser diagnostics also use the qualified helper API rather than assigning `RuleId`
 after construction. Existing direct ScriptAnalyzer output retains local diagnostic
@@ -57,8 +59,9 @@ names and suppression IDs through conversion.
 
 A standalone finding does not assign identity to its
 nested corrections; those can receive explicit IDs separately. Coordinated invocation
-still replaces all producer attribution. Field removal and the eventual diagnostic
-conversion cutover remain separate migration steps.
+still replaces all producer attribution. Direct resolver callers supply qualified
+finding identity explicitly; optional detached-correction identity is not inferred
+from the parent finding.
 
 Identity is retained across the correction proposal, application, and report without
 rewriting proposal facts or changing target-wide `ChangeSetId` grouping.

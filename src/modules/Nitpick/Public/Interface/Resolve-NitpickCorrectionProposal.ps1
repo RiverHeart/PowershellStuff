@@ -23,7 +23,7 @@ using module AstEditor
 
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
-    findings without RuleId retain their producer labels in conflict diagnostics.
+    findings require qualified RuleId; detached corrections may omit identity.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.

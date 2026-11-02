@@ -590,6 +590,13 @@ registration. Existing file-target tests pass with only necessary selector migra
 
 **Status: Complete**
 
+> Identity cutover: the Phase 5 record below describes the historical transitional
+> contract. The subsequent helper migration is now complete: native findings require
+> `RuleId`, detached corrections accept optional `RuleId`, and native `RuleName`/
+> `RuleSuppressionID` fields and helper parameters are removed. Only external diagnostic
+> conversion derives local compatibility fields. See
+> [Standalone finding identity](../README.md#standalone-finding-identity) for migration.
+
 ### Objective
 
 Make qualified identity observable end-to-end, with the coordinator as the sole source of a
@@ -673,7 +680,7 @@ Before this phase, `NitpickFinding` had `RuleName` and `RuleSuppressionID`;
   qualification contract nor adds conditional module-ownership validation.
   The subsequent additive helper migration now supplies that explicit parameter;
   see [Standalone finding identity](../README.md#standalone-finding-identity).
-  Phase 5's legacy invocation contract remains supported until a separate cutover.
+  The subsequent breaking cutover has now removed Phase 5's legacy invocation contract.
 - **Long-term identity:** `RuleId` is the rule name and the intended single identity.
   `RuleName` and `RuleSuppressionID` are transitional compatibility fields, not independent
   identities to extend. Their eventual removal requires an explicit migration of helper

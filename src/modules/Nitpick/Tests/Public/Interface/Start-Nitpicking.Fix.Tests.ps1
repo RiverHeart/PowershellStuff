@@ -43,18 +43,17 @@ Describe 'Start-Nitpicking transactional fixes' {
                         -ReplacementText $Replacement `
                         -FilePathOrContext $Context `
                         -Description 'Replace value' `
-                        -RuleName TransactionRule
+                        -RuleId 'Local/TransactionRule'
                 )
                 if ($Assignment.Extent.File -like '*Stale.ps1') {
                     [System.IO.File]::WriteAllText($Assignment.Extent.File, '$Value = 3')
                 }
             }
             New-NitpickFinding `
-                -RuleName TransactionRule `
+                -RuleId 'Local/TransactionRule' `
                 -Message 'Transaction finding' `
                 -ViolationExtent $Assignment.Extent `
                 -Severity $Severity `
-                -RuleSuppressionID TransactionRule `
                 -ScriptPath $Context `
                 -Corrections $Corrections `
                 -Explanation 'Verifies committed versus candidate analysis.'

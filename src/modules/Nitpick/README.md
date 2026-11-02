@@ -65,7 +65,7 @@ to the test process's `PSModulePath` and restores it afterward.
 
 ## Standalone finding identity
 
-Standalone helper calls can supply a qualified `RuleId` without inventing a namespace
+Standalone findings require a qualified `RuleId` without inventing a namespace
 from the implementing command. Choose the actual owning namespace, including `Local`
 when appropriate:
 
@@ -80,20 +80,17 @@ New-NitpickFinding -RuleId 'Local/AssignmentStyle' `
 ```
 
 IDs must contain exactly a namespace and a local name separated by `/`, with neither
-segment empty or containing path separators or wildcard syntax. The local name populates
-legacy `RuleName` and finding `RuleSuppressionID` fields, including for diagnostic conversion.
-Do not combine `-RuleId` with legacy identity parameters.
+segment empty or containing path separators or wildcard syntax. `RuleId` is the sole identity on native findings and corrections. Diagnostic conversion derives PSScriptAnalyzer's local `RuleName` and `RuleSuppressionID` from the current ID.
 
-Legacy finding calls using `-RuleName` and `-RuleSuppressionID`, and correction calls
-using optional `-RuleName`, still work. Without explicit `RuleId`, no namespace is inferred.
+**Breaking migration:** replace finding `-RuleName`/`-RuleSuppressionID` with a qualified `-RuleId`, and correction `-RuleName` with optional qualified `-RuleId`. Update native property access to `RuleId`. Constructors reject unknown hashtable keys, including the removed legacy identity fields, and the old positional finding constructor has been removed; use the finding helper or a hashtable with `RuleId`. Detached corrections may omit identity until coordinated execution; no namespace is inferred, and conflict diagnostics label such corrections `unattributed`.
+
 A standalone finding does not stamp its corrections; supply their IDs separately as
 shown above. During coordinated execution, Nitpick replaces producer-supplied identity
 with the executing rule descriptor's identity on both findings and corrections.
 Built-in rule producers now supply `Nitpick/...` IDs for standalone native findings
 and corrections; WPF's supporting rule supplies `WPF/AvoidBlockingUI`. Their existing
 ScriptAnalyzer diagnostic conversion still emits local names and suppression IDs.
-Legacy field removal is deferred. External DiagnosticRecord-only scaffolds are not
-native producers and remain unchanged.
+External DiagnosticRecord-only scaffolds are not native producers and remain unchanged.
 
 **TODO:**
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.

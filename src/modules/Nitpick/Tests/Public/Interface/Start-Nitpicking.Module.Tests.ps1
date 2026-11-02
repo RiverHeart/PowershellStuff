@@ -20,9 +20,9 @@ Describe 'Start-Nitpicking Module' {
 function Get-PrivateMessage { 'Custom rule executed.' }
 function Test-PathRule {
     param ($ScriptBlockAst)
-    New-NitpickFinding -Message (Get-PrivateMessage) -RuleName PathRule `
+    New-NitpickFinding -Message (Get-PrivateMessage) -RuleId 'Local/PathRule' `
         -Severity Information -ViolationExtent $ScriptBlockAst.Extent `
-        -RuleSuppressionID PathRule -ScriptPath '<ScriptBlock>' -Explanation 'Test rule.'
+        -ScriptPath '<ScriptBlock>' -Explanation 'Test rule.'
 }
 function Test-HiddenPathRule { param ($ScriptBlockAst) }
 function Test-InvalidPathRule { param ($FilePath) }

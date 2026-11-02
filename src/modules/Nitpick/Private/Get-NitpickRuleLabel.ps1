@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Selects qualified attribution or a standalone producer's unqualified display label.
+    Returns qualified native attribution, or a placeholder for unattributed corrections.
 #>
 function Get-NitpickRuleLabel {
     [CmdletBinding()]
@@ -13,6 +13,6 @@ function Get-NitpickRuleLabel {
     if ($InputObject.RuleId) {
         $InputObject.RuleId
     } else {
-        $InputObject.RuleName
+        'unattributed'
     }
 }

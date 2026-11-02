@@ -70,12 +70,10 @@ Describe 'Built-in producer identity migration' {
 
         $Findings | Should -HaveCount 1
         $Findings[0].RuleId | Should -BeExactly "Nitpick/$Name"
-        $Findings[0].RuleName | Should -BeExactly $Name
-        $Findings[0].RuleSuppressionID | Should -BeExactly $Name
         $Findings[0].Corrections.Count | Should -Be $CorrectionCount
+
         foreach ($Correction in $Findings[0].Corrections) {
             $Correction.RuleId | Should -BeExactly "Nitpick/$Name"
-            $Correction.RuleName | Should -BeExactly $Name
         }
         (& $Command -Details).Name | Should -BeExactly $Name
 
@@ -83,11 +81,8 @@ Describe 'Built-in producer identity migration' {
         $Coordinated = @($Rule.Invoke($Ast))
         $Coordinated | Should -HaveCount 1
         $Coordinated[0].RuleId | Should -BeExactly 'AlternateOwner/RenamedRule'
-        $Coordinated[0].RuleName | Should -BeExactly 'RenamedRule'
-        $Coordinated[0].RuleSuppressionID | Should -BeExactly 'RenamedRule'
         foreach ($Correction in $Coordinated[0].Corrections) {
             $Correction.RuleId | Should -BeExactly 'AlternateOwner/RenamedRule'
-            $Correction.RuleName | Should -BeExactly 'RenamedRule'
         }
     }
 }
@@ -113,21 +108,15 @@ Describe 'Native execution identity contracts' {
 
         foreach ($WithContext in $false, $true) {
             $Captured.RuleId = 'WrongOwner/WrongFinding'
-            $Captured.RuleName = 'WrongFinding'
-            $Captured.RuleSuppressionID = 'WrongSuppression'
             $Captured.Corrections[0].RuleId = 'WrongOwner/WrongCorrection'
-            $Captured.Corrections[0].RuleName = 'WrongCorrection'
             $Correction = $Captured.Corrections[0]
             $Result = if ($WithContext) { $Rule.Invoke($Ast, @{}) } else { $Rule.Invoke($Ast) }
 
             [object]::ReferenceEquals($Result[0], $Captured) | Should -BeTrue
             [object]::ReferenceEquals($Result[0].Corrections[0], $Correction) | Should -BeTrue
             $Result[0].RuleId | Should -Be 'Owner/AssignmentStyle'
-            $Result[0].RuleName | Should -Be AssignmentStyle
-            $Result[0].RuleSuppressionID | Should -Be AssignmentStyle
+
             $Correction.RuleId | Should -Be 'Owner/AssignmentStyle'
-            $Correction.RuleName | Should -Be AssignmentStyle
-            $Correction.PSObject.Properties.Name | Should -Not -Contain RuleSuppressionID
         }
     }
 
@@ -157,17 +146,21 @@ Describe 'Native execution identity contracts' {
         foreach ($Finding in @($Result.Proposal.OriginalFindings) + @($Result.Proposal.CandidateFindings) +
             @($Result.Report.EffectiveFindings) + @($Result.Report.FindingsWithCommittedCorrections)) {
             $Finding.RuleId | Should -Be 'Local/AssignmentStyle'
-            $Finding.RuleName | Should -Be AssignmentStyle
-            $Finding.RuleSuppressionID | Should -Be AssignmentStyle
         }
         $Result.Proposal.AcceptedCorrections[0].RuleId | Should -Be 'Local/AssignmentStyle'
-        [object]::ReferenceEquals($Result.Proposal.AcceptedCorrections[0],
-            $Result.Proposal.OriginalFindings[0].Corrections[0]) | Should -BeTrue
+        [object]::ReferenceEquals(
+            $Result.Proposal.AcceptedCorrections[0],
+            $Result.Proposal.OriginalFindings[0].Corrections[0]
+        ) | Should -BeTrue
+
         $Result.Report.AnalysisSource | Should -Be Candidate
+
         if ($Status -eq 'Written') {
             $Result.Application.CommittedCorrections[0].RuleId | Should -Be 'Local/AssignmentStyle'
-            [object]::ReferenceEquals($Result.Application.CommittedCorrections[0],
-                $Result.Proposal.AcceptedCorrections[0]) | Should -BeTrue
+            [object]::ReferenceEquals(
+                $Result.Application.CommittedCorrections[0],
+                $Result.Proposal.AcceptedCorrections[0]
+            ) | Should -BeTrue
             $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
             [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 2'
         } else {
@@ -187,11 +180,13 @@ Describe 'Native execution identity contracts' {
         $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.Status | Should -Be Rejected
         $Result.Proposal.Conflicts | Should -HaveCount 1
+
         $Conflict = $Result.Proposal.Conflicts[0]
         @($Conflict.ExistingCorrection.RuleId, $Conflict.IncomingCorrection.RuleId) |
             Sort-Object | Should -Be @('First/AssignmentStyle', 'Second/AssignmentStyle')
         $Conflict.Reason | Should -Match 'First/AssignmentStyle'
         $Conflict.Reason | Should -Match 'Second/AssignmentStyle'
+
         $VerboseText = ($Output | Where-Object { $_ -is [System.Management.Automation.VerboseRecord] }) -join "`n"
         $VerboseText | Should -Match "Skipped correction from 'First/AssignmentStyle'"
         $VerboseText | Should -Match "Skipped correction from 'Second/AssignmentStyle'"
@@ -209,9 +204,11 @@ Describe 'Native execution identity contracts' {
         )
         $Findings = @($Rules[0].Invoke($Ast)) + @($Rules[1].Invoke($Ast))
         $Findings[0].Corrections[0].Applicability = 'Review'
+
         $Proposal = Resolve-NitpickCorrectionProposal -Script '$Value = 1' -Finding $Findings
         $Proposal.AcceptedCorrections | Should -HaveCount 0
         $Proposal.SkippedCorrections | Should -HaveCount 2
+
         foreach ($Skipped in $Proposal.SkippedCorrections) {
             $Skipped.Correction.ChangeSetId | Should -Be Shared
             $Skipped.Reason | Should -Be "Applicability 'Review' is not selected."
@@ -222,43 +219,56 @@ Describe 'Native execution identity contracts' {
         foreach ($Namespace in 'First', 'Second') {
             Register-Nitpick -Callable (New-IdentityContractRule -Namespace $Namespace)
         }
+
         $Text = Start-Nitpicking -Script '$Value = 1' -IncludeRule '*/AssignmentStyle' -NoSummary
         $Text | Should -Match 'First/AssignmentStyle'
         $Text | Should -Match 'Second/AssignmentStyle'
+
         $Findings = @(Start-Nitpicking -Script '$Value = 1' -IncludeRule '*/AssignmentStyle' -Output Object -NoSummary)
         $Formatted = $Findings | Format-Table | Out-String -Width 240
+
         foreach ($Finding in $Findings) {
             $Formatted | Should -Match ([regex]::Escape($Finding.RuleId))
             $Finding.ToString() | Should -Match ([regex]::Escape($Finding.RuleId))
         }
     }
 
-    It 'keeps standalone labels unqualified in display and direct resolver conflicts' {
+    It 'keeps detached corrections unattributed without affecting qualified finding display' {
         $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
             '$Value = 1', [ref] $null, [ref] $null
         )
         $Findings = @(
             foreach ($Replacement in '$Value = 2', '$Value = 3') {
-                $Correction = New-NitpickCorrection -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
-                    -ReplacementText $Replacement -FilePathOrContext '<ScriptBlock>' -Description 'Replace' `
-                    -RuleName Standalone
-                New-NitpickFinding -RuleName Standalone -RuleSuppressionID Standalone `
-                    -Message 'Standalone finding' -Severity Information -ViolationExtent $Ast.Extent `
-                    -ScriptPath '<ScriptBlock>' -Explanation 'Standalone' -Corrections $Correction
+                $Correction = New-NitpickCorrection `
+                    -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
+                    -ReplacementText $Replacement `
+                    -FilePathOrContext '<ScriptBlock>' `
+                    -Description 'Replace'
+
+                New-NitpickFinding `
+                    -RuleId 'Example/Standalone' `
+                    -Message 'Standalone finding' `
+                    -Severity Information `
+                    -ViolationExtent $Ast.Extent `
+                    -ScriptPath '<ScriptBlock>' `
+                    -Explanation 'Standalone' `
+                    -Corrections $Correction
             }
         )
         $Text = InModuleScope Nitpick -Parameters @{ Ast = $Ast; Findings = $Findings } {
             param ($Ast, $Findings)
             Format-NitpickText -Ast $Ast -Finding $Findings
         }
-        $Text | Should -Match '  Standalone'
-        $Text | Should -Not -Match '(Local|_)/Standalone'
-        ($Findings | Format-Table | Out-String -Width 240) | Should -Match Standalone
-        $Findings[0].ToString() | Should -Match 'Information Standalone:'
+        $Text | Should -Match 'Example/Standalone'
+        ($Findings | Format-Table | Out-String -Width 240) | Should -Match 'Example/Standalone'
+        $Findings[0].ToString() | Should -Match 'Information Example/Standalone:'
+
         $Proposal = Resolve-NitpickCorrectionProposal -Script '$Value = 1' -Finding $Findings
-        $Proposal.Conflicts[0].Reason | Should -Match "rule 'Standalone'"
+        $Proposal.Conflicts | Should -HaveCount 1
+        $Proposal.Conflicts[0].Reason | Should -Match "rule 'unattributed'"
+
         foreach ($Finding in $Findings) {
-            $Finding.RuleId | Should -BeNullOrEmpty
+            $Finding.RuleId | Should -BeExactly 'Example/Standalone'
             $Finding.Corrections[0].RuleId | Should -BeNullOrEmpty
         }
     }
@@ -269,13 +279,21 @@ Describe 'Native execution identity contracts' {
         )
         $Findings = @(
             foreach ($Namespace in 'First', 'Second') {
-                $Correction = New-NitpickCorrection -RuleId "$Namespace/Standalone" `
+                $Correction = New-NitpickCorrection `
+                    -RuleId "$Namespace/Standalone" `
                     -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
-                    -ReplacementText "$Namespace = 2" -FilePathOrContext '<ScriptBlock>' `
+                    -ReplacementText "$Namespace = 2" `
+                    -FilePathOrContext '<ScriptBlock>' `
                     -Description 'Replace assignment.'
-                New-NitpickFinding -RuleId "$Namespace/Standalone" `
-                    -Message 'Standalone finding' -Severity Information -ViolationExtent $Ast.Extent `
-                    -ScriptPath '<ScriptBlock>' -Explanation 'Standalone' -Corrections $Correction
+
+                New-NitpickFinding `
+                    -RuleId "$Namespace/Standalone" `
+                    -Message 'Standalone finding' `
+                    -Severity Information `
+                    -ViolationExtent $Ast.Extent `
+                    -ScriptPath '<ScriptBlock>' `
+                    -Explanation 'Standalone' `
+                    -Corrections $Correction
             }
         )
         $Text = InModuleScope Nitpick -Parameters @{ Ast = $Ast; Findings = $Findings } {
@@ -291,8 +309,6 @@ Describe 'Native execution identity contracts' {
             $Table | Should -Match ([regex]::Escape($Finding.RuleId))
             $Finding.ToString() | Should -Match ([regex]::Escape($Finding.RuleId))
             $Proposal.Conflicts[0].Reason | Should -Match ([regex]::Escape($Finding.RuleId))
-            $Finding.RuleName | Should -Be Standalone
-            $Finding.RuleSuppressionID | Should -Be Standalone
             $Finding.Corrections[0].RuleId | Should -BeExactly $Finding.RuleId
         }
     }

@@ -33,11 +33,12 @@ using namespace System.Text
 
     $Ast = {}.Ast
     $Finding = New-NitpickFinding `
-        -RuleName 'MyRule' `
+        -RuleId 'Local/MyRule' `
         -Message 'This is a test message' `
         -ViolationExtent $extent `
         -Severity 'Warning' `
-        -RuleSuppressionID 'None' `
+        -ScriptPath '<ScriptBlock>' `
+        -Explanation 'Why this rule applies.' `
         -Corrections @() `
         -OutputAs 'NitpickFinding'
 

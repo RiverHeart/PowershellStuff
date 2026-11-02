@@ -187,7 +187,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Applied.Report.EffectiveText | Should -BeExactly $Expected
 
         for ($Index = 0; $Index -lt 4; $Index++) {
-            foreach ($Property in @('StartOffset', 'EndOffset', 'ExpectedText', 'ReplacementText', 'ChangeSetId', 'RuleName', 'RuleId')) {
+            foreach ($Property in @('StartOffset', 'EndOffset', 'ExpectedText', 'ReplacementText', 'ChangeSetId', 'RuleId')) {
                 $Applied.Proposal.AcceptedCorrections[$Index].$Property |
                     Should -BeExactly $Preview.Proposal.AcceptedCorrections[$Index].$Property
             }

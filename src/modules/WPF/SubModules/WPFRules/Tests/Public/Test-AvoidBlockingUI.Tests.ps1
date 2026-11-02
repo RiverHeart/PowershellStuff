@@ -40,8 +40,6 @@ Describe 'Test-AvoidBlockingUI' -Tag 'Test-AvoidBlockingUI' {
         foreach ($Finding in $Result) {
             $Finding.GetType().Name | Should -Be 'NitpickFinding'
             $Finding.RuleId | Should -BeExactly 'WPF/AvoidBlockingUI'
-            $Finding.RuleName | Should -BeExactly 'AvoidBlockingUI'
-            $Finding.RuleSuppressionID | Should -BeExactly 'AvoidBlockingUI'
         }
     }
 
@@ -55,8 +53,6 @@ Describe 'Test-AvoidBlockingUI' -Tag 'Test-AvoidBlockingUI' {
 
         $Result | Should -HaveCount 1
         $Result[0].RuleId | Should -BeExactly 'AlternateOwner/RenamedRule'
-        $Result[0].RuleName | Should -BeExactly 'RenamedRule'
-        $Result[0].RuleSuppressionID | Should -BeExactly 'RenamedRule'
     }
 
     It 'reports command extents when analyzing an inner handler script block' {

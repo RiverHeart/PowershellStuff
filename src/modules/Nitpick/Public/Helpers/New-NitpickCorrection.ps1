@@ -53,15 +53,11 @@
     in a change set is accepted or skipped together. IDs are target-wide, including across
     rules; include producer identity and occurrence unless that coupling is intentional.
 
-.PARAMETER RuleName
-    A legacy standalone display label, mutually exclusive with RuleId.
-    NitpickRule.Invoke replaces producer identity with the executing descriptor's identity.
-    Corrections do not carry a separate suppression identity.
-
 .PARAMETER RuleId
     An optional standalone identity in Namespace/Name form, without wildcard syntax.
-    Its local name populates the legacy RuleName compatibility field. Omitting both
-    RuleId and RuleName keeps the correction unattributed until coordinated execution.
+    Omitting RuleId keeps the correction unattributed until coordinated execution.
+    NitpickRule.Invoke replaces producer identity with the executing descriptor's identity.
+    Corrections do not carry a separate suppression identity.
 
 .PARAMETER ReplacementText
     Text that replaces the described source range. An empty string represents deletion.
@@ -199,9 +195,6 @@ function New-NitpickCorrection {
         [ValidateNotNullOrEmpty()]
         [string] $ChangeSetId,
 
-        [ValidateNotNullOrEmpty()]
-        [string] $RuleName,
-
         [Parameter(ParameterSetName='ByLineAndColumn', HelpMessage = "Specifies the output format for the correction extent.")]
         [Parameter(ParameterSetName='ByExtent', HelpMessage = "Specifies the output format for the correction extent.")]
         [Parameter(ParameterSetName = 'ByOffset', HelpMessage = "Specifies the output format for the correction extent.")]
@@ -212,10 +205,6 @@ function New-NitpickCorrection {
         [ValidateNotNullOrEmpty()]
         [string] $RuleId
     )
-
-    if ($PSBoundParameters.ContainsKey('RuleId') -and $PSBoundParameters.ContainsKey('RuleName')) {
-        throw 'Specify RuleId or the legacy RuleName, not both.'
-    }
 
     $Correction = $null
     $CorrectionParams = @{
@@ -253,8 +242,6 @@ function New-NitpickCorrection {
     }
     if ($PSBoundParameters.ContainsKey('RuleId')) {
         $CorrectionParams.RuleId = $RuleId
-    } elseif ($PSBoundParameters.ContainsKey('RuleName')) {
-        $CorrectionParams.RuleName = $RuleName
     }
     $Correction = [NitpickCorrection]::new($CorrectionParams)
 

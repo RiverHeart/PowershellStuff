@@ -175,7 +175,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
 
            foreach ($Correction in $Finding.Corrections) {
                 $Correction.Applicability | Should -Be 'Safe'
-                $Correction.RuleName | Should -Be 'UseIsNotOperator'
+                $Correction.RuleId | Should -Be 'Nitpick/UseIsNotOperator'
                 $Correction.TextEdit.GetType().Name | Should -Be 'AstTextEdit'
                 $Correction.Description | Should -Not -BeNullOrEmpty
                 $Correction.ExpectedText | Should -BeExactly $Source.Substring(
@@ -207,7 +207,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Findings = @($Rule.Invoke($Document.Ast))
         $Findings | Should -HaveCount 1
         $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
-        $Findings[0].RuleName | Should -Be 'UseIsNotOperator'
+        $Findings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         $Findings[0].Corrections | Should -BeNullOrEmpty
     }
 

@@ -148,7 +148,8 @@ does not create a selectable rule.
 Neither directive diagnostics nor `Nitpick/PowerShellParseError` findings are
 comment-suppressible, even under `*`. They remain subject to normal reporting and
 `ErrorOn` thresholds. Only attributed native rule findings participate in suppression;
-do not infer qualified identity from standalone findings or external DiagnosticRecords.
+standalone native findings already require qualified Rule IDs. Do not infer identity
+from external DiagnosticRecords.
 The existing deferred adapter boundary remains unchanged.
 
 Suppressed rule findings do not contribute to normal output, finding/severity totals,
@@ -202,8 +203,7 @@ for Preview, Apply, WhatIf, declined writes, and failed writes; do not rewrite p
 facts when the application outcome selects original rather than candidate reporting.
 
 Direct calls to the public correction resolver need the same suppression policy for
-qualified native inputs and candidate analysis. Standalone findings without Rule ID
-remain outside identity-based matching; no namespace is invented for them.
+qualified native inputs and candidate analysis. All native findings, including standalone findings, require Rule ID following the identity consolidation. Detached corrections may remain unattributed; suppression matches the finding, not correction identity.
 
 ## Source-coordinate requirement
 
@@ -228,8 +228,9 @@ AST's extent.
    Keep persistence in AstEditor and application/report selection in their existing owners.
 4. Add focused parser, coordinator, correction, and coordinate contract tests.
 5. Once accepted and implemented, update the README, domain terminology, maintainer
-   identity notes, and correction documentation. Clarify that legacy local-name
-   `RuleSuppressionID` compatibility is distinct from native qualified-ID directives.
+   identity notes, and correction documentation. Clarify that external local-name
+   `RuleSuppressionID` compatibility is distinct from native qualified-ID directives;
+   native legacy identity fields have already been removed.
 
 No producer changes or dependency additions are expected. Exact helper names and
 internal result shapes are implementation details, not decisions of this ADR.

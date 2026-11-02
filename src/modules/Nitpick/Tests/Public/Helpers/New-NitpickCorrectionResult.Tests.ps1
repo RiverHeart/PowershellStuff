@@ -14,15 +14,25 @@ AfterAll {
 Describe 'New-NitpickCorrectionResult' {
     BeforeEach {
         $Extent = [scriptblock]::Create('$Value = 1').Ast.EndBlock.Statements[0].Extent
-        $Correction = New-NitpickCorrection -ViolationExtent $Extent -ReplacementText '$Value = 2' `
-            -FilePathOrContext '<ScriptBlock>' -Description 'Replace value'
-        $Finding = New-NitpickFinding -ViolationExtent $Extent -Message 'Original finding' `
-            -RuleName TestRule -RuleSuppressionID TestRule -Severity Information `
-            -ScriptPath '<ScriptBlock>' -Explanation 'Constructor fixture'
+        $Correction = New-NitpickCorrection `
+            -ViolationExtent $Extent `
+            -ReplacementText '$Value = 2' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace value'
+
+        $Finding = New-NitpickFinding `
+            -ViolationExtent $Extent `
+            -Message 'Original finding' `
+            -RuleId 'Local/TestRule' `
+            -Severity Information `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Constructor fixture'
+
         $Proposal = & (Get-Module Nitpick) { [NitpickCorrectionProposal]::new() }
         $Proposal.Status = 'Ready'
         $Proposal.WasReanalyzed = $true
         $Proposal.AcceptedCorrections = @($Correction)
+
         $WriteResult = [pscustomobject]@{ WriteStatus = 'Written'; WasWritten = $true }
         $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
             [System.IO.IOException]::new('Read failed.'),

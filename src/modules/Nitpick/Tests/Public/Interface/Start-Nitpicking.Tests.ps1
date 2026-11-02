@@ -336,7 +336,7 @@ Describe 'Start-Nitpicking' {
                 -WarningAction SilentlyContinue `
                 -ErrorAction SilentlyContinue
         )
-        $ParseFinding = $Results | Where-Object RuleName -eq 'PowerShellParseError'
+        $ParseFinding = $Results | Where-Object RuleId -eq 'Nitpick/PowerShellParseError'
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $ParseFinding | Should -Not -BeNullOrEmpty
@@ -357,7 +357,7 @@ Describe 'Start-Nitpicking' {
                     -WarningAction SilentlyContinue `
                     -ErrorAction SilentlyContinue
             )
-            $ParseFinding = $Results | Where-Object RuleName -eq 'PowerShellParseError'
+            $ParseFinding = $Results | Where-Object RuleId -eq 'Nitpick/PowerShellParseError'
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
             $ParseFinding | Should -Not -BeNullOrEmpty
@@ -446,11 +446,10 @@ Describe 'Start-Nitpicking' {
             }
 
             New-NitpickFinding `
-                -RuleName ScopedRule `
+                -RuleId 'Local/ScopedRule' `
                 -Message 'Scoped rule ran' `
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity Information `
-                -RuleSuppressionID ScopedRule `
                 -ScriptPath $ScriptBlockAst.Extent.File `
                 -Explanation 'Verifies scoped dispatch.' `
                 -OutputAs NitpickFinding
@@ -483,7 +482,7 @@ Describe 'Start-Nitpicking' {
         $PathResults.Count | Should -Be 1
         $PathResults[0].Location | Should -Match 'included\.dsl\.ps1:'
         $ScriptResults.Count | Should -Be 1
-        $ScriptResults[0].RuleName | Should -Be 'ScopedRule'
+        $ScriptResults[0].RuleId | Should -Be 'Local/ScopedRule'
     }
 
     It 'returns only findings when NoSummary is specified' {
@@ -571,11 +570,10 @@ Describe 'Start-Nitpicking' {
             }, $false))
             foreach ($Variable in $Variables | Sort-Object { $_.Extent.StartLineNumber } -Descending) {
                 New-NitpickFinding `
-                    -RuleName OutOfOrder `
+                    -RuleId 'Local/OutOfOrder' `
                     -Message "$($Variable.VariablePath.UserPath) finding" `
                     -ViolationExtent $Variable.Extent `
                     -Severity Information `
-                    -RuleSuppressionID OutOfOrder `
                     -ScriptPath '<ScriptBlock>' `
                     -Explanation 'Returns findings out of order.' `
                     -OutputAs NitpickFinding
@@ -628,22 +626,21 @@ Describe 'Start-Nitpicking' {
                     -ReplacementText '$Value = 456' `
                     -FilePathOrContext '<ScriptBlock>' `
                     -Description 'First replacement.' `
-                    -RuleName 'ConflictingRule'
+                    -RuleId 'Local/ConflictingRule'
 
                 New-NitpickCorrection `
                     -ViolationExtent $Extent `
                     -ReplacementText '$Value = 789' `
                     -FilePathOrContext '<ScriptBlock>' `
                     -Description 'Second replacement.' `
-                    -RuleName 'ConflictingRule'
+                    -RuleId 'Local/ConflictingRule'
             )
 
             New-NitpickFinding `
-                -RuleName 'ConflictingRule' `
+                -RuleId 'Local/ConflictingRule' `
                 -Message 'Conflicting correction test.' `
                 -ViolationExtent $Extent `
                 -Severity Information `
-                -RuleSuppressionID 'ConflictingRule' `
                 -Corrections $Corrections `
                 -ScriptPath '<ScriptBlock>' `
                 -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
@@ -687,11 +684,10 @@ Describe 'Start-Nitpicking' {
             param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
 
             New-NitpickFinding `
-                -RuleName $RuleName `
+                -RuleId "Local/$RuleName" `
                 -Message 'Threshold test finding' `
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity $RuleSeverity `
-                -RuleSuppressionID $RuleName `
                 -ScriptPath '<ScriptBlock>' `
                 -Explanation 'Threshold test finding' `
                 -OutputAs NitpickFinding

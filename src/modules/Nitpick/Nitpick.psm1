@@ -22,7 +22,6 @@ class NitpickCorrection {
     [string] $Applicability = 'Safe'
     [string] $ChangeSetId
     [string] $RuleId
-    [string] $RuleName
     [string] $ReplacementText
     [string] $FilePathOrContext
     [string] $Description
@@ -64,6 +63,12 @@ class NitpickCorrection {
     }
 
     NitpickCorrection([hashtable] $properties) {
+        foreach ($Key in $properties.Keys) {
+            if (-not $this.PSObject.Properties[$Key]) {
+                throw "Unknown NitpickCorrection constructor key '$Key'. Rule identity uses the qualified RuleId."
+            }
+        }
+
         if ($properties.ContainsKey('TextEdit')) {
             $this.TextEdit = $properties.TextEdit
             $this.SetTextEditProjections()
@@ -73,22 +78,24 @@ class NitpickCorrection {
             $this.StartColumnNumber = $properties.StartColumnNumber
             $this.EndColumnNumber = $properties.EndColumnNumber
         }
+
         if ($properties.ContainsKey('Applicability')) {
             $this.Applicability = $properties.Applicability
         }
+
         if ($properties.ContainsKey('ChangeSetId')) {
             $this.ChangeSetId = $properties.ChangeSetId
         }
+
         if ($properties.ContainsKey('RuleId')) {
             Assert-NitpickRuleId -Value $properties.RuleId
             $this.RuleId = $properties.RuleId
-            $this.RuleName = $this.RuleId.Split('/')[1]
-        } elseif ($properties.ContainsKey('RuleName')) {
-            $this.RuleName = $properties.RuleName
         }
+
         if (-not $this.TextEdit) {
             $this.ReplacementText = $properties.ReplacementText
         }
+
         $this.FilePathOrContext = $properties.FilePathOrContext
         $this.Description = $properties.Description
         $this.Validate()
@@ -110,15 +117,18 @@ class NitpickCorrection {
         if ($this.StartLineNumber -lt 1 -or $this.EndLineNumber -lt 1) {
             throw 'Line numbers must be greater than zero.'
         }
+
         if ($this.StartColumnNumber -lt 1 -or $this.EndColumnNumber -lt 1) {
             throw 'Column numbers must be greater than zero.'
         }
+
         if ($this.EndLineNumber -lt $this.StartLineNumber -or
             ($this.EndLineNumber -eq $this.StartLineNumber -and
                 $this.EndColumnNumber -lt $this.StartColumnNumber)
         ) {
             throw 'The correction end position must not precede its start position.'
         }
+
         if ($this.Applicability -notin 'Safe', 'Review', 'Unsafe') {
             throw "Applicability must be Safe, Review, or Unsafe. Received '$($this.Applicability)'."
         }
@@ -153,41 +163,23 @@ class NitpickFinding {
     [IScriptExtent] $ViolationExtent
     [string] $Message
     [string] $RuleId
-    [string] $RuleName
-    [string] $RuleSuppressionID
     [string] $Severity
     [NitpickCorrection[]] $Corrections
     [string] $Location
 
-    NitpickFinding(
-        [IScriptExtent] $ViolationExtent,
-        [string] $replacementText,
-        [string] $filePathOrContext,
-        [string] $description
-    ) {
-        $this.ViolationExtent = $ViolationExtent
-        $this.Message = $replacementText
-        $this.RuleName = $filePathOrContext
-        $this.RuleSuppressionID = $description
-        $this.Severity = $description
-        $this.Corrections = @()
-        $this.Location =
-            $this.ViolationExtent.File + ':' +
-            $this.ViolationExtent.StartLineNumber + ':' +
-            $this.ViolationExtent.StartColumnNumber
-    }
-
     NitpickFinding([hashtable] $properties) {
+        foreach ($Key in $properties.Keys) {
+            # ScriptPath, Explanation, and RunCondition are accepted helper inputs
+            # that are not stored as finding properties.
+            if (-not ($this.PSObject.Properties[$Key] -or
+                $Key -in 'ScriptPath', 'Explanation', 'RunCondition')) {
+                throw "Unknown NitpickFinding constructor key '$Key'. Rule identity uses the qualified RuleId."
+            }
+        }
+        Assert-NitpickRuleId -Value $properties.RuleId
+        $this.RuleId = $properties.RuleId
         $this.ViolationExtent = $properties.ViolationExtent
         $this.Message = $properties.Message
-        $this.RuleName = $properties.RuleName
-        $this.RuleSuppressionID = $properties.RuleSuppressionID
-        if ($properties.ContainsKey('RuleId')) {
-            Assert-NitpickRuleId -Value $properties.RuleId
-            $this.RuleId = $properties.RuleId
-            $this.RuleName = $this.RuleId.Split('/')[1]
-            $this.RuleSuppressionID = $this.RuleName
-        }
         $this.Severity = $properties.Severity
         $this.Corrections = $properties.Corrections
         $LocationPath = if ($this.ViolationExtent.File) {
@@ -204,6 +196,8 @@ class NitpickFinding {
     }
 
     [object] ToDiagnosticRecord() {
+        Assert-NitpickRuleId -Value $this.RuleId
+        $LocalName = $this.RuleId.Split('/')[1]
         # Using `New-Object` to avoid type resolution issues at parse time
         $CorrectionExtents = New-Object 'System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]'
         foreach ($Correction in $this.Corrections) {
@@ -217,10 +211,10 @@ class NitpickFinding {
         $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord' -ArgumentList (
             $this.Message,
             $this.ViolationExtent,
-            $this.RuleName,
+            $LocalName,
             $this.Severity,
             $this.ViolationExtent.File,
-            $this.RuleSuppressionID,
+            $LocalName,
             $CorrectionExtents.PSObject.BaseObject
         )
         return $Result
@@ -442,11 +436,8 @@ class NitpickRule {
                 continue
             }
             $Finding.RuleId = $this.Id
-            $Finding.RuleName = $this.Name
-            $Finding.RuleSuppressionID = $this.Name
             foreach ($Correction in $Finding.Corrections) {
                 $Correction.RuleId = $this.Id
-                $Correction.RuleName = $this.Name
             }
         }
         return $Results

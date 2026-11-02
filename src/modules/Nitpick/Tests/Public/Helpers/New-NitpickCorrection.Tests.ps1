@@ -64,7 +64,7 @@ Describe 'New-NitpickCorrection' {
             -Description 'Replace text.' `
             -Applicability Review `
             -ChangeSetId 'changeset-1' `
-            -RuleName 'ExampleRule'
+            -RuleId 'Example/ExampleRule'
 
         $Correction.HasOffsets | Should -BeTrue
         $Correction.StartOffset | Should -Be 1
@@ -72,7 +72,7 @@ Describe 'New-NitpickCorrection' {
         $Correction.ExpectedText | Should -Be 'bc'
         $Correction.Applicability | Should -Be 'Review'
         $Correction.ChangeSetId | Should -Be 'changeset-1'
-        $Correction.RuleName | Should -Be 'ExampleRule'
+        $Correction.RuleId | Should -Be 'Example/ExampleRule'
     }
 
     It 'creates a correction from an AstEditor collection edit' {
@@ -136,7 +136,6 @@ Describe 'New-NitpickCorrection' {
         $Correction = New-NitpickCorrection @Parameters
 
         $Correction.RuleId | Should -BeExactly 'Example/TestRule'
-        $Correction.RuleName | Should -BeExactly 'TestRule'
         $Correction.ReplacementText | Should -BeExactly '$Replacement'
     }
 
@@ -163,27 +162,31 @@ Describe 'New-NitpickCorrection' {
         } | Should -Throw
     }
 
-    It 'rejects mixing explicit identity with a legacy display label' {
-        {
-            New-NitpickCorrection -RuleId 'Example/TestRule' -RuleName LegacyRule `
-                -ViolationExtent $Extent -ReplacementText '$Replacement' `
-                -FilePathOrContext '<ScriptBlock>' -Description 'Mixed identity.'
-        } | Should -Throw '*Specify RuleId or the legacy RuleName, not both*'
-    }
-
     It 'validates explicit identity in the correction hashtable constructor' {
         InModuleScope Nitpick {
             $Properties = @{
-                RuleId = 'Example/TestRule'; RuleName = 'LegacyRule'
+                RuleId = 'Example/TestRule'
                 StartLineNumber = 1; EndLineNumber = 1
                 StartColumnNumber = 1; EndColumnNumber = 2
                 ReplacementText = 'x'; Description = 'Constructor identity.'
             }
             $Correction = [NitpickCorrection]::new($Properties)
             $Correction.RuleId | Should -BeExactly 'Example/TestRule'
-            $Correction.RuleName | Should -BeExactly 'TestRule'
             $Properties.RuleId = 'Unqualified'
             { [NitpickCorrection]::new($Properties) } | Should -Throw '*Namespace/Name*'
+        }
+    }
+
+    It 'rejects unknown correction constructor keys' -ForEach @(
+        @{ Key = 'RuleName' }
+        @{ Key = 'NotARealKey' }
+    ) {
+        InModuleScope Nitpick -Parameters @{ Key = $Key } {
+            param ($Key)
+            $Properties = @{ RuleId = 'Example/TestRule' }
+            $Properties[$Key] = 'Unknown'
+            { [NitpickCorrection]::new($Properties) } |
+                Should -Throw "*Unknown NitpickCorrection constructor key '$Key'*"
         }
     }
 

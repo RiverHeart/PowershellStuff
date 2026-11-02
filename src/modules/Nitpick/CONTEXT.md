@@ -30,10 +30,10 @@ _Avoid_: Package name, implementation module (when used as the rule's identity)
 
 **Local Name**:
 A rule's canonical identifier within its namespace (for example `UseIsNotOperator`), assigned
-once by the coordinator at discovery or registration time. The `RuleName` and
-`RuleSuppressionID` properties on a finding both carry this exact value — they are not
-independent, producer-supplied identities, and a rename of a rule's backing command or
-registration changes both at once with no compatibility alias.
+once by the coordinator at discovery or registration time. The descriptor retains it
+as `Name`; native findings and corrections carry only the qualified `RuleId`.
+Diagnostic conversion derives external `RuleName` and `RuleSuppressionID` fields from
+this local component. Renames have no compatibility alias.
 _Avoid_: Display name, suppression ID (as if these were separate from Local Name)
 
 **Rule ID**:
@@ -41,14 +41,13 @@ A rule's fully qualified identity: `Namespace/Local Name` (for example `WPF/Avoi
 Used for selection, the registry key, and conflict/attribution across native findings.
 _Avoid_: Qualified name, full name
 
-### Identity direction
+### Native identity
 
-Long term, `RuleId` is the rule name and the single rule identity. The separate
-`RuleName` and `RuleSuppressionID` finding fields are transitional compatibility
-fields, not independent identities to extend. Phase 5 retains them while establishing
-coordinator-owned qualified attribution; it does not add a suppression field to corrections.
-Their eventual removal requires an explicit migration of helper signatures, standalone
-invocation, diagnostic conversion, and suppression behavior. See
+`RuleId` is the single native rule identity. Native `RuleName` and `RuleSuppressionID`
+fields and helper parameters have been removed. Findings require qualified identity at
+construction, including within producers. Detached corrections may omit identity until
+coordinated execution. No namespace is inferred. Diagnostic compatibility fields exist
+only on external DiagnosticRecords. For the historical migration, see
 [Phase 5](Docs/RulePackages.md#phase-5-findings-corrections-and-coordinator-owned-identity).
 
 ### Identity boundaries
@@ -63,18 +62,16 @@ ID does not imply a discoverable/selectable rule or a registry entry.
 
 Standalone producer/helper invocation bypasses coordinated attribution. Helpers accept
 an explicit `RuleId` in `Namespace/Name` form and validate its segments with the same
-rules as descriptor identity. For that input, legacy local fields are projections of
-the qualified ID. Helper calls cannot combine `RuleId` with legacy identity parameters.
+rules as descriptor identity. Removed legacy identity parameters no longer bind, and
+constructors reject unknown hashtable keys.
 Finding identity does not implicitly stamp nested corrections outside coordinated
 execution; callers can supply each correction's identity explicitly.
 
-The additive helper migration retains legacy signatures. When `RuleId` is absent,
-display the supplied `RuleName` without inventing a namespace. This display fallback
-does not establish identity and must not conceal missing stamping in coordinated
-execution. Built-in native producers now supply explicit `Nitpick/...` IDs for standalone
+Display uses `RuleId` without a local-name fallback; unattributed detached corrections
+render as `unattributed` in conflict and skipped-correction diagnostics. Built-in
+native producers supply explicit `Nitpick/...` IDs for standalone
 findings and corrections, and the WPF supporting-module producer supplies
 `WPF/AvoidBlockingUI`. These standalone IDs never override coordinated ownership.
-Removing legacy fields remains separate work.
 
 ## Correction lifecycle ownership
 

@@ -13,11 +13,10 @@ BeforeAll {
         )
 
         New-NitpickFinding `
-            -RuleName $RuleName `
+            -RuleId "Local/$RuleName" `
             -Message 'Competing correction.' `
             -ViolationExtent $Extent `
             -Severity Information `
-            -RuleSuppressionID $RuleName `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Exercises correction selection and attribution.' `
             -Corrections $Correction `
@@ -131,7 +130,7 @@ Describe 'Correction proposal change-set selection and failure diagnostics' -Tag
             -FilePathOrContext '<ScriptBlock>' `
             -Description $Original.Description `
             -ChangeSetId $Original.ChangeSetId `
-            -RuleName $Original.RuleName
+            -RuleId $Original.RuleId
 
         $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Result.AcceptedCorrections | Should -HaveCount 2
@@ -154,7 +153,7 @@ Describe 'Correction proposal change-set selection and failure diagnostics' -Tag
 
         foreach ($Skipped in $Result.SkippedCorrections) {
             $Skipped.Reason | Should -BeExactly 'AstEditor rejected the target because an edit is stale.'
-            $Skipped.Correction.RuleName | Should -Be 'UseIsNotOperator'
+            $Skipped.Correction.RuleId | Should -Be 'Nitpick/UseIsNotOperator'
             $Skipped.Correction.ChangeSetId | Should -Not -BeNullOrEmpty
         }
 
@@ -183,7 +182,7 @@ Describe 'Correction proposal change-set selection and failure diagnostics' -Tag
             -TextEdit $Edit `
             -FilePathOrContext '<ScriptBlock>' `
             -Description 'Competing operator replacement.' `
-            -RuleName 'CompetingRule' `
+            -RuleId 'Local/CompetingRule' `
             -ChangeSetId 'CompetingRule:operator'
 
         $CompetingFinding = New-CompetingFinding `
@@ -215,7 +214,7 @@ Describe 'Correction proposal change-set selection and failure diagnostics' -Tag
         [object]::ReferenceEquals($Conflict.IncomingCorrection, $ExpectedIncoming) | Should -BeTrue
 
         foreach ($Correction in @($Original, $CompetingCorrection)) {
-            $Conflict.Reason | Should -Match ([regex]::Escape($Correction.RuleName))
+            $Conflict.Reason | Should -Match ([regex]::Escape($Correction.RuleId))
             $Conflict.Reason | Should -Match ([regex]::Escape($Correction.ChangeSetId))
             $Range = '[{0}, {1})' -f $Correction.StartOffset, $Correction.EndOffset
             $Conflict.Reason | Should -Match ([regex]::Escape($Range))
@@ -233,7 +232,7 @@ Describe 'Correction proposal change-set selection and failure diagnostics' -Tag
 
         $Correction = New-NitpickCorrection -TextEdit $Edit `
             -FilePathOrContext '<ScriptBlock>' -Description $Edit.Reason `
-            -RuleName 'CompetingRule' -ChangeSetId $Original.ChangeSetId -Applicability Review
+            -RuleId 'Local/CompetingRule' -ChangeSetId $Original.ChangeSetId -Applicability Review
 
         $Competing = New-CompetingFinding -Extent $Findings[1].ViolationExtent -Correction $Correction
 
@@ -257,7 +256,7 @@ Describe 'Correction proposal change-set selection and failure diagnostics' -Tag
 
         $Correction = New-NitpickCorrection -TextEdit $Edit `
             -FilePathOrContext '<ScriptBlock>' -Description $Edit.Reason `
-            -RuleName 'CompetingRule' -ChangeSetId 'CompetingRule:local' -Applicability Review
+            -RuleId 'Local/CompetingRule' -ChangeSetId 'CompetingRule:local' -Applicability Review
 
         $Competing = New-CompetingFinding -Extent $Findings[1].ViolationExtent -Correction $Correction
 

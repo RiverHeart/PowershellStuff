@@ -7,6 +7,12 @@ single-pass coordinated structural fixes through the same preview and transactio
 application pipeline as simple fixes. PSScriptAnalyzer diagnostics and ungrouped
 correction suggestions remain interoperable; coordinated change sets are native-only.
 
+Native identity now uses only `RuleId`: findings require it, while detached corrections
+may omit it until coordinated execution. Earlier phase notes below mentioning native
+`RuleName` describe the historical contract, superseded by the
+[identity migration](../README.md#standalone-finding-identity). Local diagnostic names
+and suppression IDs are derived only during external conversion.
+
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
 ## Goals

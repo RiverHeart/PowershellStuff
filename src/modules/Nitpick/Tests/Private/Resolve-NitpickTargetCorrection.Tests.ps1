@@ -48,7 +48,7 @@ BeforeAll {
                 -ReplacementText '$Other' `
                 -FilePathOrContext $Document.Path `
                 -Description 'Conflicting replacement' `
-                -RuleName ConflictRule
+                -RuleId 'Local/ConflictRule'
         }
         $Rules = if ($NoReanalysis) { @() } else { @($Rule) }
         $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rules

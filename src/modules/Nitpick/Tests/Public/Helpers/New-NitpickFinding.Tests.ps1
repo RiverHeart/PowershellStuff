@@ -19,18 +19,17 @@ Describe 'New-NitpickFinding' {
 
     It 'creates a Nitpick finding from a scalar correction' {
         $Finding = New-NitpickFinding `
-            -RuleName Test-Rule `
+            -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
             -ViolationExtent $Extent `
             -Severity Warning `
-            -RuleSuppressionID NPTestRule `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
             -Corrections $Correction `
             -OutputAs NitpickFinding
 
         $Finding.GetType().Name | Should -Be 'NitpickFinding'
-        $Finding.RuleName | Should -Be 'Test-Rule'
+        $Finding.RuleId | Should -Be 'Example/Test-Rule'
         $Finding.Severity | Should -Be 'Warning'
         $Finding.Corrections.Count | Should -Be 1
         $Finding.Corrections[0] | Should -Be $Correction
@@ -38,11 +37,10 @@ Describe 'New-NitpickFinding' {
 
     It 'converts a finding to a ScriptAnalyzer DiagnosticRecord' {
         $Finding = New-NitpickFinding `
-            -RuleName Test-Rule `
+            -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
             -ViolationExtent $Extent `
             -Severity Information `
-            -RuleSuppressionID NPTestRule `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
             -Corrections $Correction `
@@ -53,17 +51,16 @@ Describe 'New-NitpickFinding' {
         $Finding.Message | Should -Be 'A problem was found.'
         $Finding.RuleName | Should -Be 'Test-Rule'
         $Finding.Severity.ToString() | Should -Be 'Information'
-        $Finding.RuleSuppressionID | Should -Be 'NPTestRule'
+        $Finding.RuleSuppressionID | Should -Be 'Test-Rule'
         $Finding.SuggestedCorrections.Count | Should -Be 1
     }
 
     It 'defaults to a native finding even when ScriptAnalyzer is loaded' {
         $Finding = New-NitpickFinding `
-            -RuleName Test-Rule `
+            -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
             -ViolationExtent $Extent `
             -Severity Information `
-            -RuleSuppressionID NPTestRule `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
             -Corrections $Correction
@@ -71,14 +68,14 @@ Describe 'New-NitpickFinding' {
         $Finding.GetType().Name | Should -Be 'NitpickFinding'
     }
 
-    It 'creates a qualified standalone finding with local compatibility fields' {
+    It 'creates a qualified standalone finding without legacy identity fields' {
         $Finding = New-NitpickFinding -RuleId 'Example/TestRule' `
             -Message 'A problem was found.' -ViolationExtent $Extent -Severity Warning `
             -ScriptPath '<ScriptBlock>' -Explanation 'Test explanation.' -Corrections $Correction
 
         $Finding.RuleId | Should -BeExactly 'Example/TestRule'
-        $Finding.RuleName | Should -BeExactly 'TestRule'
-        $Finding.RuleSuppressionID | Should -BeExactly 'TestRule'
+        $Finding.PSObject.Properties.Name | Should -Not -Contain RuleName
+        $Finding.PSObject.Properties.Name | Should -Not -Contain RuleSuppressionID
         $Finding.ToString() | Should -Match 'Warning Example/TestRule:'
         [object]::ReferenceEquals($Finding.Corrections[0], $Correction) | Should -BeTrue
         $Correction.RuleId | Should -BeNullOrEmpty
@@ -124,33 +121,41 @@ Describe 'New-NitpickFinding' {
         } | Should -Throw
     }
 
-    It 'rejects mixing explicit identity with either legacy identity parameter' -ForEach @(
-        @{ Legacy = @{ RuleName = 'LegacyRule' } }
-        @{ Legacy = @{ RuleSuppressionID = 'LegacySuppression' } }
-        @{ Legacy = @{ RuleName = 'LegacyRule'; RuleSuppressionID = 'LegacySuppression' } }
-    ) {
-        {
-            New-NitpickFinding -RuleId 'Example/TestRule' @Legacy -Message 'Mixed identity.' `
-                -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Mixed identity.'
-        } | Should -Throw
-    }
-
     It 'validates explicit identity in the finding hashtable constructor' {
         InModuleScope Nitpick -Parameters @{ Extent = $Extent } {
             param ($Extent)
 
             $Properties = @{
-                RuleId = 'Example/TestRule'; RuleName = 'LegacyRule'
-                RuleSuppressionID = 'LegacySuppression'; ViolationExtent = $Extent
+                RuleId = 'Example/TestRule'; ViolationExtent = $Extent
                 Message = 'Constructor identity.'; Severity = 'Warning'
             }
             $Finding = [NitpickFinding]::new($Properties)
             $Finding.RuleId | Should -BeExactly 'Example/TestRule'
-            $Finding.RuleName | Should -BeExactly 'TestRule'
-            $Finding.RuleSuppressionID | Should -BeExactly 'TestRule'
             $Properties.RuleId = 'Unqualified'
             { [NitpickFinding]::new($Properties) } | Should -Throw '*Namespace/Name*'
+        }
+    }
+
+    It 'requires RuleId in the helper signature and constructor' {
+        (Get-Command New-NitpickFinding).Parameters.RuleId.Attributes.Mandatory | Should -Contain $true
+        InModuleScope Nitpick {
+            { [NitpickFinding]::new(@{}) } | Should -Throw
+        }
+    }
+
+    It 'rejects unknown finding constructor keys' -ForEach @(
+        @{ Key = 'RuleName' }
+        @{ Key = 'NotARealKey' }
+    ) {
+        InModuleScope Nitpick -Parameters @{ Key = $Key; Extent = $Extent } {
+            param ($Key, $Extent)
+            $Properties = @{
+                RuleId = 'Example/TestRule'; ViolationExtent = $Extent
+                Message = 'Unknown key.'; Severity = 'Warning'
+            }
+            $Properties[$Key] = 'Unknown'
+            { [NitpickFinding]::new($Properties) } |
+                Should -Throw "*Unknown NitpickFinding constructor key '$Key'*"
         }
     }
 
@@ -173,11 +178,10 @@ Describe 'New-NitpickFinding' {
                 -ChangeSetId 'TestRule:0'
         )
         $Finding = New-NitpickFinding `
-            -RuleName Test-Rule `
+            -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
             -ViolationExtent $Extent `
             -Severity Information `
-            -RuleSuppressionID NPTestRule `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
             -Corrections (@($Correction) + $GroupedCorrections) `
@@ -194,22 +198,49 @@ Describe 'New-NitpickFinding' {
         $Diagnostic.SuggestedCorrections[0].Text | Should -BeExactly '$Replacement'
     }
 
-    It 'converts a finding with a null rule suppression ID' {
+    It 'derives diagnostic identity from the current qualified ID' {
         $Finding = New-NitpickFinding `
-            -RuleName Test-Rule `
+            -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
             -ViolationExtent $Extent `
             -Severity Warning `
-            -RuleSuppressionID NPTestRule `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
             -Corrections $Correction `
             -OutputAs NitpickFinding
-        $Finding.RuleSuppressionID = $null
+        $Finding.RuleId = 'NewOwner/RenamedRule'
 
         $DiagnosticRecord = $Finding.ToDiagnosticRecord()
 
-        $DiagnosticRecord.RuleSuppressionID | Should -BeNullOrEmpty
+        $DiagnosticRecord.RuleName | Should -BeExactly RenamedRule
+        $DiagnosticRecord.RuleSuppressionID | Should -BeExactly RenamedRule
         $DiagnosticRecord.SuggestedCorrections.Count | Should -Be 1
+    }
+
+    It 'rejects invalid identity assigned before diagnostic conversion' {
+        $Finding = New-NitpickFinding -RuleId 'Example/TestRule' -Message 'Test' `
+            -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' -Explanation 'Test'
+        $Finding.RuleId = 'Unqualified'
+        { $Finding.ToDiagnosticRecord() } | Should -Throw '*Namespace/Name*'
+    }
+
+    It 'normalizes native and external identity consistently in performance parity keys' {
+        $Finding = New-NitpickFinding -RuleId 'Nitpick/TestRule' -Message 'Test' `
+            -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' -Explanation 'Test'
+        $ScriptAst = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PSScriptRoot '..\..\..\Scripts\Measure-LinterPerformance.ps1'),
+            [ref] $null, [ref] $null
+        )
+        $KeyFunction = $ScriptAst.Find({
+            param ($Node)
+            $Node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $Node.Name -eq 'Get-FindingKey'
+        }, $false).Body.GetScriptBlock()
+
+        $NativeKey = & $KeyFunction -Finding $Finding
+        $ExternalKey = & $KeyFunction -Finding $Finding.ToDiagnosticRecord()
+
+        $NativeKey | Should -BeExactly $ExternalKey
+        $NativeKey | Should -Match '\|Nitpick/TestRule\|'
     }
 }
