@@ -7,6 +7,8 @@
 
     The rule suggests using the `[Parameter(<Attribute>)]` when the parameter is required,
     and omitting the attribute when the parameter is optional.
+    Standalone native findings and corrections use Nitpick/AvoidParameterAttributeBool.
+    Coordinated execution replaces that identity with the executing descriptor's ID.
 
 .PARAMETER Context
     Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
@@ -46,6 +48,7 @@ function Test-AvoidParameterAttributeBool {
         )
         $Command = $PSCmdlet.MyInvocation.MyCommand
         $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+        $RuleId = "Nitpick/$RuleName"
         $Metadata = [pscustomobject]@{
             Name = $RuleName
             CommandName = $Command.Name
@@ -121,15 +124,14 @@ function Test-AvoidParameterAttributeBool {
 
                 $CorrectionParams.FilePathOrContext = $FilePath
                 $CorrectionParams.Description = $Description
-                $CorrectionParams.RuleName = $RuleName
+                $CorrectionParams.RuleId = $RuleId
                 $Correction = New-NitpickCorrection @CorrectionParams
 
                 $Finding = New-NitpickFinding `
-                    -RuleName $RuleName `
+                    -RuleId $RuleId `
                     -Message "Avoid assigning Boolean values to Parameter attribute arguments" `
                     -ViolationExtent $BadNode.Extent `
                     -Severity $Metadata.Severity `
-                    -RuleSuppressionID $RuleName `
                     -Corrections $Correction `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `

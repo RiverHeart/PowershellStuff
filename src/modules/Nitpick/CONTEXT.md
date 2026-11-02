@@ -71,7 +71,10 @@ execution; callers can supply each correction's identity explicitly.
 The additive helper migration retains legacy signatures. When `RuleId` is absent,
 display the supplied `RuleName` without inventing a namespace. This display fallback
 does not establish identity and must not conceal missing stamping in coordinated
-execution. Removing legacy fields and migrating existing producers remain separate work.
+execution. Built-in native producers now supply explicit `Nitpick/...` IDs for standalone
+findings and corrections, and the WPF supporting-module producer supplies
+`WPF/AvoidBlockingUI`. These standalone IDs never override coordinated ownership.
+Removing legacy fields remains separate work.
 
 ## Correction lifecycle ownership
 

@@ -4,6 +4,11 @@ using namespace System.Management.Automation.Language
 .SYNOPSIS
     Nitpick rule.
 
+.DESCRIPTION
+    Standalone native findings use WPF/AvoidBlockingUI, following the owning package
+    rather than the supporting WPFRules module. Coordinated execution replaces that
+    identity with the executing descriptor's ID.
+
 .EXAMPLE
     Basic usage
 
@@ -147,13 +152,11 @@ function Test-AvoidBlockingUI {
                 if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
 
                 $Finding = New-NitpickFinding `
-                    -RuleName $PSCmdlet.MyInvocation.MyCommand.Name `
+                    -RuleId "WPF/$($Metadata.Name)" `
                     -Message "Avoid synchronous blocking commands in UI handlers." `
                     -Explanation $Metadata.Explanation `
                     -ViolationExtent $BadNode.Extent `
                     -Severity $Metadata.Severity `
-                    -Category $Metadata.Category `
-                    -RuleSuppressionID $Metadata.Name `
                     -ScriptPath $FilePath
 
                 Write-Output $Finding

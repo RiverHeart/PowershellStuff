@@ -38,6 +38,60 @@ AfterAll {
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
 }
 
+Describe 'Built-in producer identity migration' {
+    It 'attributes standalone <Name> findings and corrections before coordinated override' -ForEach @(
+        @{
+            Name = 'UseIsNotOperator'
+            Source = '-not ($Value -is [int])'
+            CorrectionCount = 2
+        }
+        @{
+            Name = 'AvoidParameterAttributeBool'
+            Source = 'param([Parameter(Mandatory=$true)] $Value)'
+            CorrectionCount = 1
+        }
+        @{
+            Name = 'AvoidParameterAttributeBool'
+            Source = 'param([Parameter(Mandatory=$false)] $Value)'
+            CorrectionCount = 1
+        }
+        @{
+            Name = 'AvoidAmbiguousPipelineContinuation'
+            Source = "Get-Item . |`n    Out-String`n    Write-Output value"
+            CorrectionCount = 0
+        }
+    ) {
+        $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
+            $Source, [ref] $null, [ref] $null
+        )
+        $Command = Get-Command -Name "Nitpick\Test-$Name"
+        $Context = @{ RuleBehavior = @{ OutputType = 'NitpickFinding'; SearchNestedScriptBlocks = $true } }
+        $Findings = @(& $Command -ScriptBlockAst $Ast -Context $Context)
+
+        $Findings | Should -HaveCount 1
+        $Findings[0].RuleId | Should -BeExactly "Nitpick/$Name"
+        $Findings[0].RuleName | Should -BeExactly $Name
+        $Findings[0].RuleSuppressionID | Should -BeExactly $Name
+        $Findings[0].Corrections.Count | Should -Be $CorrectionCount
+        foreach ($Correction in $Findings[0].Corrections) {
+            $Correction.RuleId | Should -BeExactly "Nitpick/$Name"
+            $Correction.RuleName | Should -BeExactly $Name
+        }
+        (& $Command -Details).Name | Should -BeExactly $Name
+
+        $Rule = New-Nitpick -Callable $Command -Namespace AlternateOwner -Name RenamedRule
+        $Coordinated = @($Rule.Invoke($Ast))
+        $Coordinated | Should -HaveCount 1
+        $Coordinated[0].RuleId | Should -BeExactly 'AlternateOwner/RenamedRule'
+        $Coordinated[0].RuleName | Should -BeExactly 'RenamedRule'
+        $Coordinated[0].RuleSuppressionID | Should -BeExactly 'RenamedRule'
+        foreach ($Correction in $Coordinated[0].Corrections) {
+            $Correction.RuleId | Should -BeExactly 'AlternateOwner/RenamedRule'
+            $Correction.RuleName | Should -BeExactly 'RenamedRule'
+        }
+    }
+}
+
 Describe 'Native execution identity contracts' {
     BeforeEach {
         InModuleScope Nitpick { (Get-NitpickRegistry).Nitpicks.Clear() }

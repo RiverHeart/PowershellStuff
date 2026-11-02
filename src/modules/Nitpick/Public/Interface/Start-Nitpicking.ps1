@@ -270,16 +270,14 @@ function Start-Nitpicking {
             $TargetFindings = [List[object]]::new()
             foreach ($ParseError in $ParseErrors) {
                 $ParserFinding = New-NitpickFinding `
-                    -RuleName 'PowerShellParseError' `
+                    -RuleId 'Nitpick/PowerShellParseError' `
                     -Message $ParseError.Message `
                     -ViolationExtent $ParseError.Extent `
                     -Severity Error `
-                    -RuleSuppressionID 'PowerShellParseError' `
                     -ScriptPath $TargetPath `
                     -Explanation 'The PowerShell parser could not parse this source.' `
                     -OutputAs NitpickFinding
 
-                $ParserFinding.RuleId = 'Nitpick/PowerShellParseError'
                 $TargetFindings.Add($ParserFinding)
             }
 

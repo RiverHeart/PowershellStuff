@@ -14,6 +14,8 @@ using namespace System.Management.Automation.Language
     negation token and replace the type-test operator. Parentheses and trivia are retained.
     Redirected and background pipelines are diagnostic-only. ScriptAnalyzer receives
     diagnostics without suggested corrections because it cannot preserve change-set atomicity.
+    Standalone native findings and corrections use Nitpick/UseIsNotOperator.
+    Coordinated execution replaces that identity with the executing descriptor's ID.
 
 .PARAMETER Context
     Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
@@ -52,6 +54,7 @@ function Test-UseIsNotOperator {
     begin {
         $Command = $PSCmdlet.MyInvocation.MyCommand
         $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+        $RuleId = "Nitpick/$RuleName"
         $Metadata = [pscustomobject]@{
             Name = $RuleName
             CommandName = $Command.Name
@@ -161,7 +164,7 @@ function Test-UseIsNotOperator {
                                 -TextEdit $Edit `
                                 -FilePathOrContext $FilePath `
                                 -Description $Edit.Reason `
-                                -RuleName $Metadata.Name `
+                                -RuleId $RuleId `
                                 -Applicability Safe `
                                 -ChangeSetId $ChangeSetId
                         }
@@ -169,11 +172,10 @@ function Test-UseIsNotOperator {
                 }
 
                 New-NitpickFinding `
-                    -RuleName $Metadata.Name `
+                    -RuleId $RuleId `
                     -Message "Uses '-not (<expression> -is <type>)' instead of '<expression> -isnot <type>'." `
                     -ViolationExtent $BadNode.Extent `
                     -Severity $Metadata.Severity `
-                    -RuleSuppressionID $Metadata.Name `
                     -Corrections $Corrections `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `

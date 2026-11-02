@@ -13,6 +13,8 @@ using namespace System.Management.Automation.Language
 
     Findings are diagnostic-only: adding a pipe or separating statements requires
     the author's intent, which cannot be inferred from formatting.
+    Standalone native findings use Nitpick/AvoidAmbiguousPipelineContinuation.
+    Coordinated execution replaces that identity with the executing descriptor's ID.
 
 .NOTES
     Warns when a separate command on the next physical line is aligned with
@@ -64,6 +66,7 @@ function Test-AvoidAmbiguousPipelineContinuation {
 
     $Command = $PSCmdlet.MyInvocation.MyCommand
     $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+    $RuleId = "Nitpick/$RuleName"
     $Metadata = [pscustomobject]@{
         Name = $RuleName
         CommandName = $Command.Name
@@ -124,11 +127,10 @@ function Test-AvoidAmbiguousPipelineContinuation {
         $CommandText = $NextCommand.CommandElements[0].Extent.Text
         $FilePath = if ($Next.Extent.File) { $Next.Extent.File } else { '<ScriptBlock>' }
         New-NitpickFinding `
-            -RuleName $RuleName `
+            -RuleId $RuleId `
             -Message "Ambiguous pipeline continuation: '$CommandText' is aligned with the preceding pipeline but starts a separate statement. Add '|' to continue the pipeline, or insert a blank line or dedent the command to make the separation explicit." `
             -ViolationExtent $NextCommand.CommandElements[0].Extent `
             -Severity $Metadata.Severity `
-            -RuleSuppressionID $RuleName `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
             -OutputAs $OutputAs

@@ -89,7 +89,11 @@ using optional `-RuleName`, still work. Without explicit `RuleId`, no namespace 
 A standalone finding does not stamp its corrections; supply their IDs separately as
 shown above. During coordinated execution, Nitpick replaces producer-supplied identity
 with the executing rule descriptor's identity on both findings and corrections.
-This is the first additive migration step; legacy field removal is deferred.
+Built-in rule producers now supply `Nitpick/...` IDs for standalone native findings
+and corrections; WPF's supporting rule supplies `WPF/AvoidBlockingUI`. Their existing
+ScriptAnalyzer diagnostic conversion still emits local names and suppression IDs.
+Legacy field removal is deferred. External DiagnosticRecord-only scaffolds are not
+native producers and remain unchanged.
 
 **TODO:**
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.

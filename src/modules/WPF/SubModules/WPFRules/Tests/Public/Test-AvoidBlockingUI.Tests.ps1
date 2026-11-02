@@ -37,6 +37,26 @@ Describe 'Test-AvoidBlockingUI' -Tag 'Test-AvoidBlockingUI' {
             'Start-Sleep -Seconds 1'
             'Wait-Longer'
         )
+        foreach ($Finding in $Result) {
+            $Finding.GetType().Name | Should -Be 'NitpickFinding'
+            $Finding.RuleId | Should -BeExactly 'WPF/AvoidBlockingUI'
+            $Finding.RuleName | Should -BeExactly 'AvoidBlockingUI'
+            $Finding.RuleSuppressionID | Should -BeExactly 'AvoidBlockingUI'
+        }
+    }
+
+    It 'allows the coordinator to override supporting-module producer attribution' {
+        $ScriptBlockAst = { On Click { Start-Sleep -Seconds 1 } }.Ast
+        $Command = Get-Command 'WPFRules\Test-AvoidBlockingUI'
+        $Command.ModuleName | Should -Be WPFRules
+        $Rule = New-Nitpick -Callable $Command -Namespace AlternateOwner -Name RenamedRule
+
+        $Result = @($Rule.Invoke($ScriptBlockAst))
+
+        $Result | Should -HaveCount 1
+        $Result[0].RuleId | Should -BeExactly 'AlternateOwner/RenamedRule'
+        $Result[0].RuleName | Should -BeExactly 'RenamedRule'
+        $Result[0].RuleSuppressionID | Should -BeExactly 'RenamedRule'
     }
 
     It 'reports command extents when analyzing an inner handler script block' {

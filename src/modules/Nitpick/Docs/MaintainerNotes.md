@@ -48,8 +48,14 @@ legacy local-name fields for diagnostic conversion. Helpers reject mixing qualif
 and legacy identity parameters. Hashtable constructors likewise validate explicit IDs
 and derive compatibility fields from them, even if legacy keys are also present.
 
-Legacy helper calls and fields remain supported unchanged in this increment. Existing
-producers are not yet migrated. A standalone finding does not assign identity to its
+Legacy helper calls and fields remain supported unchanged. Built-in native producers
+now use explicit `Nitpick/...` IDs for standalone findings and corrections; WPF's
+supporting-module producer uses `WPF/AvoidBlockingUI`, not `WPFRules/AvoidBlockingUI`.
+Parser diagnostics also use the qualified helper API rather than assigning `RuleId`
+after construction. Existing direct ScriptAnalyzer output retains local diagnostic
+names and suppression IDs through conversion.
+
+A standalone finding does not assign identity to its
 nested corrections; those can receive explicit IDs separately. Coordinated invocation
 still replaces all producer attribution. Field removal and the eventual diagnostic
 conversion cutover remain separate migration steps.
