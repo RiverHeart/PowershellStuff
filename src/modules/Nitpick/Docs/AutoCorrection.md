@@ -1,5 +1,7 @@
 # Nitpick Autocorrection
 
+**TODO:** AutoCorrection.md mixes "what is true now" (ownership boundary, result model, conflict policy) with six phases of completed plan notes. Deciding what to update vs. preserve requires reading all 730 lines carefully. The superseding-note convention works, but each remodel adds another "ignore the parts below that say X" layer. At some point, extracting the current-contract sections into their own doc and letting AutoCorrection.md become purely historical would reduce that tax.
+
 ## Status
 
 Phases 0 through 6 are implemented. Phase 7 remains proposed. Native Nitpick supports

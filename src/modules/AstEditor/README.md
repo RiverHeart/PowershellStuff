@@ -235,3 +235,7 @@ Output is written to:
 
 - AstEditor intentionally avoids mutating PowerShell AST objects in-place.
 - It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+
+## Todo
+
+- AstEditor conflict exceptions carry field snapshots, not edit instances (Data['ExistingEdit'] is a hashtable). That forced the field-matching $FindOwner logic in the resolver to map conflicts back to owning corrections — workable, but brittle if AstTextEdit fields ever change. If AstEditor could attach the actual instances (or a correlation token), the resolver's attribution would collapse to a dictionary lookup.
