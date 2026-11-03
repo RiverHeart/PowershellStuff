@@ -19,6 +19,8 @@ Start-Nitpicking -Script {
       | +         param([Parameter(Mandatory)] $MyParam)
 
   1 correction applied in memory.
+
+1 finding (1 information; 1 corrected, 0 unresolved) across 1 target in 112 ms
 ```
 
 ## Why Not Use PSScriptAnalyzer?

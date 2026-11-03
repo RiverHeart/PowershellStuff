@@ -19,6 +19,12 @@ execution and display attribution also have focused coverage in
 All current contracts execute without skipped contexts. Existing interface,
 interoperability, and autocorrection tests remain active; these contracts do not replace them.
 
+Phase notes below mentioning `ChangeSetId`, change sets, or committed corrections
+describe the historical contract, superseded by
+[the correction remodel](CorrectionRemodel.md) and
+[ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md): a correction
+is one whole fix containing atomic `TextEdits`, and "committed" is now "applied".
+
 Nitpick acquires explicit packages through `Module`, combines them with built-in rules
 and explicit registrations, and builds an invocation-local rule list. Native rule
 selection and attribution use qualified IDs; ambient loaded modules are not rule sources.
@@ -263,8 +269,8 @@ files, but cannot roll back arbitrary import side effects.
   Consequently an existing local-name suppression may still affect equally named rules
   across namespaces; qualified selection is available when that is undesirable.
 - Preserve coordinated correction grouping, applicability, and transactional saves.
-  Do not automatically rewrite producer `ChangeSetId` values: intentional cross-rule
-  coordination is already supported.
+  Identity stamping must not split a correction's atomic `TextEdits`: intentional
+  multi-edit fixes remain whole corrections.
 
 ## Phase 0: Freeze the Contracts (Complete)
 

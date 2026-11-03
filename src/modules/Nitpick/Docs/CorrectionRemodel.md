@@ -1,6 +1,6 @@
 # Plan: Correction Remodel and Summary Reporting
 
-Status: Phases 1–3 implemented (correction container remodel; applied lifecycle rename; summary counters and formatting); Phase 4 pending. Decisions ratified in [CONTEXT.md](../CONTEXT.md#correction-lifecycle) and [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
+Status: Complete. All four phases are implemented: the correction container remodel, the applied lifecycle rename, the summary counters and formatting, and the documentation/test cutover. Decisions ratified in [CONTEXT.md](../CONTEXT.md#correction-lifecycle) and [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
 
 ## Motivation
 

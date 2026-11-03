@@ -64,13 +64,13 @@ finding identity explicitly; optional detached-correction identity is not inferr
 from the parent finding.
 
 Identity is retained across the correction proposal, application, and report without
-rewriting proposal facts or changing target-wide `ChangeSetId` grouping.
+rewriting proposal facts or splitting a correction's atomic `TextEdits`.
 
 ### Proposed native comment suppression
 
 [ADR 0002](adr/0002-comment-based-rule-suppression.md) drafts coordinator-owned
 comment suppression using qualified Rule IDs, including whole-target, regional,
-and line directives. It covers correction change-set atomicity, candidate reanalysis,
+and line directives. It covers correction atomicity, candidate reanalysis,
 and in-memory source coordinates. The proposal is not yet accepted or implemented;
 it does not change the current compatibility behavior described above.
 
@@ -105,14 +105,20 @@ the outcome once, for example `1 proposed correction.` for `-FixMode Preview` an
 `1 correction applied.` after writing. Skipped, conflicting, or failed corrections report full
 counts with their proposal and application statuses. It omits the correction section when a target
 has no correction activity. Use `-Verbose` for
-per-target no-op diagnostics. Text output counts accepted edits with the same `ChangeSetId` as
-one correction; edits without a `ChangeSetId` count individually. Object output retains the
-individual edits in `Proposal.AcceptedCorrections` and `Application.CommittedCorrections`.
+per-target no-op diagnostics. Text output counts whole corrections, however many edits
+each contains. Object output retains the corrections in `Proposal.AcceptedCorrections`
+and `Application.AppliedCorrections`.
 `Proposal` retains candidate text, reanalysis, skipped corrections, and conflicts regardless
-of application outcome. Only `Application.CommittedCorrections` describes committed edits;
-`Application.Status` records whether writing succeeded, failed, or was not requested.
-Severity counts and `-ErrorOn` use `Report.EffectiveFindings`: candidate analysis for previews
-and successful writes when available, original analysis for failed or declined writes.
+of application outcome. Only `Application.AppliedCorrections` describes applied
+corrections — a successful write for file targets or an in-memory apply for script
+targets; `Application.Status` records whether writing succeeded, failed, or was not requested.
+Summary `FindingCount` and the severity counters describe detected findings from the
+original analysis, parse errors included. `-ErrorOn` and `UnresolvedFindingCount` use
+`Report.EffectiveFindings`: candidate analysis for previews and successful or in-memory
+applies when available, original analysis for failed or declined writes.
+`CorrectedFindingCount` counts findings with an applied correction;
+`CorrectableFindingCount` counts findings whose accepted corrections were not applied.
+Corrected does not mean resolved, and the counters need not sum to `FindingCount`.
 `Report.EffectiveText` contains the selected output text. `Report.AnalysisSource`
 identifies the source analyzed by `EffectiveFindings`, not necessarily `EffectiveText`:
 without reanalysis, valid candidate text can accompany original findings.
@@ -141,11 +147,13 @@ transaction ownership and constructor validation; they do not enforce immutabili
 
 The result contract intentionally breaks the earlier flat schema: use
 `Proposal.AcceptedCorrections` instead of `Corrections.Accepted`,
-`Application.CommittedCorrections` instead of `Corrections.Fixed`, and
+`Application.AppliedCorrections` instead of `Corrections.Fixed`, and
 `Report.EffectiveFindings` instead of `Findings.Final` or `Findings.Remaining`.
-`Report.FindingsWithCommittedCorrections` attributes committed edits to original findings;
-it does not claim complete resolution. The summary property is now
-`FindingsWithCommittedCorrectionsCount`, replacing `FixedFindingCount`.
+`Report.FindingsWithAppliedCorrections` attributes applied corrections to original
+findings; it does not claim complete resolution. `Report.FindingsWithAcceptedCorrections`
+attributes accepted corrections the same way regardless of application outcome. The
+summary counters are now `CorrectedFindingCount`, `CorrectableFindingCount`, and
+`UnresolvedFindingCount`, replacing `FixedFindingCount`.
 Failed writes do not turn valid accepted proposals into skipped corrections.
 
 Files retain encoding, BOM, and existing newline characters through AstEditor's transactional
@@ -157,14 +165,16 @@ so a failed target does not roll back successful changes to another target. Use
 `UseIsNotOperator` offers a native coordinated fix for `-not (<expression> -is <type>)`:
 it removes only `-not` and replaces the actual operator with `-isnot`, retaining parentheses
 and trivia. Redirected/background type-test pipelines remain diagnostic-only. ScriptAnalyzer
-also receives diagnostics only for this rule. Finding conversion omits corrections with a
-`ChangeSetId`, since ScriptAnalyzer cannot enforce atomic groups; ungrouped simple suggestions
+also receives diagnostics only for this rule. Finding conversion omits multi-edit
+corrections, since ScriptAnalyzer cannot enforce atomic groups; ungrouped simple suggestions
 remain available.
 
 Phase 6 is complete: token-aware coordinated fixes use the existing single-pass
 preview, validation, reanalysis, and per-target commit pipeline. No separate provider
-framework is required. `ChangeSetId` is target-wide; independent producers must namespace
-their IDs to avoid accidental coupling. Optional multi-pass correction remains proposed.
+framework is required. A correction's `TextEdits` array is its atomic group;
+`ChangeSetId` is retired
+([ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md)).
+Optional multi-pass correction remains proposed.
 Token acquisition scaling will be evaluated separately.
 
 See [Nitpick Autocorrection](Docs/AutoCorrection.md) for the implemented contracts,
