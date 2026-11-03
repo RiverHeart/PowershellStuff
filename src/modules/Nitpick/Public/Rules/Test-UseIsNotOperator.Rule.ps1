@@ -1,3 +1,5 @@
+using namespace System.Collections
+using namespace System.Collections.Generic
 using namespace System.Management.Automation.Language
 
 <#
@@ -38,14 +40,14 @@ using namespace System.Management.Automation.Language
 #>
 function Test-UseIsNotOperator {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
     param(
         [Parameter(Mandatory, ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
         [ScriptBlockAst] $ScriptBlockAst,
 
         [Parameter(ParameterSetName='ScriptBlockAst')]
-        [System.Collections.IDictionary] $Context,
+        [IDictionary] $Context,
 
         [Parameter(ParameterSetName='Details')]
         [switch] $Details
@@ -98,21 +100,26 @@ function Test-UseIsNotOperator {
                 $Source = $ScriptBlockAst.Extent.StartScriptPosition.GetFullScript()
                 $ParseErrors = $null
                 [void] [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $ParseErrors)
+
                 # Interpolated-string subexpressions store their tokens separately.
-                $PendingTokens = [System.Collections.Generic.Queue[Token]]::new()
-                $AllTokens = [System.Collections.Generic.List[Token]]::new()
+                $PendingTokens = [Queue[Token]]::new()
+                $AllTokens = [List[Token]]::new()
+
                 foreach ($Token in $Tokens) {
                     $PendingTokens.Enqueue($Token)
                 }
+
                 while ($PendingTokens.Count -gt 0) {
                     $Token = $PendingTokens.Dequeue()
                     $AllTokens.Add($Token)
+
                     if ($Token -is [StringExpandableToken]) {
                         foreach ($NestedToken in $Token.NestedTokens) {
                             $PendingTokens.Enqueue($NestedToken)
                         }
                     }
                 }
+
                 $Tokens = $AllTokens.ToArray()
             }
 
@@ -131,17 +138,20 @@ function Test-UseIsNotOperator {
                 # Outer -not observes redirected output or a job, not the Boolean type
                 # test result, so moving negation inside those pipelines is unsafe.
                 $IsBackground = $Pipeline.PSObject.Properties['Background'] -and $Pipeline.Background
+
                 if ($CommandExpression.Redirections.Count -eq 0 -and -not $IsBackground) {
                     $Negation = @($Tokens | Where-Object {
                         $_.Kind -eq [TokenKind]::Not -and
                             $_.Extent.StartOffset -eq $BadNode.Extent.StartOffset -and
                             $_.Extent.EndOffset -le $BadNode.Child.Extent.StartOffset
                     })
+
                     $Operator = @($Tokens | Where-Object {
                         $_.Kind -eq [TokenKind]::Is -and
                             $_.Extent.StartOffset -ge $Binary.Left.Extent.EndOffset -and
                             $_.Extent.EndOffset -le $Binary.Right.Extent.StartOffset
                     })
+
                     if ($Negation.Count -ne 1 -or $Operator.Count -ne 1) {
                         throw "Rule '$($Metadata.Name)' could not uniquely locate the negation and type-test tokens at offsets [$($BadNode.Extent.StartOffset), $($BadNode.Extent.EndOffset))."
                     }
@@ -152,11 +162,13 @@ function Test-UseIsNotOperator {
                             -Extent $Negation[0].Extent `
                             -ReplacementText '' `
                             -Reason $ChangeReason
+
                         New-AstTextEdit `
                             -Extent $Operator[0].Extent `
                             -ReplacementText '-isnot' `
                             -Reason $ChangeReason
                     )
+
                     # One fix, two edits: the correction applies them all-or-nothing.
                     $Corrections = @(
                         New-NitpickCorrection `

@@ -1,3 +1,6 @@
+using namespace System.Collections
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     PSScriptAnalyzer rule to detect instances of the `[Parameter(<Attribute>=<Bool>)]` pattern.
@@ -29,10 +32,10 @@ function Test-AvoidParameterAttributeBool {
     param(
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
-        [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
+        [ScriptBlockAst] $ScriptBlockAst,
 
         [Parameter(ParameterSetName='ScriptBlockAst')]
-        [System.Collections.IDictionary] $Context,
+        [IDictionary] $Context,
 
         [Parameter(ParameterSetName='Details')]
         [switch] $Details
@@ -69,16 +72,16 @@ function Test-AvoidParameterAttributeBool {
             $ParameterAttributes = $ScriptBlockAst.FindAll({
                 param($Ast)
 
-                $Ast -is [System.Management.Automation.Language.AttributeAst] -and
-                    $Ast.TypeName.Name -eq 'Parameter' -and
-                    $Ast.Parent -is [System.Management.Automation.Language.ParameterAst]
+                $Ast -is [AttributeAst] -and
+                $Ast.TypeName.Name -eq 'Parameter' -and
+                $Ast.Parent -is [ParameterAst]
             }, $ShouldRecurse <# ScriptAnalyzer analyzes nested scopes separately; native callers opt into recursion. #>)
 
             $MatchingArguments = foreach ($AttributeAst in $ParameterAttributes) {
                 $AttributeAst.NamedArguments | Where-Object {
                     -not $_.ExpressionOmitted -and
-                        $_.ArgumentName -in $AttributeList -and
-                        $_.Argument.Extent.Text -in '$true', '$false'
+                    $_.ArgumentName -in $AttributeList -and
+                    $_.Argument.Extent.Text -in '$true', '$false'
                 }
             }
 
@@ -92,10 +95,12 @@ function Test-AvoidParameterAttributeBool {
                 # True: argument should have no explicit value
                 if ($BadNode.Argument.Extent.Text -eq '$true') {
                     $Description = "Use '[Parameter($ArgumentName)]' instead of assigning it `$true`."
+
                     # NOTE: This is a lot but was required to produce the correct extent
                     # for carets in the ast diff.
                     $StartOffset = $BadNode.Extent.StartOffset + $ArgumentName.Length
                     $EndOffset = $BadNode.Argument.Extent.EndOffset
+
                     $CorrectionParams.TextEdit = New-AstTextEdit `
                         -StartLineNumber $BadNode.Extent.StartLineNumber `
                         -EndLineNumber $BadNode.Argument.Extent.EndLineNumber `
@@ -106,6 +111,7 @@ function Test-AvoidParameterAttributeBool {
                         -ExpectedText $BadNode.Extent.Text.Substring($ArgumentName.Length) `
                         -ReplacementText '' `
                         -Reason $Description
+
                 } elseif ($BadNode.Argument.Extent.Text -eq '$false') {
                     $Description = "Omit the '$ArgumentName' argument instead of assigning it `$false`."
                     $CorrectionParams.TextEdit = New-AstCollectionEdit `
