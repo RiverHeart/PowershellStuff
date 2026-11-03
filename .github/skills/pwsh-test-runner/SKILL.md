@@ -59,8 +59,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/Invoke-Test.ps1 
 Do not probe Pester availability by launching `powershell.exe` directly from
 `pwsh`; the inherited `PSModulePath` can hide Windows PowerShell user modules.
 
-Use `-ExitOnError` for external automation that needs failed test results to
-terminate the host with exit code 2:
+When launching with `-File`, join multiple `-Path` values with commas and no
+spaces. `-File` passes arguments verbatim, so `-Path a, b` leaves `b` unbound:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/Invoke-Test.ps1 `
+    -Suite AstEditor -Path Tests/A.Tests.ps1,Tests/B.Tests.ps1
+```
+
+Use `-ExitOnError` for external automation that needs a failed run to terminate
+the host with exit code 2. A run is failed when any test fails, or when a test
+file fails discovery (for example a parse error) or a block fails setup; those
+are printed as `[-] Container failed:` / `[-] Block failed:` lines and a
+`Failed Containers: N, Failed Blocks: M` summary line, since they do not count
+toward `Tests Passed`/`Failed`:
 
 ```powershell
 ./tools/Invoke-Test.ps1 -Suite TabCentral -ExitOnError

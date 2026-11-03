@@ -80,6 +80,10 @@ Describe 'test-runner skill scripts' {
         Set-Content -Path (Join-Path -Path $testsPath -ChildPath 'Selected.tests.ps1') -NoNewline
         "Describe 'Unselected test' { It 'fails' { `$true | Should -BeFalse } }" |
         Set-Content -Path (Join-Path -Path $testsPath -ChildPath 'Unselected.tests.ps1') -NoNewline
+        "Describe 'Broken discovery' { It 'never discovered' { `$true | Should -BeTrue }" |
+        Set-Content -Path (Join-Path -Path $testsPath -ChildPath 'Broken.tests.ps1') -NoNewline
+        "Describe 'Broken setup' { BeforeAll { throw 'setup boom' }; It 'never runs' { `$true | Should -BeTrue } }" |
+        Set-Content -Path (Join-Path -Path $testsPath -ChildPath 'Setup.tests.ps1') -NoNewline
 
         return [pscustomobject] @{
         RootPath = $RootPath
@@ -318,6 +322,49 @@ Describe 'Repository dependency' {
 
             $run.Text | Should -Match 'Starting discovery in'
             $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
+        }
+
+        It 'reports a discovery failure as a failed run instead of all tests passed' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'discovery-failure-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Broken.tests.ps1,Tests/Selected.tests.ps1', '-ExitOnError')
+
+            $run.ExitCode | Should -Be 2
+            $run.Text | Should -Match '\[-\] Container failed: .*Broken\.tests\.ps1'
+            $run.Text | Should -Match 'Broken\.tests\.ps1:1: Missing closing'
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 0'
+            $run.Text | Should -Match 'Failed Containers: 1, Failed Blocks: 0'
+            $run.Text | Should -Not -Match 'All tests passed'
+        }
+
+        It 'reports a failed block setup with its error and the affected test' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'setup-failure-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Setup.tests.ps1', '-ExitOnError')
+
+            $run.ExitCode | Should -Be 2
+            $run.Text | Should -Match '\[-\] Block failed: Broken setup\s+setup boom'
+            $run.Text | Should -Match '\[-\] Broken setup\.never runs \(Failed\)\s+setup boom'
+            $run.Text | Should -Match 'Failed Containers: 0, Failed Blocks: 1'
+        }
+
+        It 'splits comma-joined Path entries so multiple paths work under -File' {
+            $sandbox = New-TestRunnerSandbox -RootPath (Join-Path -Path $TestDrive -ChildPath 'comma-path-run')
+
+            $run = Invoke-ExternalPwshScript `
+                -WorkingDirectory $sandbox.RootPath `
+                -ScriptPath $sandbox.EntryScriptPath `
+                -Arguments @('-Suite', 'Fake', '-Path', 'Tests/Selected.tests.ps1, Tests/Unselected.tests.ps1')
+
+            $run.Text | Should -Match 'Selected\.tests\.ps1'
+            $run.Text | Should -Match 'Unselected\.tests\.ps1'
+            $run.Text | Should -Match 'Tests Passed: 1, Failed: 1'
         }
 
         It 'restores the edition-specific user module path before Pester discovery' {
