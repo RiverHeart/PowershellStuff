@@ -315,7 +315,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Preview.Report.EffectiveText | Should -Be 'param([Parameter(Mandatory)] [string] $Name)'
         [System.IO.File]::ReadAllText($Path) | Should -Be $Source
         $Preview.Application.Status | Should -Be 'Preview'
-        $Preview.Application.CommittedCorrections | Should -HaveCount 0
+        $Preview.Application.AppliedCorrections | Should -HaveCount 0
     }
 
     It 'returns rendered text instead of writing for in-memory targets' {

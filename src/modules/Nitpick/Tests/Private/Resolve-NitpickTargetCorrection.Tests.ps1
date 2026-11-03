@@ -110,7 +110,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ASSERT  ===#
         $Result.PSTypeNames[0] | Should -Be 'NitpickCorrectionResult'
         $Result.Application.Status | Should -Be 'InMemory'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
 
         $Result.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
         $Result.Report.EffectiveText | Should -BeExactly $Fixture.Proposal.CandidateText
@@ -150,8 +150,10 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         $Result.Application.Status | Should -Be $Status
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $ExpectedApplied = if ($Status -eq 'InMemory') { 1 } else { 0 }
+        $Result.Application.AppliedCorrections | Should -HaveCount $ExpectedApplied
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount $ExpectedApplied
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
         $Result.Report.EffectiveText | Should -BeExactly $Fixture.Proposal.CandidateText
         $ExpectedAnalysis = if ($NoReanalysis) { 'Original' } else { 'Candidate' }
         $Result.Report.AnalysisSource | Should -Be $ExpectedAnalysis
@@ -182,7 +184,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
 
         $Result.Application.Status | Should -Be 'Written'
-        $Result.Application.CommittedCorrections | Should -HaveCount 1
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
 
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
@@ -191,9 +193,12 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings -is [array] | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 0
 
-        $Result.Report.FindingsWithCommittedCorrections -is [array] | Should -BeTrue
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
-        $Result.Report.FindingsWithCommittedCorrections[0] | Should -Be $Fixture.Findings[0]
+        $Result.Report.FindingsWithAppliedCorrections -is [array] | Should -BeTrue
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 1
+        $Result.Report.FindingsWithAppliedCorrections[0] | Should -Be $Fixture.Findings[0]
+
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
+        $Result.Report.FindingsWithAcceptedCorrections[0] | Should -Be $Fixture.Findings[0]
 
         $Fixture.Proposal.WasReanalyzed | Should -BeTrue
 
@@ -232,12 +237,13 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         #===  ASSERT  ===#
         $Result.Application.Status | Should -Be $Status
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.CandidateText
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
 
         (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
@@ -277,8 +283,8 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
         $Result.Application.Status | Should -Be $Status
         $Result.Application.ErrorRecord | Should -Not -BeNullOrEmpty
-        $Result.Application.CommittedCorrections -is [array] | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections -is [array] | Should -BeTrue
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
@@ -295,7 +301,8 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings | Should -HaveCount 2
         $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
         (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
         $ExpectedDiskText = if ($Status -eq 'StaleSource') { '$External = 3' } else { $Fixture.Proposal.OriginalText }
@@ -342,13 +349,14 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ASSERT  ===#
         $Result.Application.Status | Should -Be 'Declined'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
         $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.SkippedCorrections | Should -HaveCount 1
@@ -391,7 +399,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Application.Status | Should -Be 'NotAttempted'
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
         $Result.Report.EffectiveFindings | Should -HaveCount 0
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 
@@ -422,11 +430,12 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Proposal.Status | Should -Be $Status
 
         $Result.Application.Status | Should -Be 'NotAttempted'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 0
 
         (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before

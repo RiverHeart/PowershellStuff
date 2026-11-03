@@ -13,7 +13,7 @@ using namespace System.Collections.Generic
     spacing between targets are left to the caller.
 
     Returns nothing when there is nothing worth reporting, meaning no accepted,
-    committed, skipped, or conflicting corrections and no failure. Each correction
+    applied, skipped, or conflicting corrections and no failure. Each correction
     counts once, however many edits it contains.
 
 .PARAMETER CorrectionResult
@@ -57,7 +57,7 @@ function Format-NitpickCorrection {
     $ProposalStatus = if ($Proposal) { $Proposal.Status } else { 'Unavailable' }
 
     $AcceptedCount = if ($Proposal) { $Proposal.AcceptedCorrections.Count } else { 0 }
-    $CommittedCount = $Application.CommittedCorrections.Count
+    $AppliedCount = $Application.AppliedCorrections.Count
     $SkippedCount = if ($Proposal) { $Proposal.SkippedCorrections.Count } else { 0 }
     $ConflictCount = if ($Proposal) { $Proposal.Conflicts.Count } else { 0 }
     $HasFailure =
@@ -68,7 +68,7 @@ function Format-NitpickCorrection {
         )
 
     if ($AcceptedCount -eq 0 -and
-        $CommittedCount -eq 0 -and
+        $AppliedCount -eq 0 -and
         $SkippedCount -eq 0 -and
         $ConflictCount -eq 0 -and
         -not $HasFailure
@@ -98,18 +98,21 @@ function Format-NitpickCorrection {
             'Preview' { '{0} proposed {1}.' -f $AcceptedCount, $CorrectionNoun }
             'WhatIf' { '{0} proposed {1}.' -f $AcceptedCount, $CorrectionNoun }
             'Declined' { '{0} proposed {1} declined.' -f $AcceptedCount, $CorrectionNoun }
-            'InMemory' { '{0} {1} applied in memory.' -f $AcceptedCount, $CorrectionNoun }
+            'InMemory' {
+                $AppliedNoun = if ($AppliedCount -eq 1) { 'correction' } else { 'corrections' }
+                '{0} {1} applied in memory.' -f $AppliedCount, $AppliedNoun
+            }
             'Written' {
-                $CommittedNoun = if ($CommittedCount -eq 1) { 'correction' } else { 'corrections' }
-                '{0} {1} applied.' -f $CommittedCount, $CommittedNoun
+                $AppliedNoun = if ($AppliedCount -eq 1) { 'correction' } else { 'corrections' }
+                '{0} {1} applied.' -f $AppliedCount, $AppliedNoun
             }
         }
     }
     if (-not $Trailer) {
         $SkippedNoun = if ($SkippedCount -eq 1) { 'correction' } else { 'corrections' }
         $ConflictNoun = if ($ConflictCount -eq 1) { 'conflict' } else { 'conflicts' }
-        $Trailer = '{0} corrections committed, {1} corrections accepted, {2} {3} skipped, {4} {5} (proposal: {6}; application: {7}).' -f
-            $CommittedCount, $AcceptedCount, $SkippedCount, $SkippedNoun,
+        $Trailer = '{0} corrections applied, {1} corrections accepted, {2} {3} skipped, {4} {5} (proposal: {6}; application: {7}).' -f
+            $AppliedCount, $AcceptedCount, $SkippedCount, $SkippedNoun,
             $ConflictCount, $ConflictNoun, $ProposalStatus, $ApplicationStatus
     }
     $Lines.Add("$Indent$Trailer")

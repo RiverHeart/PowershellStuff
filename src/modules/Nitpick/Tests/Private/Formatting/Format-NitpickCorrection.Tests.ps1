@@ -8,7 +8,7 @@ BeforeAll {
             [string] $ProposalStatus = 'Ready',
             [string] $ApplicationStatus = 'Preview',
             [object[]] $Accepted = @(),
-            [object[]] $Committed = @(),
+            [object[]] $Applied = @(),
             [object[]] $Skipped = @(),
             [object[]] $Conflicts = @(),
             [switch] $NoProposal
@@ -26,7 +26,7 @@ BeforeAll {
 
         $Application = @{
             Status = $ApplicationStatus
-            CommittedCorrections = $Committed
+            AppliedCorrections = $Applied
         }
         if ($ApplicationStatus -eq 'Written') {
             $Application.WriteResult = [pscustomobject]@{ WasWritten = $true; WriteStatus = 'Written' }
@@ -111,7 +111,9 @@ Describe 'Format-NitpickCorrection' {
         @{ Status = 'Declined'; Trailer = '1 proposed correction declined.' }
         @{ Status = 'InMemory'; Trailer = '1 correction applied in memory.' }
     ) {
-        $Result = New-TestCorrectionResult -ApplicationStatus $Status -Accepted $CoupledFix
+        $Parameters = @{ ApplicationStatus = $Status; Accepted = $CoupledFix }
+        if ($Status -eq 'InMemory') { $Parameters.Applied = $CoupledFix }
+        $Result = New-TestCorrectionResult @Parameters
 
         $Text = Format-TestCorrection $Result
 
@@ -129,7 +131,7 @@ Describe 'Format-NitpickCorrection' {
     }
 
     It 'reports applied corrections once per correction, however many edits each contains' {
-        $Result = New-TestCorrectionResult -ApplicationStatus Written -Accepted $CoupledFix -Committed $CoupledFix
+        $Result = New-TestCorrectionResult -ApplicationStatus Written -Accepted $CoupledFix -Applied $CoupledFix
 
         Format-TestCorrection $Result | Should -Match '\n  1 correction applied\.$'
     }
@@ -139,7 +141,7 @@ Describe 'Format-NitpickCorrection' {
             -Skipped @(1, 2) -Conflicts @(1)
 
         Format-TestCorrection $Result | Should -BeExactly (
-            '  0 corrections committed, 0 corrections accepted, 2 corrections skipped, 1 conflict ' +
+            '  0 corrections applied, 0 corrections accepted, 2 corrections skipped, 1 conflict ' +
             '(proposal: Rejected; application: NotAttempted).'
         )
     }

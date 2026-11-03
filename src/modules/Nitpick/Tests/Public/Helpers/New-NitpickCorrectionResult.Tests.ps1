@@ -69,22 +69,22 @@ Describe 'New-NitpickCorrectionResult' {
             Should -Be 'Application,Path,Proposal,Report'
 
         @($Result.Application.PSObject.Properties.Name | Sort-Object) -join ',' |
-            Should -Be 'CommittedCorrections,ErrorRecord,Status,WriteResult'
+            Should -Be 'AppliedCorrections,ErrorRecord,Status,WriteResult'
 
         $Result.Application.Status | Should -Be 'NotAttempted'
-        $Result.Application.CommittedCorrections -is [array] | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections -is [array] | Should -BeTrue
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         $Result.Application.WriteResult | Should -BeNullOrEmpty
         $Result.Application.ErrorRecord | Should -BeNullOrEmpty
 
         @($Result.Report.PSObject.Properties.Name | Sort-Object) -join ',' |
-            Should -Be 'AnalysisSource,EffectiveFindings,EffectiveText,FindingsWithCommittedCorrections'
+            Should -Be 'AnalysisSource,EffectiveFindings,EffectiveText,FindingsWithAcceptedCorrections,FindingsWithAppliedCorrections'
 
         $Result.Report.AnalysisSource | Should -Be 'None'
 
         ($null -eq $Result.Report.EffectiveText) | Should -BeTrue
 
-        foreach ($Property in @('EffectiveFindings', 'FindingsWithCommittedCorrections')) {
+        foreach ($Property in @('EffectiveFindings', 'FindingsWithAppliedCorrections', 'FindingsWithAcceptedCorrections')) {
             $Result.Report.$Property -is [array] | Should -BeTrue
             $Result.Report.$Property | Should -HaveCount 0
         }
@@ -94,27 +94,29 @@ Describe 'New-NitpickCorrectionResult' {
         $Result = New-NitpickCorrectionResult -Path 'Example.ps1' -Proposal $Proposal `
             -Application @{
                 Status = 'Written'
-                CommittedCorrections = @($Correction)
+                AppliedCorrections = @($Correction)
                 WriteResult = $WriteResult
             } -Report @{
                 AnalysisSource = 'Candidate'
                 EffectiveText = '$Value = 2'
                 EffectiveFindings = @($Finding)
-                FindingsWithCommittedCorrections = @($Finding)
+                FindingsWithAppliedCorrections = @($Finding)
+                FindingsWithAcceptedCorrections = @($Finding)
             }
 
         $Result.Path | Should -Be 'Example.ps1'
         [object]::ReferenceEquals($Result.Proposal, $Proposal) | Should -BeTrue
 
         $Result.Application.Status | Should -Be 'Written'
-        $Result.Application.CommittedCorrections[0] | Should -Be $Correction
+        $Result.Application.AppliedCorrections[0] | Should -Be $Correction
         $Result.Application.WriteResult | Should -Be $WriteResult
         $Result.Application.ErrorRecord | Should -BeNullOrEmpty
 
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
         $Result.Report.EffectiveFindings[0] | Should -Be $Finding
-        $Result.Report.FindingsWithCommittedCorrections[0] | Should -Be $Finding
+        $Result.Report.FindingsWithAppliedCorrections[0] | Should -Be $Finding
+        $Result.Report.FindingsWithAcceptedCorrections[0] | Should -Be $Finding
     }
 
     It 'rejects a result passed as a proposal during parameter binding' {
@@ -126,7 +128,7 @@ Describe 'New-NitpickCorrectionResult' {
 
     It 'rejects invalid collection element types' {
         { New-NitpickCorrectionResult -Proposal $Proposal `
-            -Application @{ CommittedCorrections = @('not a correction') } -ErrorAction Stop } |
+            -Application @{ AppliedCorrections = @('not a correction') } -ErrorAction Stop } |
             Should -Throw '*NitpickCorrection*'
         { New-NitpickCorrectionResult -Proposal $Proposal `
             -Report @{ AnalysisSource = 'Original'; EffectiveFindings = @('not a finding') } -ErrorAction Stop } |
@@ -141,17 +143,18 @@ Describe 'New-NitpickCorrectionResult' {
         $Findings = if ($Single) { $Finding } else { @() }
         $Result = New-NitpickCorrectionResult `
             -Proposal $Proposal `
-            -Application @{ Status = 'Written'; WriteResult = $WriteResult; CommittedCorrections = $Corrections } `
+            -Application @{ Status = 'Written'; WriteResult = $WriteResult; AppliedCorrections = $Corrections } `
             -Report @{
                 AnalysisSource = 'Candidate'
                 EffectiveFindings = $Findings
-                FindingsWithCommittedCorrections = $Findings
+                FindingsWithAppliedCorrections = $Findings
+                FindingsWithAcceptedCorrections = $Findings
             }
 
-        $Result.Application.CommittedCorrections -is [array] | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount $Count
+        $Result.Application.AppliedCorrections -is [array] | Should -BeTrue
+        $Result.Application.AppliedCorrections | Should -HaveCount $Count
 
-        foreach ($Property in @('EffectiveFindings', 'FindingsWithCommittedCorrections')) {
+        foreach ($Property in @('EffectiveFindings', 'FindingsWithAppliedCorrections', 'FindingsWithAcceptedCorrections')) {
             $Result.Report.$Property -is [array] | Should -BeTrue
             $Result.Report.$Property | Should -HaveCount $Count
         }
@@ -208,12 +211,11 @@ Describe 'New-NitpickCorrectionResult' {
             Should -Throw '*Only a Ready proposal*'
     }
 
-    It 'rejects committed corrections under <Status>' -ForEach @(
+    It 'rejects applied corrections under <Status>' -ForEach @(
         @{ Status = 'NotAttempted' }
         @{ Status = 'Preview' }
         @{ Status = 'WhatIf' }
         @{ Status = 'Declined' }
-        @{ Status = 'InMemory' }
         @{ Status = 'FailedValidation' }
         @{ Status = 'StaleSource' }
         @{ Status = 'StaleTarget' }
@@ -221,15 +223,38 @@ Describe 'New-NitpickCorrectionResult' {
         @{ Status = 'FailedWrite' }
     ) {
         { New-NitpickCorrectionResult -Proposal $Proposal `
-            -Application @{ Status = $Status; CommittedCorrections = @($Correction) } } |
-            Should -Throw '*require a Written application*'
+            -Application @{ Status = $Status; AppliedCorrections = @($Correction) } } |
+            Should -Throw '*require a Written or InMemory application*'
     }
 
-    It 'rejects attributed findings without a written application' {
+    It 'accepts applied corrections for an in-memory application' {
+        $Result = New-NitpickCorrectionResult -Proposal $Proposal `
+            -Application @{ Status = 'InMemory'; AppliedCorrections = @($Correction) } `
+            -Report @{
+                AnalysisSource = 'Candidate'
+                FindingsWithAppliedCorrections = @($Finding)
+                FindingsWithAcceptedCorrections = @($Finding)
+            }
+
+        $Result.Application.Status | Should -Be 'InMemory'
+        $Result.Application.AppliedCorrections[0] | Should -Be $Correction
+        $Result.Report.FindingsWithAppliedCorrections[0] | Should -Be $Finding
+    }
+
+    It 'accepts accepted-correction attribution without an application for Preview' {
+        $Result = New-NitpickCorrectionResult -Proposal $Proposal `
+            -Application @{ Status = 'Preview' } `
+            -Report @{ AnalysisSource = 'Candidate'; FindingsWithAcceptedCorrections = @($Finding) }
+
+        $Result.Report.FindingsWithAcceptedCorrections[0] | Should -Be $Finding
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
+    }
+
+    It 'rejects attributed findings without an applying application' {
         { New-NitpickCorrectionResult -Proposal $Proposal -Report @{
             AnalysisSource = 'Original'
-            FindingsWithCommittedCorrections = @($Finding)
-        } } | Should -Throw '*require a Written application*'
+            FindingsWithAppliedCorrections = @($Finding)
+        } } | Should -Throw '*require a Written or InMemory application*'
     }
 
     It 'requires successful persistence evidence for Written' -ForEach @(
@@ -242,14 +267,16 @@ Describe 'New-NitpickCorrectionResult' {
             Should -Throw '*successful AstEditor write result*'
     }
 
-    It 'rejects committing a correction outside the accepted proposal' {
+    It 'rejects applying a correction outside the accepted proposal under <Status>' -ForEach @(
+        @{ Status = 'Written' }
+        @{ Status = 'InMemory' }
+    ) {
         $OtherCorrection = New-NitpickCorrection -ViolationExtent $Extent -ReplacementText '$Value = 3' `
             -FilePathOrContext '<ScriptBlock>' -Description 'Unrelated edit'
-        { New-NitpickCorrectionResult -Proposal $Proposal -Application @{
-            Status = 'Written'
-            WriteResult = $WriteResult
-            CommittedCorrections = @($OtherCorrection)
-        } } | Should -Throw '*proposal accepted corrections*'
+        $Application = @{ Status = $Status; AppliedCorrections = @($OtherCorrection) }
+        if ($Status -eq 'Written') { $Application.WriteResult = $WriteResult }
+        { New-NitpickCorrectionResult -Proposal $Proposal -Application $Application } |
+            Should -Throw '*proposal accepted corrections*'
     }
 
     It 'requires a Ready proposal for Written' {
@@ -259,11 +286,23 @@ Describe 'New-NitpickCorrectionResult' {
             Should -Throw '*Ready proposal*'
     }
 
-    It 'rejects attributing findings when no corrections were committed' {
+    It 'rejects attributing findings when no corrections were applied under <Status>' -ForEach @(
+        @{ Status = 'Written' }
+        @{ Status = 'InMemory' }
+    ) {
+        $Application = @{ Status = $Status }
+        if ($Status -eq 'Written') { $Application.WriteResult = $WriteResult }
         { New-NitpickCorrectionResult -Proposal $Proposal `
-            -Application @{ Status = 'Written'; WriteResult = $WriteResult } `
-            -Report @{ AnalysisSource = 'Original'; FindingsWithCommittedCorrections = @($Finding) } } |
-            Should -Throw '*none were committed*'
+            -Application $Application `
+            -Report @{ AnalysisSource = 'Original'; FindingsWithAppliedCorrections = @($Finding) } } |
+            Should -Throw '*none were applied*'
+    }
+
+    It 'rejects attributing findings to accepted corrections when none were accepted' {
+        $Proposal.AcceptedCorrections = @()
+        { New-NitpickCorrectionResult -Proposal $Proposal `
+            -Report @{ AnalysisSource = 'Original'; FindingsWithAcceptedCorrections = @($Finding) } } |
+            Should -Throw '*none were accepted*'
     }
 
     It 'rejects candidate reporting without valid reanalysis: <Reason>' -ForEach @(
@@ -308,7 +347,8 @@ Describe 'New-NitpickCorrectionResult' {
     It 'rejects report content when AnalysisSource is None: <Property>' -ForEach @(
         @{ Property = 'EffectiveText'; Value = '' }
         @{ Property = 'EffectiveFindings'; Value = $null }
-        @{ Property = 'FindingsWithCommittedCorrections'; Value = $null }
+        @{ Property = 'FindingsWithAppliedCorrections'; Value = $null }
+        @{ Property = 'FindingsWithAcceptedCorrections'; Value = $null }
     ) {
         $Content = if ($Property -eq 'EffectiveText') { $Value } else { @($Finding) }
         { New-NitpickCorrectionResult -Report @{ $Property = $Content } } |
@@ -340,12 +380,12 @@ Describe 'New-NitpickCorrectionResult' {
         $First = New-NitpickCorrectionResult
         $Second = New-NitpickCorrectionResult
 
-        $First.Application.CommittedCorrections += $Correction
+        $First.Application.AppliedCorrections += $Correction
         $First.Application.Status = 'Written'
         $First.Report.EffectiveFindings += $Finding
         $First.Report.AnalysisSource = 'Candidate'
 
-        $Second.Application.CommittedCorrections | Should -HaveCount 0
+        $Second.Application.AppliedCorrections | Should -HaveCount 0
         $Second.Application.Status | Should -Be 'NotAttempted'
         $Second.Report.EffectiveFindings | Should -HaveCount 0
         $Second.Report.AnalysisSource | Should -Be 'None'

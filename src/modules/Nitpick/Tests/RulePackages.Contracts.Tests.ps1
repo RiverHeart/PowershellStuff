@@ -200,7 +200,7 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
             $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
             $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
-            $Preview.Application.CommittedCorrections | Should -HaveCount 0
+            $Preview.Application.AppliedCorrections | Should -HaveCount 0
             $Preview.Proposal.AcceptedCorrections[0].TextEdits | Should -HaveCount 2
 
             [System.IO.File]::ReadAllText($Path) | Should -Be $Source

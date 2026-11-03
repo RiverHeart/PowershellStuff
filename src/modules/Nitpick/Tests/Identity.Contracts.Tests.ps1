@@ -140,7 +140,7 @@ Describe 'Native execution identity contracts' {
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
         $Result.Proposal.AcceptedCorrections | Should -HaveCount 1
         foreach ($Finding in @($Result.Proposal.OriginalFindings) + @($Result.Proposal.CandidateFindings) +
-            @($Result.Report.EffectiveFindings) + @($Result.Report.FindingsWithCommittedCorrections)) {
+            @($Result.Report.EffectiveFindings) + @($Result.Report.FindingsWithAppliedCorrections)) {
             $Finding.RuleId | Should -Be 'Local/AssignmentStyle'
         }
         $Result.Proposal.AcceptedCorrections[0].RuleId | Should -Be 'Local/AssignmentStyle'
@@ -151,16 +151,19 @@ Describe 'Native execution identity contracts' {
 
         $Result.Report.AnalysisSource | Should -Be Candidate
 
-        if ($Status -eq 'Written') {
-            $Result.Application.CommittedCorrections[0].RuleId | Should -Be 'Local/AssignmentStyle'
+        if ($Status -in 'Written', 'InMemory') {
+            $Result.Application.AppliedCorrections[0].RuleId | Should -Be 'Local/AssignmentStyle'
             [object]::ReferenceEquals(
-                $Result.Application.CommittedCorrections[0],
+                $Result.Application.AppliedCorrections[0],
                 $Result.Proposal.AcceptedCorrections[0]
             ) | Should -BeTrue
-            $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
+            $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 1
+        } else {
+            $Result.Application.AppliedCorrections | Should -HaveCount 0
+        }
+        if ($Status -eq 'Written') {
             [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 2'
         } else {
-            $Result.Application.CommittedCorrections | Should -HaveCount 0
             [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
         }
     }

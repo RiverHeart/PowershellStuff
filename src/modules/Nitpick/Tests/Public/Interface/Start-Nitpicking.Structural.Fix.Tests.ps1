@@ -120,7 +120,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         $Result.Application.Status | Should -Be 'InMemory'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 2
 
         $Result.Proposal.Document.IsFileBacked | Should -BeFalse
         $Result.Proposal.WasReanalyzed | Should -BeTrue
@@ -132,7 +132,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Report.EffectiveText | Should -BeExactly $Expected
 
         $Summary.FindingCount | Should -Be 0
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 0
+        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 2
 
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
 
@@ -153,13 +153,14 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         $Preview.Application.Status | Should -Be 'Preview'
         $Preview.Application.WriteResult | Should -BeNullOrEmpty
-        $Preview.Application.CommittedCorrections | Should -HaveCount 0
+        $Preview.Application.AppliedCorrections | Should -HaveCount 0
         $Preview.Report.EffectiveText | Should -BeExactly $Expected
-        $Preview.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Preview.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Preview.Report.FindingsWithAcceptedCorrections | Should -HaveCount 2
         $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
 
         $PreviewSummary.FindingCount | Should -Be 0
-        $PreviewSummary.FindingsWithCommittedCorrectionsCount | Should -Be 0
+        $PreviewSummary.FindingsWithAppliedCorrectionsCount | Should -Be 0
 
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) | Should -BeExactly $OriginalBytes
 
@@ -201,15 +202,15 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
             }
         }
 
-        $Applied.Application.CommittedCorrections | Should -HaveCount 2
-        $Applied.Report.FindingsWithCommittedCorrections | Should -HaveCount 2
+        $Applied.Application.AppliedCorrections | Should -HaveCount 2
+        $Applied.Report.FindingsWithAppliedCorrections | Should -HaveCount 2
         $Applied.Report.EffectiveFindings | Should -HaveCount 0
         $Summary.TargetCount | Should -Be 1
         $Summary.FindingCount | Should -Be 0
         $Summary.InformationCount | Should -Be 0
         $Summary.WarningCount | Should -Be 0
         $Summary.ErrorCount | Should -Be 0
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 2
+        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 2
         $Summary.SkippedCorrectionCount | Should -Be 0
         $Summary.FailedTargetCount | Should -Be 0
         $ExpectedBytes = [byte[]](@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))
@@ -230,11 +231,11 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Second.Proposal.Status | Should -Be 'NoChanges'
         $Second.Proposal.AcceptedCorrections | Should -HaveCount 0
         $Second.Application.Status | Should -Be 'NotAttempted'
-        $Second.Application.CommittedCorrections | Should -HaveCount 0
+        $Second.Application.AppliedCorrections | Should -HaveCount 0
         $Second.Report.EffectiveFindings | Should -HaveCount 0
     }
 
-    It 'uses candidate findings under WhatIf without reporting either group committed' {
+    It 'uses candidate findings under WhatIf without reporting either group applied' {
         Mock Save-AstDocument -ModuleName Nitpick { throw 'WhatIf must not call Save.' }
 
         [array] $Results = Start-Nitpicking `
@@ -251,17 +252,18 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         $Result.Application.Status | Should -Be 'WhatIf'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.AcceptedCorrections | Should -HaveCount 2
 
         $Result.Report.EffectiveText | Should -BeExactly $Expected
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 2
         $Result.Report.EffectiveFindings | Should -HaveCount 0
 
         $Summary.FindingCount | Should -Be 0
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 0
+        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 0
 
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
 
@@ -292,7 +294,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Application.Status | Should -Be 'FailedWrite'
         $Result.Application.WriteResult.WasWritten | Should -BeFalse
         $Result.Application.ErrorRecord | Should -Not -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.CandidateText | Should -BeExactly $Expected
@@ -303,13 +305,14 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveText | Should -BeExactly $Source
         $Result.Report.EffectiveFindings | Should -HaveCount 2
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 2
 
         $Findings | Should -HaveCount 2
 
         $Summary.FindingCount | Should -Be 2
         $Summary.InformationCount | Should -Be 2
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 0
+        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 0
         $Summary.SkippedCorrectionCount | Should -Be 0
         $Summary.FailedTargetCount | Should -Be 1
 
@@ -343,15 +346,15 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount 1
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 1
         $Result.Report.EffectiveFindings | Should -HaveCount 1
         $Result.Report.EffectiveFindings[0].Corrections | Should -BeNullOrEmpty
         $Result.Report.EffectiveText | Should -BeExactly $MixedExpected
 
         $Summary.FindingCount | Should -Be 1
         $Summary.InformationCount | Should -Be 1
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 1
+        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 1
         $Summary.FailedTargetCount | Should -Be 0
 
         ($Errors | Out-String) | Should -Match "Encountered 1 findings at or above the 'Information' severity threshold"

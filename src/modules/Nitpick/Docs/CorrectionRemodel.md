@@ -1,6 +1,6 @@
 # Plan: Correction Remodel and Summary Reporting
 
-Status: Phase 1 implemented (correction container remodel); Phases 2–4 pending. Decisions ratified in [CONTEXT.md](../CONTEXT.md#correction-lifecycle) and [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
+Status: Phases 1–2 implemented (correction container remodel; applied lifecycle rename); Phases 3–4 pending. Decisions ratified in [CONTEXT.md](../CONTEXT.md#correction-lifecycle) and [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
 
 ## Motivation
 
@@ -39,7 +39,7 @@ The remodel makes the fix the unit of choice and the edit the unit of applicatio
 
 ## Phase 3 — Summary
 
-- `NitpickSummary`: `FindingCount`, `ErrorCount`, `WarningCount`, `InformationCount` switch to detected findings. Add `CorrectedFindingCount`, `CorrectableFindingCount`, `UnresolvedFindingCount`, and a `FixMode` field (for formatting). Remove `FindingsWithCommittedCorrectionsCount`. `SkippedCorrectionCount` now counts corrections (fixes), not edits.
+- `NitpickSummary`: `FindingCount`, `ErrorCount`, `WarningCount`, `InformationCount` switch to detected findings. Add `CorrectedFindingCount`, `CorrectableFindingCount`, `UnresolvedFindingCount`, and a `FixMode` field (for formatting). Remove `FindingsWithAppliedCorrectionsCount` (renamed from `FindingsWithCommittedCorrectionsCount` in Phase 2, where it also began counting in-memory applies). `SkippedCorrectionCount` now counts corrections (fixes), not edits.
 - `Start-Nitpicking`: count detected from the pre-correction finding set (parse-error findings included); unresolved from `Report.EffectiveFindings`; corrected/correctable from the report attribution lists. Pipeline object output continues to emit effective findings. The `-ErrorOn` threshold counter is untouched.
 - `ToString()`: omit zero-count severities; append the corrected/correctable/unresolved clause only when `FixMode` is not `Off`, labeling with whichever of corrected or correctable is in play:
   - Apply (in-memory): `1 finding (1 information; 1 corrected, 0 unresolved) across 1 target in 112 ms`

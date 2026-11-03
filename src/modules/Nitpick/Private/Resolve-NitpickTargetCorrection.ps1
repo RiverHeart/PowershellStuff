@@ -65,6 +65,7 @@ function Resolve-NitpickTargetCorrection {
             $Application.Status = 'Preview'
         } elseif (-not $Document.IsFileBacked) {
             $Application.Status = 'InMemory'
+            $Application.AppliedCorrections = $Proposal.AcceptedCorrections
         } elseif ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
             $WriteResult = Save-AstDocument -Document $Document -Confirm:$false -WhatIf:$false
 
@@ -73,7 +74,7 @@ function Resolve-NitpickTargetCorrection {
             $Application.ErrorRecord = $WriteResult.ErrorRecord
 
             if ($WriteResult.WasWritten) {
-                $Application.CommittedCorrections = $Proposal.AcceptedCorrections
+                $Application.AppliedCorrections = $Proposal.AcceptedCorrections
             }
         } else {
             $Application.Status = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
@@ -85,6 +86,21 @@ function Resolve-NitpickTargetCorrection {
         $Application.Status -in 'InMemory', 'Preview', 'WhatIf', 'Written'
 
     $UseCandidateFindings = $UseCandidateText -and $Proposal.WasReanalyzed
+
+    # Attribution: a finding belongs to a list when any of its corrections is in that list.
+    $SelectFindingsWithCorrections = {
+        param ([NitpickCorrection[]] $Corrections)
+
+        foreach ($OriginalFinding in $Proposal.OriginalFindings) {
+            foreach ($Correction in $OriginalFinding.Corrections) {
+                if ($Correction -in $Corrections) {
+                    $OriginalFinding
+                    break
+                }
+            }
+        }
+    }
+
     $Report = @{
         AnalysisSource = if ($UseCandidateFindings) { 'Candidate' } else { 'Original' }
         EffectiveText = if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
@@ -94,16 +110,8 @@ function Resolve-NitpickTargetCorrection {
             $Proposal.OriginalFindings
         }
 
-        FindingsWithCommittedCorrections = @(
-            foreach ($OriginalFinding in $Proposal.OriginalFindings) {
-                foreach ($Correction in $OriginalFinding.Corrections) {
-                    if ($Correction -in $Application.CommittedCorrections) {
-                        $OriginalFinding
-                        break
-                    }
-                }
-            }
-        )
+        FindingsWithAppliedCorrections = @(& $SelectFindingsWithCorrections $Application.AppliedCorrections)
+        FindingsWithAcceptedCorrections = @(& $SelectFindingsWithCorrections $Proposal.AcceptedCorrections)
     }
 
     Write-Verbose (

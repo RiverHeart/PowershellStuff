@@ -311,8 +311,8 @@ function Start-Nitpicking {
                     -Rule $ApplicableRules.ToArray()
 
                 $FinalFindings = $CorrectionResult.Report.EffectiveFindings
-                $Summary.FindingsWithCommittedCorrectionsCount +=
-                    $CorrectionResult.Report.FindingsWithCommittedCorrections.Count
+                $Summary.FindingsWithAppliedCorrectionsCount +=
+                    $CorrectionResult.Report.FindingsWithAppliedCorrections.Count
 
                 $Summary.SkippedCorrectionCount += $CorrectionResult.Proposal.SkippedCorrections.Count
 

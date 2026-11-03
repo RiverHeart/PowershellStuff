@@ -250,7 +250,7 @@ class NitpickSummary {
     [int] $ErrorCount
     [int] $WarningCount
     [int] $InformationCount
-    [int] $FindingsWithCommittedCorrectionsCount
+    [int] $FindingsWithAppliedCorrectionsCount
     [int] $SkippedCorrectionCount
     [int] $ConflictedTargetCount
     [int] $FailedTargetCount
@@ -682,7 +682,7 @@ class NitpickCorrectionProposal {
 
 class NitpickCorrectionApplication {
     [string] $Status = 'NotAttempted'
-    [NitpickCorrection[]] $CommittedCorrections = @()
+    [NitpickCorrection[]] $AppliedCorrections = @()
     [psobject] $WriteResult
     [ErrorRecord] $ErrorRecord
 }
@@ -691,7 +691,8 @@ class NitpickCorrectionReport {
     [string] $AnalysisSource = 'None'
     [string] $EffectiveText
     [NitpickFinding[]] $EffectiveFindings = @()
-    [NitpickFinding[]] $FindingsWithCommittedCorrections = @()
+    [NitpickFinding[]] $FindingsWithAppliedCorrections = @()
+    [NitpickFinding[]] $FindingsWithAcceptedCorrections = @()
 }
 
 class NitpickCorrectionResult {

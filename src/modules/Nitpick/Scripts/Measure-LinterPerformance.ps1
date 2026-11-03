@@ -202,7 +202,7 @@ try {
     if (-not $PreviewUnchanged -or $Applied.Application.Status -ne 'Written' -or
         $Second.Proposal.Status -ne 'NoChanges' -or -not $BytesPreserved -or
         $Applied.Report.EffectiveFindings.Count -ne 0 -or
-        $Applied.Report.FindingsWithCommittedCorrections.Count -ne 1) {
+        $Applied.Report.FindingsWithAppliedCorrections.Count -ne 1) {
         throw 'Preview/apply/idempotence checks failed.'
     }
 
@@ -229,7 +229,7 @@ try {
             BytesPreserved = $BytesPreserved
             Applied = $Applied.Application.Status -eq 'Written'
             AcceptedEdits = $Preview.Proposal.AcceptedCorrections.Count
-            FindingsWithCommittedCorrections = $Applied.Report.FindingsWithCommittedCorrections.Count
+            FindingsWithAppliedCorrections = $Applied.Report.FindingsWithAppliedCorrections.Count
             RemainingFindings = $Applied.Report.EffectiveFindings.Count
             SecondRun = $Second.Proposal.Status
             EffectiveText = $Applied.Report.EffectiveText
