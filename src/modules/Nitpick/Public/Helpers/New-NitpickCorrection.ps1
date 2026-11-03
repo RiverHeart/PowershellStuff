@@ -6,12 +6,14 @@
 .DESCRIPTION
     Creates an immutable description of a text correction. Line and column positions are
     one-based to preserve PSScriptAnalyzer CorrectionExtent compatibility. Native offsets
-    are zero-based and end-exclusive. A correction describes a proposed edit but does not
-    mutate a file; application belongs to a target-level correction coordinator.
+    are zero-based and end-exclusive. A correction is one complete fix for a finding: it
+    contains the AstEditor text edits that together realize it, applied all-or-nothing.
+    A correction does not mutate a file; application belongs to a target-level correction
+    coordinator.
 
     Extent-based corrections capture offsets and expected source text automatically.
     Direct offset construction is retained for compatibility but is deprecated; new callers
-    should create a validated AstEditor edit and pass it through TextEdit. Corrections created only
+    should create validated AstEditor edits and pass them through TextEdit. Corrections created only
     from line and column positions remain suitable for PSScriptAnalyzer interoperability
     but are not natively applicable until a later coordinator resolves them against source.
 
@@ -20,8 +22,9 @@
     the correction.
 
 .PARAMETER TextEdit
-    A detached AstEditor edit whose coordinates, expected text, and replacement text are
-    projected by the correction. The edit remains the authoritative source-edit object.
+    One or more detached AstEditor edits that together form this correction. The edits
+    apply all-or-nothing; the first edit anchors the correction's display coordinates.
+    The edits remain the authoritative source-edit objects.
 
 .PARAMETER StartLineNumber
     The one-based line on which the correction begins.
@@ -47,11 +50,6 @@
 
 .PARAMETER Applicability
     Classifies the correction as Safe, Review, or Unsafe. The default is Safe.
-
-.PARAMETER ChangeSetId
-    An optional identifier shared by corrections that form one change set. Every correction
-    in a change set is accepted or skipped together. IDs are target-wide, including across
-    rules; include producer identity and occurrence unless that coupling is intentional.
 
 .PARAMETER RuleId
     An optional standalone identity in Namespace/Name form, without wildcard syntax.
@@ -106,20 +104,23 @@
     Creates a zero-width insertion. ExpectedText is empty because the range contains no text.
 
 .EXAMPLE
-    $First = New-NitpickCorrection `
-        -ViolationExtent $FirstExtent `
-        -ReplacementText '$First = 2' `
+    $Edits = @(
+        New-AstTextEdit `
+            -Extent $FirstExtent `
+            -ReplacementText '$First = 2' `
+            -Reason 'Replace the coupled assignments.'
+        New-AstTextEdit `
+            -Extent $SecondExtent `
+            -ReplacementText '$Second = 3' `
+            -Reason 'Replace the coupled assignments.'
+    )
+    New-NitpickCorrection `
+        -TextEdit $Edits `
         -FilePathOrContext '<ScriptBlock>' `
-        -Description 'Replace the first assignment.' `
-        -ChangeSetId 'CoupledAssignments'
-    $Second = New-NitpickCorrection `
-        -ViolationExtent $SecondExtent `
-        -ReplacementText '$Second = 3' `
-        -FilePathOrContext '<ScriptBlock>' `
-        -Description 'Replace the second assignment.' `
-        -ChangeSetId 'CoupledAssignments'
+        -Description 'Replace the coupled assignments.'
 
-    Creates two corrections in one change set. A coordinator accepts or skips both together.
+    Creates one correction containing two edits. The edits are one fix: a coordinator
+    accepts or skips them together, and they are applied all-or-nothing.
 
 .EXAMPLE
     New-NitpickCorrection `
@@ -141,8 +142,9 @@ function New-NitpickCorrection {
         [System.Management.Automation.Language.IScriptExtent] $ViolationExtent,
 
         [Parameter(Mandatory, ParameterSetName = 'ByTextEdit')]
+        [ValidateCount(1, [int]::MaxValue)]
         [ValidateScript({ $_.GetType().Name -eq 'AstTextEdit' })]
-        [psobject] $TextEdit,
+        [psobject[]] $TextEdit,
 
         [Parameter(Mandatory, ParameterSetName = 'ByLineAndColumn')]
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
@@ -192,9 +194,6 @@ function New-NitpickCorrection {
         [ValidateSet('Safe', 'Review', 'Unsafe')]
         [string] $Applicability = 'Safe',
 
-        [ValidateNotNullOrEmpty()]
-        [string] $ChangeSetId,
-
         [Parameter(ParameterSetName='ByLineAndColumn', HelpMessage = "Specifies the output format for the correction extent.")]
         [Parameter(ParameterSetName='ByExtent', HelpMessage = "Specifies the output format for the correction extent.")]
         [Parameter(ParameterSetName = 'ByOffset', HelpMessage = "Specifies the output format for the correction extent.")]
@@ -213,12 +212,12 @@ function New-NitpickCorrection {
         Applicability = $Applicability
     }
     if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
-        $CorrectionParams.TextEdit = New-AstTextEdit `
+        $CorrectionParams.TextEdits = @(New-AstTextEdit `
             -Extent $ViolationExtent `
             -ReplacementText $ReplacementText `
-            -Reason $Description
+            -Reason $Description)
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByOffset') {
-        $CorrectionParams.TextEdit = New-AstTextEdit `
+        $CorrectionParams.TextEdits = @(New-AstTextEdit `
             -StartLineNumber $StartLineNumber `
             -EndLineNumber $EndLineNumber `
             -StartColumnNumber $StartColumnNumber `
@@ -227,18 +226,15 @@ function New-NitpickCorrection {
             -EndOffset $EndOffset `
             -ExpectedText $ExpectedText `
             -ReplacementText $ReplacementText `
-            -Reason $Description
+            -Reason $Description)
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByTextEdit') {
-        $CorrectionParams.TextEdit = $TextEdit
+        $CorrectionParams.TextEdits = @($TextEdit)
     } else {
         $CorrectionParams.StartLineNumber = $StartLineNumber
         $CorrectionParams.EndLineNumber = $EndLineNumber
         $CorrectionParams.StartColumnNumber = $StartColumnNumber
         $CorrectionParams.EndColumnNumber = $EndColumnNumber
         $CorrectionParams.ReplacementText = $ReplacementText
-    }
-    if ($PSBoundParameters.ContainsKey('ChangeSetId')) {
-        $CorrectionParams.ChangeSetId = $ChangeSetId
     }
     if ($PSBoundParameters.ContainsKey('RuleId')) {
         $CorrectionParams.RuleId = $RuleId

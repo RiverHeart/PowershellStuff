@@ -40,15 +40,27 @@ BeforeAll {
             }
         }
         if ($Invalid) {
-            $Findings[0].Corrections[1].TextEdit.ReplacementText = '('
+            $Findings[0].Corrections[0].TextEdits[1].ReplacementText = '('
         }
         if ($Conflict) {
-            $Findings[0].Corrections += New-NitpickCorrection `
+            # The conflicting fix must come from a separate finding: two Safe
+            # corrections on one finding are skipped as ambiguous alternatives
+            # before any edit is queued.
+            $ConflictCorrection = New-NitpickCorrection `
                 -ViolationExtent $Document.Ast.EndBlock.Statements[0].Extent `
                 -ReplacementText '$Other' `
                 -FilePathOrContext $Document.Path `
                 -Description 'Conflicting replacement' `
                 -RuleId 'Local/ConflictRule'
+            $Findings += New-NitpickFinding `
+                -RuleId 'Local/ConflictRule' `
+                -Message 'Conflicting fix.' `
+                -ViolationExtent $Document.Ast.EndBlock.Statements[0].Extent `
+                -Severity Information `
+                -ScriptPath $Document.Path `
+                -Explanation 'Overlaps the UseIsNotOperator fix.' `
+                -Corrections $ConflictCorrection `
+                -OutputAs NitpickFinding
         }
         $Rules = if ($NoReanalysis) { @() } else { @($Rule) }
         $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rules
@@ -170,7 +182,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
 
         $Result.Application.Status | Should -Be 'Written'
-        $Result.Application.CommittedCorrections | Should -HaveCount 2
+        $Result.Application.CommittedCorrections | Should -HaveCount 1
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
 
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
@@ -270,7 +282,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
-        $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 1
         $Result.Proposal.CandidateFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         foreach ($Correction in @($Result.Proposal.AcceptedCorrections) +
             @($Result.Proposal.SkippedCorrections.Correction) +
@@ -339,7 +351,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
-        $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 1
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
         $Result.Proposal.CandidateFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         foreach ($Correction in @($Result.Proposal.AcceptedCorrections) +

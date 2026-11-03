@@ -21,12 +21,12 @@ Describe 'New-NitpickCorrection' {
             -Description 'Replace the value.'
 
         $Correction.GetType().Name | Should -Be 'NitpickCorrection'
-        $Correction.TextEdit.GetType().Name | Should -Be 'AstTextEdit'
+        $Correction.TextEdits.Count | Should -Be 1
+        $Correction.TextEdits[0].GetType().Name | Should -Be 'AstTextEdit'
         $Correction.StartLineNumber | Should -Be $Extent.StartLineNumber
-        $Correction.StartOffset | Should -Be $Extent.StartOffset
-        $Correction.EndOffset | Should -Be $Extent.EndOffset
-        $Correction.HasOffsets | Should -BeTrue
-        $Correction.ExpectedText | Should -Be $Extent.Text
+        $Correction.TextEdits[0].StartOffset | Should -Be $Extent.StartOffset
+        $Correction.TextEdits[0].EndOffset | Should -Be $Extent.EndOffset
+        $Correction.TextEdits[0].ExpectedText | Should -Be $Extent.Text
         $Correction.ReplacementText | Should -Be '$Replacement'
         $Correction.Description | Should -Be 'Replace the value.'
     }
@@ -45,9 +45,8 @@ Describe 'New-NitpickCorrection' {
         $Correction.EndLineNumber | Should -Be 2
         $Correction.StartColumnNumber | Should -Be 3
         $Correction.EndColumnNumber | Should -Be 4
-        $Correction.HasOffsets | Should -BeFalse
-        $Correction.StartOffset | Should -Be -1
-        $Correction.ExpectedText | Should -BeNullOrEmpty
+        $Correction.TextEdits.Count | Should -Be 0
+        $Correction.ReplacementText | Should -Be 'replacement'
     }
 
     It 'creates a correction from explicit offsets' {
@@ -63,15 +62,13 @@ Describe 'New-NitpickCorrection' {
             -FilePathOrContext 'Test.ps1' `
             -Description 'Replace text.' `
             -Applicability Review `
-            -ChangeSetId 'changeset-1' `
             -RuleId 'Example/ExampleRule'
 
-        $Correction.HasOffsets | Should -BeTrue
-        $Correction.StartOffset | Should -Be 1
-        $Correction.EndOffset | Should -Be 3
-        $Correction.ExpectedText | Should -Be 'bc'
+        $Correction.TextEdits.Count | Should -Be 1
+        $Correction.TextEdits[0].StartOffset | Should -Be 1
+        $Correction.TextEdits[0].EndOffset | Should -Be 3
+        $Correction.TextEdits[0].ExpectedText | Should -Be 'bc'
         $Correction.Applicability | Should -Be 'Review'
-        $Correction.ChangeSetId | Should -Be 'changeset-1'
         $Correction.RuleId | Should -Be 'Example/ExampleRule'
     }
 
@@ -94,11 +91,55 @@ Describe 'New-NitpickCorrection' {
             -FilePathOrContext '<ScriptBlock>' `
             -Description 'Remove the argument.'
 
-        $Correction.TextEdit | Should -Be $TextEdit
-        $Correction.StartOffset | Should -Be $TextEdit.StartOffset
-        $Correction.EndOffset | Should -Be $TextEdit.EndOffset
-        $Correction.ExpectedText | Should -Be ',Mandatory=$false'
+        $Correction.TextEdits[0] | Should -Be $TextEdit
+        $Correction.TextEdits[0].StartOffset | Should -Be $TextEdit.StartOffset
+        $Correction.TextEdits[0].EndOffset | Should -Be $TextEdit.EndOffset
+        $Correction.TextEdits[0].ExpectedText | Should -Be ',Mandatory=$false'
         $Correction.ReplacementText | Should -Be ''
+    }
+
+    It 'creates one correction containing several all-or-nothing edits' {
+        $Source = "`$First = 1`n`$Second = 2"
+        $Ast = [scriptblock]::Create($Source).Ast
+        $Statements = $Ast.EndBlock.Statements
+        $Edits = @(
+            New-AstTextEdit -Extent $Statements[0].Extent `
+                -ReplacementText '$First = 10' -Reason 'Replace the coupled assignments.'
+            New-AstTextEdit -Extent $Statements[1].Extent `
+                -ReplacementText '$Second = 20' -Reason 'Replace the coupled assignments.'
+        )
+
+        $Correction = New-NitpickCorrection `
+            -TextEdit $Edits `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the coupled assignments.'
+
+        $Correction.TextEdits.Count | Should -Be 2
+        # The first edit anchors display coordinates.
+        $Correction.StartLineNumber | Should -Be $Statements[0].Extent.StartLineNumber
+        $Correction.StartColumnNumber | Should -Be $Statements[0].Extent.StartColumnNumber
+        # ReplacementText projects only single-edit corrections.
+        $Correction.ReplacementText | Should -BeNullOrEmpty
+    }
+
+    It 'cannot convert a multi-edit correction to a CorrectionExtent' {
+        $Source = "`$First = 1`n`$Second = 2"
+        $Ast = [scriptblock]::Create($Source).Ast
+        $Statements = $Ast.EndBlock.Statements
+        $Edits = @(
+            New-AstTextEdit -Extent $Statements[0].Extent `
+                -ReplacementText '$First = 10' -Reason 'Replace the coupled assignments.'
+            New-AstTextEdit -Extent $Statements[1].Extent `
+                -ReplacementText '$Second = 20' -Reason 'Replace the coupled assignments.'
+        )
+
+        {
+            New-NitpickCorrection `
+                -TextEdit $Edits `
+                -FilePathOrContext '<ScriptBlock>' `
+                -Description 'Replace the coupled assignments.' `
+                -OutputAs CorrectionExtent
+        } | Should -Throw '*multi-edit correction cannot be converted*'
     }
 
     It 'accepts explicit standalone identity with <Construction> construction' -ForEach @(
@@ -180,6 +221,8 @@ Describe 'New-NitpickCorrection' {
     It 'rejects unknown correction constructor keys' -ForEach @(
         @{ Key = 'RuleName' }
         @{ Key = 'NotARealKey' }
+        @{ Key = 'ChangeSetId' }
+        @{ Key = 'TextEdit' }
     ) {
         InModuleScope Nitpick -Parameters @{ Key = $Key } {
             param ($Key)
@@ -214,9 +257,9 @@ Describe 'New-NitpickCorrection' {
             -ExpectedText "a`r`nb" -ReplacementText 'c' `
             -FilePathOrContext '<ScriptBlock>' -Description 'Replace multiline text.'
 
-        $Insertion.ExpectedText | Should -Be ''
-        $Insertion.StartOffset | Should -Be $Insertion.EndOffset
-        $Multiline.ExpectedText | Should -Be "a`r`nb"
+        $Insertion.TextEdits[0].ExpectedText | Should -Be ''
+        $Insertion.TextEdits[0].StartOffset | Should -Be $Insertion.TextEdits[0].EndOffset
+        $Multiline.TextEdits[0].ExpectedText | Should -Be "a`r`nb"
     }
 
     It 'rejects invalid offset and coordinate ranges' {

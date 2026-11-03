@@ -27,7 +27,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.OriginalFindings | Should -HaveCount 2
-        $Result.Proposal.AcceptedCorrections | Should -HaveCount 3
+        $Result.Proposal.AcceptedCorrections | Should -HaveCount 2
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 0
         $Result.Report.EffectiveText | Should -BeExactly 'function Test-Value { param([Parameter(Mandatory)] [string] $Name);  ($Name -isnot [string]) }'
@@ -47,7 +47,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
                 -NoSummary
 
             $Proposal = $Result.Proposal
-            $Edit = $Proposal.AcceptedCorrections[0].TextEdit
+            $Edit = $Proposal.AcceptedCorrections[0].TextEdits[0]
             $Edit.ExpectedText | Should -BeExactly '=$true'
             $Edit.ReplacementText | Should -BeExactly ''
             $Proposal.Diff | Should -BeExactly (@(
@@ -125,7 +125,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Proposal.Document.IsFileBacked | Should -BeFalse
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.CandidateText | Should -BeExactly $Expected
-        $Result.Proposal.AcceptedCorrections | Should -HaveCount 4
+        $Result.Proposal.AcceptedCorrections | Should -HaveCount 2
         $Result.Proposal.OriginalFindings | Should -HaveCount 2
 
         $Result.Report.EffectiveFindings | Should -HaveCount 0
@@ -156,7 +156,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Preview.Application.CommittedCorrections | Should -HaveCount 0
         $Preview.Report.EffectiveText | Should -BeExactly $Expected
         $Preview.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
-        $Preview.Proposal.AcceptedCorrections | Should -HaveCount 4
+        $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
 
         $PreviewSummary.FindingCount | Should -Be 0
         $PreviewSummary.FindingsWithCommittedCorrectionsCount | Should -Be 0
@@ -182,18 +182,26 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Applied.Proposal.OriginalFingerprint | Should -BeExactly $Preview.Proposal.OriginalFingerprint
         $Applied.Proposal.Diff | Should -BeExactly $Preview.Proposal.Diff
         $Applied.Proposal.CandidateText | Should -BeExactly $Preview.Proposal.CandidateText
-        $Applied.Proposal.AcceptedCorrections | Should -HaveCount 4
+        $Applied.Proposal.AcceptedCorrections | Should -HaveCount 2
 
         $Applied.Report.EffectiveText | Should -BeExactly $Expected
 
-        for ($Index = 0; $Index -lt 4; $Index++) {
-            foreach ($Property in @('StartOffset', 'EndOffset', 'ExpectedText', 'ReplacementText', 'ChangeSetId', 'RuleId')) {
-                $Applied.Proposal.AcceptedCorrections[$Index].$Property |
-                    Should -BeExactly $Preview.Proposal.AcceptedCorrections[$Index].$Property
+        for ($Index = 0; $Index -lt 2; $Index++) {
+            $AppliedCorrection = $Applied.Proposal.AcceptedCorrections[$Index]
+            $PreviewCorrection = $Preview.Proposal.AcceptedCorrections[$Index]
+            foreach ($Property in @('RuleId', 'Description')) {
+                $AppliedCorrection.$Property | Should -BeExactly $PreviewCorrection.$Property
+            }
+            $AppliedCorrection.TextEdits | Should -HaveCount $PreviewCorrection.TextEdits.Count
+            for ($EditIndex = 0; $EditIndex -lt $AppliedCorrection.TextEdits.Count; $EditIndex++) {
+                foreach ($Property in @('StartOffset', 'EndOffset', 'ExpectedText', 'ReplacementText')) {
+                    $AppliedCorrection.TextEdits[$EditIndex].$Property |
+                        Should -BeExactly $PreviewCorrection.TextEdits[$EditIndex].$Property
+                }
             }
         }
 
-        $Applied.Application.CommittedCorrections | Should -HaveCount 4
+        $Applied.Application.CommittedCorrections | Should -HaveCount 2
         $Applied.Report.FindingsWithCommittedCorrections | Should -HaveCount 2
         $Applied.Report.EffectiveFindings | Should -HaveCount 0
         $Summary.TargetCount | Should -Be 1
@@ -246,7 +254,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Application.CommittedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
-        $Result.Proposal.AcceptedCorrections | Should -HaveCount 4
+        $Result.Proposal.AcceptedCorrections | Should -HaveCount 2
 
         $Result.Report.EffectiveText | Should -BeExactly $Expected
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
@@ -289,7 +297,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.CandidateText | Should -BeExactly $Expected
         $Result.Proposal.CandidateFindings | Should -HaveCount 0
-        $Result.Proposal.AcceptedCorrections | Should -HaveCount 4
+        $Result.Proposal.AcceptedCorrections | Should -HaveCount 2
         $Result.Proposal.SkippedCorrections | Should -HaveCount 0
 
         $Result.Report.AnalysisSource | Should -Be 'Original'
@@ -335,7 +343,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount 2
+        $Result.Application.CommittedCorrections | Should -HaveCount 1
         $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
         $Result.Report.EffectiveFindings | Should -HaveCount 1
         $Result.Report.EffectiveFindings[0].Corrections | Should -BeNullOrEmpty

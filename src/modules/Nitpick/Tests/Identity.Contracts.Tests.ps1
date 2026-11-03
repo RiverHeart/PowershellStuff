@@ -8,8 +8,7 @@ BeforeAll {
     function New-IdentityContractRule {
         param (
             [string] $Namespace = 'Local',
-            [string] $Replacement = '$Value = 2',
-            [string] $ChangeSetId
+            [string] $Replacement = '$Value = 2'
         )
 
         $Producer = {
@@ -22,9 +21,6 @@ BeforeAll {
                         -Description 'Replace assignment' -RuleId 'WrongOwner/WrongCorrection'
                 }
             )
-            foreach ($Correction in $Corrections) {
-                $Correction.ChangeSetId = $ChangeSetId
-            }
             $Finding = New-NitpickFinding -RuleId 'WrongOwner/WrongFinding' `
                 -Message 'Assignment finding' -Severity Information -ViolationExtent $Assignment.Extent `
                 -ScriptPath '<ScriptBlock>' -Explanation 'Identity contract' -Corrections $Corrections
@@ -43,7 +39,7 @@ Describe 'Built-in producer identity migration' {
         @{
             Name = 'UseIsNotOperator'
             Source = '-not ($Value -is [int])'
-            CorrectionCount = 2
+            CorrectionCount = 1
         }
         @{
             Name = 'AvoidParameterAttributeBool'
@@ -194,10 +190,10 @@ Describe 'Native execution identity contracts' {
             Should -Be @('First/AssignmentStyle', 'Second/AssignmentStyle')
     }
 
-    It 'preserves intentional cross-rule change sets without prefixing their IDs' {
+    It 'skips non-Safe corrections independently across rules' {
         $Rules = @(
-            New-IdentityContractRule -Namespace First -ChangeSetId Shared
-            New-IdentityContractRule -Namespace Second -ChangeSetId Shared
+            New-IdentityContractRule -Namespace First
+            New-IdentityContractRule -Namespace Second -Replacement '$Value = 3'
         )
         $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
             '$Value = 1', [ref] $null, [ref] $null
@@ -206,13 +202,12 @@ Describe 'Native execution identity contracts' {
         $Findings[0].Corrections[0].Applicability = 'Review'
 
         $Proposal = Resolve-NitpickCorrectionProposal -Script '$Value = 1' -Finding $Findings
-        $Proposal.AcceptedCorrections | Should -HaveCount 0
-        $Proposal.SkippedCorrections | Should -HaveCount 2
-
-        foreach ($Skipped in $Proposal.SkippedCorrections) {
-            $Skipped.Correction.ChangeSetId | Should -Be Shared
-            $Skipped.Reason | Should -Be "Applicability 'Review' is not selected."
-        }
+        $Proposal.AcceptedCorrections | Should -HaveCount 1
+        $Proposal.AcceptedCorrections[0].RuleId | Should -Be 'Second/AssignmentStyle'
+        $Proposal.SkippedCorrections | Should -HaveCount 1
+        $Proposal.SkippedCorrections[0].Correction.RuleId | Should -Be 'First/AssignmentStyle'
+        $Proposal.SkippedCorrections[0].Reason | Should -Be "Applicability 'Review' is not selected."
+        $Proposal.CandidateText | Should -Be '$Value = 3'
     }
 
     It 'uses qualified labels in text, default object formatting, and string conversion' {

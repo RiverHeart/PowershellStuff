@@ -13,8 +13,8 @@ using namespace System.Collections.Generic
     spacing between targets are left to the caller.
 
     Returns nothing when there is nothing worth reporting, meaning no accepted,
-    committed, skipped, or conflicting corrections and no failure. Counts of accepted
-    and committed corrections treat each change set as one correction.
+    committed, skipped, or conflicting corrections and no failure. Each correction
+    counts once, however many edits it contains.
 
 .PARAMETER CorrectionResult
     The NitpickCorrectionResult for one target, as produced by
@@ -56,14 +56,8 @@ function Format-NitpickCorrection {
     $ApplicationStatus = $Application.Status
     $ProposalStatus = if ($Proposal) { $Proposal.Status } else { 'Unavailable' }
 
-    $AcceptedEditCount = if ($Proposal) { $Proposal.AcceptedCorrections.Count } else { 0 }
-    $AcceptedCount = if ($Proposal) {
-        Get-NitpickCorrectionCount -Corrections $Proposal.AcceptedCorrections
-    } else {
-        0
-    }
-
-    $CommittedCount = Get-NitpickCorrectionCount -Corrections $Application.CommittedCorrections
+    $AcceptedCount = if ($Proposal) { $Proposal.AcceptedCorrections.Count } else { 0 }
+    $CommittedCount = $Application.CommittedCorrections.Count
     $SkippedCount = if ($Proposal) { $Proposal.SkippedCorrections.Count } else { 0 }
     $ConflictCount = if ($Proposal) { $Proposal.Conflicts.Count } else { 0 }
     $HasFailure =
@@ -73,7 +67,7 @@ function Format-NitpickCorrection {
             'FailedRead', 'FailedValidation', 'StaleSource', 'StaleTarget', 'InvalidTarget', 'FailedWrite'
         )
 
-    if ($AcceptedEditCount -eq 0 -and
+    if ($AcceptedCount -eq 0 -and
         $CommittedCount -eq 0 -and
         $SkippedCount -eq 0 -and
         $ConflictCount -eq 0 -and
@@ -84,7 +78,7 @@ function Format-NitpickCorrection {
 
     $Indent = '  '
     $Lines = [List[string]]::new()
-    if ($AcceptedEditCount -gt 0 -and $Proposal.Diff) {
+    if ($AcceptedCount -gt 0 -and $Proposal.Diff) {
         foreach ($Line in ([string] $Proposal.Diff) -split '\r?\n') {
             $Lines.Add($(if ($Line) { "$Indent$Line" } else { '' }))
         }
@@ -93,7 +87,7 @@ function Format-NitpickCorrection {
 
     $CorrectionNoun = if ($AcceptedCount -eq 1) { 'correction' } else { 'corrections' }
     $IsCleanOutcome =
-        $AcceptedEditCount -gt 0 -and
+        $AcceptedCount -gt 0 -and
         $SkippedCount -eq 0 -and
         $ConflictCount -eq 0 -and
         -not $HasFailure
@@ -112,7 +106,7 @@ function Format-NitpickCorrection {
         }
     }
     if (-not $Trailer) {
-        $SkippedNoun = if ($SkippedCount -eq 1) { 'edit' } else { 'edits' }
+        $SkippedNoun = if ($SkippedCount -eq 1) { 'correction' } else { 'corrections' }
         $ConflictNoun = if ($ConflictCount -eq 1) { 'conflict' } else { 'conflicts' }
         $Trailer = '{0} corrections committed, {1} corrections accepted, {2} {3} skipped, {4} {5} (proposal: {6}; application: {7}).' -f
             $CommittedCount, $AcceptedCount, $SkippedCount, $SkippedNoun,

@@ -1,5 +1,6 @@
 BeforeAll {
     Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
+    Import-Module -Name "$PSScriptRoot/../../../../AstEditor/AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 }
 
@@ -159,24 +160,19 @@ Describe 'New-NitpickFinding' {
         }
     }
 
-    It 'omits coordinated corrections while preserving ungrouped suggestions' -ForEach @(
+    It 'omits multi-edit corrections while preserving single-edit suggestions' -ForEach @(
         @{ OutputAs = 'NitpickFinding' }
         @{ OutputAs = 'DiagnosticRecord' }
     ) {
-        $GroupedCorrections = @(
-            New-NitpickCorrection `
-                -ViolationExtent $Extent `
-                -ReplacementText '$First' `
-                -FilePathOrContext '<ScriptBlock>' `
-                -Description 'First coordinated edit.' `
-                -ChangeSetId 'TestRule:0'
-            New-NitpickCorrection `
-                -ViolationExtent $Extent `
-                -ReplacementText '$Second' `
-                -FilePathOrContext '<ScriptBlock>' `
-                -Description 'Second coordinated edit.' `
-                -ChangeSetId 'TestRule:0'
-        )
+        $MultiEditCorrection = New-NitpickCorrection `
+            -TextEdit @(
+                New-AstTextEdit -Extent $Extent `
+                    -ReplacementText '$First' -Reason 'Coordinated fix.'
+                New-AstTextEdit -Extent $Extent `
+                    -ReplacementText '$Second' -Reason 'Coordinated fix.'
+            ) `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Coordinated fix.'
         $Finding = New-NitpickFinding `
             -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
@@ -184,11 +180,11 @@ Describe 'New-NitpickFinding' {
             -Severity Information `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
-            -Corrections (@($Correction) + $GroupedCorrections) `
+            -Corrections (@($Correction) + $MultiEditCorrection) `
             -OutputAs $OutputAs
 
         $Diagnostic = if ($OutputAs -eq 'NitpickFinding') {
-            $Finding.Corrections | Should -HaveCount 3
+            $Finding.Corrections | Should -HaveCount 2
             $Finding.ToDiagnosticRecord()
         } else {
             $Finding

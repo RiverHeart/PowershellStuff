@@ -10,17 +10,15 @@ $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 #----------------------
 
 class NitpickCorrection {
-    [psobject] $TextEdit
+    # One correction is one complete fix for a finding: its text edits apply
+    # all-or-nothing. Line/column fields project the first edit for display;
+    # ReplacementText projects only single-edit corrections for interop.
+    [psobject[]] $TextEdits = @()
     [int] $StartLineNumber
     [int] $EndLineNumber
     [int] $StartColumnNumber
     [int] $EndColumnNumber
-    [int] $StartOffset = -1
-    [int] $EndOffset = -1
-    [bool] $HasOffsets
-    [string] $ExpectedText
     [string] $Applicability = 'Safe'
-    [string] $ChangeSetId
     [string] $RuleId
     [string] $ReplacementText
     [string] $FilePathOrContext
@@ -32,12 +30,11 @@ class NitpickCorrection {
         [string] $filePathOrContext,
         [string] $description
     ) {
-        $this.TextEdit = New-AstTextEdit `
+        $this.TextEdits = @(New-AstTextEdit `
             -Extent $ViolationExtent `
             -ReplacementText $replacementText `
-            -Reason $description
+            -Reason $description)
         $this.SetTextEditProjections()
-        $this.ReplacementText = $replacementText
         $this.FilePathOrContext = $filePathOrContext
         $this.Description = $description
         $this.Validate()
@@ -69,8 +66,8 @@ class NitpickCorrection {
             }
         }
 
-        if ($properties.ContainsKey('TextEdit')) {
-            $this.TextEdit = $properties.TextEdit
+        if ($properties.ContainsKey('TextEdits')) {
+            $this.TextEdits = @($properties.TextEdits)
             $this.SetTextEditProjections()
         } else {
             $this.StartLineNumber = $properties.StartLineNumber
@@ -83,16 +80,12 @@ class NitpickCorrection {
             $this.Applicability = $properties.Applicability
         }
 
-        if ($properties.ContainsKey('ChangeSetId')) {
-            $this.ChangeSetId = $properties.ChangeSetId
-        }
-
         if ($properties.ContainsKey('RuleId')) {
             Assert-NitpickRuleId -Value $properties.RuleId
             $this.RuleId = $properties.RuleId
         }
 
-        if (-not $this.TextEdit) {
+        if ($this.TextEdits.Count -eq 0) {
             $this.ReplacementText = $properties.ReplacementText
         }
 
@@ -102,18 +95,25 @@ class NitpickCorrection {
     }
 
     hidden [void] SetTextEditProjections() {
-        $this.StartLineNumber = $this.TextEdit.StartLineNumber
-        $this.EndLineNumber = $this.TextEdit.EndLineNumber
-        $this.StartColumnNumber = $this.TextEdit.StartColumnNumber
-        $this.EndColumnNumber = $this.TextEdit.EndColumnNumber
-        $this.StartOffset = $this.TextEdit.StartOffset
-        $this.EndOffset = $this.TextEdit.EndOffset
-        $this.HasOffsets = $true
-        $this.ExpectedText = $this.TextEdit.ExpectedText
-        $this.ReplacementText = $this.TextEdit.ReplacementText
+        $Primary = $this.TextEdits[0]
+        $this.StartLineNumber = $Primary.StartLineNumber
+        $this.EndLineNumber = $Primary.EndLineNumber
+        $this.StartColumnNumber = $Primary.StartColumnNumber
+        $this.EndColumnNumber = $Primary.EndColumnNumber
+        $this.ReplacementText = if ($this.TextEdits.Count -eq 1) {
+            $Primary.ReplacementText
+        } else {
+            $null
+        }
     }
 
     hidden [void] Validate() {
+        foreach ($Edit in $this.TextEdits) {
+            if ($null -eq $Edit -or $Edit.GetType().Name -ne 'AstTextEdit') {
+                throw 'TextEdits must contain only AstEditor AstTextEdit objects.'
+            }
+        }
+
         if ($this.StartLineNumber -lt 1 -or $this.EndLineNumber -lt 1) {
             throw 'Line numbers must be greater than zero.'
         }
@@ -141,6 +141,10 @@ class NitpickCorrection {
         [object] # Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent
     #>
     [object] ToCorrectionExtent() {
+        if ($this.TextEdits.Count -gt 1) {
+            throw 'A multi-edit correction cannot be converted to a single PSScriptAnalyzer CorrectionExtent.'
+        }
+
         # Using `New-Object` to avoid type resolution issues at parse time
         $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent' -ArgumentList (
             $this.StartLineNumber,
@@ -201,8 +205,9 @@ class NitpickFinding {
         # Using `New-Object` to avoid type resolution issues at parse time
         $CorrectionExtents = New-Object 'System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]'
         foreach ($Correction in $this.Corrections) {
-            # ScriptAnalyzer cannot enforce all-or-nothing selection of a change set.
-            if ($Correction.ChangeSetId) {
+            # ScriptAnalyzer cannot enforce all-or-nothing application of a
+            # multi-edit fix, so only single-edit corrections are exported.
+            if ($Correction.TextEdits.Count -gt 1) {
                 continue
             }
             $CorrectionExtents.Add($Correction.ToCorrectionExtent())

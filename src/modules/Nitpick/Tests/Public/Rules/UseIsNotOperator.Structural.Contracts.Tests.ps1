@@ -161,41 +161,36 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
 
         foreach ($Finding in $Findings) {
             $Finding.GetType().Name | Should -Be 'NitpickFinding'
-            $Finding.Corrections | Should -HaveCount 2
-            $Finding.Corrections[0].ChangeSetId | Should -BeExactly (
-                'UseIsNotOperator:{0}:{1}' -f
-                    $Finding.ViolationExtent.StartOffset,
-                    $Finding.ViolationExtent.EndOffset
-            )
 
-           @($Finding.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount 1
-           @($Finding.Corrections.Description | Select-Object -Unique) | Should -HaveCount 1
-           $Finding.Corrections[0].Description |
-               Should -BeExactly "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
+            # One fix per finding, containing two all-or-nothing edits.
+            $Finding.Corrections | Should -HaveCount 1
+            $Correction = $Finding.Corrections[0]
 
-           foreach ($Correction in $Finding.Corrections) {
-                $Correction.Applicability | Should -Be 'Safe'
-                $Correction.RuleId | Should -Be 'Nitpick/UseIsNotOperator'
-                $Correction.TextEdit.GetType().Name | Should -Be 'AstTextEdit'
-                $Correction.Description | Should -Not -BeNullOrEmpty
-                $Correction.ExpectedText | Should -BeExactly $Source.Substring(
-                    $Correction.StartOffset,
-                    $Correction.EndOffset - $Correction.StartOffset
+            $Correction.Applicability | Should -Be 'Safe'
+            $Correction.RuleId | Should -Be 'Nitpick/UseIsNotOperator'
+            $Correction.Description |
+                Should -BeExactly "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
+            $Correction.TextEdits | Should -HaveCount 2
+
+            foreach ($Edit in $Correction.TextEdits) {
+                $Edit.GetType().Name | Should -Be 'AstTextEdit'
+                $Edit.ExpectedText | Should -BeExactly $Source.Substring(
+                    $Edit.StartOffset,
+                    $Edit.EndOffset - $Edit.StartOffset
                 )
             }
 
-            $Finding.Corrections[0].StartOffset | Should -Be $Finding.ViolationExtent.StartOffset
-            $Finding.Corrections[0].ExpectedText | Should -Be '-not'
-            $Finding.Corrections[0].ReplacementText | Should -BeExactly ''
-            $Finding.Corrections[1].ExpectedText | Should -Be '-is'
-            $Finding.Corrections[1].ReplacementText | Should -BeExactly '-isnot'
+            $Correction.TextEdits[0].StartOffset | Should -Be $Finding.ViolationExtent.StartOffset
+            $Correction.TextEdits[0].ExpectedText | Should -Be '-not'
+            $Correction.TextEdits[0].ReplacementText | Should -BeExactly ''
+            $Correction.TextEdits[1].ExpectedText | Should -Be '-is'
+            $Correction.TextEdits[1].ReplacementText | Should -BeExactly '-isnot'
         }
 
-        @($Findings.Corrections.ChangeSetId | Select-Object -Unique) | Should -HaveCount $Count
         $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
 
         $Result.CandidateText | Should -BeExactly $Expected
-        $Result.AcceptedCorrections | Should -HaveCount ($Count * 2)
+        $Result.AcceptedCorrections | Should -HaveCount $Count
         $Result.SkippedCorrections | Should -HaveCount 0
         $Result.CandidateFindings | Should -HaveCount 0
     }
@@ -232,10 +227,12 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         foreach ($Correction in $Findings[0].Corrections) {
             $Correction.FilePathOrContext | Should -BeExactly $Document.Path
             $Correction.StartLineNumber | Should -Be 2
-            $Correction.ExpectedText | Should -BeExactly $Source.Substring(
-                $Correction.StartOffset,
-                $Correction.EndOffset - $Correction.StartOffset
-            )
+            foreach ($Edit in $Correction.TextEdits) {
+                $Edit.ExpectedText | Should -BeExactly $Source.Substring(
+                    $Edit.StartOffset,
+                    $Edit.EndOffset - $Edit.StartOffset
+                )
+            }
         }
 
         $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings
@@ -282,11 +279,12 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
 
         $Document.ParseErrors | Should -BeNullOrEmpty
         $Findings | Should -HaveCount 1
-        $Findings[0].Corrections | Should -HaveCount 2
+        $Findings[0].Corrections | Should -HaveCount 1
+        $Findings[0].Corrections[0].TextEdits | Should -HaveCount 2
 
         $Result = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Result.CandidateText | Should -BeExactly $Expected
-        $Result.AcceptedCorrections | Should -HaveCount 2
+        $Result.AcceptedCorrections | Should -HaveCount 1
         $Result.CandidateFindings | Should -HaveCount 0
     }
 

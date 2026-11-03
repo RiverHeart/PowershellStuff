@@ -1,4 +1,5 @@
 BeforeAll {
+    Import-Module -Name "$PSScriptRoot\..\..\..\..\AstEditor\AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
 
     function New-TestCorrectionResult {
@@ -56,11 +57,14 @@ AfterAll {
 
 Describe 'Format-NitpickCorrection' {
     BeforeEach {
-        $ChangeSet = @(
-            New-NitpickCorrection -ViolationExtent ([scriptblock]::Create('$Value = 1').Ast.Extent) `
-                -ReplacementText '$Value = 2' -FilePathOrContext '<ScriptBlock>' -Description 'First edit' -ChangeSetId Set1
-            New-NitpickCorrection -ViolationExtent ([scriptblock]::Create('$Other = 1').Ast.Extent) `
-                -ReplacementText '$Other = 2' -FilePathOrContext '<ScriptBlock>' -Description 'Second edit' -ChangeSetId Set1
+        # One fix containing two all-or-nothing edits.
+        $CoupledFix = @(
+            New-NitpickCorrection -TextEdit @(
+                New-AstTextEdit -Extent ([scriptblock]::Create('$Value = 1').Ast.Extent) `
+                    -ReplacementText '$Value = 2' -Reason 'Coupled fix'
+                New-AstTextEdit -Extent ([scriptblock]::Create('$Other = 1').Ast.Extent) `
+                    -ReplacementText '$Other = 2' -Reason 'Coupled fix'
+            ) -FilePathOrContext '<ScriptBlock>' -Description 'Coupled fix'
         )
     }
 
@@ -71,7 +75,6 @@ Describe 'Format-NitpickCorrection' {
         InModuleScope Nitpick -Parameters @{ Command = $Command } {
             param ($Command)
 
-            Mock Get-NitpickCorrectionCount { throw 'Counting must not be reached.' }
             $Parameters = @{
                 CorrectionResult = [NitpickCorrectionProposal]::new()
                 ErrorAction = 'Stop'
@@ -81,7 +84,6 @@ Describe 'Format-NitpickCorrection' {
             }
 
             { & $Command @Parameters } | Should -Throw '*NitpickCorrectionResult*'
-            Should -Invoke Get-NitpickCorrectionCount -Times 0 -Exactly
         }
     }
 
@@ -92,7 +94,7 @@ Describe 'Format-NitpickCorrection' {
     }
 
     It 'indents the diff without a heading and leaves outer spacing to the caller' {
-        $Result = New-TestCorrectionResult -Accepted $ChangeSet
+        $Result = New-TestCorrectionResult -Accepted $CoupledFix
 
         Format-TestCorrection $Result | Should -BeExactly (@(
             '  29:13  Reason'
@@ -109,7 +111,7 @@ Describe 'Format-NitpickCorrection' {
         @{ Status = 'Declined'; Trailer = '1 proposed correction declined.' }
         @{ Status = 'InMemory'; Trailer = '1 correction applied in memory.' }
     ) {
-        $Result = New-TestCorrectionResult -ApplicationStatus $Status -Accepted $ChangeSet
+        $Result = New-TestCorrectionResult -ApplicationStatus $Status -Accepted $CoupledFix
 
         $Text = Format-TestCorrection $Result
 
@@ -117,27 +119,27 @@ Describe 'Format-NitpickCorrection' {
         $Text | Should -Not -Match 'preview|WhatIf|No files changed'
     }
 
-    It 'pluralizes proposed corrections by change set' {
+    It 'pluralizes proposed corrections' {
         $Independent = New-NitpickCorrection -ViolationExtent ([scriptblock]::Create('$Third = 1').Ast.Extent) `
             -ReplacementText '$Third = 2' -FilePathOrContext '<ScriptBlock>' -Description 'Independent edit'
-        $Accepted = @($ChangeSet) + $Independent
+        $Accepted = @($CoupledFix) + $Independent
         $Result = New-TestCorrectionResult -Accepted $Accepted
 
         Format-TestCorrection $Result | Should -Match '\n  2 proposed corrections\.$'
     }
 
-    It 'reports applied corrections by committed change sets' {
-        $Result = New-TestCorrectionResult -ApplicationStatus Written -Accepted $ChangeSet -Committed $ChangeSet
+    It 'reports applied corrections once per correction, however many edits each contains' {
+        $Result = New-TestCorrectionResult -ApplicationStatus Written -Accepted $CoupledFix -Committed $CoupledFix
 
         Format-TestCorrection $Result | Should -Match '\n  1 correction applied\.$'
     }
 
-    It 'reports full counts and statuses when edits are skipped or conflicting' {
+    It 'reports full counts and statuses when corrections are skipped or conflicting' {
         $Result = New-TestCorrectionResult -ProposalStatus Rejected -ApplicationStatus NotAttempted `
             -Skipped @(1, 2) -Conflicts @(1)
 
         Format-TestCorrection $Result | Should -BeExactly (
-            '  0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict ' +
+            '  0 corrections committed, 0 corrections accepted, 2 corrections skipped, 1 conflict ' +
             '(proposal: Rejected; application: NotAttempted).'
         )
     }

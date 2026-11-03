@@ -7,10 +7,10 @@ using module AstEditor
 
 .DESCRIPTION
     Selects safe corrections and delegates atomic source validation and queueing to
-    AstEditor. Corrections sharing a ChangeSetId are selected or skipped together. A
-    correction without a ChangeSetId forms its own independent change set. IDs are
-    target-wide; producers should include their rule identity and occurrence in IDs
-    unless they intentionally coordinate across findings or rules.
+    AstEditor. A correction is one complete fix for a finding: its text edits are queued
+    together and applied all-or-nothing. Only Safe corrections are selected, and at most
+    one per finding; a finding proposing several Safe corrections has all of its
+    corrections skipped, because automatic selection never chooses between alternatives.
 
     If the selected batch is stale or conflicting, AstEditor rejects it without queueing any
     member. Returns a stable proposal containing candidate text, validation diagnostics,
@@ -48,30 +48,30 @@ using module AstEditor
     $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
     $Result.CandidateText
 
-    Previews all independent safe corrections attached to the findings. Every correction
-    without a ChangeSetId is evaluated independently, and all accepted corrections are
+    Previews all independent safe corrections attached to the findings. Each finding's
+    single Safe correction is evaluated as one unit, and all accepted corrections are
     rendered against the original source snapshot in one pass.
 
 .EXAMPLE
-    $Corrections = @(
-        New-NitpickCorrection `
-            -ViolationExtent $FirstExtent `
+    $Edits = @(
+        New-AstTextEdit `
+            -Extent $FirstExtent `
             -ReplacementText '$First = 2' `
-            -FilePathOrContext '<ScriptBlock>' `
-            -Description 'Replace the first assignment.' `
-            -ChangeSetId 'CoupledAssignments'
+            -Reason 'Replace the coupled assignments.'
 
-        New-NitpickCorrection `
-            -ViolationExtent $SecondExtent `
+        New-AstTextEdit `
+            -Extent $SecondExtent `
             -ReplacementText '$Second = 3' `
-            -FilePathOrContext '<ScriptBlock>' `
-            -Description 'Replace the second assignment.' `
-            -ChangeSetId 'CoupledAssignments'
+            -Reason 'Replace the coupled assignments.'
     )
+    $Correction = New-NitpickCorrection `
+        -TextEdit $Edits `
+        -FilePathOrContext '<ScriptBlock>' `
+        -Description 'Replace the coupled assignments.'
     $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
-    When $Finding contains $Corrections, both corrections are accepted or skipped together.
-    For example, stale ExpectedText on either correction skips the complete change set.
+    When $Finding carries $Correction, both of its edits are accepted or skipped together.
+    For example, stale expected text on either edit skips the complete correction.
 
 .EXAMPLE
     Inspect conflicts when independent change sets overlap. Under the target-level conflict
@@ -134,58 +134,45 @@ function Resolve-NitpickCorrectionProposal {
     $SelectedCorrections = [List[NitpickCorrection]]::new()
     $Conflicts = [List[object]]::new()
     $FinalFindings = [List[object]]::new()
-    $ChangeSets = [ordered]@{}
-    $StandaloneCorrectionId = 0
 
-    # MARK: CHANGE SET GROUPING
-    # Build all-or-nothing change sets while keeping ungrouped corrections independent.
-    foreach ($Correction in $Finding.Corrections) {
-        if ($null -eq $Correction) {
+    # MARK: CORRECTION SELECTION
+    # A correction is one whole fix; its edits apply all-or-nothing. Only Safe
+    # corrections are selected, at most one per finding: automatic selection
+    # never chooses between alternatives.
+    foreach ($SourceFinding in $Finding) {
+        $FindingCorrections = @($SourceFinding.Corrections | Where-Object { $null -ne $_ })
+        if ($FindingCorrections.Count -eq 0) {
             continue
         }
-        $ChangeSetKey = if ($Correction.ChangeSetId) {
-            "ChangeSet:$($Correction.ChangeSetId)"
-        } else {
-            "Correction:$StandaloneCorrectionId"
-        }
 
-        if (-not $ChangeSets.Contains($ChangeSetKey)) {
-            $ChangeSets[$ChangeSetKey] = [List[NitpickCorrection]]::new()
-        }
-
-        $ChangeSets[$ChangeSetKey].Add($Correction)
-        $StandaloneCorrectionId++
-    }
-
-    # MARK: CHANGE SET SELECTION
-    # Select only complete change sets that satisfy Nitpick correction policy.
-    foreach ($ChangeSetKey in $ChangeSets.Keys) {
-        $ChangeSet = $ChangeSets[$ChangeSetKey]
-        $RejectionReason = $null
-
-        foreach ($Correction in $ChangeSet) {
-            if ($Correction.Applicability -ne 'Safe') {
-                $RejectionReason = "Applicability '$($Correction.Applicability)' is not selected."
-                break
-            }
-
-            if (-not $Correction.TextEdit) {
-                $RejectionReason = 'Correction does not contain an AstEditor text edit.'
-                break
-            }
-        }
-
-        if ($RejectionReason) {
-            foreach ($Correction in $ChangeSet) {
+        $SafeCorrections = @($FindingCorrections | Where-Object { $_.Applicability -eq 'Safe' })
+        if ($SafeCorrections.Count -gt 1) {
+            $AmbiguousReason = "The finding proposes $($SafeCorrections.Count) Safe corrections; " +
+                'automatic selection never chooses between alternatives.'
+            foreach ($Correction in $FindingCorrections) {
                 $SkippedCorrections.Add([pscustomobject]@{
                     Correction = $Correction
-                    Reason = $RejectionReason
+                    Reason = $AmbiguousReason
                 })
             }
             continue
         }
 
-        foreach ($Correction in $ChangeSet) {
+        foreach ($Correction in $FindingCorrections) {
+            $RejectionReason = if ($Correction.Applicability -ne 'Safe') {
+                "Applicability '$($Correction.Applicability)' is not selected."
+            } elseif ($Correction.TextEdits.Count -eq 0) {
+                'Correction does not contain an AstEditor text edit.'
+            }
+
+            if ($RejectionReason) {
+                $SkippedCorrections.Add([pscustomobject]@{
+                    Correction = $Correction
+                    Reason = $RejectionReason
+                })
+                continue
+            }
+
             $SelectedCorrections.Add($Correction)
         }
     }
@@ -196,7 +183,7 @@ function Resolve-NitpickCorrectionProposal {
         try {
             $null = Add-AstTextEdit `
                 -Document $Document `
-                -TextEdit @($SelectedCorrections.TextEdit)
+                -TextEdit @($SelectedCorrections.TextEdits)
 
             foreach ($Correction in $SelectedCorrections) {
                 $AcceptedCorrections.Add($Correction)
@@ -207,35 +194,45 @@ function Resolve-NitpickCorrectionProposal {
                 $ExistingEdit = $_.Exception.Data['ExistingEdit']
                 $IncomingEdit = $_.Exception.Data['IncomingEdit']
 
-                $ExistingCorrection = $SelectedCorrections |
-                    Where-Object {
-                        $_.TextEdit.StartOffset -eq $ExistingEdit.StartOffset -and
-                        $_.TextEdit.EndOffset -eq $ExistingEdit.EndOffset -and
-                        $_.TextEdit.Reason -ceq $ExistingEdit.Reason -and
-                        $_.TextEdit.ReplacementText -ceq $ExistingEdit.ReplacementText
-                    } |
-                    Select-Object -First 1
+                # Conflict data carries edit field snapshots, so owners are
+                # recovered by matching fields against each correction's edits.
+                $FindOwner = {
+                    param($ConflictEdit, $Exclude)
+                    foreach ($Candidate in $SelectedCorrections) {
+                        if ($Exclude -and [object]::ReferenceEquals($Candidate, $Exclude)) {
+                            continue
+                        }
+                        foreach ($OwnedEdit in $Candidate.TextEdits) {
+                            if ($OwnedEdit.StartOffset -eq $ConflictEdit.StartOffset -and
+                                $OwnedEdit.EndOffset -eq $ConflictEdit.EndOffset -and
+                                $OwnedEdit.Reason -ceq $ConflictEdit.Reason -and
+                                $OwnedEdit.ReplacementText -ceq $ConflictEdit.ReplacementText
+                            ) {
+                                return $Candidate
+                            }
+                        }
+                    }
+                }
 
-                $IncomingCorrection = $SelectedCorrections |
-                    Where-Object {
-                        $_.TextEdit.StartOffset -eq $IncomingEdit.StartOffset -and
-                        $_.TextEdit.EndOffset -eq $IncomingEdit.EndOffset -and
-                        $_.TextEdit.Reason -ceq $IncomingEdit.Reason -and
-                        $_.TextEdit.ReplacementText -ceq $IncomingEdit.ReplacementText -and
-                        -not [object]::ReferenceEquals($_, $ExistingCorrection)
-                    } |
-                    Select-Object -First 1
+                $ExistingCorrection = & $FindOwner $ExistingEdit $null
+                $IncomingCorrection = & $FindOwner $IncomingEdit $ExistingCorrection
+
+                # Two edits of the same correction can also conflict; report the
+                # single owner rather than hiding the rule-authoring error.
+                if (-not $IncomingCorrection) {
+                    $IncomingCorrection = $ExistingCorrection
+                }
 
                 $Conflicts.Add([pscustomobject]@{
                     ExistingCorrection = $ExistingCorrection
                     IncomingCorrection = $IncomingCorrection
                     Reason = (
-                        "{0} Existing rule '{1}', change set '{2}'; incoming rule '{3}', change set '{4}'." -f
+                        "{0} Existing rule '{1}', correction '{2}'; incoming rule '{3}', correction '{4}'." -f
                             $_.Exception.Message,
                             (Get-NitpickRuleLabel -InputObject $ExistingCorrection),
-                            $ExistingCorrection.ChangeSetId,
+                            $ExistingCorrection.Description,
                             (Get-NitpickRuleLabel -InputObject $IncomingCorrection),
-                            $IncomingCorrection.ChangeSetId
+                            $IncomingCorrection.Description
                     )
                 })
             }

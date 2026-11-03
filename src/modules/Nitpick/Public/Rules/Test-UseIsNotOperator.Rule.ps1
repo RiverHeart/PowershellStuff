@@ -146,7 +146,6 @@ function Test-UseIsNotOperator {
                         throw "Rule '$($Metadata.Name)' could not uniquely locate the negation and type-test tokens at offsets [$($BadNode.Extent.StartOffset), $($BadNode.Extent.EndOffset))."
                     }
 
-                    $ChangeSetId = '{0}:{1}:{2}' -f $Metadata.Name, $BadNode.Extent.StartOffset, $BadNode.Extent.EndOffset
                     $ChangeReason = "Replace '-not (<expr> -is <type>)' with '<expr> -isnot <type>'."
                     $Edits = @(
                         New-AstTextEdit `
@@ -158,16 +157,14 @@ function Test-UseIsNotOperator {
                             -ReplacementText '-isnot' `
                             -Reason $ChangeReason
                     )
+                    # One fix, two edits: the correction applies them all-or-nothing.
                     $Corrections = @(
-                        foreach ($Edit in $Edits) {
-                            New-NitpickCorrection `
-                                -TextEdit $Edit `
-                                -FilePathOrContext $FilePath `
-                                -Description $Edit.Reason `
-                                -RuleId $RuleId `
-                                -Applicability Safe `
-                                -ChangeSetId $ChangeSetId
-                        }
+                        New-NitpickCorrection `
+                            -TextEdit $Edits `
+                            -FilePathOrContext $FilePath `
+                            -Description $ChangeReason `
+                            -RuleId $RuleId `
+                            -Applicability Safe
                     )
                 }
 

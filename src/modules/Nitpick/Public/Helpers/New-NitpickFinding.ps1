@@ -6,8 +6,8 @@
     Creates a new Nitpick finding object with the specified properties. When OutputAs is not
     specified, returns NitpickFinding regardless of which assemblies are loaded.
     ScriptAnalyzer-compatible rules must explicitly request DiagnosticRecord output.
-    Diagnostic conversion omits corrections with a ChangeSetId because ScriptAnalyzer
-    cannot preserve their all-or-nothing selection. Ungrouped suggestions remain available.
+    Diagnostic conversion omits multi-edit corrections because ScriptAnalyzer
+    cannot preserve their all-or-nothing application. Single-edit corrections remain available.
     Findings require a qualified RuleId. Diagnostic conversion derives local RuleName
     and RuleSuppressionID values at the external boundary; native objects carry only RuleId.
     NitpickRule.Invoke replaces producer-supplied identity on native findings and nested

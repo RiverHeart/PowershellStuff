@@ -97,10 +97,9 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Description 'Replace the second assignment.' `
             -RuleId 'Local/SecondAssignment'
 
-        $Correction.HasOffsets | Should -BeTrue
-        $Correction.StartOffset | Should -Be $Extent.StartOffset
-        $Correction.EndOffset | Should -Be $Extent.EndOffset
-        $Correction.ExpectedText | Should -Be '$Second = 2'
+        $Correction.TextEdits[0].StartOffset | Should -Be $Extent.StartOffset
+        $Correction.TextEdits[0].EndOffset | Should -Be $Extent.EndOffset
+        $Correction.TextEdits[0].ExpectedText | Should -Be '$Second = 2'
         $Correction.Applicability | Should -Be 'Safe'
         $Correction.RuleId | Should -Be 'Local/SecondAssignment'
     }
@@ -122,7 +121,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Correction.Applicability | Should -Be $Applicability
     }
 
-    It 'accepts or skips every correction in a change set together' {
+    It 'accepts or skips every edit of a correction together' {
         $Source = '$First = 1; $Second = 2; $Third = 3'
         $Tokens = $null
         $Errors = $null
@@ -130,48 +129,60 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $FirstExtent = $Ast.EndBlock.Statements[0].Extent
         $SecondExtent = $Ast.EndBlock.Statements[1].Extent
         $ThirdExtent = $Ast.EndBlock.Statements[2].Extent
-        $Corrections = @(
-            New-NitpickCorrection `
+
+        # One fix whose second edit is stale: both edits must be skipped together.
+        $CoupledCorrection = New-NitpickCorrection `
+            -TextEdit @(
+                New-AstTextEdit `
+                    -Extent $FirstExtent `
+                    -ReplacementText '$First = 2' `
+                    -Reason 'Replace the coupled assignments.'
+                New-AstTextEdit `
+                    -StartLineNumber $SecondExtent.StartLineNumber `
+                    -EndLineNumber $SecondExtent.EndLineNumber `
+                    -StartColumnNumber $SecondExtent.StartColumnNumber `
+                    -EndColumnNumber $SecondExtent.EndColumnNumber `
+                    -StartOffset $SecondExtent.StartOffset `
+                    -EndOffset $SecondExtent.EndOffset `
+                    -ExpectedText '$Second = 9' `
+                    -ReplacementText '$Second = 3' `
+                    -Reason 'Replace the coupled assignments.'
+            ) `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the coupled assignments.'
+
+        $IndependentCorrection = New-NitpickCorrection `
+            -ViolationExtent $ThirdExtent `
+            -ReplacementText '$Third = 4' `
+            -FilePathOrContext '<ScriptBlock>' `
+            -Description 'Replace the third assignment.'
+
+        $Findings = @(
+            New-NitpickFinding `
+                -RuleId 'Local/ReplaceAssignments' `
+                -Message 'Replace coupled assignments.' `
                 -ViolationExtent $FirstExtent `
-                -ReplacementText '$First = 2' `
-                -FilePathOrContext '<ScriptBlock>' `
-                -Description 'Replace the first assignment.' `
-                -ChangeSetId 'CoupledAssignments'
-
-            New-NitpickCorrection `
-                -StartLineNumber $SecondExtent.StartLineNumber `
-                -EndLineNumber $SecondExtent.EndLineNumber `
-                -StartColumnNumber $SecondExtent.StartColumnNumber `
-                -EndColumnNumber $SecondExtent.EndColumnNumber `
-                -StartOffset $SecondExtent.StartOffset `
-                -EndOffset $SecondExtent.EndOffset `
-                -ExpectedText '$Second = 9' `
-                -ReplacementText '$Second = 3' `
-                -FilePathOrContext '<ScriptBlock>' `
-                -Description 'Replace the second assignment.' `
-                -ChangeSetId 'CoupledAssignments'
-
-            New-NitpickCorrection `
+                -Severity Information `
+                -Corrections $CoupledCorrection `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Exercises all-or-nothing correction edits.' `
+                -OutputAs NitpickFinding
+            New-NitpickFinding `
+                -RuleId 'Local/ReplaceAssignments' `
+                -Message 'Replace the third assignment.' `
                 -ViolationExtent $ThirdExtent `
-                -ReplacementText '$Third = 4' `
-                -FilePathOrContext '<ScriptBlock>' `
-                -Description 'Replace the third assignment.'
+                -Severity Information `
+                -Corrections $IndependentCorrection `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Exercises all-or-nothing correction edits.' `
+                -OutputAs NitpickFinding
         )
-        $Finding = New-NitpickFinding `
-            -RuleId 'Local/ReplaceAssignments' `
-            -Message 'Replace assignments.' `
-            -ViolationExtent $FirstExtent `
-            -Severity Information `
-            -Corrections $Corrections `
-            -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Exercises all-or-nothing correction change sets.' `
-            -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Findings
 
         $Result.CandidateText | Should -Be $Source
         $Result.AcceptedCorrections | Should -HaveCount 0
-        $Result.SkippedCorrections | Should -HaveCount 3
+        $Result.SkippedCorrections | Should -HaveCount 2
         $Result.SkippedCorrections.Reason | Should -Contain 'AstEditor rejected the target because an edit is stale.'
     }
 
@@ -195,17 +206,30 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -FilePathOrContext '<ScriptBlock>' `
                 -Description 'Replace the second assignment.'
         )
-        $Finding = New-NitpickFinding `
-            -RuleId 'Local/ReplaceAssignments' `
-            -Message 'Replace assignments.' `
-            -ViolationExtent $FirstExtent `
-            -Severity Information `
-            -Corrections $Corrections `
-            -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Exercises independent corrections.' `
-            -OutputAs NitpickFinding
+        # Independent fixes belong to independent findings; a single finding
+        # offering several Safe corrections is skipped as ambiguous.
+        $Findings = @(
+            New-NitpickFinding `
+                -RuleId 'Local/ReplaceAssignments' `
+                -Message 'Replace the first assignment.' `
+                -ViolationExtent $FirstExtent `
+                -Severity Information `
+                -Corrections $Corrections[0] `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Exercises independent corrections.' `
+                -OutputAs NitpickFinding
+            New-NitpickFinding `
+                -RuleId 'Local/ReplaceAssignments' `
+                -Message 'Replace the second assignment.' `
+                -ViolationExtent $SecondExtent `
+                -Severity Information `
+                -Corrections $Corrections[1] `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Exercises independent corrections.' `
+                -OutputAs NitpickFinding
+        )
 
-        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Findings
 
         $Result.CandidateText | Should -Be '$First = 100; $Second = 200'
         $Result.AcceptedCorrections | Should -HaveCount 2
@@ -244,12 +268,23 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Message 'Exercise overlapping corrections.' `
             -ViolationExtent $Extent `
             -Severity Information `
-            -Corrections $Corrections `
+            -Corrections $Corrections[0] `
+            -ScriptPath '<ScriptBlock>' `
+            -Explanation 'Exercises target-level conflict rejection.' `
+            -OutputAs NitpickFinding
+        # Overlapping fixes must come from separate findings to reach the
+        # conflict policy; alternatives on one finding are skipped earlier.
+        $CompetingFinding = New-NitpickFinding `
+            -RuleId 'Local/OverlappingRules' `
+            -Message 'Exercise overlapping corrections.' `
+            -ViolationExtent $Extent `
+            -Severity Information `
+            -Corrections $Corrections[1] `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Exercises target-level conflict rejection.' `
             -OutputAs NitpickFinding
 
-        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
+        $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding @($Finding, $CompetingFinding)
 
         $Result.CandidateText | Should -Be $Source
         $Result.AcceptedCorrections | Should -HaveCount 0
@@ -483,23 +518,31 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 return
             }
 
-            $Corrections = if ($Assignment.Extent.Text -eq '$Value = 123') {
-                @(
-                    New-NitpickCorrection `
+            if ($Assignment.Extent.Text -eq '$Value = 123') {
+                # Conflicting fixes must come from separate findings; two Safe
+                # corrections on one finding are skipped as ambiguous alternatives.
+                foreach ($Replacement in '$Value = 456', '$Value = 789') {
+                    $Correction = New-NitpickCorrection `
                         -ViolationExtent $Assignment.Extent `
-                        -ReplacementText '$Value = 456' `
+                        -ReplacementText $Replacement `
                         -FilePathOrContext $Assignment.Extent.File `
-                        -Description 'First conflicting replacement.' `
+                        -Description "Replace the assignment with $Replacement." `
                         -RuleId 'Local/PerTargetRule'
 
-                    New-NitpickCorrection `
+                    New-NitpickFinding `
+                        -RuleId 'Local/PerTargetRule' `
+                        -Message 'Per-target correction test.' `
                         -ViolationExtent $Assignment.Extent `
-                        -ReplacementText '$Value = 789' `
-                        -FilePathOrContext $Assignment.Extent.File `
-                        -Description 'Second conflicting replacement.' `
-                        -RuleId 'Local/PerTargetRule'
-                )
-            } elseif ($Assignment.Extent.Text -eq '$Value = 1') {
+                        -Severity Information `
+                        -Corrections $Correction `
+                        -ScriptPath $Assignment.Extent.File `
+                        -Explanation 'Verifies target preview failure isolation.' `
+                        -OutputAs NitpickFinding
+                }
+                return
+            }
+
+            $Corrections = if ($Assignment.Extent.Text -eq '$Value = 1') {
                 @(
                     New-NitpickCorrection `
                         -ViolationExtent $Assignment.Extent `

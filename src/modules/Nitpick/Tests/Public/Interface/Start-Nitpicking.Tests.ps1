@@ -620,31 +620,26 @@ Describe 'Start-Nitpicking' {
             param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
 
             $Extent = $ScriptBlockAst.EndBlock.Statements[0].Extent
-            $Corrections = @(
-                New-NitpickCorrection `
+            # Conflicting fixes must come from separate findings; two Safe
+            # corrections on one finding are skipped as ambiguous alternatives.
+            foreach ($Replacement in '$Value = 456', '$Value = 789') {
+                $Correction = New-NitpickCorrection `
                     -ViolationExtent $Extent `
-                    -ReplacementText '$Value = 456' `
+                    -ReplacementText $Replacement `
                     -FilePathOrContext '<ScriptBlock>' `
-                    -Description 'First replacement.' `
+                    -Description "Replace with $Replacement." `
                     -RuleId 'Local/ConflictingRule'
 
-                New-NitpickCorrection `
+                New-NitpickFinding `
+                    -RuleId 'Local/ConflictingRule' `
+                    -Message 'Conflicting correction test.' `
                     -ViolationExtent $Extent `
-                    -ReplacementText '$Value = 789' `
-                    -FilePathOrContext '<ScriptBlock>' `
-                    -Description 'Second replacement.' `
-                    -RuleId 'Local/ConflictingRule'
-            )
-
-            New-NitpickFinding `
-                -RuleId 'Local/ConflictingRule' `
-                -Message 'Conflicting correction test.' `
-                -ViolationExtent $Extent `
-                -Severity Information `
-                -Corrections $Corrections `
-                -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
-                -OutputAs NitpickFinding
+                    -Severity Information `
+                    -Corrections $Correction `
+                    -ScriptPath '<ScriptBlock>' `
+                    -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
+                    -OutputAs NitpickFinding
+            }
         }
         Register-Nitpick -Callable $Rule -Name ConflictingRule -Source Tests
 
@@ -674,7 +669,7 @@ Describe 'Start-Nitpicking' {
                 -NoSummary
         ) -join "`n"
         $Text | Should -Match '(?m)^<ScriptBlock>\r?$'
-        $Text | Should -Match '  0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict \(proposal: Rejected; application: NotAttempted\)\.'
+        $Text | Should -Match '  0 corrections committed, 0 corrections accepted, 2 corrections skipped, 1 conflict \(proposal: Rejected; application: NotAttempted\)\.'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {
