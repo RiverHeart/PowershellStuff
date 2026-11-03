@@ -5,9 +5,9 @@ Nitpick is a Powershell based linter that seeks to replace ScriptAnalyzer. It fo
 ## Example
 
 ```powershell
-Start-Nitpicking -Script {
-	param([Parameter(Mandatory=$true)] $MyParam)
-} -FixMode Apply
+Start-Nitpicking -FixMode Apply -Script {
+    param([Parameter(Mandatory=$true)] $MyParam)
+}
 ```
 
 **Output**
@@ -50,16 +50,23 @@ ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unl
 
 **Other issues:**
 
-* The inability to limit a test to certain file types/names is problematic since rule suppression doesn't behave well in Pester where tests may run against purposefully incorrect code.
-* The inability to throw an error for a given severity makes CI tasks harder than necessary. Powershell task runners (Psake, InvokeBuild, PleaseWork) must manually parse the results and throw an error themselves or execute ScriptAnalyzer in a dedicated Powershell process with `-EnableExitCode` which only works if error records were produced.
+* It doesn't allow you to limit a test to certain file types/names.
+  * Rule suppression doesn't behave well in Pester so if you're writing PSSA rules and want to test them, which requires purposefully incorrect code, you're going to have issues.
+* Doesn't allow throwing an error for findings of a given severity.
+  * This makes CI and pre-commit tasks harder than necessary. Powershell task runners (Psake, InvokeBuild, PleaseWork) must manually parse the results and throw an error themselves or execute ScriptAnalyzer in a dedicated Powershell process with `-EnableExitCode` which only works if error records were produced.
 * Renders results exclusively as objects instead of standard text output.
-* Doesn't support test categories.
+  * Powershell objects are great for a lot of things. This is not one of those things.
+* Doesn't support rule categories.
 * Rule suppression is difficult to use.
+  * The suppression attributes are finicky, I can never remember the syntax, and they don't support line or temporary disabling.
 * Doesn't support linting non-Powershell files.
+  * I have dreams of Nitpick doing more than Powershell but I'm trying not to put the cart before the horse.
 * Developers are forced to become C# devs to contribute to it.
-* The documentation isn't great.
+  * Which is fine, tons of tools are written in different languages than they serve but if you, like myself, have no interest the C# language or ecosystem then that's a negative.
+* The documentation could be better.
+* It doesn't ensure rules are unique even when they originate from the same source. That's why if you run `Invoke-ScriptAnalyzer` with `CustomRulePath` set to module already on the path it'll load rules from it twice and produce duplicate results.
 
-## Comparison
+## Feature Comparison
 
 Below is a quick overview of the key differences between PSScriptAnalyzer and Nitpick.
 
@@ -67,10 +74,10 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
 | **Built-In Ruleset** | 75 Rules | 3 Rules |  |
-| **VSCode Integration** | Yes | No |  |
+| **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |
-| **Rule Categories** | No | Yes |  |
+| **Rule Categories** | No | Working on it |  |
 | **Rule Scoping** | No | Working on it |  |
 | **Nested Module Support** | No | Yes |  |
 | **Errors On Failures** | No | Yes | ScriptAnalyzer doesn't throw for failures so Powershell task runners have to call it from a subprocess with `-EnableExit` or sort through the objects and throw itself. |
@@ -94,12 +101,21 @@ when appropriate:
 
 ```powershell
 $Extent = { $Value = 1 }.Ast.EndBlock.Statements[0].Extent
-$Correction = New-NitpickCorrection -RuleId 'Local/AssignmentStyle' `
-    -ViolationExtent $Extent -ReplacementText '$Value = 2' `
-    -FilePathOrContext '<ScriptBlock>' -Description 'Replace the assignment.'
-New-NitpickFinding -RuleId 'Local/AssignmentStyle' `
-    -ViolationExtent $Extent -Message 'Prefer the replacement.' -Severity Information `
-    -ScriptPath '<ScriptBlock>' -Explanation 'Standalone example.' -Corrections $Correction
+$Correction = New-NitpickCorrection `
+    -RuleId 'Local/AssignmentStyle' `
+    -ViolationExtent $Extent `
+    -ReplacementText '$Value = 2' `
+    -FilePathOrContext '<ScriptBlock>'`
+    -Description 'Replace the assignment.'
+
+New-NitpickFinding `
+    -RuleId 'Local/AssignmentStyle' `
+    -ViolationExtent $Extent `
+    -Message 'Prefer the replacement.' `
+    -Severity Information `
+    -ScriptPath '<ScriptBlock>' `
+    -Explanation 'Standalone example.' `
+    -Corrections $Correction
 ```
 
 IDs must contain exactly a namespace and a local name separated by `/`, with neither
@@ -118,6 +134,6 @@ External DiagnosticRecord-only scaffolds are not native producers and remain unc
 **TODO:**
   - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
   - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
-  - Explore VSCode integration via `$PSEditor` (see [EditorTextManipulation.md](./src/modules/AstEditor/Docs/EditorTextManipulation.md)) for violation review/fixes. Nitpick could drive the editor from the terminal by opening the file at the occurence of the offending code and apply the fix before the user, and changes could be reverted before moving on. Sort of like a code review. Application of manual fixes would be nice but not sure how that would work. This could serve as a nice alternative to yet another editor extension. Probably won't be as straight forward as I imagine though.
   - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
   - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.
+  - Add Nitpick rule for using `return` in `Begin` and `Process` blocks.
