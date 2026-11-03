@@ -430,7 +430,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Result.Status | Should -Be 'FailedValidation'
     }
 
-    It 'reports findings and severity counts from final analysis after fixing' {
+    It 'reports effective findings while counting detected severities after fixing' {
         $Rule = {
             param([ScriptBlockAst] $ScriptBlockAst)
 
@@ -497,8 +497,10 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
         $Preview.Report.EffectiveFindings[0].Severity | Should -Be 'Warning'
         $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
         $Summary.FindingCount | Should -Be 1
-        $Summary.ErrorCount | Should -Be 0
-        $Summary.WarningCount | Should -Be 1
+        $Summary.ErrorCount | Should -Be 1
+        $Summary.WarningCount | Should -Be 0
+        $Summary.CorrectedFindingCount | Should -Be 1
+        $Summary.UnresolvedFindingCount | Should -Be 1
         $Errors | Should -BeNullOrEmpty
     }
 

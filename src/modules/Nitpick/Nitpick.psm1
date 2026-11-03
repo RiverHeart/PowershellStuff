@@ -246,11 +246,14 @@ Update-TypeData `
 class NitpickSummary {
     [int] $TargetCount
     [int] $RuleCount
+    [string] $FixMode = 'Off'
     [int] $FindingCount
     [int] $ErrorCount
     [int] $WarningCount
     [int] $InformationCount
-    [int] $FindingsWithAppliedCorrectionsCount
+    [int] $CorrectedFindingCount
+    [int] $CorrectableFindingCount
+    [int] $UnresolvedFindingCount
     [int] $SkippedCorrectionCount
     [int] $ConflictedTargetCount
     [int] $FailedTargetCount
@@ -260,12 +263,42 @@ class NitpickSummary {
         $FindingLabel = if ($this.FindingCount -eq 1) { 'finding' } else { 'findings' }
         $TargetLabel = if ($this.TargetCount -eq 1) { 'target' } else { 'targets' }
 
-        return '{0} {1} ({2} errors, {3} warnings, {4} information) across {5} {6} in {7:N0} ms' -f `
+        # FindingCount and the severity counters describe detected findings; zero severities are omitted.
+        $SeverityParts = @(
+            if ($this.ErrorCount -gt 0) {
+                '{0} {1}' -f $this.ErrorCount, $(if ($this.ErrorCount -eq 1) { 'error' } else { 'errors' })
+            }
+            if ($this.WarningCount -gt 0) {
+                '{0} {1}' -f $this.WarningCount, $(if ($this.WarningCount -eq 1) { 'warning' } else { 'warnings' })
+            }
+            if ($this.InformationCount -gt 0) {
+                '{0} information' -f $this.InformationCount
+            }
+        )
+
+        # The correction clause appears only in fix modes, labeled by whichever outcome is in play.
+        $CorrectionParts = @(
+            if ($this.FixMode -ne 'Off') {
+                if ($this.CorrectedFindingCount -gt 0) {
+                    '{0} corrected' -f $this.CorrectedFindingCount
+                }
+                if ($this.CorrectableFindingCount -gt 0) {
+                    '{0} correctable' -f $this.CorrectableFindingCount
+                }
+                '{0} unresolved' -f $this.UnresolvedFindingCount
+            }
+        )
+
+        $Groups = @(
+            if ($SeverityParts.Count -gt 0) { $SeverityParts -join ', ' }
+            if ($CorrectionParts.Count -gt 0) { $CorrectionParts -join ', ' }
+        )
+        $Detail = if ($Groups.Count -gt 0) { ' ({0})' -f ($Groups -join '; ') } else { '' }
+
+        return '{0} {1}{2} across {3} {4} in {5:N0} ms' -f `
             $this.FindingCount,
             $FindingLabel,
-            $this.ErrorCount,
-            $this.WarningCount,
-            $this.InformationCount,
+            $Detail,
             $this.TargetCount,
             $TargetLabel,
             $this.Duration.TotalMilliseconds

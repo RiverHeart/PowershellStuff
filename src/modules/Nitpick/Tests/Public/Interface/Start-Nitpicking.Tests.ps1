@@ -534,7 +534,7 @@ Describe 'Start-Nitpicking' {
         $Results[0] | Should -BeOfType ([string])
         $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool$'
         $Results[1] | Should -BeOfType ([string])
-        $Results[1] | Should -Match '^1 finding \(0 errors, 0 warnings, 1 information\) across 1 target in [\d,]+ ms$'
+        $Results[1] | Should -Match '^1 finding \(1 information\) across 1 target in [\d,]+ ms$'
     }
 
     It 'separates consecutive target findings with host-only blank lines' {
@@ -593,7 +593,7 @@ Describe 'Start-Nitpicking' {
         $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+Local/OutOfOrder$'
     }
 
-    It 'previews corrections and summarizes final findings for in-memory input' {
+    It 'previews corrections and summarizes detected findings for in-memory input' {
         $Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
         [array] $Results = Start-Nitpicking `
             -Script $Source `
@@ -611,8 +611,10 @@ Describe 'Start-Nitpicking' {
         $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
         $Preview.Application.AppliedCorrections | Should -HaveCount 0
 
-        $Summary.FindingCount | Should -Be 0
-        $Summary.InformationCount | Should -Be 0
+        $Summary.FindingCount | Should -Be 1
+        $Summary.InformationCount | Should -Be 1
+        $Summary.CorrectableFindingCount | Should -Be 1
+        $Summary.UnresolvedFindingCount | Should -Be 0
     }
 
     It 'reports rejected corrections and conflicts in object and text output' {

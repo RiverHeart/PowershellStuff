@@ -131,15 +131,17 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Report.EffectiveFindings | Should -HaveCount 0
         $Result.Report.EffectiveText | Should -BeExactly $Expected
 
-        $Summary.FindingCount | Should -Be 0
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 2
+        $Summary.FindingCount | Should -Be 2
+        $Summary.InformationCount | Should -Be 2
+        $Summary.CorrectedFindingCount | Should -Be 2
+        $Summary.UnresolvedFindingCount | Should -Be 0
 
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
 
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) | Should -BeExactly $OriginalBytes
     }
 
-    It 'previews and commits equivalent groups with final counts and preserved bytes' {
+    It 'previews and commits equivalent groups with detected counts and preserved bytes' {
         [array] $PreviewOutput = Start-Nitpicking `
             -Path $Path `
             -IncludeRule Nitpick/UseIsNotOperator `
@@ -159,8 +161,11 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Preview.Report.FindingsWithAcceptedCorrections | Should -HaveCount 2
         $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
 
-        $PreviewSummary.FindingCount | Should -Be 0
-        $PreviewSummary.FindingsWithAppliedCorrectionsCount | Should -Be 0
+        $PreviewSummary.FindingCount | Should -Be 2
+        $PreviewSummary.InformationCount | Should -Be 2
+        $PreviewSummary.CorrectedFindingCount | Should -Be 0
+        $PreviewSummary.CorrectableFindingCount | Should -Be 2
+        $PreviewSummary.UnresolvedFindingCount | Should -Be 0
 
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) | Should -BeExactly $OriginalBytes
 
@@ -206,11 +211,13 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Applied.Report.FindingsWithAppliedCorrections | Should -HaveCount 2
         $Applied.Report.EffectiveFindings | Should -HaveCount 0
         $Summary.TargetCount | Should -Be 1
-        $Summary.FindingCount | Should -Be 0
-        $Summary.InformationCount | Should -Be 0
+        $Summary.FindingCount | Should -Be 2
+        $Summary.InformationCount | Should -Be 2
         $Summary.WarningCount | Should -Be 0
         $Summary.ErrorCount | Should -Be 0
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 2
+        $Summary.CorrectedFindingCount | Should -Be 2
+        $Summary.CorrectableFindingCount | Should -Be 0
+        $Summary.UnresolvedFindingCount | Should -Be 0
         $Summary.SkippedCorrectionCount | Should -Be 0
         $Summary.FailedTargetCount | Should -Be 0
         $ExpectedBytes = [byte[]](@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))
@@ -262,8 +269,10 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 2
         $Result.Report.EffectiveFindings | Should -HaveCount 0
 
-        $Summary.FindingCount | Should -Be 0
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 0
+        $Summary.FindingCount | Should -Be 2
+        $Summary.CorrectedFindingCount | Should -Be 0
+        $Summary.CorrectableFindingCount | Should -Be 2
+        $Summary.UnresolvedFindingCount | Should -Be 0
 
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
 
@@ -312,7 +321,9 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
 
         $Summary.FindingCount | Should -Be 2
         $Summary.InformationCount | Should -Be 2
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 0
+        $Summary.CorrectedFindingCount | Should -Be 0
+        $Summary.CorrectableFindingCount | Should -Be 2
+        $Summary.UnresolvedFindingCount | Should -Be 2
         $Summary.SkippedCorrectionCount | Should -Be 0
         $Summary.FailedTargetCount | Should -Be 1
 
@@ -352,9 +363,10 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Result.Report.EffectiveFindings[0].Corrections | Should -BeNullOrEmpty
         $Result.Report.EffectiveText | Should -BeExactly $MixedExpected
 
-        $Summary.FindingCount | Should -Be 1
-        $Summary.InformationCount | Should -Be 1
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 2
+        $Summary.InformationCount | Should -Be 2
+        $Summary.CorrectedFindingCount | Should -Be 1
+        $Summary.UnresolvedFindingCount | Should -Be 1
         $Summary.FailedTargetCount | Should -Be 0
 
         ($Errors | Out-String) | Should -Match "Encountered 1 findings at or above the 'Information' severity threshold"

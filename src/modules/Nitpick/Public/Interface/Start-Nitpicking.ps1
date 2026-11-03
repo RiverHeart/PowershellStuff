@@ -148,6 +148,7 @@ function Start-Nitpicking {
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
+        $Summary.FixMode = $FixMode
         $Stopwatch = [Stopwatch]::StartNew()
         $SeverityRank = @{
             Information = 0
@@ -311,8 +312,15 @@ function Start-Nitpicking {
                     -Rule $ApplicableRules.ToArray()
 
                 $FinalFindings = $CorrectionResult.Report.EffectiveFindings
-                $Summary.FindingsWithAppliedCorrectionsCount +=
+
+                $Summary.CorrectedFindingCount +=
                     $CorrectionResult.Report.FindingsWithAppliedCorrections.Count
+                foreach ($AcceptedFinding in $CorrectionResult.Report.FindingsWithAcceptedCorrections) {
+                    if ($AcceptedFinding -notin $CorrectionResult.Report.FindingsWithAppliedCorrections) {
+                        $Summary.CorrectableFindingCount++
+                    }
+                }
+                $Summary.UnresolvedFindingCount += $FinalFindings.Count
 
                 $Summary.SkippedCorrectionCount += $CorrectionResult.Proposal.SkippedCorrections.Count
 
@@ -327,14 +335,18 @@ function Start-Nitpicking {
                 }
             }
 
-            foreach ($Finding in $FinalFindings) {
+            # FindingCount and the severity counters describe detected findings (original analysis,
+            # parse errors included). Pipeline output and the -ErrorOn threshold use effective findings.
+            foreach ($Finding in $TargetFindings) {
                 $Summary.FindingCount++
                 switch ($Finding.Severity) {
                     'Error' { $Summary.ErrorCount++ }
                     'Warning' { $Summary.WarningCount++ }
                     'Information' { $Summary.InformationCount++ }
                 }
+            }
 
+            foreach ($Finding in $FinalFindings) {
                 if ($ErrorOn -and
                     $SeverityRank.ContainsKey($Finding.Severity) -and
                     $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]

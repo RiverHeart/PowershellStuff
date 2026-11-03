@@ -61,7 +61,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         Register-Nitpick -Callable $Rule -Name TransactionRule -Source Tests
     }
 
-    It 'commits a file and calculates output, severity counts, and threshold from final analysis' {
+    It 'commits a file, counts detected severities, and thresholds on final analysis' {
         $Path = Join-Path $TestDrive 'Apply.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
@@ -82,9 +82,13 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Findings[0].Severity | Should -Be 'Warning'
 
-        $Summary.ErrorCount | Should -Be 0
-        $Summary.WarningCount | Should -Be 1
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 1
+        $Summary.ErrorCount | Should -Be 1
+        $Summary.WarningCount | Should -Be 0
+        $Summary.CorrectedFindingCount | Should -Be 1
+        $Summary.CorrectableFindingCount | Should -Be 0
+        $Summary.UnresolvedFindingCount | Should -Be 1
+        $Summary.FixMode | Should -Be 'Apply'
         $Summary.PSObject.Properties.Name | Should -Not -Contain 'FixedFindingCount'
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 2'
@@ -109,8 +113,10 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Result.Report.EffectiveFindings.GetType().IsArray | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 0
 
-        $Summary.FindingCount | Should -Be 0
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 2
+        $Summary.FindingCount | Should -Be 2
+        $Summary.InformationCount | Should -Be 2
+        $Summary.CorrectedFindingCount | Should -Be 2
+        $Summary.UnresolvedFindingCount | Should -Be 0
 
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) |
             Should -Be ([Convert]::ToBase64String($ExpectedBytes))
@@ -225,8 +231,8 @@ Describe 'Start-Nitpicking transactional fixes' {
     }
 
     It 'reports <Status> for script input in <FixMode> mode while returning candidate analysis' -ForEach @(
-        @{ FixMode = 'Preview'; Status = 'Preview'; AppliedCount = 0 }
-        @{ FixMode = 'Apply'; Status = 'InMemory'; AppliedCount = 1 }
+        @{ FixMode = 'Preview'; Status = 'Preview'; AppliedCount = 0; CorrectableCount = 1 }
+        @{ FixMode = 'Apply'; Status = 'InMemory'; AppliedCount = 1; CorrectableCount = 0 }
     ) {
         $Source = [scriptblock]::Create('$Value = 1')
         $Results = @(Start-Nitpicking -Script $Source -IncludeRule Local/TransactionRule -FixMode $FixMode `
@@ -240,9 +246,12 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
         $Result.Report.EffectiveFindings[0].Severity | Should -Be 'Warning'
-        $Summary.ErrorCount | Should -Be 0
-        $Summary.WarningCount | Should -Be 1
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be $AppliedCount
+        $Summary.FindingCount | Should -Be 1
+        $Summary.ErrorCount | Should -Be 1
+        $Summary.WarningCount | Should -Be 0
+        $Summary.CorrectedFindingCount | Should -Be $AppliedCount
+        $Summary.CorrectableFindingCount | Should -Be $CorrectableCount
+        $Summary.UnresolvedFindingCount | Should -Be 1
         $Source.ToString() | Should -Be '$Value = 1'
     }
 
@@ -354,7 +363,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Summary.TargetCount | Should -Be 2
         $Summary.FailedTargetCount | Should -Be 1
         $Summary.SkippedCorrectionCount | Should -Be 1
-        $Summary.FindingsWithAppliedCorrectionsCount | Should -Be 1
+        $Summary.CorrectedFindingCount | Should -Be 1
 
         [System.IO.File]::ReadAllText($InvalidPath) | Should -Be '$Value = 1'
         [System.IO.File]::ReadAllText($ValidPath) | Should -Be '$Value = 2'
