@@ -218,7 +218,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Summary.CorrectedFindingCount | Should -Be 2
         $Summary.CorrectableFindingCount | Should -Be 0
         $Summary.UnresolvedFindingCount | Should -Be 0
-        $Summary.SkippedCorrectionCount | Should -Be 0
+        $Summary.SkippedFindingCount | Should -Be 0
         $Summary.FailedTargetCount | Should -Be 0
         $ExpectedBytes = [byte[]](@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))
 
@@ -324,7 +324,7 @@ Describe 'Start-Nitpicking coordinated structural transactions' {
         $Summary.CorrectedFindingCount | Should -Be 0
         $Summary.CorrectableFindingCount | Should -Be 2
         $Summary.UnresolvedFindingCount | Should -Be 2
-        $Summary.SkippedCorrectionCount | Should -Be 0
+        $Summary.SkippedFindingCount | Should -Be 0
         $Summary.FailedTargetCount | Should -Be 1
 
         ($Errors | Out-String) | Should -Match 'Simulated structural commit failure'

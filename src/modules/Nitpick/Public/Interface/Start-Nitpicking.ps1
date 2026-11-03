@@ -61,8 +61,11 @@ using namespace System.Management.Automation.Language
     Specifies the mode for applying corrections.
     'Off'     - Do not apply any corrections.
     'Preview' - Report safe corrections as proposals for file-backed or in-memory inputs.
-    'Guided'  - Interactive correction process (not yet implemented).
-    'Apply'   - Apply safe corrections.
+    'Guided'  - Apply safe corrections; when a finding needs a choice (several
+                corrections, or only non-Safe ones), select it in the editor via
+                PowerShell Editor Services when available and prompt for the
+                correction to apply. Requires an interactive host.
+    'Apply'   - Apply safe corrections. Findings needing a choice are reported as undecided.
 
     NOTE: Previewing or applying against in-memory inputs returns candidate text
     in object output under `Report.EffectiveText` without modifying the input.
@@ -128,7 +131,6 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
-        # TODO: Implement guided mode as an interactive correction process.
         [ValidateSet('Off', 'Preview', 'Guided', 'Apply')]
         [string] $FixMode = 'Off',
 
@@ -139,6 +141,18 @@ function Start-Nitpicking {
 
     # MARK: BEGIN BLK
     begin {
+        # A plain `return` here would only exit `begin`; `process` and `end` would still run.
+        if ($FixMode -eq 'Guided' -and -not (Test-NitpickInteractiveSession)) {
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    [InvalidOperationException]::new('Guided mode requires an interactive session.'),
+                    'NitpickGuidedModeNonInteractive',
+                    [ErrorCategory]::InvalidOperation,
+                    $FixMode
+                )
+            )
+        }
+
         [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
             -Module $Module `
             -IncludeRule $IncludeRule `
@@ -306,7 +320,7 @@ function Start-Nitpicking {
             $FinalFindings = $TargetFindings.ToArray()
             if ($FixMode -ne 'Off') {
                 $CorrectionResult = Resolve-NitpickTargetCorrection `
-                    -Preview:($FixMode -eq 'Preview') `
+                    -FixMode $FixMode `
                     -Document $Document `
                     -Finding $TargetFindings.ToArray() `
                     -Rule $ApplicableRules.ToArray()
@@ -321,8 +335,9 @@ function Start-Nitpicking {
                     }
                 }
                 $Summary.UnresolvedFindingCount += $FinalFindings.Count
+                $Summary.UndecidedFindingCount += $CorrectionResult.Proposal.UndecidedFindings.Count
 
-                $Summary.SkippedCorrectionCount += $CorrectionResult.Proposal.SkippedCorrections.Count
+                $Summary.SkippedFindingCount += $CorrectionResult.Proposal.SkippedFindings.Count
 
                 if ($CorrectionResult.Proposal.Conflicts.Count -gt 0) {
                     $Summary.ConflictedTargetCount++
@@ -368,7 +383,18 @@ function Start-Nitpicking {
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
 
-                $TargetText = Format-NitpickText -Ast $Ast -Finding $SortedFindings -CorrectionResult $CorrectionResult
+                $SourceLabel = if ($PSCmdlet.ParameterSetName -eq 'Script' -and
+                    -not $Ast.Extent.File -and
+                    $Target.Extent.File
+                ) {
+                    '{0}:{1}:{2}' -f $Target.Extent.File, $Target.Extent.StartLineNumber, $Target.Extent.StartColumnNumber
+                }
+
+                $TargetText = Format-NitpickText `
+                    -Ast $Ast `
+                    -Finding $SortedFindings `
+                    -CorrectionResult $CorrectionResult `
+                    -SourceLabel $SourceLabel
 
                 if ($TargetText) {
                     if ($HasWrittenTextBlock) { Write-Host '' }

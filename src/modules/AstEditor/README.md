@@ -48,6 +48,18 @@ Resolve-AstDocument -Document $document
 `AstDocument` remains an internal implementation type. Consumers create documents through
 `New-AstDocument` and detached edits through `New-AstTextEdit` or structural edit commands.
 
+Document constructors share initialization and parsing. String, ScriptBlock, and AST inputs
+are parsed once; ScriptBlock and AST inputs currently use their extent text and produce
+fragment-local AST, token, and parse-error coordinates. `SourceExtent` retains the original
+AST's bounds without replacing native AST extents. `HasSourceProvenance()` reports whether
+that extent identifies a file; it is informational and independent of `IsFileBacked`.
+`GetSourcePosition(offset)` maps a document-local offset in `OriginalText` to a source
+`Path`, `Offset`, and one-based `LineNumber` and `ColumnNumber`; without provenance it
+returns document-local coordinates. Offsets taken from the original (unreparsed) AST are
+already source-absolute and must not be passed through it. Mapping applies only to the
+original snapshot, not rendered candidate text. These inputs remain in-memory documents;
+only `-Path` captures a transactional file snapshot.
+
 ## Core Model
 
 - `AstTextEdit`: class-based detached edit contract with source coordinates, expected text, replacement text, and reason

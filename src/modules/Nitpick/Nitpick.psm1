@@ -253,8 +253,9 @@ class NitpickSummary {
     [int] $InformationCount
     [int] $CorrectedFindingCount
     [int] $CorrectableFindingCount
+    [int] $UndecidedFindingCount
     [int] $UnresolvedFindingCount
-    [int] $SkippedCorrectionCount
+    [int] $SkippedFindingCount
     [int] $ConflictedTargetCount
     [int] $FailedTargetCount
     [timespan] $Duration
@@ -285,6 +286,9 @@ class NitpickSummary {
                 if ($this.CorrectableFindingCount -gt 0) {
                     '{0} correctable' -f $this.CorrectableFindingCount
                 }
+                if ($this.UndecidedFindingCount -gt 0) {
+                    '{0} undecided' -f $this.UndecidedFindingCount
+                }
                 '{0} unresolved' -f $this.UnresolvedFindingCount
             }
         )
@@ -295,13 +299,21 @@ class NitpickSummary {
         )
         $Detail = if ($Groups.Count -gt 0) { ' ({0})' -f ($Groups -join '; ') } else { '' }
 
-        return '{0} {1}{2} across {3} {4} in {5:N0} ms' -f `
+        # Undecided findings need a human choice; point at the mode that offers one.
+        $Hint = if ($this.UndecidedFindingCount -gt 0 -and $this.FixMode -ne 'Guided') {
+            '. Use -FixMode Guided to choose between alternative or non-Safe corrections.'
+        } else {
+            ''
+        }
+
+        return '{0} {1}{2} across {3} {4} in {5:N0} ms{6}' -f `
             $this.FindingCount,
             $FindingLabel,
             $Detail,
             $this.TargetCount,
             $TargetLabel,
-            $this.Duration.TotalMilliseconds
+            $this.Duration.TotalMilliseconds,
+            $Hint
     }
 }
 
@@ -698,6 +710,8 @@ class ScriptBlockAstTransform : ArgumentTransformationAttribute {
 
 class NitpickCorrectionProposal {
     [string] $Path = '<ScriptBlock>'
+    # Origin file when the snapshot has source provenance; informational only, never a write target.
+    [string] $SourcePath
     [psobject] $Document
     [string] $OriginalFingerprint
     [string] $Status = 'NoChanges'
@@ -705,6 +719,8 @@ class NitpickCorrectionProposal {
     [NitpickFinding[]] $OriginalFindings = @()
     [string] $CandidateText
     [NitpickFinding[]] $CandidateFindings = @()
+    [NitpickFinding[]] $UndecidedFindings = @()
+    [NitpickFinding[]] $SkippedFindings = @()
     [bool] $WasReanalyzed
     [NitpickCorrection[]] $AcceptedCorrections = @()
     [object[]] $SkippedCorrections = @()

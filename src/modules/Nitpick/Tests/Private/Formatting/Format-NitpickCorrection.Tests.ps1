@@ -9,17 +9,25 @@ BeforeAll {
             [string] $ApplicationStatus = 'Preview',
             [object[]] $Accepted = @(),
             [object[]] $Applied = @(),
-            [object[]] $Skipped = @(),
+            [int] $SkippedFindingCount = 0,
+            [int] $UndecidedFindingCount = 0,
             [object[]] $Conflicts = @(),
             [switch] $NoProposal
         )
+
+        $NewFinding = {
+            New-NitpickFinding -RuleId 'Local/Placeholder' -Message 'Placeholder' `
+                -ViolationExtent ([scriptblock]::Create('$Placeholder = 1').Ast.Extent) `
+                -Severity Information -ScriptPath $Path -Explanation 'Placeholder.' -OutputAs NitpickFinding
+        }
 
         $Proposal = $null
         if (-not $NoProposal) {
             $Proposal = & (Get-Module Nitpick) { [NitpickCorrectionProposal]::new() }
             $Proposal.Status = $ProposalStatus
             $Proposal.AcceptedCorrections = $Accepted
-            $Proposal.SkippedCorrections = $Skipped
+            $Proposal.SkippedFindings = @(for ($i = 0; $i -lt $SkippedFindingCount; $i++) { & $NewFinding })
+            $Proposal.UndecidedFindings = @(for ($i = 0; $i -lt $UndecidedFindingCount; $i++) { & $NewFinding })
             $Proposal.Conflicts = $Conflicts
             $Proposal.Diff = "29:13  Reason`n  29 - old`n     + new"
         }
@@ -136,13 +144,25 @@ Describe 'Format-NitpickCorrection' {
         Format-TestCorrection $Result | Should -Match '\n  1 correction applied\.$'
     }
 
-    It 'reports full counts and statuses when corrections are skipped or conflicting' {
+    It 'reports full counts and statuses when findings are skipped or corrections conflict' {
         $Result = New-TestCorrectionResult -ProposalStatus Rejected -ApplicationStatus NotAttempted `
-            -Skipped @(1, 2) -Conflicts @(1)
+            -SkippedFindingCount 2 -Conflicts @(1)
 
         Format-TestCorrection $Result | Should -BeExactly (
-            '  0 corrections applied, 0 corrections accepted, 2 corrections skipped, 1 conflict ' +
+            '  0 corrections applied, 0 corrections accepted, 2 findings skipped, 1 conflict ' +
             '(proposal: Rejected; application: NotAttempted).'
+        )
+    }
+
+    It 'reports undecided findings only when present' {
+        $Result = New-TestCorrectionResult `
+            -ProposalStatus NoChanges `
+            -ApplicationStatus NotAttempted `
+            -UndecidedFindingCount 1
+
+        Format-TestCorrection $Result | Should -BeExactly (
+            '  0 corrections applied, 0 corrections accepted, 0 findings skipped, 1 finding undecided, 0 conflicts ' +
+            '(proposal: NoChanges; application: NotAttempted).'
         )
     }
 

@@ -76,6 +76,25 @@ Describe 'NitpickSummary formatting' {
             }
             Expected = '0 findings (0 unresolved) across 1 target in 5 ms'
         }
+        @{
+            Label = 'an apply with undecided findings and a guided-mode hint'
+            Values = @{
+                FixMode = 'Apply'; FindingCount = 2; WarningCount = 2
+                UndecidedFindingCount = 2; UnresolvedFindingCount = 2
+                TargetCount = 1; Duration = [timespan]::FromMilliseconds(5)
+            }
+            Expected = '2 findings (2 warnings; 2 undecided, 2 unresolved) across 1 target in 5 ms. ' +
+                'Use -FixMode Guided to choose between alternative or non-Safe corrections.'
+        }
+        @{
+            Label = 'a guided run with undecided findings and no hint'
+            Values = @{
+                FixMode = 'Guided'; FindingCount = 1; WarningCount = 1
+                UndecidedFindingCount = 1; UnresolvedFindingCount = 1
+                TargetCount = 1; Duration = [timespan]::FromMilliseconds(5)
+            }
+            Expected = '1 finding (1 warning; 1 undecided, 1 unresolved) across 1 target in 5 ms'
+        }
     ) {
         (New-TestSummary $Values).ToString() | Should -BeExactly $Expected
     }

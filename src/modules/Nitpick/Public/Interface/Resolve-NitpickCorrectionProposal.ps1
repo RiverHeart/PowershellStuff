@@ -8,9 +8,21 @@ using module AstEditor
 .DESCRIPTION
     Selects safe corrections and delegates atomic source validation and queueing to
     AstEditor. A correction is one complete fix for a finding: its text edits are queued
-    together and applied all-or-nothing. Only Safe corrections are selected, and at most
-    one per finding; a finding proposing several Safe corrections has all of its
-    corrections skipped, because automatic selection never chooses between alternatives.
+    together and applied all-or-nothing. Automatic selection accepts only Safe corrections,
+    and at most one per finding. A finding whose corrections require a choice (several
+    alternatives, or only non-Safe corrections) is undecided: automatic selection never
+    chooses between alternatives, so its corrections are skipped and the finding is
+    reported in UndecidedFindings.
+
+    A CorrectionSelector delegates that choice. It is invoked only for findings that
+    require one, and the correction it returns is accepted as explicit consent, including
+    non-Safe corrections. Returning nothing skips the finding without marking it undecided.
+    Alternatives that were not chosen are neither accepted nor skipped.
+
+    Each finding with corrections resolves exactly one way: accepted (one of its
+    corrections is in AcceptedCorrections), undecided, or skipped (SkippedFindings).
+    SkippedCorrections is the correction-level diagnostic record with reasons; counts
+    and summaries use the finding-level groups.
 
     If the selected batch is stale or conflicting, AstEditor rejects it without queueing any
     member. Returns a stable proposal containing candidate text, validation diagnostics,
@@ -43,6 +55,21 @@ using module AstEditor
 
 .PARAMETER Path
     Optional source path used to retain file identity during final rule analysis.
+
+.PARAMETER CorrectionSelector
+    Script block invoked for each finding that requires a choice, with positional
+    arguments: the NitpickFinding, its candidate NitpickCorrection array, and the
+    AstDocument. Return one of the supplied corrections to accept it as consent, or
+    nothing to skip the finding. The resolver performs no host interaction itself;
+    Start-Nitpicking -FixMode Guided supplies a selector that navigates and prompts.
+
+.EXAMPLE
+    $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding -CorrectionSelector {
+        param($Finding, $Corrections, $Document)
+        $Corrections | Where-Object Applicability -eq 'Review' | Select-Object -First 1
+    }
+
+    Accepts a Review correction that automatic selection would have left undecided.
 
 .EXAMPLE
     $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
@@ -109,7 +136,9 @@ function Resolve-NitpickCorrectionProposal {
         [NitpickRule[]] $Rule,
 
         [AllowNull()]
-        [string] $Path
+        [string] $Path,
+
+        [scriptblock] $CorrectionSelector
     )
 
     if ($Document.IsFileBacked -and $Path) {
@@ -132,13 +161,15 @@ function Resolve-NitpickCorrectionProposal {
     $AcceptedCorrections = [List[NitpickCorrection]]::new()
     $SkippedCorrections = [List[object]]::new()
     $SelectedCorrections = [List[NitpickCorrection]]::new()
+    $UndecidedFindings = [List[NitpickFinding]]::new()
     $Conflicts = [List[object]]::new()
     $FinalFindings = [List[object]]::new()
 
     # MARK: CORRECTION SELECTION
-    # A correction is one whole fix; its edits apply all-or-nothing. Only Safe
-    # corrections are selected, at most one per finding: automatic selection
-    # never chooses between alternatives.
+    # A correction is one whole fix; its edits apply all-or-nothing. Automatic
+    # selection accepts exactly one Safe correction per finding and never chooses
+    # between alternatives; findings that need a choice go to the selector or are
+    # reported as undecided.
     foreach ($SourceFinding in $Finding) {
         $FindingCorrections = @($SourceFinding.Corrections | Where-Object { $null -ne $_ })
         if ($FindingCorrections.Count -eq 0) {
@@ -146,16 +177,70 @@ function Resolve-NitpickCorrectionProposal {
         }
 
         $SafeCorrections = @($FindingCorrections | Where-Object { $_.Applicability -eq 'Safe' })
+        $RequiresChoice = $FindingCorrections.Count -gt 1 -or $SafeCorrections.Count -eq 0
+
+        if ($RequiresChoice -and $CorrectionSelector) {
+            $ChosenCorrection = & $CorrectionSelector $SourceFinding $FindingCorrections $Document
+            $ChosenCorrection = @($ChosenCorrection | Where-Object { $null -ne $_ } | Select-Object -First 1)
+
+            if ($ChosenCorrection.Count -eq 0) {
+                foreach ($Correction in $FindingCorrections) {
+                    $SkippedCorrections.Add([pscustomobject]@{
+                        Correction = $Correction
+                        Reason = 'The finding was skipped during guided selection.'
+                    })
+                }
+
+                continue
+            }
+
+            $ChosenCorrection = $ChosenCorrection[0]
+            $IsOffered = $false
+            foreach ($Candidate in $FindingCorrections) {
+                if ([object]::ReferenceEquals($Candidate, $ChosenCorrection)) {
+                    $IsOffered = $true
+                    break
+                }
+            }
+
+            if (-not $IsOffered) {
+                throw [System.InvalidOperationException]::new(
+                    'The correction selector must return one of the corrections offered for the finding.')
+            }
+
+            # Explicit choice is consent: only the edit contract is still enforced.
+            # Alternatives not chosen are neither accepted nor skipped; the finding
+            # resolves through the chosen correction.
+            if ($ChosenCorrection.TextEdits.Count -eq 0) {
+                $SkippedCorrections.Add([pscustomobject]@{
+                    Correction = $ChosenCorrection
+                    Reason = 'Correction does not contain an AstEditor text edit.'
+                })
+
+                continue
+            }
+
+            $SelectedCorrections.Add($ChosenCorrection)
+            continue
+        }
+
         if ($SafeCorrections.Count -gt 1) {
+            $UndecidedFindings.Add($SourceFinding)
             $AmbiguousReason = "The finding proposes $($SafeCorrections.Count) Safe corrections; " +
                 'automatic selection never chooses between alternatives.'
+
             foreach ($Correction in $FindingCorrections) {
                 $SkippedCorrections.Add([pscustomobject]@{
                     Correction = $Correction
                     Reason = $AmbiguousReason
                 })
             }
+
             continue
+        }
+
+        if ($SafeCorrections.Count -eq 0) {
+            $UndecidedFindings.Add($SourceFinding)
         }
 
         foreach ($Correction in $FindingCorrections) {
@@ -170,6 +255,7 @@ function Resolve-NitpickCorrectionProposal {
                     Correction = $Correction
                     Reason = $RejectionReason
                 })
+
                 continue
             }
 
@@ -190,6 +276,7 @@ function Resolve-NitpickCorrectionProposal {
             }
         } catch {
             $FailureKind = $_.Exception.Data['FailureKind']
+
             if ($FailureKind -eq 'Conflict') {
                 $ExistingEdit = $_.Exception.Data['ExistingEdit']
                 $IncomingEdit = $_.Exception.Data['IncomingEdit']
@@ -202,6 +289,7 @@ function Resolve-NitpickCorrectionProposal {
                         if ($Exclude -and [object]::ReferenceEquals($Candidate, $Exclude)) {
                             continue
                         }
+
                         foreach ($OwnedEdit in $Candidate.TextEdits) {
                             if ($OwnedEdit.StartOffset -eq $ConflictEdit.StartOffset -and
                                 $OwnedEdit.EndOffset -eq $ConflictEdit.EndOffset -and
@@ -296,8 +384,40 @@ function Resolve-NitpickCorrectionProposal {
         $WasReanalyzed = $true
     }
 
+    # MARK: FINDING RESOLUTION
+    # A finding with corrections resolves as accepted, undecided, or skipped. Computed
+    # after validation so batch rejections and render failures count as skips.
+    $SkippedFindings = [List[NitpickFinding]]::new()
+    foreach ($SourceFinding in $Finding) {
+        if ($UndecidedFindings.Contains($SourceFinding)) {
+            continue
+        }
+
+        $FindingCorrections = @($SourceFinding.Corrections | Where-Object { $null -ne $_ })
+        if ($FindingCorrections.Count -eq 0) {
+            continue
+        }
+
+        $HasAcceptedCorrection = $false
+        foreach ($Correction in $FindingCorrections) {
+            if ($AcceptedCorrections.Contains($Correction)) {
+                $HasAcceptedCorrection = $true
+                break
+            }
+        }
+
+        if (-not $HasAcceptedCorrection) {
+            $SkippedFindings.Add($SourceFinding)
+        }
+    }
+
     return [NitpickCorrectionProposal]@{
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
+        SourcePath = if ($Document.SourceExtent -and $Document.SourceExtent.File) {
+            $Document.SourceExtent.File
+        } else {
+            $null
+        }
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint
         OriginalText = $Script
@@ -315,6 +435,8 @@ function Resolve-NitpickCorrectionProposal {
         }
 
         CandidateFindings = $FinalFindings.ToArray()
+        UndecidedFindings = $UndecidedFindings.ToArray()
+        SkippedFindings = $SkippedFindings.ToArray()
         AcceptedCorrections = $AcceptedCorrections.ToArray()
         SkippedCorrections = $SkippedCorrections.ToArray()
         Conflicts = $Conflicts.ToArray()

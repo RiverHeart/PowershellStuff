@@ -118,6 +118,15 @@ original analysis, parse errors included. `-ErrorOn` and `UnresolvedFindingCount
 applies when available, original analysis for failed or declined writes.
 `CorrectedFindingCount` counts findings with an applied correction;
 `CorrectableFindingCount` counts findings whose accepted corrections were not applied.
+`UndecidedFindingCount` counts `Proposal.UndecidedFindings`: findings whose corrections
+need a choice automatic selection never makes; outside Guided mode the summary text adds
+a hint to use `-FixMode Guided`. `SkippedFindingCount` (formerly `SkippedCorrectionCount`)
+counts `Proposal.SkippedFindings`: findings with corrections, none accepted, that are not
+undecided. Counts are per finding because a finding's alternative corrections are
+different ways to resolve it; `Proposal.SkippedCorrections` keeps the correction-level
+reasons for `-Verbose`. `Proposal.SourcePath` records the origin file of a
+snapshot with source provenance and is informational; `Proposal.Path` remains the write
+target or `<ScriptBlock>`.
 Corrected does not mean resolved, and the counters need not sum to `FindingCount`.
 `Report.EffectiveText` contains the selected output text. `Report.AnalysisSource`
 identifies the source analyzed by `EffectiveFindings`, not necessarily `EffectiveText`:

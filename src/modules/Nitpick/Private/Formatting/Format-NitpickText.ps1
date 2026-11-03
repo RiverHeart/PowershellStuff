@@ -28,6 +28,11 @@ using namespace System.Text
 .PARAMETER CorrectionResult
     The NitpickCorrectionResult for the target, when corrections were requested.
 
+.PARAMETER SourceLabel
+    Origin of in-memory input with source provenance, such as 'C:\kicker.ps1:12:3'.
+    Appended to the '<ScriptBlock>' header for orientation only; finding positions
+    remain local to the analyzed fragment and are not hyperlinked.
+
 .EXAMPLE
     Format findings for a specific AST and display them as console-friendly text
 
@@ -56,7 +61,10 @@ function Format-NitpickText {
         [object[]] $Finding = @(),
 
         [Parameter()]
-        [NitpickCorrectionResult] $CorrectionResult
+        [NitpickCorrectionResult] $CorrectionResult,
+
+        [Parameter()]
+        [string] $SourceLabel
     )
 
     $CorrectionText = if ($CorrectionResult) {
@@ -71,7 +79,7 @@ function Format-NitpickText {
         $FilePath = $Ast.Extent.File
         $UriPath = [Uri]::new($Ast.Extent.File)
     } else {
-        $FilePath = '<ScriptBlock>'
+        $FilePath = if ($SourceLabel) { "<ScriptBlock> from $SourceLabel" } else { '<ScriptBlock>' }
         $UriPath = $null
     }
 

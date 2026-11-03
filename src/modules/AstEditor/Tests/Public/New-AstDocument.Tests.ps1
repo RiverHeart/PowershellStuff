@@ -44,6 +44,137 @@ Describe 'New-AstDocument' {
         $Overlay.OriginalText | Should -Be 'Window Main { }'
     }
 
+    It 'populates tokens, parse errors, and newline style for ScriptBlock input' {
+        $Source = [scriptblock]::Create("`$Value = 1`r`n")
+
+        $Overlay = New-AstDocument -InputObject $Source
+
+        [object]::ReferenceEquals($Overlay.Ast, $Source.Ast) | Should -BeFalse
+        $Overlay.Tokens.Count | Should -BeGreaterThan 0
+        @($Overlay.ParseErrors) | Should -HaveCount 0
+        $Overlay.NewLineSequence | Should -BeExactly "`r`n"
+        $Overlay.OriginalFingerprint | Should -Be (
+            New-AstDocument -InputObject $Source.Ast.Extent.Text
+        ).OriginalFingerprint
+    }
+
+    It 'returns parse errors instead of throwing for invalid string input' {
+        $Overlay = New-AstDocument -InputObject 'if ('
+
+        $Overlay.Ast | Should -Not -BeNullOrEmpty
+        $Overlay.Tokens.Count | Should -BeGreaterThan 0
+        $Overlay.ParseErrors.Count | Should -BeGreaterThan 0
+        $Overlay.OriginalText | Should -BeExactly 'if ('
+    }
+
+    It 'accepts empty source text' {
+        $Overlay = New-AstDocument -InputObject ''
+
+        $Overlay.OriginalText | Should -BeExactly ''
+        ($null -ne $Overlay.Ast) | Should -BeTrue
+        @($Overlay.ParseErrors) | Should -HaveCount 0
+    }
+
+    It 'reparses nested file AST input into fragment-local coordinates without enabling saves' {
+        $Path = Join-Path $TestDrive 'Nested.ps1'
+        $Text = "# preceding line`r`n& { `$Value = 1 }"
+        [System.IO.File]::WriteAllText($Path, $Text)
+        $Tokens = $null
+        $Errors = $null
+        $Root = [Parser]::ParseFile($Path, [ref] $Tokens, [ref] $Errors)
+        $Nested = $Root.Find({
+            param($Node)
+            $Node -is [ScriptBlockExpressionAst]
+        }, $true).ScriptBlock
+
+        $Overlay = New-AstDocument -InputObject $Nested
+
+        $Nested.Extent.StartOffset | Should -BeGreaterThan 0
+        $Overlay.Ast.Extent.StartOffset | Should -Be 0
+        $Overlay.Ast.Extent.StartLineNumber | Should -Be 1
+        $Overlay.OriginalText | Should -BeExactly $Nested.Extent.Text
+        $Overlay.Path | Should -Be '<memory>'
+        $Overlay.IsFileBacked | Should -BeFalse
+        [object]::ReferenceEquals($Overlay.SourceExtent, $Nested.Extent) | Should -BeTrue
+        $Assignment = $Overlay.Ast.Find({
+            param($Node)
+            $Node -is [AssignmentStatementAst]
+        }, $true)
+        $Overlay.Replace($Assignment, '$Value = 2', 'Replace value')
+        $Overlay.Render() | Should -BeExactly '{ $Value = 2 }'
+    }
+
+    It 'initializes file input with source-path tokens and a transactional snapshot' {
+        $Path = Join-Path $TestDrive 'Source.ps1'
+        $Text = "`$Value = 1`r`n"
+        [System.IO.File]::WriteAllText($Path, $Text)
+
+        $Overlay = New-AstDocument -Path $Path
+
+        $Overlay.Path | Should -Be $Path
+        $Overlay.IsFileBacked | Should -BeTrue
+        $Overlay.Ast.Extent.File | Should -Be $Path
+        $Overlay.Tokens[0].Extent.File | Should -Be $Path
+        @($Overlay.ParseErrors) | Should -HaveCount 0
+        $Overlay.NewLineSequence | Should -BeExactly "`r`n"
+        $Overlay.OriginalText | Should -BeExactly $Text
+    }
+
+    It 'maps fragment boundaries and assignments to original coordinates: <Label>' -ForEach @(
+        @{ Label = 'same-line LF'; NewLine = "`n"; Body = ' $Value = 1 ' }
+        @{ Label = 'same-line CRLF'; NewLine = "`r`n"; Body = ' $Value = 1 ' }
+        @{ Label = 'multiline LF'; NewLine = "`n"; Body = "`n`t`$Value = 1`n" }
+        @{ Label = 'multiline CRLF'; NewLine = "`r`n"; Body = "`r`n`t`$Value = 1`r`n" }
+    ) {
+        $Text = "# prefix${NewLine}& {$Body}"
+        $Path = Join-Path $TestDrive 'Coordinates.ps1'
+        $Tokens = $null
+        $Errors = $null
+        $Root = [Parser]::ParseInput($Text, $Path, [ref] $Tokens, [ref] $Errors)
+        $Nested = $Root.Find({
+            param($Node)
+            $Node -is [ScriptBlockExpressionAst]
+        }, $true).ScriptBlock
+        $OriginalAssignment = $Nested.Find({
+            param($Node)
+            $Node -is [AssignmentStatementAst]
+        }, $true)
+
+        foreach ($Input in @($Nested, $Nested.GetScriptBlock())) {
+            $Overlay = New-AstDocument -InputObject $Input
+            $LocalAssignment = $Overlay.Ast.Find({
+                param($Node)
+                $Node -is [AssignmentStatementAst]
+            }, $true)
+            foreach ($Pair in @(
+                @{ Local = 0; Original = $Nested.Extent.StartScriptPosition }
+                @{ Local = $LocalAssignment.Extent.StartOffset; Original = $OriginalAssignment.Extent.StartScriptPosition }
+                @{ Local = $Overlay.OriginalText.Length; Original = $Nested.Extent.EndScriptPosition }
+            )) {
+                $Position = $Overlay.GetSourcePosition($Pair.Local)
+                $Position.Path | Should -Be $Path
+                $Position.Offset | Should -Be $Pair.Original.Offset
+                $Position.LineNumber | Should -Be $Pair.Original.LineNumber
+                $Position.ColumnNumber | Should -Be $Pair.Original.ColumnNumber
+            }
+            $Overlay.IsFileBacked | Should -BeFalse
+        }
+    }
+
+    It 'maps string inputs locally without inventing source provenance' {
+        $Overlay = New-AstDocument -InputObject "`$Value = 1`n`t`$Other = 2"
+        $Position = $Overlay.GetSourcePosition(12)
+
+        $Overlay.SourceExtent | Should -BeNullOrEmpty
+        $Position.Path | Should -Be '<memory>'
+        $Position.Offset | Should -Be 12
+        $Position.LineNumber | Should -Be 2
+        $Position.ColumnNumber | Should -Be 2
+        { $Overlay.GetSourcePosition(-1) } | Should -Throw '*within the original document*'
+        { $Overlay.GetSourcePosition($Overlay.OriginalText.Length + 1) } |
+            Should -Throw '*within the original document*'
+    }
+
     It 'returns an existing AstDocument without coercing or reparsing it' {
         $Original = New-AstDocument -InputObject 'function Get-Greeting { ''hello'' }'
 

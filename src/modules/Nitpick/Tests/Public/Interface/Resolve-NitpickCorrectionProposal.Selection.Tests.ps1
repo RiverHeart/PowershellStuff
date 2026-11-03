@@ -37,8 +37,8 @@ Describe 'Correction proposal selection and failure diagnostics' -Tag 'Autocorre
     It 'returns exactly the proposal schema without application or derived finding groups' {
         $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rule
         $Properties = @(
-            'Path', 'Document', 'OriginalFingerprint', 'Status', 'OriginalText',
-            'OriginalFindings', 'CandidateText', 'CandidateFindings', 'WasReanalyzed',
+            'Path', 'SourcePath', 'Document', 'OriginalFingerprint', 'Status', 'OriginalText',
+            'OriginalFindings', 'CandidateText', 'CandidateFindings', 'UndecidedFindings', 'SkippedFindings', 'WasReanalyzed',
             'AcceptedCorrections', 'SkippedCorrections', 'Conflicts', 'ParseErrors', 'Diff'
         )
 

@@ -287,6 +287,172 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Result.Proposal.Document.IsFileBacked | Should -BeFalse
     }
 
+    It 'resolves a kicker-style nested scriptblock in Guided mode' {
+        Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+        Mock Read-Host -ModuleName Nitpick { '0' }
+        $Source = {
+            param([Parameter(Mandatory=$true)] $MyParam)
+        }
+
+        $Results = @(Start-Nitpicking -Script $Source `
+            -IncludeRule Nitpick/AvoidParameterAttributeBool -FixMode Guided `
+            -Output Object -NoSummary -ErrorAction Stop)
+
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+        $Result.Proposal.Status | Should -Be 'Ready'
+        $Result.Application.Status | Should -Be 'InMemory'
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
+        $Result.Report.EffectiveText | Should -Match '\[Parameter\(Mandatory\)\]'
+        $Result.Report.EffectiveText | Should -Not -Match 'Mandatory=\$true'
+        $Result.Proposal.Document.IsFileBacked | Should -BeFalse
+        Should -Invoke Read-Host -ModuleName Nitpick -Times 0 -Exactly
+    }
+
+    It 'terminates Guided mode in a non-interactive host before analysis' {
+        $ModulePath = (Get-Module Nitpick).Path
+        $ModuleRoot = (Resolve-Path (Join-Path (Split-Path $ModulePath) '..')).Path
+        $ScriptPath = Join-Path $TestDrive 'NonInteractiveGuided.ps1'
+        @(
+            '$env:PSModulePath = "{0}" + [IO.Path]::PathSeparator + $env:PSModulePath' -f $ModuleRoot
+            'Import-Module "{0}" -Force' -f $ModulePath
+            '$Output = @()'
+            'try {'
+            '    $Output = @(Start-Nitpicking -Script ''param([Parameter(Mandatory=$true)] $MyParam)'' `'
+            '        -IncludeRule Nitpick/AvoidParameterAttributeBool -FixMode Guided -Output Object)'
+            '} catch {'
+            '    "Error=$($_.FullyQualifiedErrorId)"'
+            '}'
+            '"Outputs=$($Output.Count)"'
+        ) | Set-Content -LiteralPath $ScriptPath -Encoding UTF8
+
+        $HostPath = (Get-Process -Id $PID).Path
+        $Lines = @(& $HostPath -NoProfile -NonInteractive -File $ScriptPath 2>&1 | ForEach-Object { "$_" })
+
+        $Lines | Should -Contain 'Error=NitpickGuidedModeNonInteractive,Start-Nitpicking'
+        $Lines | Should -Contain 'Outputs=0'
+    }
+
+    Context 'findings that require a choice' {
+        BeforeEach {
+            $ChoiceRule = {
+                param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
+
+                $Assignment = $ScriptBlockAst.EndBlock.Statements | Select-Object -First 1
+                if (-not $Assignment -or $Assignment.Extent.Text -ne '$Choice = 1') {
+                    return
+                }
+                $Context = if ($Assignment.Extent.File) { $Assignment.Extent.File } else { '<ScriptBlock>' }
+                $Corrections = @(
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText '$Choice = 2' `
+                        -FilePathOrContext $Context `
+                        -Description 'Review replacement' `
+                        -Applicability Review `
+                        -RuleId 'Local/ChoiceRule'
+
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText '$Choice = 3' `
+                        -FilePathOrContext $Context `
+                        -Description 'Unsafe replacement' `
+                        -Applicability Unsafe `
+                        -RuleId 'Local/ChoiceRule'
+                )
+
+                New-NitpickFinding `
+                    -RuleId 'Local/ChoiceRule' `
+                    -Message 'Choice finding' `
+                    -ViolationExtent $Assignment.Extent `
+                    -Severity Warning `
+                    -ScriptPath $Context `
+                    -Corrections $Corrections `
+                    -Explanation 'Offers alternative corrections.'
+            }
+
+            Register-Nitpick -Callable $ChoiceRule -Name ChoiceRule -Source Tests
+            $Path = Join-Path $TestDrive 'Choice.ps1'
+            [System.IO.File]::WriteAllText($Path, '$Choice = 1')
+        }
+
+        It 'applies the correction chosen in Guided mode, including a non-Safe one' {
+            Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+            Mock Write-Host -ModuleName Nitpick { }
+            Mock Read-Host -ModuleName Nitpick { '1' }
+
+            $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Guided `
+                -Output Object -Confirm:$false -ErrorAction Stop)
+
+            $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+            $Summary = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickSummary' }
+
+            $Result.Application.Status | Should -Be 'Written'
+            $Result.Application.AppliedCorrections | Should -HaveCount 1
+            $Result.Application.AppliedCorrections[0].Applicability | Should -Be 'Unsafe'
+            $Result.Proposal.UndecidedFindings | Should -HaveCount 0
+
+            [System.IO.File]::ReadAllText($Path) | Should -Be '$Choice = 3'
+
+            $Summary.CorrectedFindingCount | Should -Be 1
+            $Summary.UndecidedFindingCount | Should -Be 0
+            $Summary.ToString() | Should -Not -Match 'FixMode Guided'
+            Should -Invoke Read-Host -ModuleName Nitpick -Times 1 -Exactly
+        }
+
+        It 'reports an undecided finding in <FixMode> mode and hints at Guided' -ForEach @(
+            @{ FixMode = 'Apply' }
+            @{ FixMode = 'Preview' }
+        ) {
+            $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode $FixMode `
+                -Output Object -Confirm:$false -ErrorAction Stop)
+
+            $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+            $Summary = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickSummary' }
+
+            $Result.Proposal.Status | Should -Be 'NoChanges'
+            $Result.Proposal.UndecidedFindings | Should -HaveCount 1
+            $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+
+            [System.IO.File]::ReadAllText($Path) | Should -Be '$Choice = 1'
+
+            $Summary.UndecidedFindingCount | Should -Be 1
+            $Summary.CorrectedFindingCount | Should -Be 0
+            $Summary.ToString() | Should -Match '1 undecided'
+            $Summary.ToString() | Should -Match 'Use -FixMode Guided to choose'
+        }
+
+        It 'prints a clean trailer when the chosen correction resolves the finding' {
+            Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+            Mock Read-Host -ModuleName Nitpick { '1' }
+
+            $Text = (Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Guided `
+                -Output Text -NoSummary -Confirm:$false -ErrorAction Stop 6>$null) -join "`n"
+
+            $Text | Should -Match '\n  1 correction applied\.$'
+            $Text | Should -Not -Match 'skipped'
+        }
+
+        It 'prints the Guided hint in the text summary' {
+            $Text = (Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Apply `
+                -Output Text -Confirm:$false -ErrorAction Stop 6>$null) -join "`n"
+
+            $Text | Should -Match '1 undecided'
+            $Text | Should -Match 'Use -FixMode Guided to choose between alternative or non-Safe corrections\.'
+        }
+    }
+
+    It 'labels the text header with the origin of a file-backed scriptblock input' {
+        $Path = Join-Path $TestDrive 'Origin.ps1'
+        [System.IO.File]::WriteAllText($Path, "# prefix`n`$Value = 1")
+        $Ast = Import-ScriptBlockAst -FilePath $Path
+
+        $Text = (Start-Nitpicking -Script $Ast -IncludeRule Local/TransactionRule -FixMode Preview `
+            -Output Text -NoSummary -ErrorAction Stop) -join "`n"
+
+        $Text | Should -Match ('^<ScriptBlock> from {0}:1:1' -f [regex]::Escape($Path))
+        [System.IO.File]::ReadAllText($Path) | Should -Be "# prefix`n`$Value = 1"
+    }
+
     It 'does not write a file-backed AST supplied through Script' {
         $Path = Join-Path $TestDrive 'AstInput.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
@@ -323,7 +489,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Summary.ErrorCount | Should -Be 1
         $Summary.FailedTargetCount | Should -Be 1
-        $Summary.SkippedCorrectionCount | Should -Be 0
+        $Summary.SkippedFindingCount | Should -Be 0
         $Errors | Should -Not -BeNullOrEmpty
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 3'
@@ -362,7 +528,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Summary.TargetCount | Should -Be 2
         $Summary.FailedTargetCount | Should -Be 1
-        $Summary.SkippedCorrectionCount | Should -Be 1
+        $Summary.SkippedFindingCount | Should -Be 1
         $Summary.CorrectedFindingCount | Should -Be 1
 
         [System.IO.File]::ReadAllText($InvalidPath) | Should -Be '$Value = 1'

@@ -44,8 +44,9 @@ _Avoid_: Correction (for an individual replacement)
 
 **Accepted**:
 A correction the proposal stage selected for application after policy and validation
-checks. The contrary outcome is skipped, with a recorded reason; corrections are never
-silently dropped.
+checks. A rejected candidate is skipped, with a recorded reason; corrections are never
+silently rejected. Alternatives on a finding that were not chosen are neither accepted
+nor skipped: they are other ways to resolve the same finding, not separate outcomes.
 _Avoid_: Queued, chosen
 
 **Applied**:
@@ -68,6 +69,28 @@ A detected finding with at least one accepted correction that was not applied â€
 proposed fix exists but the target is unchanged (preview, WhatIf, declined, or failed
 write).
 _Avoid_: Fixable, pending
+
+**Undecided (finding)**:
+A detected finding whose corrections require a choice that automatic selection never
+makes: several Safe alternatives, or only non-Safe corrections. Its corrections are
+skipped with a reason and the summary points at Guided mode. A finding the user skipped
+during guided selection is not undecided; the choice was made.
+_Avoid_: Ambiguous, deferred, needs review
+
+**Skipped (finding)**:
+A detected finding with corrections, none of which was accepted, that is not undecided:
+stale text, a conflict, an invalid edit, a render failure, or a guided skip. Counts and
+summaries use this finding-level resolution; `SkippedCorrections` remains the
+correction-level diagnostic record with reasons. A finding with corrections resolves
+exactly one way: accepted, undecided, or skipped.
+_Avoid_: Rejected (reserved for the proposal status), dropped
+
+**Guided selection**:
+Delegating an undecided finding's choice to a `CorrectionSelector`. The correction it
+returns is accepted as explicit consent, regardless of applicability; the alternatives
+simply go unchosen. The resolver never performs host interaction;
+`-FixMode Guided` supplies a selector that navigates with Editor Services and prompts.
+_Avoid_: Interactive mode (for the resolver), confirmation
 
 **Unresolved (finding)**:
 A finding still present in the effective analysis after correction handling; the input
@@ -109,8 +132,9 @@ findings and corrections, and the WPF supporting-module producer supplies
 
 | Component | Owns | Must not do |
 | --- | --- | --- |
-| [Correction resolver](Public/Interface/Resolve-NitpickCorrectionProposal.ps1) | Selection policy, candidate validation and analysis, proposal diagnostics | Save files or choose effective reporting |
-| [Target coordinator](Private/Resolve-NitpickTargetCorrection.ps1) | ShouldProcess, application policy, effective report selection | Rewrite proposal facts or update invocation totals |
+| [Correction resolver](Public/Interface/Resolve-NitpickCorrectionProposal.ps1) | Selection policy, candidate validation and analysis, proposal diagnostics | Save files, choose effective reporting, or interact with the host |
+| [Guided selector](Private/Select-NitpickGuidedCorrection.ps1) | Editor navigation and the correction prompt for one undecided finding | Decide eligibility, record skips, or save files |
+| [Target coordinator](Private/Resolve-NitpickTargetCorrection.ps1) | ShouldProcess, application policy, effective report selection, supplying the selector for Guided | Rewrite proposal facts or update invocation totals |
 | [Invocation coordinator](Public/Interface/Start-Nitpicking.ps1) | Output, error emission, summaries, severity thresholds | Redo correction selection or reinterpret candidate validity |
 | [Result constructor](Public/Helpers/New-NitpickCorrectionResult.ps1) | Envelope shape and lifecycle consistency checks | Repair contradictions, resolve corrections, or perform I/O |
 | [AstEditor](../AstEditor/README.md) | Edit validation and transactional persistence | Decide Nitpick selection or reporting policy |

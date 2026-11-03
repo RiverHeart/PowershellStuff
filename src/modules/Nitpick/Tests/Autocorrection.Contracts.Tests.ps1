@@ -606,6 +606,6 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
 
         $Summary.TargetCount | Should -Be 2
         $Summary.FailedTargetCount | Should -Be 0
-        $Summary.SkippedCorrectionCount | Should -Be 2
+        $Summary.SkippedFindingCount | Should -Be 2
     }
 }

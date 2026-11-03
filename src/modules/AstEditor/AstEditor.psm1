@@ -1,6 +1,8 @@
+using namespace System
 using namespace System.Collections.Generic
 using namespace System.IO
 using namespace System.Management.Automation.Language
+using namespace System.Text
 
 <#
 .SYNOPSIS
@@ -95,28 +97,100 @@ class AstDocument {
     [string] $OriginalText
     [string] $OriginalFingerprint
     [bool] $IsFileBacked
-    [System.Text.Encoding] $SourceEncoding = [System.Text.UTF8Encoding]::new($false, $true)
+    [Encoding] $SourceEncoding = [UTF8Encoding]::new($false, $true)
     [string] $NewLineSequence = "`n"
     [Ast] $Ast
+    [IScriptExtent] $SourceExtent
     [Token[]] $Tokens
     [ParseError[]] $ParseErrors
     [List[AstTextEdit]] $Edits = [List[AstTextEdit]]::new()
 
     AstDocument(
-        [string] $Path,
-        [string] $Text,
-        [Ast] $Ast,
-        [Token[]] $Tokens,
-        [ParseError[]] $ParseErrors
+        [ScriptBlock] $ScriptBlock
     ) {
+        $this.Init('<memory>', $ScriptBlock.Ast.Extent.Text)
+        $this.SourceExtent = $ScriptBlock.Ast.Extent
+    }
+
+    AstDocument(
+        [Ast] $Ast
+    ) {
+        $this.Init('<memory>', $Ast.Extent.Text)
+        $this.SourceExtent = $Ast.Extent
+    }
+
+    AstDocument(
+        [string] $Text
+    ) {
+        $this.Init('<memory>', $Text)
+    }
+
+    AstDocument(
+        [string] $Path,
+        [string] $Text
+    ) {
+        $this.Init($Path, $Text)
+        $this.SourceExtent = $this.Ast.Extent
+    }
+
+    hidden [void] Init([string] $Path, [string] $Text) {
         $this.Path = $Path
         $this.OriginalText = $Text
         $this.OriginalFingerprint = Get-AstSourceFingerprint -Bytes (
-            $this.SourceEncoding.GetBytes($Text)
+            $this.SourceEncoding.GetBytes($this.OriginalText)
         )
-        $this.Ast = $Ast
-        $this.Tokens = $Tokens
-        $this.ParseErrors = $ParseErrors
+        $this.Parse()
+    }
+
+    hidden [void] Parse() {
+        $ParsedTokens = $null
+        $Errors = $null
+        $SourcePath = if ($this.Path -eq '<memory>') { $null } else { $this.Path }
+        $this.Ast = [Parser]::ParseInput(
+            $this.OriginalText,
+            $SourcePath,
+            [ref] $ParsedTokens,
+            [ref] $Errors
+        )
+        $this.Tokens = $ParsedTokens
+        $this.ParseErrors = $Errors
+
+        $this.NewLineSequence = if ($this.OriginalText.Contains("`r`n")) { "`r`n" } else { "`n" }
+    }
+
+    # True when SourceExtent identifies a file; informational only and independent of IsFileBacked.
+    [bool] HasSourceProvenance() {
+        return $null -ne $this.SourceExtent -and -not [string]::IsNullOrEmpty($this.SourceExtent.File)
+    }
+
+    # Offset is document-local (relative to OriginalText, which is the fragment text for
+    # ScriptBlock and Ast input), not an offset into the original source file.
+    [hashtable] GetSourcePosition([int] $Offset) {
+        if ($Offset -lt 0 -or $Offset -gt $this.OriginalText.Length) {
+            throw [ArgumentOutOfRangeException]::new('Offset', 'Offset must be within the original document text.')
+        }
+
+        $Prefix = $this.OriginalText.Substring(0, $Offset)
+        $LineNumber = [regex]::Matches($Prefix, "`n").Count + 1
+        $ColumnNumber = $Offset - $Prefix.LastIndexOf("`n")
+        $SourceOffset = $Offset
+        $SourcePath = $this.Path
+
+        if ($this.SourceExtent) {
+            if ($LineNumber -eq 1) {
+                $ColumnNumber += $this.SourceExtent.StartColumnNumber - 1
+            }
+            $LineNumber += $this.SourceExtent.StartLineNumber - 1
+            $SourceOffset += $this.SourceExtent.StartOffset
+            $SourcePath = if ($this.SourceExtent.File) { $this.SourceExtent.File } else { '<memory>' }
+        }
+
+        return @{
+            Path = $SourcePath
+            Offset = $SourceOffset
+            LineNumber = $LineNumber
+            ColumnNumber = $ColumnNumber
+        }
     }
 
     hidden [void] AddEdit([AstTextEdit] $Edit) {
@@ -332,8 +406,6 @@ Export-ModuleMember `
     -Cmdlet $Manifest.CmdletsToExport `
     -Variable $Manifest.VariablesToExport `
     -Alias $Manifest.AliasesToExport
-
-
 
 
 

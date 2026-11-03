@@ -22,8 +22,10 @@ using namespace System.Management.Automation.Language
 .PARAMETER Ast
     Original AST retaining source path context.
 
-.PARAMETER Preview
-    Reports candidate corrections without writing.
+.PARAMETER FixMode
+    Controls whether corrections are previewed, guided, or applied. Guided supplies
+    Select-NitpickGuidedCorrection as the proposal's CorrectionSelector and otherwise
+    applies like Apply.
 
 .EXAMPLE
     Resolves, applies, and reports corrections for one analyzed target.
@@ -32,7 +34,7 @@ using namespace System.Management.Automation.Language
         -Document $Document `
         -Finding $Findings `
         -Rule $Rules `
-        -Preview
+        -FixMode 'Preview'
 #>
 function Resolve-NitpickTargetCorrection {
     [CmdletBinding(SupportsShouldProcess)]
@@ -49,14 +51,28 @@ function Resolve-NitpickTargetCorrection {
         [AllowEmptyCollection()]
         [NitpickRule[]] $Rule,
 
-        [switch] $Preview
+        [Parameter(Mandatory)]
+        [ValidateSet('Preview', 'Guided', 'Apply')]
+        [string] $FixMode
     )
 
+    $Preview = $FixMode -eq 'Preview'
     $ResolveParameters = @{
         Document = $Document
         Finding = $Finding
         Rule = $Rule
     }
+
+    if ($FixMode -eq 'Guided') {
+        $ResolveParameters.CorrectionSelector = {
+            param($Finding, $Corrections, $Document)
+            Select-NitpickGuidedCorrection `
+                -Finding $Finding `
+                -Correction $Corrections `
+                -Document $Document
+        }
+    }
+
     $Proposal = Resolve-NitpickCorrectionProposal @ResolveParameters
 
     $Application = @{ Status = 'NotAttempted' }
@@ -115,9 +131,9 @@ function Resolve-NitpickTargetCorrection {
     }
 
     Write-Verbose (
-        "Correction proposal for '{0}': {1}; {2} accepted, {3} skipped; application: {4}." -f
+        "Correction proposal for '{0}': {1}; {2} accepted, {3} findings skipped, {4} undecided; application: {5}." -f
         $Proposal.Path, $Proposal.Status, $Proposal.AcceptedCorrections.Count,
-        $Proposal.SkippedCorrections.Count, $Application.Status
+        $Proposal.SkippedFindings.Count, $Proposal.UndecidedFindings.Count, $Application.Status
     )
 
     foreach ($SkippedCorrection in $Proposal.SkippedCorrections) {

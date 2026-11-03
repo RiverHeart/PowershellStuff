@@ -23,6 +23,27 @@ Start-Nitpicking -Script {
 1 finding (1 information; 1 corrected, 0 unresolved) across 1 target in 112 ms
 ```
 
+## Guided navigation
+
+`-FixMode Guided` applies Safe corrections like `Apply`, and prompts only when a finding
+is undecided: it offers several corrections, or only non-Safe ones. When run in the
+PowerShell extension's terminal with `$psEditor` available, the finding's violation range
+is selected in the editor before the prompt. The chosen correction is applied as explicit
+consent, including Review or Unsafe corrections; a blank answer skips the finding.
+Navigation uses one-based Editor Services coordinates and the original source extent,
+including for a nested ScriptBlock or AST passed through `-Script`. Corrections and
+previews remain fragment-local and Script inputs are still applied only in memory; the
+text header shows the origin as `<ScriptBlock> from <file>:<line>:<column>`.
+
+Guided mode requires an interactive host and terminates under `-NonInteractive`. In
+`Apply` and `Preview`, undecided findings are counted in the summary with a hint to use
+Guided. To make Guided your personal default, add
+`$PSDefaultParameterValues['Start-Nitpicking:FixMode'] = 'Guided'` to your profile.
+
+Plain strings have no exact source provenance and do not navigate. Navigation refers
+to the original source location; it does not track subsequent editor changes or
+launch VS Code from an ordinary PowerShell terminal.
+
 ## Why Not Use PSScriptAnalyzer?
 
 ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unlikely that I can fully replicate all the functionality it offers, however, it doesn't possess the ergonomics I care about. For starters, you can't run it from the VSCode Powershell Extension which means you have to switch to a different terminal anytime you want to run it and you can't run the VSCode debugger against anything that calls it. As I work almost exclusively in Powershell that's unacceptable.

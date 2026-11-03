@@ -1,3 +1,4 @@
+using namespace System
 using namespace System.IO
 using namespace System.Management.Automation.Language
 
@@ -13,6 +14,13 @@ using namespace System.Management.Automation.Language
     immutable-AST + overlay workflow. File inputs capture a byte fingerprint and
     source encoding for transactional saves. BOM-less input must be valid UTF-8;
     BOM-marked UTF-8, UTF-16, and UTF-32 are also supported.
+    ScriptBlock and Ast inputs currently reparse their extent text, so the AST,
+    tokens, and parse errors use fragment-local coordinates. They remain in-memory
+    documents even when the original extent identifies a file.
+    SourceExtent retains the supplied AST's original bounds. HasSourceProvenance reports
+    whether that extent identifies a file. GetSourcePosition maps a document-local offset
+    to the source file's offset and one-based line/column.
+    Strings have no inferred call-site provenance.
 
 .EXAMPLE
     $doc = New-AstDocument -Path '.\ImageViewer.DSL.ps1'
@@ -27,7 +35,7 @@ using namespace System.Management.Automation.Language
 .EXAMPLE
     $doc = New-AstDocument -InputObject { Window Demo { } }
 
-    Uses a ScriptBlock input directly without an explicit parse step.
+    Parses the ScriptBlock's extent text into a document.
 
 .EXAMPLE
     $tokens = $null
@@ -35,7 +43,7 @@ using namespace System.Management.Automation.Language
     $ast = [Parser]::ParseInput("Window Demo { }", [ref] $tokens, [ref] $errors)
     $doc = New-AstDocument -InputObject $ast
 
-    Wraps an already parsed AST in a document.
+    Parses the supplied AST's extent text into a document.
 #>
 function New-AstDocument {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
@@ -52,9 +60,6 @@ function New-AstDocument {
     )
 
     process {
-        $Tokens = $null
-        $Errors = $null
-
         if ($null -ne $InputObject -and $InputObject -is [AstDocument]) {
             return $InputObject
         }
@@ -62,31 +67,18 @@ function New-AstDocument {
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
             $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
             $Snapshot = Get-AstFileSnapshot -Path $ResolvedPath
-            $FileText = $Snapshot.Text
-            $Ast = [Parser]::ParseInput($FileText, $ResolvedPath, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($FileText.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new($ResolvedPath, $FileText, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
+            $Document = [AstDocument]::new($ResolvedPath, $Snapshot.Text)
             $Document.IsFileBacked = $true
             $Document.SourceEncoding = $Snapshot.Encoding
             $Document.OriginalFingerprint = $Snapshot.Fingerprint
             return $Document
         }
 
-        if ($InputObject -is [string]) {
-            $Text = [string] $InputObject
-        } elseif ($InputObject -is [ScriptBlock]) {
-            $Text = $InputObject.Ast.Extent.Text
-        } elseif ($InputObject -is [Ast]) {
-            $Text = ([Ast] $InputObject).Extent.Text
-        } else {
-            throw [System.ArgumentException]::new("Unsupported InputObject type '$($InputObject.GetType().FullName)'. Expected String, ScriptBlock, or Ast.")
+        if ($InputObject -is [string] -or $InputObject -is [ScriptBlock] -or $InputObject -is [Ast]) {
+            return [AstDocument]::new($InputObject)
         }
 
-        $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-        $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-        $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-        $Document.NewLineSequence = $NewLineSequence
-        return $Document
+        $TypeName = if ($null -eq $InputObject) { '<null>' } else { $InputObject.GetType().FullName }
+        throw [ArgumentException]::new("Unsupported InputObject type '$TypeName'. Expected String, ScriptBlock, or Ast.")
     }
 }

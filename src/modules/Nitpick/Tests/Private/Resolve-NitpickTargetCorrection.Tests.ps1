@@ -52,6 +52,7 @@ BeforeAll {
                 -FilePathOrContext $Document.Path `
                 -Description 'Conflicting replacement' `
                 -RuleId 'Local/ConflictRule'
+
             $Findings += New-NitpickFinding `
                 -RuleId 'Local/ConflictRule' `
                 -Message 'Conflicting fix.' `
@@ -62,8 +63,13 @@ BeforeAll {
                 -Corrections $ConflictCorrection `
                 -OutputAs NitpickFinding
         }
+
         $Rules = if ($NoReanalysis) { @() } else { @($Rule) }
-        $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rules
+        $Proposal = Resolve-NitpickCorrectionProposal `
+            -Document $Document `
+            -Finding $Findings `
+            -Rule $Rules
+
         [pscustomobject]@{
             Document = $Document
             Findings = $Findings
@@ -82,7 +88,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         InModuleScope Nitpick {
             $Command = Get-Command Resolve-NitpickTargetCorrection
             $Command.OutputType.Name | Should -Contain 'NitpickCorrectionResult'
-            foreach ($Parameter in @('Document', 'Finding', 'Rule', 'Preview', 'WhatIf', 'Confirm')) {
+            foreach ($Parameter in @('Document', 'Finding', 'Rule', 'FixMode', 'WhatIf', 'Confirm')) {
                 $Command.Parameters.Keys | Should -Contain $Parameter
             }
             $Command.Parameters.Keys | Should -Not -Contain 'Fix'
@@ -99,11 +105,13 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
-            param ($Fixture)
+            param($Fixture)
+
             Resolve-NitpickTargetCorrection `
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -WhatIf
         }
 
@@ -128,23 +136,24 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     }
 
     It 'reports in-memory <Status> with NoReanalysis=<NoReanalysis> without saving or changing the proposal' -ForEach @(
-        @{ Status = 'Preview'; Preview = $true; NoReanalysis = $false }
-        @{ Status = 'Preview'; Preview = $true; NoReanalysis = $true }
-        @{ Status = 'InMemory'; Preview = $false; NoReanalysis = $false }
-        @{ Status = 'InMemory'; Preview = $false; NoReanalysis = $true }
+        @{ Status = 'Preview'; FixMode = 'Preview'; NoReanalysis = $false }
+        @{ Status = 'Preview'; FixMode = 'Preview'; NoReanalysis = $true }
+        @{ Status = 'InMemory'; FixMode = 'Apply'; NoReanalysis = $false }
+        @{ Status = 'InMemory'; FixMode = 'Apply'; NoReanalysis = $true }
     ) {
         $Fixture = New-TargetCorrectionFixture -NoReanalysis:$NoReanalysis
         $Before = Get-TargetProposalSnapshot $Fixture.Proposal
         Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'In-memory targets must not be saved.' }
 
-        $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; Preview = $Preview } {
-            param ($Fixture, $Preview)
+        $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; FixMode = $FixMode } {
+            param($Fixture, $FixMode)
+
             Resolve-NitpickTargetCorrection `
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
-                -Preview:$Preview `
+                -FixMode $FixMode `
                 -Confirm:$false
         }
 
@@ -177,6 +186,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -209,8 +219,8 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     }
 
     It 'reports candidate text but original analysis without reanalysis under <Status>' -ForEach @(
-        @{ Status = 'Preview'; Preview = $true; WhatIf = $false }
-        @{ Status = 'WhatIf'; Preview = $false; WhatIf = $true }
+        @{ Status = 'Preview'; FixMode = 'Preview'; WhatIf = $false }
+        @{ Status = 'WhatIf'; FixMode = 'Apply'; WhatIf = $true }
     ) {
         #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive "$Status.ps1"
@@ -222,15 +232,16 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{
             Fixture = $Fixture
-            Preview = $Preview
+            FixMode = $FixMode
             WhatIf = $WhatIf
         } {
-            param ($Fixture, $Preview, $WhatIf)
+            param($Fixture, $FixMode, $WhatIf)
+
             Resolve-NitpickTargetCorrection `
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
-                -Preview:$Preview `
+                -FixMode $FixMode `
                 -WhatIf:$WhatIf `
                 -Confirm:$false
         }
@@ -276,6 +287,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -340,6 +352,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                     -Document $Fixture.Document `
                     -Finding $Fixture.Findings `
                     -Rule $Fixture.Rules `
+                    -FixMode Apply `
                     -Confirm:$false
             } finally {
                 $Breakpoint | Remove-PSBreakpoint
@@ -391,6 +404,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -423,6 +437,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
