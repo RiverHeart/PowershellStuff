@@ -238,4 +238,5 @@ Output is written to:
 
 ## Todo
 
-- AstEditor conflict exceptions carry field snapshots, not edit instances (Data['ExistingEdit'] is a hashtable). That forced the field-matching $FindOwner logic in the resolver to map conflicts back to owning corrections — workable, but brittle if AstTextEdit fields ever change. If AstEditor could attach the actual instances (or a correlation token), the resolver's attribution would collapse to a dictionary lookup.
+- AstEditor conflict exceptions carry field snapshots, not edit instances (Data['ExistingEdit'] is a hashtable). That forced the field-matching `$FindOwner` logic in the resolver to map conflicts back to owning corrections — workable, but brittle if AstTextEdit fields ever change. If AstEditor could attach the actual instances (or a correlation token), the resolver's attribution would collapse to a dictionary lookup.
+  - `$FindOwner` lives in `Resolve-NitpickCorrectionProposal` around line 230.
