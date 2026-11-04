@@ -252,6 +252,8 @@ function Start-Nitpicking {
                 }
 
                 # WARNING: Keep original extent context for rules; reparsing memory input resets it.
+                # Fix modes therefore report fragment-local coordinates for Script input.
+                # See Docs/FragmentCoordinates.md for the plan to remove this fork.
                 $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and $FixMode -eq 'Off') {
                     $Target
                 } else {

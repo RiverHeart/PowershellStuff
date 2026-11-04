@@ -189,6 +189,18 @@ Token acquisition scaling will be evaluated separately.
 See [Nitpick Autocorrection](Docs/AutoCorrection.md) for the implemented contracts,
 result schema, safety boundaries, and remaining work.
 
+### Fragment coordinates (known limitation)
+
+`-Script` input that is a fragment of a larger source (a nested scriptblock, a `{ }`
+literal from a `.ps1`) is reparsed from its extent text when any fix mode is active, so
+findings, edits, and diffs use fragment-local line numbers with no `Extent.File`, while
+`-FixMode Off` reports source-absolute positions for the same input. Guided navigation
+and the `<ScriptBlock> from file:line:col` header compensate through
+`AstDocument.GetSourcePosition`. The intended fix — parse the full source via
+`Extent.StartScriptPosition.GetFullScript()` and scope analysis to the fragment's node —
+is written up in [Fragment Coordinates](Docs/FragmentCoordinates.md), including the
+behavior decisions that need an owner's answer before implementation.
+
 ## Gotchas
 
 For the manifest contract and package ownership behavior, see

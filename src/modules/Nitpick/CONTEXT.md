@@ -28,6 +28,32 @@ _Avoid_: Display name, suppression ID (as if these were separate from Local Name
 A rule's fully qualified identity: `Namespace/Local Name` (for example `WPF/AvoidBlockingUI`). Used for selection, the registry key, and conflict/attribution across native findings.
 _Avoid_: Qualified name, full name
 
+### Analysis input
+
+**Target**:
+The unit of analysis the user submitted: a file (via `-Path`) or a fragment (via
+`-Script`). Findings, corrections, and effective text are always about the target.
+_Avoid_: Input, script, source
+
+**Fragment**:
+A target that is a scriptblock or AST node taken from a larger body of source — a block
+in a file, a block typed at the console, or text created in memory. A fragment is never
+written back.
+_Avoid_: Scope, nested block, in-memory input
+
+**Snapshot**:
+The complete source text a target was parsed from, captured once at analysis time. All
+coordinates (findings, edits, diffs) refer to the snapshot. For a file target the
+snapshot is the file; for a fragment it is the fragment's host source, which may be
+larger than the fragment itself.
+_Avoid_: Full script, whole file, original text
+
+**Effective text**:
+The target's text after correction handling — the file contents for a file target, or
+the fragment's own slice of the rendered snapshot for a fragment. Never the whole
+snapshot of a fragment.
+_Avoid_: Candidate text (for what is returned to the user), rendered text
+
 ### Correction lifecycle
 
 **Correction**:
@@ -51,7 +77,7 @@ _Avoid_: Queued, chosen
 
 **Applied**:
 An accepted correction whose edits took effect in the effective text — persisted for
-file targets, or realized in the returned candidate text for in-memory targets.
+file targets, or realized in the returned effective text for fragments.
 _Avoid_: Committed, fixed
 
 **Detected (finding)**:

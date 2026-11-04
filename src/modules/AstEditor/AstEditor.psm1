@@ -159,6 +159,9 @@ class AstDocument {
     }
 
     # True when SourceExtent identifies a file; informational only and independent of IsFileBacked.
+    # SourceExtent/GetSourcePosition exist only because ScriptBlock and Ast input is reparsed
+    # from fragment text. Nitpick/Docs/FragmentCoordinates.md plans to parse the full source
+    # (Extent.StartScriptPosition.GetFullScript()) instead, which retires this mapping layer.
     [bool] HasSourceProvenance() {
         return $null -ne $this.SourceExtent -and -not [string]::IsNullOrEmpty($this.SourceExtent.File)
     }
