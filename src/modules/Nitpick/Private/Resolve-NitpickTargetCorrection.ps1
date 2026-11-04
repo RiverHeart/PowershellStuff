@@ -119,7 +119,11 @@ function Resolve-NitpickTargetCorrection {
 
     $Report = @{
         AnalysisSource = if ($UseCandidateFindings) { 'Candidate' } else { 'Original' }
-        EffectiveText = if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
+        EffectiveText = if ($Document.IsFragment) {
+            if ($UseCandidateText) { $Proposal.CandidateFragmentText } else { $Proposal.OriginalFragmentText }
+        } else {
+            if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
+        }
         EffectiveFindings = if ($UseCandidateFindings) {
             $Proposal.CandidateFindings
         } else {

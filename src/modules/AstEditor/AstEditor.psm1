@@ -91,8 +91,14 @@ class AstTextEditResult {
     }
 }
 
+class AstParseData {
+    [Ast] $Ast
+    [Token[]] $Tokens
+    [ParseError[]] $ParseErrors
+}
+
 class AstDocument {
-    # Preserves source provenance and gives Save-AstDocument a default target path.
+    # A default save target, distinct from the parser's informational source file.
     [string] $Path
     [string] $OriginalText
     [string] $OriginalFingerprint
@@ -100,6 +106,8 @@ class AstDocument {
     [Encoding] $SourceEncoding = [UTF8Encoding]::new($false, $true)
     [string] $NewLineSequence = "`n"
     [Ast] $Ast
+    [AstParseData] $Root = [AstParseData]::new()
+    [bool] $IsFragment
     [IScriptExtent] $SourceExtent
     [Token[]] $Tokens
     [ParseError[]] $ParseErrors
@@ -108,66 +116,141 @@ class AstDocument {
     AstDocument(
         [ScriptBlock] $ScriptBlock
     ) {
-        $this.Init('<memory>', $ScriptBlock.Ast.Extent.Text)
-        $this.SourceExtent = $ScriptBlock.Ast.Extent
+        $this.InitFromAst($ScriptBlock.Ast)
     }
 
     AstDocument(
         [Ast] $Ast
     ) {
-        $this.Init('<memory>', $Ast.Extent.Text)
-        $this.SourceExtent = $Ast.Extent
+        $this.InitFromAst($Ast)
     }
 
     AstDocument(
         [string] $Text
     ) {
-        $this.Init('<memory>', $Text)
+        $this.Init('<memory>', $Text, $null)
     }
 
     AstDocument(
         [string] $Path,
         [string] $Text
     ) {
-        $this.Init($Path, $Text)
+        $this.Init($Path, $Text, $Path)
         $this.SourceExtent = $this.Ast.Extent
     }
 
-    hidden [void] Init([string] $Path, [string] $Text) {
+    hidden [void] InitFromAst([Ast] $InputAst) {
+        $Extent = $InputAst.Extent
+        $Snapshot = $Extent.StartScriptPosition.GetFullScript()
+        if ($null -eq $Snapshot) {
+            $this.Init('<memory>', $Extent.Text, $Extent.File)
+        } else {
+            if ($Extent.StartOffset -lt 0 -or
+                $Extent.EndOffset -lt $Extent.StartOffset -or
+                $Extent.EndOffset -gt $Snapshot.Length -or
+                $Snapshot.Substring($Extent.StartOffset, $Extent.EndOffset - $Extent.StartOffset) -cne $Extent.Text
+            ) {
+                throw [ArgumentException]::new('The supplied AST extent does not match its source snapshot.')
+            }
+
+            $this.Init('<memory>', $Snapshot, $Extent.File)
+            $this.Ast = $this.FindFragment($this.Root.Ast, $InputAst, $Extent.EndOffset)
+            $this.IsFragment = -not [object]::ReferenceEquals($this.Ast, $this.Root.Ast)
+            if ($this.IsFragment) {
+                $this.Tokens = $this.GetFragmentTokens($this.Root.Tokens)
+                $this.ParseErrors = @($this.Root.ParseErrors | Where-Object {
+                    $_.Extent.StartOffset -ge $this.Ast.Extent.StartOffset
+                })
+            }
+        }
+        $this.SourceExtent = $Extent
+    }
+
+    hidden [Token[]] GetFragmentTokens([Token[]] $SourceTokens) {
+        $SelectedTokens = [List[Token]]::new()
+        foreach ($Token in $SourceTokens) {
+            if ($Token.Extent.StartOffset -ge $this.Ast.Extent.StartOffset -and
+                $Token.Extent.EndOffset -le $this.Ast.Extent.EndOffset
+            ) {
+                $SelectedTokens.Add($Token)
+            } elseif ($Token -is [StringExpandableToken]) {
+                # The parser nests tokens for $() inside expandable strings.
+                foreach ($NestedToken in $this.GetFragmentTokens($Token.NestedTokens)) {
+                    $SelectedTokens.Add($NestedToken)
+                }
+            }
+        }
+        return $SelectedTokens.ToArray()
+    }
+
+    hidden [Ast] FindFragment([Ast] $Root, [Ast] $Fragment, [int] $EndOffset) {
+        $Depth = 0
+        $Ancestor = $Fragment
+        while ($null -ne $Ancestor.Parent) {
+            $Depth++
+            $Ancestor = $Ancestor.Parent
+        }
+
+        $Candidates = @($Root.FindAll({
+            param($Node)
+
+            if ($Node.GetType() -ne $Fragment.GetType() -or
+                $Node.Extent.StartOffset -ne $Fragment.Extent.StartOffset -or
+                $Node.Extent.EndOffset -ne $EndOffset
+            ) {
+                return $false
+            }
+
+            $NodeDepth = 0
+            $Parent = $Node
+            while ($null -ne $Parent.Parent) {
+                $NodeDepth++
+                $Parent = $Parent.Parent
+            }
+            return $NodeDepth -eq $Depth
+        }, $true))
+
+        if ($Candidates.Count -ne 1) {
+            throw [InvalidOperationException]::new(
+                "Could not uniquely locate the submitted fragment ($($Fragment.GetType().Name), depth $Depth) at offsets [$($Fragment.Extent.StartOffset), $EndOffset) in the source snapshot; found $($Candidates.Count) matches."
+            )
+        }
+        return $Candidates[0]
+    }
+
+    hidden [int] GetRenderedFragmentEndOffset() {
+        $EndOffset = $this.Ast.Extent.EndOffset
+        foreach ($Edit in $this.Edits) {
+            $EndOffset += $Edit.ReplacementText.Length - ($Edit.EndOffset - $Edit.StartOffset)
+        }
+        return $EndOffset
+    }
+
+    hidden [void] Init([string] $Path, [string] $Text, [string] $SourcePath) {
         $this.Path = $Path
         $this.OriginalText = $Text
         $this.OriginalFingerprint = Get-AstSourceFingerprint -Bytes (
             $this.SourceEncoding.GetBytes($this.OriginalText)
         )
-        $this.Parse()
-    }
-
-    hidden [void] Parse() {
         $ParsedTokens = $null
         $Errors = $null
-        $SourcePath = if ($this.Path -eq '<memory>') { $null } else { $this.Path }
-        $this.Ast = [Parser]::ParseInput(
-            $this.OriginalText,
-            $SourcePath,
-            [ref] $ParsedTokens,
-            [ref] $Errors
+        $this.Root.Ast = [Parser]::ParseInput(
+            $this.OriginalText, $SourcePath, [ref] $ParsedTokens, [ref] $Errors
         )
-        $this.Tokens = $ParsedTokens
-        $this.ParseErrors = $Errors
-
+        $this.Ast = $this.Root.Ast
+        $this.Root.Tokens = $ParsedTokens
+        $this.Tokens = $this.Root.Tokens
+        $this.Root.ParseErrors = $Errors
+        $this.ParseErrors = $this.Root.ParseErrors
         $this.NewLineSequence = if ($this.OriginalText.Contains("`r`n")) { "`r`n" } else { "`n" }
     }
 
-    # True when SourceExtent identifies a file; informational only and independent of IsFileBacked.
-    # SourceExtent/GetSourcePosition exist only because ScriptBlock and Ast input is reparsed
-    # from fragment text. Nitpick/Docs/FragmentCoordinates.md plans to parse the full source
-    # (Extent.StartScriptPosition.GetFullScript()) instead, which retires this mapping layer.
+    # Transitional APIs retained until Nitpick consumes snapshot coordinates directly.
     [bool] HasSourceProvenance() {
         return $null -ne $this.SourceExtent -and -not [string]::IsNullOrEmpty($this.SourceExtent.File)
     }
 
-    # Offset is document-local (relative to OriginalText, which is the fragment text for
-    # ScriptBlock and Ast input), not an offset into the original source file.
+    # Offsets are already snapshot-absolute; only line/column lookup remains.
     [hashtable] GetSourcePosition([int] $Offset) {
         if ($Offset -lt 0 -or $Offset -gt $this.OriginalText.Length) {
             throw [ArgumentOutOfRangeException]::new('Offset', 'Offset must be within the original document text.')
@@ -177,16 +260,7 @@ class AstDocument {
         $LineNumber = [regex]::Matches($Prefix, "`n").Count + 1
         $ColumnNumber = $Offset - $Prefix.LastIndexOf("`n")
         $SourceOffset = $Offset
-        $SourcePath = $this.Path
-
-        if ($this.SourceExtent) {
-            if ($LineNumber -eq 1) {
-                $ColumnNumber += $this.SourceExtent.StartColumnNumber - 1
-            }
-            $LineNumber += $this.SourceExtent.StartLineNumber - 1
-            $SourceOffset += $this.SourceExtent.StartOffset
-            $SourcePath = if ($this.SourceExtent.File) { $this.SourceExtent.File } else { '<memory>' }
-        }
+        $SourcePath = if ($this.Ast.Extent.File) { $this.Ast.Extent.File } else { '<memory>' }
 
         return @{
             Path = $SourcePath
@@ -196,7 +270,28 @@ class AstDocument {
         }
     }
 
+    hidden [void] ValidateEditTarget([AstTextEdit] $Edit) {
+        if ($this.IsFragment -and
+            ($Edit.StartOffset -lt $this.Ast.Extent.StartOffset -or
+            $Edit.EndOffset -gt $this.Ast.Extent.EndOffset)
+        ) {
+            $Exception = [InvalidOperationException]::new(
+                "Edit '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset)) falls outside the submitted fragment [$($this.Ast.Extent.StartOffset), $($this.Ast.Extent.EndOffset))."
+            )
+            $Exception.Data['FailureKind'] = 'OutsideTarget'
+            $Exception.Data['IncomingEdit'] = @{
+                StartOffset = $Edit.StartOffset
+                EndOffset = $Edit.EndOffset
+                ReplacementText = $Edit.ReplacementText
+                ExpectedText = $Edit.ExpectedText
+                Reason = $Edit.Reason
+            }
+            throw $Exception
+        }
+    }
+
     hidden [void] AddEdit([AstTextEdit] $Edit) {
+        $this.ValidateEditTarget($Edit)
         foreach ($Existing in $this.Edits) {
             $HasSharedInsertionOffset =
                 $Existing.StartOffset -eq $Existing.EndOffset -and
@@ -409,9 +504,6 @@ Export-ModuleMember `
     -Cmdlet $Manifest.CmdletsToExport `
     -Variable $Manifest.VariablesToExport `
     -Alias $Manifest.AliasesToExport
-
-
-
 
 
 

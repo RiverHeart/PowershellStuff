@@ -10,6 +10,8 @@ using namespace System.Management.Automation.Language
     AstDocument. Every edit is checked against the document's immutable
     OriginalText before any edit is queued. Conflicts with previously queued
     edits or other members of the supplied batch reject the complete batch.
+    Fragment documents also reject edits outside the submitted fragment, with
+    FailureKind 'OutsideTarget'. Offsets always refer to the complete snapshot.
 
     ExpectedText can be supplied as a stale-source guard. Its value must exactly
     match the source text in the requested range before the edit is queued.
@@ -117,6 +119,7 @@ function Add-AstTextEdit {
 
         $ValidatedEdits = [List[AstTextEdit]]::new()
         foreach ($Edit in $Edits) {
+            $Document.ValidateEditTarget($Edit)
             if ($Edit.StartOffset -lt 0) {
                 throw 'StartOffset must be non-negative.'
             }

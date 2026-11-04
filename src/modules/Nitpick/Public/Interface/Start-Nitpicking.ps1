@@ -251,14 +251,7 @@ function Start-Nitpicking {
                     New-AstDocument -InputObject $Target
                 }
 
-                # WARNING: Keep original extent context for rules; reparsing memory input resets it.
-                # Fix modes therefore report fragment-local coordinates for Script input.
-                # See Docs/FragmentCoordinates.md for the plan to remove this fork.
-                $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and $FixMode -eq 'Off') {
-                    $Target
-                } else {
-                    $Document.Ast
-                }
+                $Ast = $Document.Ast
                 $ParseErrors = $Document.ParseErrors
             } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
                 $Summary.TargetCount++
@@ -385,18 +378,11 @@ function Start-Nitpicking {
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
 
-                $SourceLabel = if ($PSCmdlet.ParameterSetName -eq 'Script' -and
-                    -not $Ast.Extent.File -and
-                    $Target.Extent.File
-                ) {
-                    '{0}:{1}:{2}' -f $Target.Extent.File, $Target.Extent.StartLineNumber, $Target.Extent.StartColumnNumber
-                }
-
                 $TargetText = Format-NitpickText `
                     -Ast $Ast `
                     -Finding $SortedFindings `
                     -CorrectionResult $CorrectionResult `
-                    -SourceLabel $SourceLabel
+                    -IsFragment:$Document.IsFragment
 
                 if ($TargetText) {
                     if ($HasWrittenTextBlock) { Write-Host '' }

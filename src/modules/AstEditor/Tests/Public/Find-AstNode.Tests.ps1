@@ -44,7 +44,8 @@ Describe 'New-AstDocument' {
                 }, $true))
 
         $Overlay | Should -Not -BeNullOrEmpty
-        $Overlay.Ast.Extent.StartOffset | Should -Be 0
+        $Overlay.Ast.Extent.StartOffset | Should -BeGreaterThan 0
+        $Overlay.IsFragment | Should -BeTrue
         $Functions.Name | Should -Be 'Get-Greeting'
     }
 

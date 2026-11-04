@@ -27,7 +27,9 @@ Describe 'New-AstDocument' {
                 }, $true))
 
         $Overlay | Should -Not -BeNullOrEmpty
-        $Overlay.Ast.Extent.StartOffset | Should -Be 0
+        $Overlay.Ast.Extent.StartOffset | Should -BeGreaterThan 0
+        $Overlay.IsFragment | Should -BeTrue
+        $Overlay.Root.Ast.Extent.StartOffset | Should -Be 0
         $Functions.Name | Should -Be 'Get-Greeting'
     }
 
@@ -75,7 +77,7 @@ Describe 'New-AstDocument' {
         @($Overlay.ParseErrors) | Should -HaveCount 0
     }
 
-    It 'reparses nested file AST input into fragment-local coordinates without enabling saves' {
+    It 'reparses nested file AST input in its snapshot without enabling saves' {
         $Path = Join-Path $TestDrive 'Nested.ps1'
         $Text = "# preceding line`r`n& { `$Value = 1 }"
         [System.IO.File]::WriteAllText($Path, $Text)
@@ -90,9 +92,11 @@ Describe 'New-AstDocument' {
         $Overlay = New-AstDocument -InputObject $Nested
 
         $Nested.Extent.StartOffset | Should -BeGreaterThan 0
-        $Overlay.Ast.Extent.StartOffset | Should -Be 0
-        $Overlay.Ast.Extent.StartLineNumber | Should -Be 1
-        $Overlay.OriginalText | Should -BeExactly $Nested.Extent.Text
+        $Overlay.Ast.Extent.StartOffset | Should -Be $Nested.Extent.StartOffset
+        $Overlay.Ast.Extent.StartLineNumber | Should -Be 2
+        $Overlay.Ast.Extent.File | Should -Be $Path
+        $Overlay.OriginalText | Should -BeExactly $Text
+        $Overlay.IsFragment | Should -BeTrue
         $Overlay.Path | Should -Be '<memory>'
         $Overlay.IsFileBacked | Should -BeFalse
         [object]::ReferenceEquals($Overlay.SourceExtent, $Nested.Extent) | Should -BeTrue
@@ -101,7 +105,7 @@ Describe 'New-AstDocument' {
             $Node -is [AssignmentStatementAst]
         }, $true)
         $Overlay.Replace($Assignment, '$Value = 2', 'Replace value')
-        $Overlay.Render() | Should -BeExactly '{ $Value = 2 }'
+        $Overlay.Render() | Should -BeExactly "# preceding line`r`n& { `$Value = 2 }"
     }
 
     It 'initializes file input with source-path tokens and a transactional snapshot' {
@@ -146,10 +150,11 @@ Describe 'New-AstDocument' {
                 param($Node)
                 $Node -is [AssignmentStatementAst]
             }, $true)
+
             foreach ($Pair in @(
-                @{ Local = 0; Original = $Nested.Extent.StartScriptPosition }
+                @{ Local = $Nested.Extent.StartOffset; Original = $Nested.Extent.StartScriptPosition }
                 @{ Local = $LocalAssignment.Extent.StartOffset; Original = $OriginalAssignment.Extent.StartScriptPosition }
-                @{ Local = $Overlay.OriginalText.Length; Original = $Nested.Extent.EndScriptPosition }
+                @{ Local = $Nested.Extent.EndOffset; Original = $Nested.Extent.EndScriptPosition }
             )) {
                 $Position = $Overlay.GetSourcePosition($Pair.Local)
                 $Position.Path | Should -Be $Path

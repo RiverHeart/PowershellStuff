@@ -409,7 +409,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         }
     }
 
-    It 'labels the text header with the origin of a file-backed scriptblock input' {
+    It 'uses the bare source path for whole-file AST input without enabling writes' {
         $Path = Join-Path $TestDrive 'Origin.ps1'
         [System.IO.File]::WriteAllText($Path, "# prefix`n`$Value = 1")
         $Ast = Import-ScriptBlockAst -FilePath $Path
@@ -417,7 +417,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Text = (Start-Nitpicking -Script $Ast -IncludeRule Local/TransactionRule -FixMode Preview `
             -Output Text -NoSummary -ErrorAction Stop) -join "`n"
 
-        $Text | Should -Match ('^<ScriptBlock> from {0}:1:1' -f [regex]::Escape($Path))
+        ($Text -split '\r?\n')[0] | Should -BeExactly $Path
         [System.IO.File]::ReadAllText($Path) | Should -Be "# prefix`n`$Value = 1"
     }
 

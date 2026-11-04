@@ -28,10 +28,10 @@ using namespace System.Text
 .PARAMETER CorrectionResult
     The NitpickCorrectionResult for the target, when corrections were requested.
 
-.PARAMETER SourceLabel
-    Origin of in-memory input with source provenance, such as 'C:\kicker.ps1:12:3'.
-    Appended to the '<ScriptBlock>' header for orientation only; finding positions
-    remain local to the analyzed fragment and are not hyperlinked.
+.PARAMETER IsFragment
+    Identifies a submitted fragment rather than a complete snapshot root. For a
+    file-sourced fragment, places its line range above the bare path so native
+    terminal path detection remains available.
 
 .EXAMPLE
     Format findings for a specific AST and display them as console-friendly text
@@ -64,7 +64,7 @@ function Format-NitpickText {
         [NitpickCorrectionResult] $CorrectionResult,
 
         [Parameter()]
-        [string] $SourceLabel
+        [switch] $IsFragment
     )
 
     $CorrectionText = if ($CorrectionResult) {
@@ -79,11 +79,15 @@ function Format-NitpickText {
         $FilePath = $Ast.Extent.File
         $UriPath = [Uri]::new($Ast.Extent.File)
     } else {
-        $FilePath = if ($SourceLabel) { "<ScriptBlock> from $SourceLabel" } else { '<ScriptBlock>' }
+        $FilePath = '<ScriptBlock>'
         $UriPath = $null
     }
 
     $Builder = [StringBuilder]::new()
+    if ($IsFragment -and $Ast.Extent.File) {
+        $Builder.AppendLine(('(fragment, lines {0}-{1})' -f
+            $Ast.Extent.StartLineNumber, $Ast.Extent.EndLineNumber)) | Out-Null
+    }
     $Builder.AppendLine($FilePath) | Out-Null
 
     # Convert each finding into a structured row for display so we can calculate

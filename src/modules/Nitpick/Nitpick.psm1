@@ -716,8 +716,10 @@ class NitpickCorrectionProposal {
     [string] $OriginalFingerprint
     [string] $Status = 'NoChanges'
     [string] $OriginalText
+    [string] $OriginalFragmentText
     [NitpickFinding[]] $OriginalFindings = @()
     [string] $CandidateText
+    [string] $CandidateFragmentText
     [NitpickFinding[]] $CandidateFindings = @()
     [NitpickFinding[]] $UndecidedFindings = @()
     [NitpickFinding[]] $SkippedFindings = @()

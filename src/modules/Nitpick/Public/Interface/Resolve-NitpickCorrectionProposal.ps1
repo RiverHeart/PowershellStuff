@@ -28,6 +28,11 @@ using module AstEditor
     member. Returns a stable proposal containing candidate text, validation diagnostics,
     and candidate findings when rules are supplied. Application never changes these
     facts; a proposal does not claim that edits were written.
+    OriginalText and CandidateText are complete snapshot text; OriginalFragmentText
+    and CandidateFragmentText are the submitted target's text. Fragment candidates
+    are reanalyzed only within the relocated fragment, retaining the source file
+    name. An edit outside the fragment rejects the whole batch; a missing rendered
+    fragment fails validation even when the candidate has no syntax errors.
 
     Diff includes navigable line:column reason headers and caret rows
     beneath removed and added edit spans. Multiline spans annotate their first
@@ -329,6 +334,8 @@ function Resolve-NitpickCorrectionProposal {
                 'AstEditor rejected the target because the selected edits conflict.'
             } elseif ($FailureKind -eq 'ExpectedTextMismatch') {
                 'AstEditor rejected the target because an edit is stale.'
+            } elseif ($FailureKind -eq 'OutsideTarget') {
+                'AstEditor rejected the target because an edit falls outside the submitted fragment.'
             } else {
                 "AstEditor rejected the target batch: $($_.Exception.Message)"
             }
@@ -351,7 +358,7 @@ function Resolve-NitpickCorrectionProposal {
         foreach ($Correction in $AcceptedCorrections) {
             $SkippedCorrections.Add([pscustomobject]@{
                 Correction = $Correction
-                Reason = 'The rendered correction batch contains parse errors.'
+                Reason = 'The rendered correction batch failed validation: ' + ($Resolution.ParseErrors.Message -join ' ')
             })
         }
 
@@ -361,18 +368,20 @@ function Resolve-NitpickCorrectionProposal {
     # MARK: FINAL REANALYSIS
     # Rerun only the caller-selected rules, and only after rendered text passes validation.
     $WasReanalyzed = $false
-    if ($Rule.Count -gt 0 -and $Resolution.ParseErrorCount -eq 0) {
-        $RenderedAst = if ($Path) {
-            $Tokens = $null
-            $ParseErrors = $null
-            [Parser]::ParseInput(
-                $CandidateText,
-                $Path,
-                [ref] $Tokens,
-                [ref] $ParseErrors
-            )
+    if ($Rule.Count -gt 0 -and $Resolution.ParseErrorCount -eq 0 -and
+        ($SelectedCorrections.Count -eq 0 -or $AcceptedCorrections.Count -gt 0)
+    ) {
+        $SourcePath = if ($Path) { $Path } else { $Document.Ast.Extent.File }
+        $Tokens = $null
+        $ParseErrors = $null
+        $RenderedRoot = [Parser]::ParseInput(
+            $CandidateText, $SourcePath, [ref] $Tokens, [ref] $ParseErrors
+        )
+
+        $RenderedAst = if ($Document.IsFragment) {
+            $Document.FindFragment($RenderedRoot, $Document.Ast, $Document.GetRenderedFragmentEndOffset())
         } else {
-            (New-AstDocument -InputObject $CandidateText).Ast
+            $RenderedRoot
         }
 
         foreach ($SelectedRule in $Rule) {
@@ -413,14 +422,11 @@ function Resolve-NitpickCorrectionProposal {
 
     return [NitpickCorrectionProposal]@{
         Path = if ($Path) { $Path } else { '<ScriptBlock>' }
-        SourcePath = if ($Document.SourceExtent -and $Document.SourceExtent.File) {
-            $Document.SourceExtent.File
-        } else {
-            $null
-        }
+        SourcePath = $Document.Ast.Extent.File
         Document = $Document
         OriginalFingerprint = $Document.OriginalFingerprint
         OriginalText = $Script
+        OriginalFragmentText = if ($Document.IsFragment) { $Document.Ast.Extent.Text } else { $Script }
         OriginalFindings = @($Finding)
         WasReanalyzed = $WasReanalyzed
 
@@ -442,6 +448,7 @@ function Resolve-NitpickCorrectionProposal {
         Conflicts = $Conflicts.ToArray()
         ParseErrors = @($Resolution.ParseErrors)
         CandidateText = $CandidateText
+        CandidateFragmentText = $Resolution.RenderedFragmentText
         Diff = Show-AstDiff -Document $Document -Label Position -Annotate
     }
 }

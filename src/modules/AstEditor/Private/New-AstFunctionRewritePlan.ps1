@@ -51,7 +51,9 @@ function New-AstFunctionRewritePlan {
             }
 
             $Ancestor = $Node.Parent
-            while ($null -ne $Ancestor) {
+            while ($null -ne $Ancestor -and
+                -not [object]::ReferenceEquals($Ancestor, $Document.Ast.Parent)
+            ) {
                 if ($Ancestor -is [FunctionDefinitionAst]) {
                     return $false
                 }

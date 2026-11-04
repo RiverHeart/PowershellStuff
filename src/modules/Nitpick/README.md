@@ -30,10 +30,19 @@ is undecided: it offers several corrections, or only non-Safe ones. When run in 
 PowerShell extension's terminal with `$psEditor` available, the finding's violation range
 is selected in the editor before the prompt. The chosen correction is applied as explicit
 consent, including Review or Unsafe corrections; a blank answer skips the finding.
-Navigation uses one-based Editor Services coordinates and the original source extent,
-including for a nested ScriptBlock or AST passed through `-Script`. Corrections and
-previews remain fragment-local and Script inputs are still applied only in memory; the
-text header shows the origin as `<ScriptBlock> from <file>:<line>:<column>`.
+Navigation uses one-based Editor Services coordinates directly from finding extents,
+including for a nested ScriptBlock or AST passed through `-Script`. All fix modes use
+the complete parse-time snapshot's coordinates, but analyze and edit only the submitted
+fragment. Script inputs are still applied only in memory; knowing a source file never
+enables saving to it. Later disk changes are not tracked and can make navigation stale.
+For file-sourced fragments the text header places `(fragment, lines N-M)` on its own
+line above the bare path, preserving VS Code's native path and position linking.
+Proposal `OriginalText` and `CandidateText` hold complete snapshots;
+`OriginalFragmentText` and `CandidateFragmentText` hold the submitted fragment's text.
+`Report.EffectiveText` continues to return only that fragment, including when no
+correction is needed or validation fails. File targets and standalone strings retain
+their existing output shape. Path filters apply to file selection, not explicit
+`-Script` targets, even when those targets have source file provenance.
 
 Guided mode requires an interactive host and terminates under `-NonInteractive`. In
 `Apply` and `Preview`, undecided findings are counted in the summary with a hint to use

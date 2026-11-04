@@ -16,13 +16,13 @@ using module AstEditor
     end-of-input answer skips the finding.
 
 .PARAMETER Finding
-    The finding requiring a decision. Its ViolationExtent offsets are document-local.
+    The finding requiring a decision. Its ViolationExtent uses snapshot coordinates.
 
 .PARAMETER Correction
     The corrections offered for the finding.
 
 .PARAMETER Document
-    The AstDocument analyzed for the finding; used to map offsets to source positions.
+    The AstDocument analyzed for the finding. It remains in-memory for Script input.
 
 .EXAMPLE
     Select-NitpickGuidedCorrection -Finding $Finding -Correction $Finding.Corrections -Document $Document
@@ -49,20 +49,17 @@ function Select-NitpickGuidedCorrection {
     $Extent = $Finding.ViolationExtent
     $Location = '{0}:{1}' -f $Extent.StartLineNumber, $Extent.StartColumnNumber
 
-    if ($Document.HasSourceProvenance()) {
+    if ($Extent.File) {
+        $Location = '{0}:{1}:{2}' -f $Extent.File, $Extent.StartLineNumber, $Extent.StartColumnNumber
         try {
-            $Start = $Document.GetSourcePosition($Extent.StartOffset)
-            $End = $Document.GetSourcePosition($Extent.EndOffset)
-            $Location = '{0}:{1}:{2}' -f $Start.Path, $Start.LineNumber, $Start.ColumnNumber
-
             if ($PSEditor) {
-                Write-Verbose "Opening $($Start.Path) in the editor."
-                $PSEditor.Workspace.OpenFile($Start.Path)
+                Write-Verbose "Opening $($Extent.File) in the editor."
+                $PSEditor.Workspace.OpenFile($Extent.File)
                 $PSEditor.GetEditorContext().SetSelection(
-                    $Start.LineNumber,
-                    $Start.ColumnNumber,
-                    $End.LineNumber,
-                    $End.ColumnNumber
+                    $Extent.StartLineNumber,
+                    $Extent.StartColumnNumber,
+                    $Extent.EndLineNumber,
+                    $Extent.EndColumnNumber
                 )
             }
         } catch {

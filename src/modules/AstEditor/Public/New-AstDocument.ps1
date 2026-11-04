@@ -14,12 +14,19 @@ using namespace System.Management.Automation.Language
     immutable-AST + overlay workflow. File inputs capture a byte fingerprint and
     source encoding for transactional saves. BOM-less input must be valid UTF-8;
     BOM-marked UTF-8, UTF-16, and UTF-32 are also supported.
-    ScriptBlock and Ast inputs currently reparse their extent text, so the AST,
-    tokens, and parse errors use fragment-local coordinates. They remain in-memory
-    documents even when the original extent identifies a file.
-    SourceExtent retains the supplied AST's original bounds. HasSourceProvenance reports
-    whether that extent identifies a file. GetSourcePosition maps a document-local offset
-    to the source file's offset and one-based line/column.
+    ScriptBlock and Ast inputs reparse their complete parse-time source snapshot.
+    Ast is the submitted node located in that snapshot by type, offsets, and depth;
+    Root groups the complete snapshot's typed Ast, Tokens, and ParseErrors.
+    IsFragment distinguishes a submitted node
+    from the root, even when both cover the same text. These inputs remain in-memory
+    documents: Extent.File is provenance, not permission to save to that file.
+    OriginalText and all offsets refer to the snapshot. Tokens contains only tokens
+    inside Ast.Extent; Root.Tokens contains all snapshot tokens. ParseErrors omits
+    only errors positioned strictly before the fragment start; Root.ParseErrors
+    contains every snapshot error. No render-validation errors are filtered.
+    When GetFullScript() is null, extent text is parsed as standalone input.
+    SourceExtent, HasSourceProvenance, and GetSourcePosition are transitional APIs;
+    GetSourcePosition now looks up a snapshot offset without shifting it.
     Strings have no inferred call-site provenance.
 
 .EXAMPLE
@@ -35,7 +42,7 @@ using namespace System.Management.Automation.Language
 .EXAMPLE
     $doc = New-AstDocument -InputObject { Window Demo { } }
 
-    Parses the ScriptBlock's extent text into a document.
+    Parses the ScriptBlock's source snapshot and selects its fragment node.
 
 .EXAMPLE
     $tokens = $null
@@ -43,7 +50,7 @@ using namespace System.Management.Automation.Language
     $ast = [Parser]::ParseInput("Window Demo { }", [ref] $tokens, [ref] $errors)
     $doc = New-AstDocument -InputObject $ast
 
-    Parses the supplied AST's extent text into a document.
+    Parses the supplied AST's snapshot and selects the corresponding node.
 #>
 function New-AstDocument {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
