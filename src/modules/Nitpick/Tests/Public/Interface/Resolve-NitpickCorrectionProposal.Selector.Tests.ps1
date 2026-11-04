@@ -1,37 +1,6 @@
 BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '../../../Nitpick.psd1') -Force
-
-    function New-SelectorFixture {
-        param (
-            [string[]] $Applicability = @('Safe')
-        )
-
-        $Path = Join-Path $TestDrive "Selector-$([guid]::NewGuid().ToString('N')).ps1"
-        [System.IO.File]::WriteAllText($Path, 'param([Parameter(Mandatory=$true)] $MyParam)')
-        $Document = New-AstDocument -Path $Path
-        $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
-        $Findings = @($Rule.Invoke($Document.Ast))
-        $Template = $Findings[0].Corrections[0]
-
-        # Distinct correction objects sharing the template's edits, so the selector's
-        # return can be identified by reference and non-chosen ones can be reported.
-        $Findings[0].Corrections = @(
-            foreach ($Value in $Applicability) {
-                New-NitpickCorrection `
-                    -TextEdit $Template.TextEdits `
-                    -FilePathOrContext $Path `
-                    -Description "$Value alternative" `
-                    -Applicability $Value `
-                    -RuleId 'Nitpick/AvoidParameterAttributeBool'
-            }
-        )
-
-        [pscustomobject]@{
-            Path = $Path
-            Document = $Document
-            Findings = $Findings
-        }
-    }
+    . (Join-Path $PSScriptRoot '../../Support/CorrectionFixtures.ps1')
 }
 
 AfterAll {
@@ -39,13 +8,17 @@ AfterAll {
 }
 
 Describe 'Resolve-NitpickCorrectionProposal correction selector' {
+    BeforeEach {
+        $Fixture = New-TestSourceDocument
+    }
+
     It 'does not invoke the selector when a single Safe correction needs no choice' {
-        $Fixture = New-SelectorFixture -Applicability 'Safe'
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe'
         $Calls = [System.Collections.Generic.List[object]]::new()
 
         $Proposal = Resolve-NitpickCorrectionProposal `
             -Document $Fixture.Document `
-            -Finding $Fixture.Findings `
+            -Finding $Finding `
             -CorrectionSelector { $Calls.Add($args); $args[1][0] }
 
         $Calls.Count | Should -Be 0
@@ -59,12 +32,12 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
         @{ Label = 'a Safe and a Review correction'; Applicability = 'Safe', 'Review' }
         @{ Label = 'a lone Unsafe correction'; Applicability = , 'Unsafe' }
     ) {
-        $Fixture = New-SelectorFixture -Applicability $Applicability
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability $Applicability
         $Calls = [System.Collections.Generic.List[object]]::new()
 
         $null = Resolve-NitpickCorrectionProposal `
             -Document $Fixture.Document `
-            -Finding $Fixture.Findings `
+            -Finding $Finding `
             -CorrectionSelector {
                 param($Finding, $Corrections, $Document)
                 $Calls.Add(@{ Finding = $Finding; Corrections = $Corrections; Document = $Document })
@@ -72,7 +45,7 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
             }
 
         $Calls.Count | Should -Be 1
-        [object]::ReferenceEquals($Calls[0].Finding, $Fixture.Findings[0]) | Should -BeTrue
+        [object]::ReferenceEquals($Calls[0].Finding, $Finding) | Should -BeTrue
         $Calls[0].Corrections | Should -HaveCount $Applicability.Count
         [object]::ReferenceEquals($Calls[0].Document, $Fixture.Document) | Should -BeTrue
     }
@@ -81,12 +54,12 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
         @{ Applicability = 'Review' }
         @{ Applicability = 'Unsafe' }
     ) {
-        $Fixture = New-SelectorFixture -Applicability 'Safe', $Applicability
-        $Chosen = $Fixture.Findings[0].Corrections[1]
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', $Applicability
+        $Chosen = $Finding.Corrections[1]
 
         $Proposal = Resolve-NitpickCorrectionProposal `
             -Document $Fixture.Document `
-            -Finding $Fixture.Findings `
+            -Finding $Finding `
             -CorrectionSelector { param($Finding, $Corrections) $Corrections[1] }
 
         $Proposal.Status | Should -Be 'Ready'
@@ -98,11 +71,11 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
     }
 
     It 'skips the finding without marking it undecided when the selector returns nothing' {
-        $Fixture = New-SelectorFixture -Applicability 'Safe', 'Safe'
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', 'Safe'
 
         $Proposal = Resolve-NitpickCorrectionProposal `
             -Document $Fixture.Document `
-            -Finding $Fixture.Findings `
+            -Finding $Finding `
             -CorrectionSelector { }
 
         $Proposal.Status | Should -Be 'NoChanges'
@@ -113,14 +86,14 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
             'The finding was skipped during guided selection.'
         )
         $Proposal.SkippedFindings | Should -HaveCount 1
-        [object]::ReferenceEquals($Proposal.SkippedFindings[0], $Fixture.Findings[0]) | Should -BeTrue
+        [object]::ReferenceEquals($Proposal.SkippedFindings[0], $Finding) | Should -BeTrue
         $Proposal.UndecidedFindings | Should -HaveCount 0
     }
 
     It 'throws when the selector returns a correction that was not offered' {
-        $Fixture = New-SelectorFixture -Applicability 'Safe', 'Safe'
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', 'Safe'
         $Foreign = New-NitpickCorrection `
-            -TextEdit $Fixture.Findings[0].Corrections[0].TextEdits `
+            -TextEdit $Finding.Corrections[0].TextEdits `
             -FilePathOrContext $Fixture.Path `
             -Description 'Not offered' `
             -RuleId 'Nitpick/AvoidParameterAttributeBool'
@@ -128,7 +101,7 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
         {
             Resolve-NitpickCorrectionProposal `
                 -Document $Fixture.Document `
-                -Finding $Fixture.Findings `
+                -Finding $Finding `
                 -CorrectionSelector { $Foreign }
         } | Should -Throw '*must return one of the corrections offered*'
     }
@@ -138,22 +111,22 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
         @{ Label = 'a lone Review correction'; Applicability = , 'Review'; Reason = "Applicability 'Review' is not selected." }
         @{ Label = 'only non-Safe corrections'; Applicability = 'Review', 'Unsafe'; Reason = 'is not selected' }
     ) {
-        $Fixture = New-SelectorFixture -Applicability $Applicability
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability $Applicability
 
-        $Proposal = Resolve-NitpickCorrectionProposal -Document $Fixture.Document -Finding $Fixture.Findings
+        $Proposal = Resolve-NitpickCorrectionProposal -Document $Fixture.Document -Finding $Finding
 
         $Proposal.Status | Should -Be 'NoChanges'
         $Proposal.UndecidedFindings | Should -HaveCount 1
-        [object]::ReferenceEquals($Proposal.UndecidedFindings[0], $Fixture.Findings[0]) | Should -BeTrue
+        [object]::ReferenceEquals($Proposal.UndecidedFindings[0], $Finding) | Should -BeTrue
         $Proposal.SkippedFindings | Should -HaveCount 0
         $Proposal.SkippedCorrections | Should -HaveCount $Applicability.Count
         $Proposal.SkippedCorrections[0].Reason | Should -Match $Reason
     }
 
     It 'selects the single Safe correction automatically alongside a non-Safe alternative' {
-        $Fixture = New-SelectorFixture -Applicability 'Safe', 'Unsafe'
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', 'Unsafe'
 
-        $Proposal = Resolve-NitpickCorrectionProposal -Document $Fixture.Document -Finding $Fixture.Findings
+        $Proposal = Resolve-NitpickCorrectionProposal -Document $Fixture.Document -Finding $Finding
 
         $Proposal.Status | Should -Be 'Ready'
         $Proposal.AcceptedCorrections | Should -HaveCount 1
@@ -162,42 +135,56 @@ Describe 'Resolve-NitpickCorrectionProposal correction selector' {
         $Proposal.SkippedCorrections[0].Reason | Should -BeExactly "Applicability 'Unsafe' is not selected."
     }
 
-    It 'exposes SourcePath for <Label>' -ForEach @(
-        @{ Label = 'a file-backed document'; Kind = 'File' }
-        @{ Label = 'a nested AST with provenance'; Kind = 'Nested' }
-        @{ Label = 'a plain string'; Kind = 'String' }
+    It 'exposes SourcePath for <Kind> input' -ForEach @(
+        @{ Kind = 'File'; ExpectSourcePath = $true; ExpectPathIsFile = $true }
+        @{ Kind = 'Nested'; ExpectSourcePath = $true; ExpectPathIsFile = $false }
+        @{ Kind = 'String'; ExpectSourcePath = $false; ExpectPathIsFile = $false }
     ) {
-        $Source = 'param([Parameter(Mandatory=$true)] $MyParam)'
-        $Path = Join-Path $TestDrive 'Provenance.ps1'
-        $Document = switch ($Kind) {
-            'File' {
-                [System.IO.File]::WriteAllText($Path, $Source)
-                New-AstDocument -Path $Path
-            }
-            'Nested' {
-                [System.IO.File]::WriteAllText($Path, "& {$Source}")
-                $Tokens = $null
-                $Errors = $null
-                $Root = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref] $Tokens, [ref] $Errors)
-                $Nested = $Root.Find({
-                    param($Node)
-                    $Node -is [System.Management.Automation.Language.ScriptBlockExpressionAst]
-                }, $true).ScriptBlock
-                New-AstDocument -InputObject $Nested
-            }
-            'String' { New-AstDocument -InputObject $Source }
-        }
-        $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
-        $Findings = @($Rule.Invoke($Document.Ast))
+        $Fixture = New-TestSourceDocument -Kind $Kind
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe'
 
-        $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings
+        $Proposal = Resolve-NitpickCorrectionProposal -Document $Fixture.Document -Finding $Finding
 
-        if ($Kind -eq 'String') {
-            $Proposal.SourcePath | Should -BeNullOrEmpty
-            $Proposal.Path | Should -Be '<ScriptBlock>'
+        if ($ExpectSourcePath) {
+            $Proposal.SourcePath | Should -Be $Fixture.Path
         } else {
-            $Proposal.SourcePath | Should -Be $Path
-            $Proposal.Path | Should -Be $(if ($Kind -eq 'File') { $Path } else { '<ScriptBlock>' })
+            $Proposal.SourcePath | Should -BeNullOrEmpty
+        }
+        $Proposal.Path | Should -Be $(if ($ExpectPathIsFile) { $Fixture.Path } else { '<ScriptBlock>' })
+    }
+}
+
+Describe 'Correction fixture invariants' {
+    It 'produces distinct alternative objects' {
+        $Fixture = New-TestSourceDocument
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', 'Safe', 'Unsafe'
+
+        $Finding.Corrections | Should -HaveCount 3
+        { Assert-TestCorrectionsDistinct -Correction $Finding.Corrections } | Should -Not -Throw
+        $Finding.Corrections.Applicability | Should -Be @('Safe', 'Safe', 'Unsafe')
+    }
+
+    It 'rejects a finding that lists one correction twice' {
+        $Fixture = New-TestSourceDocument
+        $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe'
+        $Same = $Finding.Corrections[0]
+
+        { Assert-TestCorrectionsDistinct -Correction @($Same, $Same) } |
+            Should -Throw '*index 0 and 1 are the same object*'
+    }
+
+    It 'builds a <Kind> document with the expected provenance' -ForEach @(
+        @{ Kind = 'File'; FileBacked = $true; Provenance = $true }
+        @{ Kind = 'Nested'; FileBacked = $false; Provenance = $true }
+        @{ Kind = 'String'; FileBacked = $false; Provenance = $false }
+    ) {
+        $Fixture = New-TestSourceDocument -Kind $Kind
+
+        $Fixture.Document.IsFileBacked | Should -Be $FileBacked
+        $Fixture.Document.HasSourceProvenance() | Should -Be $Provenance
+        if ($Kind -eq 'Nested') {
+            $Fixture.Document.SourceExtent.StartLineNumber | Should -Be 2
+            $Fixture.FragmentAst | Should -Not -BeNullOrEmpty
         }
     }
 }

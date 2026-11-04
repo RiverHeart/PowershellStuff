@@ -1,6 +1,7 @@
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
+    . "$PSScriptRoot\..\..\Support\CorrectionFixtures.ps1"
 
     # Keep text assertions independent of the host terminal's hyperlink support.
     $PreviousNoHyperlink = $env:NO_HYPERLINK
@@ -334,43 +335,10 @@ Describe 'Start-Nitpicking transactional fixes' {
 
     Context 'findings that require a choice' {
         BeforeEach {
-            $ChoiceRule = {
-                param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
-
-                $Assignment = $ScriptBlockAst.EndBlock.Statements | Select-Object -First 1
-                if (-not $Assignment -or $Assignment.Extent.Text -ne '$Choice = 1') {
-                    return
-                }
-                $Context = if ($Assignment.Extent.File) { $Assignment.Extent.File } else { '<ScriptBlock>' }
-                $Corrections = @(
-                    New-NitpickCorrection `
-                        -ViolationExtent $Assignment.Extent `
-                        -ReplacementText '$Choice = 2' `
-                        -FilePathOrContext $Context `
-                        -Description 'Review replacement' `
-                        -Applicability Review `
-                        -RuleId 'Local/ChoiceRule'
-
-                    New-NitpickCorrection `
-                        -ViolationExtent $Assignment.Extent `
-                        -ReplacementText '$Choice = 3' `
-                        -FilePathOrContext $Context `
-                        -Description 'Unsafe replacement' `
-                        -Applicability Unsafe `
-                        -RuleId 'Local/ChoiceRule'
-                )
-
-                New-NitpickFinding `
-                    -RuleId 'Local/ChoiceRule' `
-                    -Message 'Choice finding' `
-                    -ViolationExtent $Assignment.Extent `
-                    -Severity Warning `
-                    -ScriptPath $Context `
-                    -Corrections $Corrections `
-                    -Explanation 'Offers alternative corrections.'
-            }
-
-            Register-Nitpick -Callable $ChoiceRule -Name ChoiceRule -Source Tests
+            Register-TestAlternativesRule -Name ChoiceRule -Trigger '$Choice = 1' -Alternative @(
+                @{ ReplacementText = '$Choice = 2'; Applicability = 'Review' }
+                @{ ReplacementText = '$Choice = 3'; Applicability = 'Unsafe' }
+            )
             $Path = Join-Path $TestDrive 'Choice.ps1'
             [System.IO.File]::WriteAllText($Path, '$Choice = 1')
         }
