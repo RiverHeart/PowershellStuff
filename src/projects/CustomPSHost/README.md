@@ -2,7 +2,7 @@
 
 This project experiments with custom PSHosts.
 
-The immediate use case for such a thing is output suppression from tests without having to configure that specifically though the need to run the code in a new runspace might make that a no-go.
+The immediate use case for such a thing is output suppression from tests without having to configure that specifically though the need to run the code in a new runspace might make that a no-go. On the other hand, if Pester if called using the runspace with the host then that should work.
 
 ## Reading Material
 

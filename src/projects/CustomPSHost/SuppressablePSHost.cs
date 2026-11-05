@@ -16,12 +16,20 @@ using Foo;
 
 namespace Foo
 {
-    public class SilentPSHostUI : PSHostUserInterface
+    public class SuppressablePSHostUI : PSHostUserInterface
     {
         private readonly PSHostUserInterface _baseUI;
+        public bool AllowStandard { get; set; } = false;
+        public bool AllowWhatIf { get; set; } = false;
+        public bool AllowVerbose { get; set; } = false;
+        public bool AllowWarning { get; set; } = false;
+        public bool AllowError { get; set; } = false;
+        public bool AllowDebug { get; set; } = false;
+        public bool AllowInformation { get; set; } = false;
+        public bool AllowProgress { get; set; } = false;
 
         // Pass the original PSHostUserInterface to forward interactive prompts
-        public SilentPSHostUI(PSHostUserInterface baseUI)
+        public SuppressablePSHostUI(PSHostUserInterface baseUI)
         {
             if (baseUI == null)
             {
@@ -30,22 +38,71 @@ namespace Foo
             this._baseUI = baseUI;
         }
 
+        private bool ShouldWrite(string value)
+        {
+            if (!AllowStandard) return false;
+            if (!AllowWhatIf && value.StartsWith("What if:")) return false;
+            return true;
+        }
 
         // Suppress all output methods
-        public override void Write(string value) { }
-        public override void Write(ConsoleColor foregroundColor, ConsoleColor backgroundColor, string value) { }
-        public override void WriteLine() { }
-        public override void WriteLine(string value) { }
-        public override void WriteLine(ConsoleColor foregroundColor, ConsoleColor backgroundColor, string value) { }
+        public override void Write(string value)
+        {
+            if (ShouldWrite(value)) _baseUI.Write(value);
+        }
+        public override void Write(
+            ConsoleColor foregroundColor,
+            ConsoleColor backgroundColor,
+            string value
+        ) {
+            if (ShouldWrite(value)) {
+                _baseUI.Write(foregroundColor, backgroundColor, value);
+            }
+        }
+        public override void WriteLine()
+        {
+            if (ShouldWrite(string.Empty)) _baseUI.WriteLine();
+        }
+        public override void WriteLine(string value)
+        {
+            if (ShouldWrite(value)) _baseUI.WriteLine(value);
+        }
+        public override void WriteLine(
+            ConsoleColor foregroundColor,
+            ConsoleColor backgroundColor,
+            string value
+        ) {
+            if (ShouldWrite(value)) {
+                _baseUI.WriteLine(foregroundColor, backgroundColor, value);
+            }
+        }
 
 
         // Suppress secondary streams
-        public override void WriteDebugLine(string message) { }
-        public override void WriteErrorLine(string value) { }
-        public override void WriteInformation(InformationRecord record) { }
-        public override void WriteProgress(long sourceId, ProgressRecord progressRecord) { }
-        public override void WriteVerboseLine(string value) { }
-        public override void WriteWarningLine(string value) { }
+        public override void WriteDebugLine(string message)
+        {
+            if (AllowDebug) _baseUI.WriteDebugLine(message);
+        }
+        public override void WriteErrorLine(string value)
+        {
+            if (AllowError) _baseUI.WriteErrorLine(value);
+        }
+        public override void WriteInformation(InformationRecord record)
+        {
+            if (AllowInformation) _baseUI.WriteInformation(record);
+        }
+        public override void WriteProgress(long sourceId, ProgressRecord progressRecord)
+        {
+            if (AllowProgress) _baseUI.WriteProgress(sourceId, progressRecord);
+        }
+        public override void WriteVerboseLine(string value)
+        {
+            if (AllowVerbose) _baseUI.WriteVerboseLine(value);
+        }
+        public override void WriteWarningLine(string value)
+        {
+            if (AllowWarning) _baseUI.WriteWarningLine(value);
+        }
 
 
         // Forward interactive prompts to the base UI
@@ -104,18 +161,18 @@ namespace Foo
     }
 }
 
-public class SilentPSHost : PSHost
+public class SuppressablePSHost : PSHost
 {
     private readonly Guid _id = Guid.NewGuid();
-    private readonly SilentPSHostUI _ui;
+    private readonly SuppressablePSHostUI _ui;
 
-    public SilentPSHost(PSHost host)
+    public SuppressablePSHost(PSHost host)
     {
         if (host == null) throw new ArgumentNullException(nameof(host));
-        _ui = new SilentPSHostUI(host.UI);
+        _ui = new SuppressablePSHostUI(host.UI);
     }
 
-    public override string Name => "SilentPSHost";
+    public override string Name => "SuppressablePSHost";
     public override Version Version => new Version(1, 0);
 
     public override Guid InstanceId => _id;
