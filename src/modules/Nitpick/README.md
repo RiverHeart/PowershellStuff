@@ -29,7 +29,7 @@ C:\path\to\file.ps1
 
 ### Remediation
 
-Nitpick usage is fairly straight forward, point it at a file or scriptblock and it'll begin evaluating.
+Apply automatic fixes to a piece of code.
 
 ```powershell
 Start-Nitpicking -FixMode Apply -Script {
