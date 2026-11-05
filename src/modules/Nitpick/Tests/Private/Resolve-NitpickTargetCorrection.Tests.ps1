@@ -1,4 +1,7 @@
 BeforeAll {
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
+    $env:WHATIF__QUIET = 'True'
+
     Import-Module -Name "$PSScriptRoot\..\..\..\AstEditor\AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot\..\..\Nitpick.psd1" -Force
 
@@ -80,6 +83,7 @@ BeforeAll {
 }
 
 AfterAll {
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -327,36 +331,19 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Fixture = New-TargetCorrectionFixture -Path $Path -RemainingFinding
         $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
         Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        Mock Should-Process -ModuleName Nitpick { $false }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Declined targets must not be saved.' }
 
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            $Command = Get-Command Resolve-NitpickTargetCorrection
 
-            $ShouldProcessCall = $Command.ScriptBlock.Ast.Find({
-                param ($Node)
-                $Node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and
-                    $Node.Member.Value -eq 'ShouldProcess'
-            }, $true)
-
-            # Replace only this invocation's decision, without prompting or changing production code.
-            $Breakpoint = Set-PSBreakpoint -Script $Command.ScriptBlock.File `
-                -Line $ShouldProcessCall.Extent.StartLineNumber -Action {
-                    $Invocation = (Get-Variable -Name PSCmdlet -Scope 1).Value
-                    $Invocation | Add-Member -MemberType ScriptMethod -Name ShouldProcess -Value { $false } -Force
-                }
-
-            try {
-                Resolve-NitpickTargetCorrection `
-                    -Document $Fixture.Document `
-                    -Finding $Fixture.Findings `
-                    -Rule $Fixture.Rules `
-                    -FixMode Apply `
-                    -Confirm:$false
-            } finally {
-                $Breakpoint | Remove-PSBreakpoint
-            }
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -FixMode Apply `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#
@@ -386,6 +373,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
             Should -BeExactly $Before
 
         [System.IO.File]::ReadAllText($Path) | Should -Be $Fixture.Proposal.OriginalText
+        Should -Invoke Should-Process -ModuleName Nitpick -Times 1 -Exactly
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 

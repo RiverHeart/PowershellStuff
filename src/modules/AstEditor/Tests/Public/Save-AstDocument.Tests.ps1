@@ -1,5 +1,6 @@
 BeforeAll {
     Import-Module "$PSScriptRoot\..\..\AstEditor.psd1" -Force
+    $env:WHATIF__QUIET = $true
 }
 
 AfterAll {
@@ -49,8 +50,13 @@ Describe 'Save-AstDocument transactions' {
         $Path = Join-Path $TestDrive 'WhatIf.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         $Document = New-AstDocument -Path $Path
-        $null = Add-AstTextEdit -Document $Document -StartOffset 9 -EndOffset 10 `
-            -ReplacementText '2' -Reason 'Replace value'
+        Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 9 `
+            -EndOffset 10 `
+            -ReplacementText '2' `
+            -Reason 'Replace value' |
+            Out-Null
 
         $Result = Save-AstDocument -Document $Document -WhatIf
 
@@ -64,8 +70,14 @@ Describe 'Save-AstDocument transactions' {
         $Path = Join-Path $TestDrive 'Stale.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1', [System.Text.UTF8Encoding]::new($false))
         $Document = New-AstDocument -Path $Path
-        $null = Add-AstTextEdit -Document $Document -StartOffset 9 -EndOffset 10 `
-            -ReplacementText '2' -Reason 'Replace value'
+        Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 9 `
+            -EndOffset 10 `
+            -ReplacementText '2' `
+            -Reason 'Replace value' |
+            Out-Null
+
         [System.IO.File]::WriteAllText($Path, '$Value = 1', [System.Text.UTF8Encoding]::new($true))
         $Before = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path))
 
@@ -95,8 +107,12 @@ Describe 'Save-AstDocument transactions' {
         $Path = Join-Path $TestDrive 'Invalid.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         $Document = New-AstDocument -Path $Path
-        $null = Add-AstTextEdit -Document $Document -StartOffset 9 -EndOffset 10 `
-            -ReplacementText '(' -Reason 'Invalid replacement'
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 9 `
+            -EndOffset 10 `
+            -ReplacementText '(' `
+            -Reason 'Invalid replacement'
 
         $Result = Save-AstDocument -Document $Document -Confirm:$false
 
@@ -111,8 +127,13 @@ Describe 'Save-AstDocument transactions' {
         $Path = Join-Path $TestDrive 'Failed.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         $Document = New-AstDocument -Path $Path
-        $null = Add-AstTextEdit -Document $Document -StartOffset 9 -EndOffset 10 `
-            -ReplacementText '2' -Reason 'Replace value'
+        Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 9 `
+            -EndOffset 10 `
+            -ReplacementText '2' `
+            -Reason 'Replace value' |
+            Out-Null
 
         Mock Invoke-AstFileReplacement -ModuleName AstEditor {
             throw [System.IO.IOException]::new('Simulated replacement failure.')

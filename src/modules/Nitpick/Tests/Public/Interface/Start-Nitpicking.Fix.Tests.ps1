@@ -8,11 +8,15 @@ BeforeAll {
     $PreviousForceHyperlink = $env:FORCE_HYPERLINK
     $env:NO_HYPERLINK = '1'
     $env:FORCE_HYPERLINK = $null
+
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
+    $env:WHATIF__QUIET = 'True'
 }
 
 AfterAll {
     $env:NO_HYPERLINK = $PreviousNoHyperlink
     $env:FORCE_HYPERLINK = $PreviousForceHyperlink
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
     Remove-Module Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -144,8 +148,13 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
         $Output = @(
-            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Preview `
-                -Output Text -NoSummary -ErrorAction Stop
+            Start-Nitpicking `
+                -Path $Path `
+                -IncludeRule Local/TransactionRule `
+                -FixMode Preview `
+                -Output Text `
+                -NoSummary `
+                -ErrorAction Stop
         ) -join "`n"
 
         $Lines = $Output -split '\r?\n'
@@ -216,8 +225,16 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         Remove-Variable NitpickInvocationContext -Scope Global -ErrorAction SilentlyContinue
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply -WhatIf `
-            -Output Object -NoSummary -ErrorAction Stop)
+        $Results = @(
+            Start-Nitpicking `
+                -Path $Path `
+                -IncludeRule Local/TransactionRule `
+                -FixMode Apply `
+                -WhatIf `
+                -Output Object `
+                -NoSummary `
+                -ErrorAction Stop
+        )
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'WhatIf'

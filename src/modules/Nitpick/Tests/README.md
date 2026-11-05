@@ -10,3 +10,52 @@ to its file extent), and `New-TestPSEditor`/`Set-TestPSEditor`/`Restore-TestPSEd
 recording `$psEditor` fake). Alternatives must be distinct objects because guided
 selection identifies the chosen correction by reference; `Assert-TestCorrectionsDistinct`
 enforces this for hand-built fixtures.
+
+## Suppressing WhatIf
+
+For calls routed through `Should-Process`, set `WHATIF__QUIET` to `'True'` while
+testing `-WhatIf`, and restore its previous value afterward. This suppresses the
+host output while preserving a false decision for WhatIf. Restore the environment
+variable in `AfterAll` when setting it in `BeforeAll` to avoid leaking test state.
+When WhatIf is inactive, quiet mode still honors `-Confirm` and
+`$ConfirmPreference`; it does not automatically approve writes.
+
+Worth documenting, the following code block presents an interesting way of suppressing WhatIf output by overriding the `$PSCmdlet.ShouldProcess` method at runtime using a breakpoint action.
+
+```powershell
+$Breakpoint = Set-PSBreakpoint `
+    -Script $Command.ScriptBlock.File `
+    -Line $ShouldProcessCall.Extent.StartLineNumber `
+    -Action {
+        (Get-Variable -Name PSCmdlet -Scope 1).Value |
+        Add-Member `
+            -MemberType ScriptMethod `
+            -Name ShouldProcess `
+            -Value { $false } -Force
+    }
+
+try {
+    Resolve-NitpickTargetCorrection `
+        -Document $Fixture.Document `
+        -Finding $Fixture.Findings `
+        -Rule $Fixture.Rules `
+        -FixMode Apply `
+        -Confirm:$false
+} finally {
+    $Breakpoint | Remove-PSBreakpoint
+}
+```
+
+## Simulating a declined confirmation
+
+Quiet WhatIf and a declined confirmation are different cases. `-Confirm:$false`
+disables confirmation prompts; it does not decline an operation. Mock the wrapper
+to return false when testing a decline without `-WhatIf`:
+
+```powershell
+Mock Should-Process -ModuleName Nitpick { $false }
+```
+
+This replaces the breakpoint that previously overrode `$PSCmdlet.ShouldProcess`.
+Keep WhatIf tests unmocked so they exercise the wrapper's WhatIf behavior.
+

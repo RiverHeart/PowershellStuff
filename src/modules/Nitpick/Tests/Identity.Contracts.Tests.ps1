@@ -16,17 +16,32 @@ BeforeAll {
             $Assignment = $ScriptBlockAst.EndBlock.Statements[0]
             $Corrections = @(
                 if ($Assignment.Extent.Text -eq '$Value = 1') {
-                    New-NitpickCorrection -ViolationExtent $Assignment.Extent `
-                        -ReplacementText $Replacement -FilePathOrContext '<ScriptBlock>' `
-                        -Description 'Replace assignment' -RuleId 'WrongOwner/WrongCorrection'
+                    New-NitpickCorrection `
+                        -ViolationExtent $Assignment.Extent `
+                        -ReplacementText $Replacement `
+                        -FilePathOrContext '<ScriptBlock>' `
+                        -Description 'Replace assignment' `
+                        -RuleId 'WrongOwner/WrongCorrection'
                 }
             )
-            $Finding = New-NitpickFinding -RuleId 'WrongOwner/WrongFinding' `
-                -Message 'Assignment finding' -Severity Information -ViolationExtent $Assignment.Extent `
-                -ScriptPath '<ScriptBlock>' -Explanation 'Identity contract' -Corrections $Corrections
-            $Finding
+
+            $Finding = New-NitpickFinding `
+                -RuleId 'WrongOwner/WrongFinding' `
+                -Message 'Assignment finding' `
+                -Severity Information `
+                -ViolationExtent $Assignment.Extent `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'Identity contract' `
+                -Corrections $Corrections
+
+            Write-Output $Finding
         }.GetNewClosure()
-        New-Nitpick -Callable $Producer -Name AssignmentStyle -Namespace $Namespace -Source Tests
+
+        New-Nitpick `
+            -Callable $Producer `
+            -Name AssignmentStyle `
+            -Namespace $Namespace `
+            -Source Tests
     }
 }
 
@@ -125,11 +140,15 @@ Describe 'Native execution identity contracts' {
         Register-Nitpick -Callable (New-IdentityContractRule)
         $Path = Join-Path $TestDrive "$Status.ps1"
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
+
         $Parameters = @{
             IncludeRule = 'Local/AssignmentStyle'; Output = 'Object'
             FixMode = if ($Preview) { 'Preview' } else { 'Apply' }
-            WhatIf = $WhatIf; Confirm = $false; ErrorAction = 'Stop'
+            WhatIf = $WhatIf
+            Confirm = $false
+            ErrorAction = 'Stop'
         }
+
         if ($ScriptInput) { $Parameters.Script = '$Value = 1' } else { $Parameters.Path = $Path }
         $Output = @(Start-Nitpicking @Parameters)
         $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
@@ -139,10 +158,12 @@ Describe 'Native execution identity contracts' {
         $Result.Proposal.OriginalFindings | Should -HaveCount 1
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
         $Result.Proposal.AcceptedCorrections | Should -HaveCount 1
+
         foreach ($Finding in @($Result.Proposal.OriginalFindings) + @($Result.Proposal.CandidateFindings) +
             @($Result.Report.EffectiveFindings) + @($Result.Report.FindingsWithAppliedCorrections)) {
             $Finding.RuleId | Should -Be 'Local/AssignmentStyle'
         }
+
         $Result.Proposal.AcceptedCorrections[0].RuleId | Should -Be 'Local/AssignmentStyle'
         [object]::ReferenceEquals(
             $Result.Proposal.AcceptedCorrections[0],
@@ -157,6 +178,7 @@ Describe 'Native execution identity contracts' {
                 $Result.Application.AppliedCorrections[0],
                 $Result.Proposal.AcceptedCorrections[0]
             ) | Should -BeTrue
+
             $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 1
         } else {
             $Result.Application.AppliedCorrections | Should -HaveCount 0
@@ -174,8 +196,14 @@ Describe 'Native execution identity contracts' {
             New-IdentityContractRule -Namespace Second -Replacement '$Value = 3'
         )
         $Rules | Register-Nitpick
-        $Output = @(Start-Nitpicking -Script '$Value = 1' -IncludeRule '*/AssignmentStyle' `
-            -FixMode Apply -Output Object -Verbose 4>&1)
+        $Output = @(
+            Start-Nitpicking `
+            -Script '$Value = 1' `
+            -IncludeRule '*/AssignmentStyle' `
+            -FixMode Apply `
+            -Output Object `
+            -Verbose 4>&1
+        )
         $Result = $Output | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.Status | Should -Be Rejected
         $Result.Proposal.Conflicts | Should -HaveCount 1
