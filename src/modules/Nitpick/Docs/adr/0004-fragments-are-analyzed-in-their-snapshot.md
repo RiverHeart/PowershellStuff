@@ -10,6 +10,6 @@ A fragment target (a scriptblock or AST node submitted via `-Script`) was repars
 
 - A fragment's snapshot may be far larger than the fragment; it is context, never a write target. `IsFileBacked` remains the sole write gate and is only set by `-Path`.
 - Effective text returned to callers is the fragment's slice, not the snapshot; diff and reanalysis operate on the snapshot so a second analysis pass keeps absolute coordinates.
-- `GetSourcePosition`, `SourceExtent`, `HasSourceProvenance`, `SourceLabel`, and the `FixMode Off` fork are retired once no consumer remains.
+- `GetSourcePosition`, `SourceExtent`, `HasSourceProvenance`, `SourceLabel`, and the `FixMode Off` fork are retired; no coordinate-translation consumer remains.
 - The snapshot is the parse-time text; later edits to the file on disk are not tracked, so editor navigation may land on stale lines. This was already true and is accepted.
 - `Start-Nitpicking -Script` strings and `[scriptblock]::Create()` input have no host, so their snapshot equals the fragment and their behavior is unchanged.

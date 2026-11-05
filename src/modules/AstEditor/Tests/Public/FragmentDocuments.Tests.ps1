@@ -105,7 +105,6 @@ Describe 'Snapshot-backed fragment documents' {
         $Document.Ast.Extent.StartLineNumber | Should -Be 1
         $Document.Ast.Extent.StartColumnNumber | Should -Be 26
         $Document.Ast.Extent.File | Should -BeNullOrEmpty
-        $Document.HasSourceProvenance() | Should -BeFalse
         $Document.OriginalText | Should -BeExactly $Text
         (Resolve-AstDocument -Document $Document -PassThruText).RenderedFragmentText |
             Should -BeExactly '{ $Value = 1 }'

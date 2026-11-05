@@ -25,8 +25,6 @@ using namespace System.Management.Automation.Language
     only errors positioned strictly before the fragment start; Root.ParseErrors
     contains every snapshot error. No render-validation errors are filtered.
     When GetFullScript() is null, extent text is parsed as standalone input.
-    SourceExtent, HasSourceProvenance, and GetSourcePosition are transitional APIs;
-    GetSourcePosition now looks up a snapshot offset without shifting it.
     Strings have no inferred call-site provenance.
 
 .EXAMPLE

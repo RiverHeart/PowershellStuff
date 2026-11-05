@@ -99,7 +99,8 @@ Describe 'New-AstDocument' {
         $Overlay.IsFragment | Should -BeTrue
         $Overlay.Path | Should -Be '<memory>'
         $Overlay.IsFileBacked | Should -BeFalse
-        [object]::ReferenceEquals($Overlay.SourceExtent, $Nested.Extent) | Should -BeTrue
+        $Overlay.Root.Ast.Extent.Text | Should -BeExactly $Text
+        [object]::ReferenceEquals($Overlay.Ast, $Overlay.Root.Ast) | Should -BeFalse
         $Assignment = $Overlay.Ast.Find({
             param($Node)
             $Node -is [AssignmentStatementAst]
@@ -124,7 +125,7 @@ Describe 'New-AstDocument' {
         $Overlay.OriginalText | Should -BeExactly $Text
     }
 
-    It 'maps fragment boundaries and assignments to original coordinates: <Label>' -ForEach @(
+    It 'preserves original coordinates on fragment boundaries and assignments: <Label>' -ForEach @(
         @{ Label = 'same-line LF'; NewLine = "`n"; Body = ' $Value = 1 ' }
         @{ Label = 'same-line CRLF'; NewLine = "`r`n"; Body = ' $Value = 1 ' }
         @{ Label = 'multiline LF'; NewLine = "`n"; Body = "`n`t`$Value = 1`n" }
@@ -146,38 +147,39 @@ Describe 'New-AstDocument' {
 
         foreach ($Input in @($Nested, $Nested.GetScriptBlock())) {
             $Overlay = New-AstDocument -InputObject $Input
-            $LocalAssignment = $Overlay.Ast.Find({
+            $Assignment = $Overlay.Ast.Find({
                 param($Node)
                 $Node -is [AssignmentStatementAst]
             }, $true)
 
             foreach ($Pair in @(
-                @{ Local = $Nested.Extent.StartOffset; Original = $Nested.Extent.StartScriptPosition }
-                @{ Local = $LocalAssignment.Extent.StartOffset; Original = $OriginalAssignment.Extent.StartScriptPosition }
-                @{ Local = $Nested.Extent.EndOffset; Original = $Nested.Extent.EndScriptPosition }
+                @{ Actual = $Overlay.Ast.Extent.StartScriptPosition; Original = $Nested.Extent.StartScriptPosition }
+                @{ Actual = $Assignment.Extent.StartScriptPosition; Original = $OriginalAssignment.Extent.StartScriptPosition }
+                @{ Actual = $Overlay.Ast.Extent.EndScriptPosition; Original = $Nested.Extent.EndScriptPosition }
             )) {
-                $Position = $Overlay.GetSourcePosition($Pair.Local)
-                $Position.Path | Should -Be $Path
-                $Position.Offset | Should -Be $Pair.Original.Offset
-                $Position.LineNumber | Should -Be $Pair.Original.LineNumber
-                $Position.ColumnNumber | Should -Be $Pair.Original.ColumnNumber
+                $Pair.Actual.File | Should -Be $Path
+                $Pair.Actual.Offset | Should -Be $Pair.Original.Offset
+                $Pair.Actual.LineNumber | Should -Be $Pair.Original.LineNumber
+                $Pair.Actual.ColumnNumber | Should -Be $Pair.Original.ColumnNumber
             }
             $Overlay.IsFileBacked | Should -BeFalse
         }
     }
 
-    It 'maps string inputs locally without inventing source provenance' {
+    It 'keeps string input coordinates without inventing source provenance' {
         $Overlay = New-AstDocument -InputObject "`$Value = 1`n`t`$Other = 2"
-        $Position = $Overlay.GetSourcePosition(12)
+        $Assignment = @($Overlay.Ast.FindAll({
+            param($Node)
+            $Node -is [AssignmentStatementAst]
+        }, $true))[1]
+        $Position = $Assignment.Extent.StartScriptPosition
 
-        $Overlay.SourceExtent | Should -BeNullOrEmpty
-        $Position.Path | Should -Be '<memory>'
+        $Position.File | Should -BeNullOrEmpty
         $Position.Offset | Should -Be 12
         $Position.LineNumber | Should -Be 2
         $Position.ColumnNumber | Should -Be 2
-        { $Overlay.GetSourcePosition(-1) } | Should -Throw '*within the original document*'
-        { $Overlay.GetSourcePosition($Overlay.OriginalText.Length + 1) } |
-            Should -Throw '*within the original document*'
+        $Overlay.IsFragment | Should -BeFalse
+        [object]::ReferenceEquals($Overlay.Ast, $Overlay.Root.Ast) | Should -BeTrue
     }
 
     It 'returns an existing AstDocument without coercing or reparsing it' {

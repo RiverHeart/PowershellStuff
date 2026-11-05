@@ -1,6 +1,6 @@
 # Plan: Snapshot-absolute coordinates for fragment targets
 
-Status: **snapshot-backed implementation and Nitpick integration complete; compatibility cleanup pending.**
+Status: **implementation and compatibility cleanup complete.**
 Decision record: [ADR 0004](adr/0004-fragments-are-analyzed-in-their-snapshot.md).
 Terms (fragment, snapshot, target, effective text) are defined in [CONTEXT.md](../CONTEXT.md)
 and used here with those meanings. Avoid "scope" — this plan originally used it for what
@@ -45,10 +45,10 @@ Consequences before implementation:
   `Start-Nitpicking` passes the original AST to rules when `FixMode -eq 'Off'` but the
   reparsed `Document.Ast` otherwise (the former fix-mode fork in
   [Start-Nitpicking.ps1](../Public/Interface/Start-Nitpicking.ps1)).
-- A mapping layer exists solely to undo the reparse: `AstDocument.SourceExtent`,
+- A mapping layer existed solely to undo the reparse: `AstDocument.SourceExtent`,
   `HasSourceProvenance()`, `GetSourcePosition(offset)` in
   [AstEditor.psm1](../../AstEditor/AstEditor.psm1); `Proposal.SourcePath`;
-  `Format-NitpickText -SourceLabel`; the `Get-TestSourceExtent` test helper. It works for
+  `Format-NitpickText -SourceLabel`; the `Get-TestSourceExtent` test helper. It worked for
   guided navigation but every new consumer must know whether an offset is fragment-local
   or snapshot-absolute, and passing the wrong kind double-shifts silently.
 
@@ -264,36 +264,36 @@ matches PowerShell's own error positions. Nothing to navigate to; nothing to spe
 
 ## Implementation checkpoint
 
-- Steps 1–3 below are implemented together, including typed `Root`, confined edits,
+- Steps 1–3 below were implemented together, including typed `Root`, confined edits,
   fragment-only effective text, source-preserving reanalysis, and the two-line header.
 - Full validation passed on PowerShell 7 and Windows PowerShell 5.1:
-  AstEditor **206/206** on each; Nitpick **612/612** on PowerShell 7 and **610/610**
+  AstEditor **206/206** on each; Nitpick **626/626** on PowerShell 7 and **624/624**
   on Windows PowerShell 5.1.
-- Compatibility cleanup remains: `SourceExtent`, `HasSourceProvenance()`,
-  `GetSourcePosition()`, and their remaining tests/fixtures. Nitpick no longer needs
-  coordinate translation; the retained lookup is an identity lookup.
+- Compatibility cleanup is complete: `SourceExtent`, `HasSourceProvenance()`,
+  `GetSourcePosition()`, and `Get-TestSourceExtent` are removed. Tests compare
+  source extents directly; no coordinate-translation consumer or helper remains.
 - Automated tests verify header shape and OSC 8 destinations. Actual terminal
   click-through from edge case 21 remains a manual check.
 
-## Removal checklist (after the above lands)
+## Completed removal checklist
 
-- `AstDocument.SourceExtent`, `HasSourceProvenance()`, `GetSourcePosition()` and their
+- [x] `AstDocument.SourceExtent`, `HasSourceProvenance()`, `GetSourcePosition()` and their
   README paragraph in [AstEditor/README.md](../../AstEditor/README.md); the pointer
   comment above them in `AstEditor.psm1`.
-- `Format-NitpickText -SourceLabel` and the `$SourceLabel` block in `Start-Nitpicking`.
-- `GetSourcePosition` usage in `Select-NitpickGuidedCorrection`.
-- `Get-TestSourceExtent` in `Tests/Support/CorrectionFixtures.ps1` (keep
-  `New-TestSourceDocument -Nested`; it becomes the primary fixture for these tests).
-- Tests in `AstEditor/Tests/Public/New-AstDocument.Tests.ps1` that assert
+- [x] `Format-NitpickText -SourceLabel` and the `$SourceLabel` block in `Start-Nitpicking`.
+- [x] `GetSourcePosition` usage in `Select-NitpickGuidedCorrection`.
+- [x] `Get-TestSourceExtent` in `Tests/Support/CorrectionFixtures.ps1` (keep
+  `New-TestSourceDocument -Kind Nested` as a source-backed fragment fixture).
+- [x] Tests in `AstEditor/Tests/Public/New-AstDocument.Tests.ps1` that assert
   fragment-local coordinates or `SourceExtent` reference identity; replace with
   assertions on `Root.Ast`/`IsFragment` and absolute `Extent.File`/line numbers.
-- README "Guided navigation" paragraph in [Nitpick/README.md](../README.md) about
+- [x] README "Guided navigation" paragraph in [Nitpick/README.md](../README.md) about
   fragment-local previews.
-- The fragment-coordinates paragraph in `MaintainerNotes.md` (it describes the
+- [x] The fragment-coordinates paragraph in `MaintainerNotes.md` (it described the
   limitation this plan removes).
-- `New-AstDocument` help text describing fragment-local reparse.
+- [x] `New-AstDocument` help text describing fragment-local reparse.
 
-## Suggested order
+## Implementation order (completed)
 
 Steps 1 and 2 (including the header/navigation wiring from step 3) must land together.
 Keeping `GetSourcePosition` as an identity lookup does not preserve old Nitpick
@@ -303,8 +303,8 @@ the host rather than the fragment. This was confirmed by targeted integration te
 1. AstEditor: snapshot parse + typed `Root`/`IsFragment` (D10) + `Tokens`/`Root.Tokens` (D9) +
    file-name-as-provenance + D5 fallback/mismatch/depth + `OutsideTarget` check +
    `RenderedFragmentText` + target-level `ParseErrors`, with `New-AstDocument` tests for the
-   table above and edge cases 9–14, 16–17, 19, 24. Keep `GetSourcePosition` working
-   as an identity lookup until its remaining compatibility tests and fixtures migrate.
+   table above and edge cases 9–14, 16–17, 19, 24–25. `GetSourcePosition` was retained
+   temporarily as an identity lookup until the compatibility tests and fixtures migrated.
 2. Nitpick: rules on `Document.Ast`; delete the `FixMode -eq 'Off'` fork;
    `OutsideTarget` skip reason; D6 reanalysis with file name; D2 `*FragmentText` and
    `EffectiveText` slicing; D4/D10 `ParseErrors`; D8 leave `$TargetPath` alone.

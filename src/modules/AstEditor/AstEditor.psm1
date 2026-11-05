@@ -108,7 +108,6 @@ class AstDocument {
     [Ast] $Ast
     [AstParseData] $Root = [AstParseData]::new()
     [bool] $IsFragment
-    [IScriptExtent] $SourceExtent
     [Token[]] $Tokens
     [ParseError[]] $ParseErrors
     [List[AstTextEdit]] $Edits = [List[AstTextEdit]]::new()
@@ -136,7 +135,6 @@ class AstDocument {
         [string] $Text
     ) {
         $this.Init($Path, $Text, $Path)
-        $this.SourceExtent = $this.Ast.Extent
     }
 
     hidden [void] InitFromAst([Ast] $InputAst) {
@@ -163,7 +161,6 @@ class AstDocument {
                 })
             }
         }
-        $this.SourceExtent = $Extent
     }
 
     hidden [Token[]] GetFragmentTokens([Token[]] $SourceTokens) {
@@ -243,31 +240,6 @@ class AstDocument {
         $this.Root.ParseErrors = $Errors
         $this.ParseErrors = $this.Root.ParseErrors
         $this.NewLineSequence = if ($this.OriginalText.Contains("`r`n")) { "`r`n" } else { "`n" }
-    }
-
-    # Transitional APIs retained until Nitpick consumes snapshot coordinates directly.
-    [bool] HasSourceProvenance() {
-        return $null -ne $this.SourceExtent -and -not [string]::IsNullOrEmpty($this.SourceExtent.File)
-    }
-
-    # Offsets are already snapshot-absolute; only line/column lookup remains.
-    [hashtable] GetSourcePosition([int] $Offset) {
-        if ($Offset -lt 0 -or $Offset -gt $this.OriginalText.Length) {
-            throw [ArgumentOutOfRangeException]::new('Offset', 'Offset must be within the original document text.')
-        }
-
-        $Prefix = $this.OriginalText.Substring(0, $Offset)
-        $LineNumber = [regex]::Matches($Prefix, "`n").Count + 1
-        $ColumnNumber = $Offset - $Prefix.LastIndexOf("`n")
-        $SourceOffset = $Offset
-        $SourcePath = if ($this.Ast.Extent.File) { $this.Ast.Extent.File } else { '<memory>' }
-
-        return @{
-            Path = $SourcePath
-            Offset = $SourceOffset
-            LineNumber = $LineNumber
-            ColumnNumber = $ColumnNumber
-        }
     }
 
     hidden [void] ValidateEditTarget([AstTextEdit] $Edit) {
@@ -532,7 +504,6 @@ if ($Manifest.AliasesToExport.Count -gt 0) {
 }
 
 Export-ModuleMember @ExportParams
-
 
 
 

@@ -181,9 +181,15 @@ Describe 'Correction fixture invariants' {
         $Fixture = New-TestSourceDocument -Kind $Kind
 
         $Fixture.Document.IsFileBacked | Should -Be $FileBacked
-        $Fixture.Document.HasSourceProvenance() | Should -Be $Provenance
+        if ($Provenance) {
+            $Fixture.Document.Ast.Extent.File | Should -Be $Fixture.Path
+        } else {
+            $Fixture.Document.Ast.Extent.File | Should -BeNullOrEmpty
+        }
         if ($Kind -eq 'Nested') {
-            $Fixture.Document.SourceExtent.StartLineNumber | Should -Be 2
+            $Fixture.Document.Ast.Extent.StartLineNumber | Should -Be 2
+            $Fixture.Document.IsFragment | Should -BeTrue
+            $Fixture.Document.Root.Ast.Extent.Text | Should -BeExactly $Fixture.FileText
             $Fixture.FragmentAst | Should -Not -BeNullOrEmpty
         }
     }

@@ -71,9 +71,8 @@ ScriptBlock and AST inputs remain in-memory documents (`Path = '<memory>'`,
 `IsFileBacked = false`), even when their extents identify a file. Parser file names
 are provenance, not save targets; only `-Path` captures a transactional file snapshot.
 The source is not reread from disk, so later disk changes can make navigation stale.
-`SourceExtent` and `HasSourceProvenance()` remain temporarily for compatibility cleanup.
-`GetSourcePosition(offset)` now looks up a snapshot offset's path and one-based
-line/column without shifting it. It applies to the original snapshot, not rendered text.
+Use AST and token extents directly for source paths and one-based line/column positions;
+no coordinate translation is needed.
 
 `Resolve-AstDocument -PassThruText` returns the complete rendered snapshot as
 `RenderedText` and the submitted fragment's slice as `RenderedFragmentText`; they are

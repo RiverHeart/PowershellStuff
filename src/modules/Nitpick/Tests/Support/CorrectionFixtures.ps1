@@ -32,7 +32,7 @@ using namespace System.Management.Automation.Language
 .PARAMETER Kind
     File: a file-backed document (IsFileBacked, Path = file).
     Nested: an in-memory document parsed from a ScriptBlockAst found inside a file,
-    so SourceExtent carries the file and a line/column offset.
+    whose extents retain snapshot-absolute file and line/column positions.
     String: an in-memory document with no provenance.
 
 .PARAMETER Prefix
@@ -44,8 +44,8 @@ using namespace System.Management.Automation.Language
 
 .EXAMPLE
     $Fixture = New-TestSourceDocument -Kind Nested
-    $Fixture.Document.HasSourceProvenance()  # True
-    $Fixture.Document.IsFileBacked           # False
+    $Fixture.Document.Ast.Extent.File  # Source file, not a save target
+    $Fixture.Document.IsFileBacked    # False
 #>
 function New-TestSourceDocument {
     [CmdletBinding()]
@@ -106,42 +106,6 @@ function New-TestSourceDocument {
     }
 
     return $Fixture
-}
-
-<#
-.SYNOPSIS
-    Finds the extent of a document-local violation in the original source file.
-
-.DESCRIPTION
-    Document findings on Nested fixtures carry fragment-local coordinates. This
-    returns the matching node's extent from the file's root AST so tests can assert
-    navigation against true source positions.
-
-.EXAMPLE
-    $Extent = Get-TestSourceExtent -Fixture $Fixture -Finding $Finding
-    $Extent.StartLineNumber  # file line, not fragment line
-#>
-function Get-TestSourceExtent {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory)]
-        [psobject] $Fixture,
-
-        [Parameter(Mandatory)]
-        [psobject] $Finding
-    )
-
-    if (-not $Fixture.RootAst) {
-        throw "Fixture kind '$($Fixture.Kind)' has no source file to map against."
-    }
-
-    $Text = $Finding.ViolationExtent.Text
-    $Node = $Fixture.RootAst.Find({ param($Node) $Node.Extent.Text -ceq $Text }, $true)
-    if (-not $Node) {
-        throw "No node in the source file matches the violation text '$Text'."
-    }
-
-    return $Node.Extent
 }
 
 <#

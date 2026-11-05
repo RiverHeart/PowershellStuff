@@ -39,7 +39,14 @@ Describe 'Select-NitpickGuidedCorrection' {
     ) {
         $Fixture = New-TestSourceDocument -Kind $Kind
         $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', 'Unsafe'
-        $Original = Get-TestSourceExtent -Fixture $Fixture -Finding $Finding
+        $Original = $Fixture.RootAst.Find({
+            param($Node)
+            $Node -is [System.Management.Automation.Language.NamedAttributeArgumentAst] -and
+            $Node.ArgumentName -eq 'Mandatory'
+        }, $true).Extent
+        $Original | Should -Not -BeNullOrEmpty
+        $Finding.ViolationExtent.StartOffset | Should -Be $Original.StartOffset
+        $Finding.ViolationExtent.EndOffset | Should -Be $Original.EndOffset
         $Answers.Enqueue('0')
 
         $Chosen = Invoke-GuidedSelection $Fixture $Finding
