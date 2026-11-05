@@ -782,8 +782,37 @@ foreach ($Path in $Paths) {
 }
 
 
-# Register built-in rules
-# Get-ChildItem -Path "$ModuleRoot/Public/Rules" -Recurse -Filter '*.ps1' |
-#     ForEach-Object {
-#         Register-Nitpick -
-#     }
+# MARK: EXPORTS
+#
+# Prevent `Should-Process` from triggering invalid verb warning because
+# `Import-Module` uses everything by default if `Export-ModuleMember` is
+# not specified even if the manifest gets applied afterwards. Don't feel
+# like aliasing `Should-Process` to avoid the invalid verb warning.
+#
+# Powershell module loading is so unnecessarily bad...
+$ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'Nitpick.psd1'
+if (-not (Test-Path -Path $ManifestPath)) {
+    throw "Module manifest not found at '$ManifestPath'."
+}
+
+try {
+    $Manifest = Import-PowerShellDataFile -LiteralPath $ManifestPath -ErrorAction Stop
+} catch {
+    throw "Failed to load module manifest '$ManifestPath'. Error: $_"
+}
+
+$ExportParams = @{}
+if ($Manifest.FunctionsToExport.Count -gt 0) {
+    $ExportParams.Function = $Manifest.FunctionsToExport
+}
+if ($Manifest.CmdletsToExport.Count -gt 0) {
+    $ExportParams.Cmdlet = $Manifest.CmdletsToExport
+}
+if ($Manifest.VariablesToExport.Count -gt 0) {
+    $ExportParams.Variable = $Manifest.VariablesToExport
+}
+if ($Manifest.AliasesToExport.Count -gt 0) {
+    $ExportParams.Alias = $Manifest.AliasesToExport
+}
+
+Export-ModuleMember @ExportParams
