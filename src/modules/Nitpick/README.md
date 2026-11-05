@@ -1,8 +1,35 @@
 # Nitpick
 
-Nitpick is a Powershell based linter that seeks to replace ScriptAnalyzer. It focuses on rule authoring in Powershell and improving the developer experience.
+Nitpick is a Powershell based linter that seeks to replace ScriptAnalyzer (if for no one but myself). It focuses on rule authoring in Powershell and improving the developer experience.
 
-## Example
+## Examples
+
+### Analysis
+
+Analyze a given piece of code for violations.
+
+```powershell
+Start-Nitpicking -Script {
+    param([Parameter(Mandatory=$true)] $MyParam)
+}
+```
+
+The resulting output starts by identifying the lines that were considered. The filepath is followed up by each finding from that file. Those findings are formatted as `N:M severity Description RuleName`. An uninterrupted filepath followed by `N:M` at the start of each line allows VSCode to mark them lines as hyperlinks to the violation area.
+
+Finally, the number of findings, their severity, the number of files evaluated, and the time taken to do so is listed.
+
+**Output**
+```
+(fragment, lines 8-10)
+C:\path\to\file.ps1
+  9:26  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool
+
+1 finding (1 information) across 1 target in 39 ms
+```
+
+### Remediation
+
+Nitpick usage is fairly straight forward, point it at a file or scriptblock and it'll begin evaluating.
 
 ```powershell
 Start-Nitpicking -FixMode Apply -Script {
@@ -10,17 +37,22 @@ Start-Nitpicking -FixMode Apply -Script {
 }
 ```
 
+The resulting output starts by identifying the lines that were considered. The filepath is followed up by the correction applied to each finding. Those corrections are formatted as `N:M Description`. An uninterrupted filepath followed by `N:M` at the start of each line allows VSCode to mark them lines as hyperlinks to the violation area. A diff is presented that highlights the change area. A note is made that the change was made in memory because a scriptblock is not backed by a file even though it appears in one.
+
+Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
+
 **Output**
 ```plaintext
-<ScriptBlock>
-  2:35  Use '[Parameter(Mandatory)]' instead of assigning it $true.
-    2 | -         param([Parameter(Mandatory=$true)] $MyParam)
-      |                                     ^^^^^^
-      | +         param([Parameter(Mandatory)] $MyParam)
+(fragment, lines 8-10)
+C:\path\to\file.ps1
+  9:35  Use '[Parameter(Mandatory)]' instead of assigning it $true.
+     9 | -         param([Parameter(Mandatory=$true)] $MyParam)
+       |                                     ^^^^^^
+       | +         param([Parameter(Mandatory)] $MyParam)
 
   1 correction applied in memory.
 
-1 finding (1 information; 1 corrected, 0 unresolved) across 1 target in 112 ms
+1 finding (1 information; 1 corrected, 0 unresolved) across 1 target in 510 ms
 ```
 
 ## Guided navigation
