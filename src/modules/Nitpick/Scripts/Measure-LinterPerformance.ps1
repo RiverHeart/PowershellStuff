@@ -67,7 +67,8 @@ function Get-FindingKey {
     param([object] $Finding)
 
     $Extent = if ($Finding.ViolationExtent) { $Finding.ViolationExtent } else { $Finding.Extent }
-    '{0}|{1}|{2}|{3}|{4}|{5}' -f $Extent.File, $Finding.RuleName, $Finding.Severity,
+    $RuleId = if ($Finding.RuleId) { $Finding.RuleId } else { "Nitpick/$($Finding.RuleName)" }
+    '{0}|{1}|{2}|{3}|{4}|{5}' -f $Extent.File, $RuleId, $Finding.Severity,
         $Extent.StartOffset, $Extent.EndOffset, $Finding.Message
 }
 
@@ -123,7 +124,7 @@ try {
 
     $Native = @(Invoke-Engine -Engine Nitpick -Rule UseIsNotOperator -Path $CorpusRoot)
     $Analyzer = @(Invoke-Engine -Engine ScriptAnalyzer -Rule UseIsNotOperator -Path $CorpusRoot)
-    $NativeKeys = @($Native | Where-Object RuleName -eq UseIsNotOperator | ForEach-Object { Get-FindingKey $_ })
+    $NativeKeys = @($Native | Where-Object RuleId -eq 'Nitpick/UseIsNotOperator' | ForEach-Object { Get-FindingKey $_ })
     $AnalyzerKeys = @($Analyzer | Where-Object RuleName -eq UseIsNotOperator | ForEach-Object { Get-FindingKey $_ })
     $NativeSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($Key in $NativeKeys) { [void] $NativeSet.Add($Key) }
@@ -201,7 +202,7 @@ try {
     if (-not $PreviewUnchanged -or $Applied.Application.Status -ne 'Written' -or
         $Second.Proposal.Status -ne 'NoChanges' -or -not $BytesPreserved -or
         $Applied.Report.EffectiveFindings.Count -ne 0 -or
-        $Applied.Report.FindingsWithCommittedCorrections.Count -ne 1) {
+        $Applied.Report.FindingsWithAppliedCorrections.Count -ne 1) {
         throw 'Preview/apply/idempotence checks failed.'
     }
 
@@ -216,7 +217,7 @@ try {
             Bytes = $Bytes
             NitpickRuleFindings = $NativeKeys.Count
             ScriptAnalyzerRuleFindings = $AnalyzerKeys.Count
-            NativeParseErrors = @($Native | Where-Object RuleName -eq PowerShellParseError).Count
+            NativeParseErrors = @($Native | Where-Object RuleId -eq 'Nitpick/PowerShellParseError').Count
             ScriptAnalyzerParseErrors = @($Analyzer | Where-Object RuleName -eq ParseError).Count
             MissingFromNitpick = @($AnalyzerSet | Where-Object { -not $NativeSet.Contains($_) }).Count
             OnlyInNitpick = @($NativeSet | Where-Object { -not $AnalyzerSet.Contains($_) }).Count
@@ -228,7 +229,7 @@ try {
             BytesPreserved = $BytesPreserved
             Applied = $Applied.Application.Status -eq 'Written'
             AcceptedEdits = $Preview.Proposal.AcceptedCorrections.Count
-            FindingsWithCommittedCorrections = $Applied.Report.FindingsWithCommittedCorrections.Count
+            FindingsWithAppliedCorrections = $Applied.Report.FindingsWithAppliedCorrections.Count
             RemainingFindings = $Applied.Report.EffectiveFindings.Count
             SecondRun = $Second.Proposal.Status
             EffectiveText = $Applied.Report.EffectiveText

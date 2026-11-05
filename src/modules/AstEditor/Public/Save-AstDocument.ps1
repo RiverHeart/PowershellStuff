@@ -73,7 +73,7 @@ function Save-AstDocument {
             Get-AstSourceFingerprint -Path $TargetPath
         }
 
-        if (-not $PSCmdlet.ShouldProcess($TargetPath, 'Write rendered AST overlay output')) {
+        if (-not (Should-Process $TargetPath 'Write rendered AST overlay output')) {
             $Result.WriteStatus = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
             return $Result
         }
@@ -87,6 +87,7 @@ function Save-AstDocument {
             $TemporaryPath, [FileMode]::CreateNew, [FileAccess]::Write, [FileShare]::None
         )
         $OwnsTemporaryFile = $true
+
         try {
             $Stream.Write($Preamble, 0, $Preamble.Length)
             $Stream.Write($Content, 0, $Content.Length)
@@ -95,17 +96,19 @@ function Save-AstDocument {
             $Stream.Dispose()
         }
 
-        if ($Document.IsFileBacked -and
-            (-not [File]::Exists($Document.Path) -or
-            (Get-AstSourceFingerprint -Path $Document.Path) -cne $Document.OriginalFingerprint)
+        if ($Document.IsFileBacked -and (
+                -not [File]::Exists($Document.Path) -or
+                (Get-AstSourceFingerprint -Path $Document.Path) -cne $Document.OriginalFingerprint
+            )
         ) {
             $Result.WriteStatus = 'StaleSource'
             throw [IOException]::new('The source file changed after the document snapshot was created.')
         }
 
-        if ([File]::Exists($TargetPath) -ne $TargetExists -or
-            ($TargetExists -and
-            (Get-AstSourceFingerprint -Path $TargetPath) -cne $TargetFingerprint)
+        if ([File]::Exists($TargetPath) -ne $TargetExists -or (
+                $TargetExists -and
+                (Get-AstSourceFingerprint -Path $TargetPath) -cne $TargetFingerprint
+            )
         ) {
             $Result.WriteStatus = 'StaleTarget'
             throw [IOException]::new('The destination file changed before the transaction could commit.')

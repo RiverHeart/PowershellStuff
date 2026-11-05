@@ -1,3 +1,8 @@
+using namespace System
+using namespace System.Collections.Generic
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Host
+
 <#
 .SYNOPSIS
     Runs Pester tests with compact, failure-focused output using suite configuration.
@@ -28,7 +33,9 @@
 
 .PARAMETER Path
     Optional test paths to run instead of the paths configured by the suite. Relative paths
-    are resolved from the directory containing the suite configuration.
+    are resolved from the directory containing the suite configuration. Each entry may also
+    contain comma-separated paths, which is required when launching the script with
+    `powershell.exe -File`, because that host does not parse `-Path a, b` as an array.
 
 .PARAMETER ListSuites
     Lists configured test suites and exits.
@@ -55,8 +62,9 @@
     Returns the full Pester result object after printing the summary.
 
 .PARAMETER ExitOnError
-    Exits the hosting PowerShell process with code 2 when Pester reports one or
-    more failed tests. Errors outside completed test results retain their normal
+    Exits the hosting PowerShell process with code 2 when Pester reports a failed
+    run: one or more failed tests, or a test container or block that failed during
+    discovery or setup. Errors outside completed test results retain their normal
     error behavior.
 
 .EXAMPLE
@@ -83,6 +91,12 @@
     Runs the Example suite under Windows PowerShell. The host used to launch this
     script selects the PowerShell runtime; Invoke-Test restores that edition's
     CurrentUser module path before discovering Pester.
+
+.EXAMPLE
+    powershell.exe -NoProfile -File ./tools/Invoke-Test.ps1 -Suite Example -Path Tests/A.tests.ps1,Tests/B.tests.ps1
+
+    Runs two focused paths under -File. Join the paths with commas and no spaces;
+    -File passes arguments verbatim, so `-Path a, b` would leave `b` unbound.
 
 .EXAMPLE
     ./tools/Invoke-Test.ps1 -Suite Example -ExitOnError
@@ -172,8 +186,8 @@ function Test-IsInteractive {
 
     try {
         return [Environment]::UserInteractive -and
-            -not [System.Console]::IsOutputRedirected -and
-            -not [System.Console]::IsInputRedirected
+            -not [Console]::IsOutputRedirected -and
+            -not [Console]::IsInputRedirected
     } catch {
         Write-Debug "Could not determine console interactivity. Treating session as non-interactive. $_"
         return $false
@@ -193,9 +207,9 @@ try {
 
         $Title = 'Pester v5 Required'
         $Message = 'Pester v5 or later is required to run tests. Would you like to install it?'
-        $Options = [System.Management.Automation.Host.ChoiceDescription[]]@(
-            [System.Management.Automation.Host.ChoiceDescription]::new('&Yes', 'Install Pester v5 from the PowerShell Gallery.'),
-            [System.Management.Automation.Host.ChoiceDescription]::new('&No', 'Do not install Pester v5 and exit.')
+        $Options = [ChoiceDescription[]]@(
+            [ChoiceDescription]::new('&Yes', 'Install Pester v5 from the PowerShell Gallery.'),
+            [ChoiceDescription]::new('&No', 'Do not install Pester v5 and exit.')
         )
 
         $UserChoice = $Host.UI.PromptForChoice($Title, $Message, $Options, 0)
@@ -207,11 +221,13 @@ try {
                 Force = $True
                 ErrorAction = 'Stop'
             }
+
             if ($PSEdition -eq 'Desktop') {
                 # Require because newer community-maintained versions have a different
                 # digital certificate than the Microsoft one that signs the bundled Pester v3 module.
                 $InstallParams.SkipPublisherCheck = $true
             }
+
             try {
                 Install-Module @InstallParams
                 Write-Host 'Pester v5 has been installed. Proceeding with test execution.'
@@ -267,6 +283,7 @@ function Get-RepositoryRoot {
                 if ($parent -eq $current) {
                     break
                 }
+
                 $current = $parent
             }
         }
@@ -306,7 +323,9 @@ function Test-RootManifest {
         [string] $Path
     )
 
-    if (-not ($RootConfig.PSObject.Properties.Name -contains 'isRoot') -or -not [bool] $RootConfig.isRoot) {
+    if (-not ($RootConfig.PSObject.Properties.Name -contains 'isRoot') -or
+        -not [bool] $RootConfig.isRoot
+    ) {
         throw "Root config '$Path' must contain isRoot=true."
     }
 
@@ -320,7 +339,9 @@ function Test-RootManifest {
     }
 
     foreach ($Suite in $Suites) {
-        if (-not ($Suite.PSObject.Properties.Name -contains 'Name') -or [string]::IsNullOrWhiteSpace([string] $Suite.Name)) {
+        if (-not ($Suite.PSObject.Properties.Name -contains 'Name') -or
+            [string]::IsNullOrWhiteSpace([string] $Suite.Name)
+        ) {
             throw "Each suite in '$Path' must define a non-empty Name."
         }
 
@@ -358,7 +379,8 @@ function Test-SuiteManifest {
         [string] $Path
     )
 
-    if (-not ($SuiteConfig.PSObject.Properties.Name -contains 'Run') -or $null -eq $SuiteConfig.Run) {
+    if (-not ($SuiteConfig.PSObject.Properties.Name -contains 'Run') -or
+        $null -eq $SuiteConfig.Run) {
         throw "Suite config '$Path' must define Run."
     }
 
@@ -465,7 +487,10 @@ function Convert-SingleSuiteManifestToSuiteList {
         return
     }
 
-    $Suite = @($ConfiguredSuites | Where-Object { $_.Name -eq $TestSuite } | Select-Object -First 1)
+    $Suite = @($ConfiguredSuites |
+        Where-Object { $_.Name -eq $TestSuite } |
+        Select-Object -First 1)
+
     if ($Suite.Count -eq 0) {
         $AvailableSuites = @($ConfiguredSuites | ForEach-Object { $_.Name }) -join ', '
         Write-Error "Unknown test suite '$TestSuite'. Available suites: $AvailableSuites"
@@ -507,14 +532,17 @@ function Convert-SingleSuiteManifestToSuiteList {
         $SuiteConfig = $Suite[0]
 
         try {
-            Test-SuiteManifest -SuiteConfig $SuiteConfig -Path "$RootConfigPath (suite '$($Suite[0].Name)')"
+            Test-SuiteManifest `
+                -SuiteConfig $SuiteConfig `
+                -Path "$RootConfigPath (suite '$($Suite[0].Name)')"
         } catch {
             Write-Error $_
             return
         }
     }
+    # Under `powershell.exe -File`, `-Path a,b` arrives as the single string 'a,b'.
     $RequestedPath = if ($null -ne $Path -and $Path.Count -gt 0) {
-        @($Path)
+        @($Path -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     } else {
         @($SuiteConfig.Run.Path)
     }
@@ -550,8 +578,8 @@ function Convert-SingleSuiteManifestToSuiteList {
 
         $DiscoveryResult = Invoke-Pester -Configuration $DiscoveryConfiguration
 
-        $AllTags = [System.Collections.Generic.List[string]]::new()
-        $AllBlocks = [System.Collections.Generic.List[object]]::new()
+        $AllTags = [List[string]]::new()
+        $AllBlocks = [List[object]]::new()
 
         function Add-DiscoveredBlock {
             param([object[]] $Blocks)
@@ -560,22 +588,31 @@ function Convert-SingleSuiteManifestToSuiteList {
                 if ($null -eq $block) { continue }
 
                 $AllBlocks.Add($block)
-                if ($block.PSObject.Properties.Name -contains 'Blocks' -and $null -ne $block.Blocks) {
+                if ($block.PSObject.Properties.Name -contains 'Blocks' -and
+                    $null -ne $block.Blocks
+                ) {
                     Add-DiscoveredBlock -Blocks @($block.Blocks)
                 }
             }
         }
 
-        if ($null -ne $DiscoveryResult -and ($DiscoveryResult.PSObject.Properties.Name -contains 'Containers') -and $null -ne $DiscoveryResult.Containers) {
+        if ($null -ne $DiscoveryResult -and
+            ($DiscoveryResult.PSObject.Properties.Name -contains 'Containers') -and
+            $null -ne $DiscoveryResult.Containers
+        ) {
             foreach ($Container in @($DiscoveryResult.Containers)) {
-                if ($Container.PSObject.Properties.Name -contains 'Blocks' -and $null -ne $Container.Blocks) {
+                if ($Container.PSObject.Properties.Name -contains 'Blocks' -and
+                    $null -ne $Container.Blocks
+                ) {
                     Add-DiscoveredBlock -Blocks @($Container.Blocks)
                 }
             }
         }
 
         foreach ($DiscoveredBlock in $AllBlocks) {
-            if ($DiscoveredBlock.PSObject.Properties.Name -contains 'Tag' -and $null -ne $DiscoveredBlock.Tag) {
+            if ($DiscoveredBlock.PSObject.Properties.Name -contains 'Tag' -and
+                $null -ne $DiscoveredBlock.Tag
+            ) {
                 foreach ($TagName in @($DiscoveredBlock.Tag)) {
                     if (-not [string]::IsNullOrWhiteSpace([string] $TagName)) {
                         $AllTags.Add([string] $TagName)
@@ -669,11 +706,61 @@ function Convert-SingleSuiteManifestToSuiteList {
         }
     }
 
+    # Discovery and setup failures never reach FailedCount, so they are reported separately.
+    $FailedContainers = @()
+    if ($Result.PSObject.Properties.Name -contains 'Containers' -and
+        $null -ne $Result.Containers
+    ) {
+        $FailedContainers = @($Result.Containers | Where-Object {
+            $_.Result -eq 'Failed' -and @($_.ErrorRecord).Count -gt 0
+        })
+    }
+
+    $FailedBlocks = @()
+    if ($Result.PSObject.Properties.Name -contains 'FailedBlocks' -and
+        $null -ne $Result.FailedBlocks
+    ) {
+        $FailedBlocks = @($Result.FailedBlocks | Where-Object { @($_.ErrorRecord).Count -gt 0 })
+    }
+
+    <#
+    .SYNOPSIS
+        Returns a one-line summary of the first error record, preferring parse error details.
+    #>
+    function Get-FirstErrorLine {
+        param([object[]] $ErrorRecords)
+
+        foreach ($Record in @($ErrorRecords)) {
+            $Exception = $Record.Exception
+
+            # Parse errors put the location first and the message several lines down.
+            if ($Exception -is [ParseException] -and @($Exception.Errors).Count -gt 0) {
+                $ParseError = @($Exception.Errors)[0]
+                return ('{0}:{1}: {2}' -f $ParseError.Extent.File, $ParseError.Extent.StartLineNumber, $ParseError.Message)
+            }
+
+            $Message = if ($Exception) { $Exception.Message } else { "$Record" }
+            if (-not [string]::IsNullOrWhiteSpace($Message)) {
+                return ($Message -split "`r?`n")[0]
+            }
+        }
+
+        return ''
+    }
+
+    foreach ($Container in $FailedContainers) {
+        Write-Host ("[-] Container failed: {0}`n    {1}" -f $Container.Item, (Get-FirstErrorLine $Container.ErrorRecord))
+    }
+
+    foreach ($Block in $FailedBlocks) {
+        Write-Host ("[-] Block failed: {0}`n    {1}" -f $Block.ExpandedPath, (Get-FirstErrorLine $Block.ErrorRecord))
+    }
+
     if ($NonPassing.Count -gt 0) {
         foreach ($Test in $NonPassing) {
-            $ErrorMessage = ''
-            if ($Test.ErrorRecord -and $Test.ErrorRecord.Exception) {
-                $ErrorMessage = $Test.ErrorRecord.Exception.Message
+            $ErrorMessage = Get-FirstErrorLine $Test.ErrorRecord
+            if ([string]::IsNullOrWhiteSpace($ErrorMessage) -and $Test.Block) {
+                $ErrorMessage = Get-FirstErrorLine $Test.Block.ErrorRecord
             }
 
             if ([string]::IsNullOrWhiteSpace($ErrorMessage)) {
@@ -682,12 +769,14 @@ function Convert-SingleSuiteManifestToSuiteList {
                 Write-Host ("[-] {0} ({1})`n    {2}" -f $Test.ExpandedPath, $Test.Result, $ErrorMessage)
             }
         }
-    } elseif (-not $ShowPassed) {
+    } elseif ($FailedContainers.Count -eq 0 -and $FailedBlocks.Count -eq 0 -and -not $ShowPassed) {
         Write-Host 'All tests passed. No non-passing tests to report.'
     }
 
     $DurationSeconds = 0
-    if ($Result.PSObject.Properties.Name -contains 'Duration' -and $null -ne $Result.Duration) {
+    if ($Result.PSObject.Properties.Name -contains 'Duration' -and
+        $null -ne $Result.Duration
+    ) {
         $DurationSeconds = $Result.Duration.TotalSeconds
     }
 
@@ -701,11 +790,21 @@ function Convert-SingleSuiteManifestToSuiteList {
         $Result.NotRunCount
     )
 
+    if ($FailedContainers.Count -gt 0 -or $FailedBlocks.Count -gt 0) {
+        Write-Host ("Failed Containers: {0}, Failed Blocks: {1}" -f $FailedContainers.Count, $FailedBlocks.Count)
+    }
+
     if ($PassThru) {
         $Result
     }
 
-    if ($Result.FailedCount -gt 0) {
+    # Pester's overall Result also covers failures that do not reach FailedCount.
+    $RunFailed = $Result.FailedCount -gt 0 -or
+        $FailedContainers.Count -gt 0 -or
+        $FailedBlocks.Count -gt 0 -or
+        $Result.Result -eq 'Failed'
+
+    if ($RunFailed) {
         if ($ExitOnError) {
             exit 2
         }

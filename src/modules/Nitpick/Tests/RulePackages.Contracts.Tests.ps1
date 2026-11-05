@@ -26,9 +26,9 @@ Export-ModuleMember -Function Test-ParentRule
 function Get-ContractMessage { 'Declared rule executed.' }
 function Test-ContractRule {
     param ($ScriptBlockAst)
-    New-NitpickFinding -RuleName ContractRule -Message (Get-ContractMessage) `
+    New-NitpickFinding -RuleId 'Local/ContractRule' -Message (Get-ContractMessage) `
         -Severity Information -ViolationExtent $ScriptBlockAst.Extent `
-        -RuleSuppressionID ContractRule -ScriptPath '<ScriptBlock>' `
+        -ScriptPath '<ScriptBlock>' `
         -Explanation 'Rule package contract.' -OutputAs NitpickFinding
 }
 function Test-HiddenContractRule { param ($ScriptBlockAst) }
@@ -159,14 +159,18 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         }
 
         It 'retains local diagnostic names and suppression IDs at the external boundary' {
-            $Finding = New-NitpickFinding -RuleName ContractRule -RuleSuppressionID ContractSuppression `
-                -Message 'Contract finding.' -Severity Information -ViolationExtent {}.Ast.Extent `
-                -ScriptPath '<ScriptBlock>' -Explanation 'External identity contract.' `
+            $Finding = New-NitpickFinding `
+                -RuleId 'Local/ContractRule' `
+                -Message 'Contract finding.' `
+                -Severity Information `
+                -ViolationExtent {}.Ast.Extent `
+                -ScriptPath '<ScriptBlock>' `
+                -Explanation 'External identity contract.' `
                 -OutputAs NitpickFinding
 
             $Diagnostic = $Finding.ToDiagnosticRecord()
             $Diagnostic.RuleName | Should -Be ContractRule
-            $Diagnostic.RuleSuppressionID | Should -Be ContractSuppression
+            $Diagnostic.RuleSuppressionID | Should -Be ContractRule
         }
 
         It 'retains supporting module scope and private helpers without exporting global commands' {
@@ -195,9 +199,9 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
 
             $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
             $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
-            $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
-            $Preview.Application.CommittedCorrections | Should -HaveCount 0
-            @($Preview.Proposal.AcceptedCorrections.ChangeSetId | Sort-Object -Unique) | Should -HaveCount 1
+            $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
+            $Preview.Application.AppliedCorrections | Should -HaveCount 0
+            $Preview.Proposal.AcceptedCorrections[0].TextEdits | Should -HaveCount 2
 
             [System.IO.File]::ReadAllText($Path) | Should -Be $Source
         }
@@ -630,11 +634,10 @@ Export-ModuleMember -Function Test-ContractRule
     }
 
     Context 'Phase 5: coordinator-owned identity' {
-        It 'attributes legacy producer names to the executing qualified rule' {
+        It 'replaces producer identity with the executing qualified rule' {
             $Package = New-ContractRulePackage -Name NitpickContractPackage -Root $ContractRoot
             $ProducerText = Get-Content -LiteralPath $Package.RulesPath -Raw
-            $ProducerText = $ProducerText.Replace('-RuleName ContractRule', '-RuleName WrongProducer')
-            $ProducerText = $ProducerText.Replace('-RuleSuppressionID ContractRule', '-RuleSuppressionID WrongSuppression')
+            $ProducerText = $ProducerText.Replace("-RuleId 'Local/ContractRule'", "-RuleId 'WrongOwner/WrongProducer'")
             Set-Content -LiteralPath $Package.RulesPath -Value $ProducerText
             $Results = @(Start-Nitpicking -Script {} -Module $Package.ManifestPath `
                 -IncludeRule 'NitpickContractPackage/ContractRule' -Output Object)
@@ -642,8 +645,6 @@ Export-ModuleMember -Function Test-ContractRule
             $Findings = @($Results | Where-Object { $_.GetType().Name -eq 'NitpickFinding' })
             $Findings | Should -HaveCount 1
             $Findings[0].RuleId | Should -Be 'NitpickContractPackage/ContractRule'
-            $Findings[0].RuleName | Should -Be ContractRule
-            $Findings[0].RuleSuppressionID | Should -Be ContractRule
 
             $Diagnostic = $Findings[0].ToDiagnosticRecord()
             $Diagnostic.RuleName | Should -Be ContractRule
@@ -674,7 +675,7 @@ Export-ModuleMember -Function Test-ContractRule
             $Preview = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
             $Preview.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
             $Preview.Report.EffectiveFindings | Should -HaveCount 0
-            $Preview.Proposal.AcceptedCorrections | Should -HaveCount 2
+            $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
             $Preview.Proposal.WasReanalyzed | Should -BeTrue
 
             $Ids = @($Preview.Proposal.AcceptedCorrections.RuleId | Sort-Object -Unique)

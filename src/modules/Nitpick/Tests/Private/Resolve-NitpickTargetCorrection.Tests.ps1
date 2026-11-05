@@ -1,4 +1,7 @@
 BeforeAll {
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
+    $env:WHATIF__QUIET = 'True'
+
     Import-Module -Name "$PSScriptRoot\..\..\..\AstEditor\AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot\..\..\Nitpick.psd1" -Force
 
@@ -40,18 +43,36 @@ BeforeAll {
             }
         }
         if ($Invalid) {
-            $Findings[0].Corrections[1].TextEdit.ReplacementText = '('
+            $Findings[0].Corrections[0].TextEdits[1].ReplacementText = '('
         }
         if ($Conflict) {
-            $Findings[0].Corrections += New-NitpickCorrection `
+            # The conflicting fix must come from a separate finding: two Safe
+            # corrections on one finding are skipped as ambiguous alternatives
+            # before any edit is queued.
+            $ConflictCorrection = New-NitpickCorrection `
                 -ViolationExtent $Document.Ast.EndBlock.Statements[0].Extent `
                 -ReplacementText '$Other' `
                 -FilePathOrContext $Document.Path `
                 -Description 'Conflicting replacement' `
-                -RuleName ConflictRule
+                -RuleId 'Local/ConflictRule'
+
+            $Findings += New-NitpickFinding `
+                -RuleId 'Local/ConflictRule' `
+                -Message 'Conflicting fix.' `
+                -ViolationExtent $Document.Ast.EndBlock.Statements[0].Extent `
+                -Severity Information `
+                -ScriptPath $Document.Path `
+                -Explanation 'Overlaps the UseIsNotOperator fix.' `
+                -Corrections $ConflictCorrection `
+                -OutputAs NitpickFinding
         }
+
         $Rules = if ($NoReanalysis) { @() } else { @($Rule) }
-        $Proposal = Resolve-NitpickCorrectionProposal -Document $Document -Finding $Findings -Rule $Rules
+        $Proposal = Resolve-NitpickCorrectionProposal `
+            -Document $Document `
+            -Finding $Findings `
+            -Rule $Rules
+
         [pscustomobject]@{
             Document = $Document
             Findings = $Findings
@@ -62,6 +83,7 @@ BeforeAll {
 }
 
 AfterAll {
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -70,7 +92,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         InModuleScope Nitpick {
             $Command = Get-Command Resolve-NitpickTargetCorrection
             $Command.OutputType.Name | Should -Contain 'NitpickCorrectionResult'
-            foreach ($Parameter in @('Document', 'Finding', 'Rule', 'Preview', 'WhatIf', 'Confirm')) {
+            foreach ($Parameter in @('Document', 'Finding', 'Rule', 'FixMode', 'WhatIf', 'Confirm')) {
                 $Command.Parameters.Keys | Should -Contain $Parameter
             }
             $Command.Parameters.Keys | Should -Not -Contain 'Fix'
@@ -87,18 +109,20 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
 
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
-            param ($Fixture)
+            param($Fixture)
+
             Resolve-NitpickTargetCorrection `
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -WhatIf
         }
 
         #===  ASSERT  ===#
         $Result.PSTypeNames[0] | Should -Be 'NitpickCorrectionResult'
         $Result.Application.Status | Should -Be 'InMemory'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
 
         $Result.Report.EffectiveText | Should -Be ' ($Value -isnot [int])'
         $Result.Report.EffectiveText | Should -BeExactly $Fixture.Proposal.CandidateText
@@ -116,30 +140,33 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     }
 
     It 'reports in-memory <Status> with NoReanalysis=<NoReanalysis> without saving or changing the proposal' -ForEach @(
-        @{ Status = 'Preview'; Preview = $true; NoReanalysis = $false }
-        @{ Status = 'Preview'; Preview = $true; NoReanalysis = $true }
-        @{ Status = 'InMemory'; Preview = $false; NoReanalysis = $false }
-        @{ Status = 'InMemory'; Preview = $false; NoReanalysis = $true }
+        @{ Status = 'Preview'; FixMode = 'Preview'; NoReanalysis = $false }
+        @{ Status = 'Preview'; FixMode = 'Preview'; NoReanalysis = $true }
+        @{ Status = 'InMemory'; FixMode = 'Apply'; NoReanalysis = $false }
+        @{ Status = 'InMemory'; FixMode = 'Apply'; NoReanalysis = $true }
     ) {
         $Fixture = New-TargetCorrectionFixture -NoReanalysis:$NoReanalysis
         $Before = Get-TargetProposalSnapshot $Fixture.Proposal
         Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'In-memory targets must not be saved.' }
 
-        $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; Preview = $Preview } {
-            param ($Fixture, $Preview)
+        $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; FixMode = $FixMode } {
+            param($Fixture, $FixMode)
+
             Resolve-NitpickTargetCorrection `
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
-                -Preview:$Preview `
+                -FixMode $FixMode `
                 -Confirm:$false
         }
 
         $Result.Application.Status | Should -Be $Status
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $ExpectedApplied = if ($Status -eq 'InMemory') { 1 } else { 0 }
+        $Result.Application.AppliedCorrections | Should -HaveCount $ExpectedApplied
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount $ExpectedApplied
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
         $Result.Report.EffectiveText | Should -BeExactly $Fixture.Proposal.CandidateText
         $ExpectedAnalysis = if ($NoReanalysis) { 'Original' } else { 'Candidate' }
         $Result.Report.AnalysisSource | Should -Be $ExpectedAnalysis
@@ -163,6 +190,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -170,7 +198,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
 
         $Result.Application.Status | Should -Be 'Written'
-        $Result.Application.CommittedCorrections | Should -HaveCount 2
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
 
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
@@ -179,9 +207,12 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings -is [array] | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 0
 
-        $Result.Report.FindingsWithCommittedCorrections -is [array] | Should -BeTrue
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
-        $Result.Report.FindingsWithCommittedCorrections[0] | Should -Be $Fixture.Findings[0]
+        $Result.Report.FindingsWithAppliedCorrections -is [array] | Should -BeTrue
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 1
+        $Result.Report.FindingsWithAppliedCorrections[0] | Should -Be $Fixture.Findings[0]
+
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
+        $Result.Report.FindingsWithAcceptedCorrections[0] | Should -Be $Fixture.Findings[0]
 
         $Fixture.Proposal.WasReanalyzed | Should -BeTrue
 
@@ -192,8 +223,8 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
     }
 
     It 'reports candidate text but original analysis without reanalysis under <Status>' -ForEach @(
-        @{ Status = 'Preview'; Preview = $true; WhatIf = $false }
-        @{ Status = 'WhatIf'; Preview = $false; WhatIf = $true }
+        @{ Status = 'Preview'; FixMode = 'Preview'; WhatIf = $false }
+        @{ Status = 'WhatIf'; FixMode = 'Apply'; WhatIf = $true }
     ) {
         #===  ARRANGE  ===#
         $Path = Join-Path $TestDrive "$Status.ps1"
@@ -205,27 +236,29 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{
             Fixture = $Fixture
-            Preview = $Preview
+            FixMode = $FixMode
             WhatIf = $WhatIf
         } {
-            param ($Fixture, $Preview, $WhatIf)
+            param($Fixture, $FixMode, $WhatIf)
+
             Resolve-NitpickTargetCorrection `
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
-                -Preview:$Preview `
+                -FixMode $FixMode `
                 -WhatIf:$WhatIf `
                 -Confirm:$false
         }
 
         #===  ASSERT  ===#
         $Result.Application.Status | Should -Be $Status
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.CandidateText
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
 
         (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
@@ -258,6 +291,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -265,12 +299,12 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         [object]::ReferenceEquals($Result.Proposal, $Fixture.Proposal) | Should -BeTrue
         $Result.Application.Status | Should -Be $Status
         $Result.Application.ErrorRecord | Should -Not -BeNullOrEmpty
-        $Result.Application.CommittedCorrections -is [array] | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections -is [array] | Should -BeTrue
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
-        $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 1
         $Result.Proposal.CandidateFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         foreach ($Correction in @($Result.Proposal.AcceptedCorrections) +
             @($Result.Proposal.SkippedCorrections.Correction) +
@@ -283,7 +317,8 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Report.EffectiveFindings | Should -HaveCount 2
         $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
         (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before
         $ExpectedDiskText = if ($Status -eq 'StaleSource') { '$External = 3' } else { $Fixture.Proposal.OriginalText }
@@ -296,50 +331,35 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Fixture = New-TargetCorrectionFixture -Path $Path -RemainingFinding
         $Before = (Get-TargetProposalSnapshot $Fixture.Proposal)
         Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick -RemoveParameterValidation Document { $Fixture.Proposal }
+        Mock Should-Process -ModuleName Nitpick { $false }
         Mock Save-AstDocument -ModuleName Nitpick { throw 'Declined targets must not be saved.' }
 
         #===  ACT  ===#
         $Result = InModuleScope Nitpick -Parameters @{ Fixture = $Fixture } {
             param ($Fixture)
-            $Command = Get-Command Resolve-NitpickTargetCorrection
 
-            $ShouldProcessCall = $Command.ScriptBlock.Ast.Find({
-                param ($Node)
-                $Node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and
-                    $Node.Member.Value -eq 'ShouldProcess'
-            }, $true)
-
-            # Replace only this invocation's decision, without prompting or changing production code.
-            $Breakpoint = Set-PSBreakpoint -Script $Command.ScriptBlock.File `
-                -Line $ShouldProcessCall.Extent.StartLineNumber -Action {
-                    $Invocation = (Get-Variable -Name PSCmdlet -Scope 1).Value
-                    $Invocation | Add-Member -MemberType ScriptMethod -Name ShouldProcess -Value { $false } -Force
-                }
-
-            try {
-                Resolve-NitpickTargetCorrection `
-                    -Document $Fixture.Document `
-                    -Finding $Fixture.Findings `
-                    -Rule $Fixture.Rules `
-                    -Confirm:$false
-            } finally {
-                $Breakpoint | Remove-PSBreakpoint
-            }
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -FixMode Apply `
+                -Confirm:$false
         }
 
         #===  ASSERT  ===#
         $Result.Application.Status | Should -Be 'Declined'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
         $Result.Report.EffectiveFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 1
 
         $Result.Proposal.WasReanalyzed | Should -BeTrue
-        $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+        $Result.Proposal.SkippedCorrections | Should -HaveCount 1
         $Result.Proposal.CandidateFindings | Should -HaveCount 1
         $Result.Proposal.CandidateFindings[0].RuleId | Should -Be 'Nitpick/UseIsNotOperator'
         foreach ($Correction in @($Result.Proposal.AcceptedCorrections) +
@@ -353,6 +373,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
             Should -BeExactly $Before
 
         [System.IO.File]::ReadAllText($Path) | Should -Be $Fixture.Proposal.OriginalText
+        Should -Invoke Should-Process -ModuleName Nitpick -Times 1 -Exactly
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 
@@ -371,6 +392,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -379,7 +401,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Application.Status | Should -Be 'NotAttempted'
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
         $Result.Report.EffectiveFindings | Should -HaveCount 0
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly
     }
 
@@ -403,6 +425,7 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
                 -Document $Fixture.Document `
                 -Finding $Fixture.Findings `
                 -Rule $Fixture.Rules `
+                -FixMode Apply `
                 -Confirm:$false
         }
 
@@ -410,11 +433,12 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         $Result.Proposal.Status | Should -Be $Status
 
         $Result.Application.Status | Should -Be 'NotAttempted'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         $Result.Report.AnalysisSource | Should -Be 'Original'
         $Result.Report.EffectiveText | Should -Be $Fixture.Proposal.OriginalText
         $Result.Report.EffectiveFindings[0] | Should -Be $Fixture.Findings[0]
+        $Result.Report.FindingsWithAcceptedCorrections | Should -HaveCount 0
 
         (Get-TargetProposalSnapshot $Fixture.Proposal) |
             Should -BeExactly $Before

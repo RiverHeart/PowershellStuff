@@ -22,8 +22,10 @@ using namespace System.Management.Automation.Language
 .PARAMETER Ast
     Original AST retaining source path context.
 
-.PARAMETER Preview
-    Reports candidate corrections without writing.
+.PARAMETER FixMode
+    Controls whether corrections are previewed, guided, or applied. Guided supplies
+    Select-NitpickGuidedCorrection as the proposal's CorrectionSelector and otherwise
+    applies like Apply.
 
 .EXAMPLE
     Resolves, applies, and reports corrections for one analyzed target.
@@ -32,7 +34,7 @@ using namespace System.Management.Automation.Language
         -Document $Document `
         -Finding $Findings `
         -Rule $Rules `
-        -Preview
+        -FixMode 'Preview'
 #>
 function Resolve-NitpickTargetCorrection {
     [CmdletBinding(SupportsShouldProcess)]
@@ -49,14 +51,28 @@ function Resolve-NitpickTargetCorrection {
         [AllowEmptyCollection()]
         [NitpickRule[]] $Rule,
 
-        [switch] $Preview
+        [Parameter(Mandatory)]
+        [ValidateSet('Preview', 'Guided', 'Apply')]
+        [string] $FixMode
     )
 
+    $Preview = $FixMode -eq 'Preview'
     $ResolveParameters = @{
         Document = $Document
         Finding = $Finding
         Rule = $Rule
     }
+
+    if ($FixMode -eq 'Guided') {
+        $ResolveParameters.CorrectionSelector = {
+            param($Finding, $Corrections, $Document)
+            Select-NitpickGuidedCorrection `
+                -Finding $Finding `
+                -Correction $Corrections `
+                -Document $Document
+        }
+    }
+
     $Proposal = Resolve-NitpickCorrectionProposal @ResolveParameters
 
     $Application = @{ Status = 'NotAttempted' }
@@ -65,7 +81,8 @@ function Resolve-NitpickTargetCorrection {
             $Application.Status = 'Preview'
         } elseif (-not $Document.IsFileBacked) {
             $Application.Status = 'InMemory'
-        } elseif ($PSCmdlet.ShouldProcess($Document.Path, 'Apply Nitpick corrections')) {
+            $Application.AppliedCorrections = $Proposal.AcceptedCorrections
+        } elseif (Should-Process $Document.Path 'Apply Nitpick corrections') {
             $WriteResult = Save-AstDocument -Document $Document -Confirm:$false -WhatIf:$false
 
             $Application.Status = $WriteResult.WriteStatus
@@ -73,7 +90,7 @@ function Resolve-NitpickTargetCorrection {
             $Application.ErrorRecord = $WriteResult.ErrorRecord
 
             if ($WriteResult.WasWritten) {
-                $Application.CommittedCorrections = $Proposal.AcceptedCorrections
+                $Application.AppliedCorrections = $Proposal.AcceptedCorrections
             }
         } else {
             $Application.Status = if ($WhatIfPreference) { 'WhatIf' } else { 'Declined' }
@@ -85,31 +102,42 @@ function Resolve-NitpickTargetCorrection {
         $Application.Status -in 'InMemory', 'Preview', 'WhatIf', 'Written'
 
     $UseCandidateFindings = $UseCandidateText -and $Proposal.WasReanalyzed
+
+    # Attribution: a finding belongs to a list when any of its corrections is in that list.
+    $SelectFindingsWithCorrections = {
+        param ([NitpickCorrection[]] $Corrections)
+
+        foreach ($OriginalFinding in $Proposal.OriginalFindings) {
+            foreach ($Correction in $OriginalFinding.Corrections) {
+                if ($Correction -in $Corrections) {
+                    $OriginalFinding
+                    break
+                }
+            }
+        }
+    }
+
     $Report = @{
         AnalysisSource = if ($UseCandidateFindings) { 'Candidate' } else { 'Original' }
-        EffectiveText = if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
+        EffectiveText = if ($Document.IsFragment) {
+            if ($UseCandidateText) { $Proposal.CandidateFragmentText } else { $Proposal.OriginalFragmentText }
+        } else {
+            if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
+        }
         EffectiveFindings = if ($UseCandidateFindings) {
             $Proposal.CandidateFindings
         } else {
             $Proposal.OriginalFindings
         }
 
-        FindingsWithCommittedCorrections = @(
-            foreach ($OriginalFinding in $Proposal.OriginalFindings) {
-                foreach ($Correction in $OriginalFinding.Corrections) {
-                    if ($Correction -in $Application.CommittedCorrections) {
-                        $OriginalFinding
-                        break
-                    }
-                }
-            }
-        )
+        FindingsWithAppliedCorrections = @(& $SelectFindingsWithCorrections $Application.AppliedCorrections)
+        FindingsWithAcceptedCorrections = @(& $SelectFindingsWithCorrections $Proposal.AcceptedCorrections)
     }
 
     Write-Verbose (
-        "Correction proposal for '{0}': {1}; {2} accepted, {3} skipped; application: {4}." -f
+        "Correction proposal for '{0}': {1}; {2} accepted, {3} findings skipped, {4} undecided; application: {5}." -f
         $Proposal.Path, $Proposal.Status, $Proposal.AcceptedCorrections.Count,
-        $Proposal.SkippedCorrections.Count, $Application.Status
+        $Proposal.SkippedFindings.Count, $Proposal.UndecidedFindings.Count, $Application.Status
     )
 
     foreach ($SkippedCorrection in $Proposal.SkippedCorrections) {

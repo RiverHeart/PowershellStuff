@@ -19,6 +19,12 @@ execution and display attribution also have focused coverage in
 All current contracts execute without skipped contexts. Existing interface,
 interoperability, and autocorrection tests remain active; these contracts do not replace them.
 
+Phase notes below mentioning `ChangeSetId`, change sets, or committed corrections
+describe the historical contract, superseded by
+[the correction remodel](CorrectionRemodel.md) and
+[ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md): a correction
+is one whole fix containing atomic `TextEdits`, and "committed" is now "applied".
+
 Nitpick acquires explicit packages through `Module`, combines them with built-in rules
 and explicit registrations, and builds an invocation-local rule list. Native rule
 selection and attribution use qualified IDs; ambient loaded modules are not rule sources.
@@ -263,8 +269,8 @@ files, but cannot roll back arbitrary import side effects.
   Consequently an existing local-name suppression may still affect equally named rules
   across namespaces; qualified selection is available when that is undesirable.
 - Preserve coordinated correction grouping, applicability, and transactional saves.
-  Do not automatically rewrite producer `ChangeSetId` values: intentional cross-rule
-  coordination is already supported.
+  Identity stamping must not split a correction's atomic `TextEdits`: intentional
+  multi-edit fixes remain whole corrections.
 
 ## Phase 0: Freeze the Contracts (Complete)
 
@@ -590,6 +596,13 @@ registration. Existing file-target tests pass with only necessary selector migra
 
 **Status: Complete**
 
+> Identity cutover: the Phase 5 record below describes the historical transitional
+> contract. The subsequent helper migration is now complete: native findings require
+> `RuleId`, detached corrections accept optional `RuleId`, and native `RuleName`/
+> `RuleSuppressionID` fields and helper parameters are removed. Only external diagnostic
+> conversion derives local compatibility fields. See
+> [Standalone finding identity](../README.md#standalone-finding-identity) for migration.
+
 ### Objective
 
 Make qualified identity observable end-to-end, with the coordinator as the sole source of a
@@ -671,6 +684,9 @@ Before this phase, `NitpickFinding` had `RuleName` and `RuleSuppressionID`;
 - **Standalone explicit-ID API:** defer a producer-facing `RuleId` parameter to the
   later helper-signature migration. Phase 5 neither overloads `RuleName` with a
   qualification contract nor adds conditional module-ownership validation.
+  The subsequent additive helper migration now supplies that explicit parameter;
+  see [Standalone finding identity](../README.md#standalone-finding-identity).
+  The subsequent breaking cutover has now removed Phase 5's legacy invocation contract.
 - **Long-term identity:** `RuleId` is the rule name and the intended single identity.
   `RuleName` and `RuleSuppressionID` are transitional compatibility fields, not independent
   identities to extend. Their eventual removal requires an explicit migration of helper

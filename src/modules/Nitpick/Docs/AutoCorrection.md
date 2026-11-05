@@ -1,11 +1,29 @@
 # Nitpick Autocorrection
 
+**TODO:** AutoCorrection.md mixes "what is true now" (ownership boundary, result model, conflict policy) with six phases of completed plan notes. Deciding what to update vs. preserve requires reading all 730 lines carefully. The superseding-note convention works, but each remodel adds another "ignore the parts below that say X" layer. At some point, extracting the current-contract sections into their own doc and letting AutoCorrection.md become purely historical would reduce that tax.
+
 ## Status
 
 Phases 0 through 6 are implemented. Phase 7 remains proposed. Native Nitpick supports
 single-pass coordinated structural fixes through the same preview and transactional
 application pipeline as simple fixes. PSScriptAnalyzer diagnostics and ungrouped
-correction suggestions remain interoperable; coordinated change sets are native-only.
+correction suggestions remain interoperable; coordinated multi-edit corrections are
+native-only.
+
+Native identity now uses only `RuleId`: findings require it, while detached corrections
+may omit it until coordinated execution. Earlier phase notes below mentioning native
+`RuleName` describe the historical contract, superseded by the
+[identity migration](../README.md#standalone-finding-identity). Local diagnostic names
+and suppression IDs are derived only during external conversion.
+
+The correction model was remodeled after Phase 6: a `NitpickCorrection` is now one
+complete fix containing its atomic `TextEdits`, `ChangeSetId` is retired, "committed"
+became "applied" (now including in-memory applies), and summaries count detected
+findings alongside corrected/correctable/unresolved attribution. Earlier phase notes
+below mentioning change sets, per-edit correction records, committed corrections, or
+final-analysis summary counts describe the historical contract, superseded by
+[the correction remodel](CorrectionRemodel.md) and
+[ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
 
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
@@ -26,7 +44,7 @@ Each file is one correction transaction based on one immutable source snapshot:
 1. Parse the source once into an `AstDocument`.
 2. Run enabled rules against that snapshot.
 3. Collect Nitpick correction metadata around detached AstEditor edits from that snapshot.
-4. Let Nitpick select eligible change sets, then let AstEditor atomically validate and queue the target batch.
+4. Let Nitpick select eligible corrections, then let AstEditor atomically validate and queue the target batch.
 5. Render all edits in one pass.
 6. Reparse and rerun the enabled rules against the rendered text.
 7. Write only when validation and stale-source checks succeed.
@@ -44,12 +62,13 @@ AstEditor owns source-edit mechanics:
 Nitpick owns lint and correction policy:
 
 - Rule execution, findings, applicability, rule identity, user-facing descriptions, and PSScriptAnalyzer interoperability.
-- `ChangeSetId` as the target-wide declaration that corrections must be selected
-  or skipped together. Producers namespace IDs unless cross-finding or cross-rule
-  coordination is intentional.
-- Selection of eligible change sets, final reanalysis, summaries, and translation of AstEditor validation results into rule-aware outcomes.
+- A correction's `TextEdits` array as the declaration that its edits apply together:
+  one correction is one complete fix for a finding, applied all-or-nothing.
+- Selection of eligible corrections, final reanalysis, summaries, and translation of AstEditor validation results into rule-aware outcomes.
 
-`NitpickCorrection` is a metadata envelope around one AstEditor text edit. Existing edit properties may remain as compatibility projections, but the wrapped AstEditor edit is authoritative. Nitpick does not independently validate ranges, stale text, or overlaps.
+`NitpickCorrection` is a metadata envelope around one or more AstEditor text edits.
+Remaining coordinate and replacement properties are single-edit projections, but the
+wrapped AstEditor edits are authoritative. Nitpick does not independently validate ranges, stale text, or overlaps.
 
 ### Diff presentation
 
@@ -504,7 +523,7 @@ conversion contracts now execute alongside the syntax proofs in PowerShell 5.1 a
   changes neither tokenization nor source-integrity ownership.
 
 The focused contracts live in
-`Tests/Public/Interface/Resolve-NitpickCorrectionProposal.ChangeSets.Tests.ps1`.
+`Tests/Public/Interface/Resolve-NitpickCorrectionProposal.Selection.Tests.ps1`.
 
 ### Chunk 6.5: Real-Rule Transaction Proof
 
@@ -578,7 +597,7 @@ Multiple passes converge predictably or stop with a clear pass-limit or cycle di
 
 AstEditor unit tests own detached edit construction, generic range validation, atomic batch behavior, ordering, conflict detection, rendering, parse validation, stale-source checks, and durable writes.
 
-Nitpick unit tests own correction metadata, compatibility projections, applicability, change-set selection, rule-aware diagnostics, and PSScriptAnalyzer conversion.
+Nitpick unit tests own correction metadata, compatibility projections, applicability, correction selection, rule-aware diagnostics, and PSScriptAnalyzer conversion.
 
 Nitpick integration tests own rule collection, multi-rule conflicts, final reanalysis, summary behavior, preview output, file application, and compatibility with native and PSScriptAnalyzer-style corrections.
 
@@ -594,8 +613,9 @@ multiple correction passes remain proposed in Phase 7.
 
 ## Conflict and Failure Policy
 
-- Never silently choose between overlapping change sets.
-- Accept all members of a change set or skip all of them.
+- Never silently choose between overlapping corrections or ambiguous alternatives:
+  a finding proposing multiple `Safe` corrections has all of them skipped.
+- Accept all edits of a correction or skip the complete correction.
 - Treat an expected-text mismatch as stale analysis, not as an ordinary overlap.
 - Do not write output that introduces parse errors.
 - Do not write when the source file differs from the analyzed snapshot.
@@ -626,14 +646,15 @@ Proposal
   Diff
 Application
   Status
-  CommittedCorrections
+  AppliedCorrections
   WriteResult
   ErrorRecord
 Report
   AnalysisSource
   EffectiveText
   EffectiveFindings
-  FindingsWithCommittedCorrections
+  FindingsWithAppliedCorrections
+  FindingsWithAcceptedCorrections
 ```
 
 `Resolve-NitpickCorrectionProposal` returns just the proposal above as a
@@ -650,9 +671,13 @@ same transaction rather than rebuilding edits from the proposal's diagnostic fie
 See [correction lifecycle ownership](../CONTEXT.md#correction-lifecycle-ownership)
 for component responsibilities.
 
-`Application.CommittedCorrections` is populated only by a successful write.
-`Report.FindingsWithCommittedCorrections` contains each original finding once if any
-associated correction was committed, not a claim of complete resolution.
+`Application.AppliedCorrections` is populated when accepted corrections take effect
+in the effective text: a successful write for file targets or an in-memory apply for
+script targets. `Report.FindingsWithAppliedCorrections` contains each original finding
+once if any associated correction was applied — corrected, not a claim of complete
+resolution. `Report.FindingsWithAcceptedCorrections` attributes accepted corrections
+the same way regardless of application outcome, so previews and declined or failed
+writes can report correctable findings.
 `Report.EffectiveFindings` holds the analysis used for pipeline output, severity
 counts, and thresholds. `AnalysisSource` is `Original`, `Candidate`, or `None`.
 
@@ -671,10 +696,12 @@ Arrays remain arrays, including empty and singleton collections; absent optional
 records are null.
 
 The constructor validates recognized application statuses and analysis sources and
-rejects contradictory states before emitting an envelope. Committed corrections and
-their attributed findings require `Written`; a written application requires a Ready
-proposal and successful AstEditor write evidence, and committed edits must belong to
-the accepted proposal. Candidate reporting requires valid candidate reanalysis and
+rejects contradictory states before emitting an envelope. Applied corrections and
+their attributed findings require `Written` or `InMemory`; a written application
+additionally requires a Ready proposal and successful AstEditor write evidence, and
+applied corrections must belong to the accepted proposal. Preview, WhatIf, declined,
+and failed applications never populate applied corrections. Candidate reporting
+requires valid candidate reanalysis and
 an outcome that permits using it. `None` cannot contain effective text or findings.
 `FailedRead` requires an error, no proposal, and no analysis. An uninitialized default
 envelope remains valid. Validation does not repair input or freeze returned objects.
@@ -689,13 +716,31 @@ There are no compatibility aliases for the previous result shape:
 | `RenderedText` | `Report.EffectiveText` on envelopes; `CandidateText` on proposals |
 | `Findings.Final` / `Findings.Remaining` | `Report.EffectiveFindings` |
 | `Findings.Candidate` | `Proposal.CandidateFindings` |
-| `Findings.Fixed` | `Report.FindingsWithCommittedCorrections` |
+| `Findings.Fixed` | `Report.FindingsWithAppliedCorrections` |
 | `Corrections.Accepted` | `Proposal.AcceptedCorrections` |
-| `Corrections.Fixed` | `Application.CommittedCorrections` |
+| `Corrections.Fixed` | `Application.AppliedCorrections` |
 | `Corrections.Skipped` / `Corrections.Conflicts` | `Proposal.SkippedCorrections` / `Proposal.Conflicts` |
 | `WasReanalyzed` | `Proposal.WasReanalyzed`, now an enduring fact |
 | `WasWritten` | Successful `Application.Status` is `Written`; underlying write result also retains its flag |
-| Summary `FixedFindingCount` | `FindingsWithCommittedCorrectionsCount` |
+| Summary `FixedFindingCount` | `CorrectedFindingCount` |
+
+The correction remodel renamed and widened the applied lifecycle, again without
+compatibility aliases:
+
+| Previous field | Replacement |
+| --- | --- |
+| `NitpickCorrection.TextEdit` + per-edit projections | `TextEdits` array; one correction per logical fix |
+| `NitpickCorrection.ChangeSetId` | Retired; a correction's `TextEdits` are its atomic group |
+| `Application.CommittedCorrections` | `Application.AppliedCorrections`, now also populated for in-memory applies |
+| `Report.FindingsWithCommittedCorrections` | `Report.FindingsWithAppliedCorrections`; `FindingsWithAcceptedCorrections` adds accepted attribution |
+| Summary `FindingsWithCommittedCorrectionsCount` | `CorrectedFindingCount`, with `CorrectableFindingCount` and `UnresolvedFindingCount` alongside |
+
+Summary `FindingCount` and the severity counters now describe detected findings
+(original analysis, parse errors included) rather than effective findings.
+`UnresolvedFindingCount` counts effective findings in fix modes, and the `-ErrorOn`
+threshold still gates on effective findings. `Summary.ToString()` omits zero-count
+severities and appends the corrected/correctable/unresolved clause only when the
+summary's `FixMode` is not `Off`.
 
 Derived skipped/conflicted/failed-validation finding lists are no longer returned;
 proposal corrections and validation diagnostics describe those decisions directly.

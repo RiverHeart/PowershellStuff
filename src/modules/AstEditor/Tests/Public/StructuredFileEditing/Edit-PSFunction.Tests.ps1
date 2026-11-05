@@ -2,6 +2,7 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module "$PSScriptRoot/../../../AstEditor.psd1" -Force
+    $env:WHATIF__QUIET = $true
 }
 
 AfterAll {

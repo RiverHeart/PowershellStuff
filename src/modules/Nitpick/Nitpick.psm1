@@ -10,19 +10,16 @@ $ModuleRoot = Split-Path -Path $MyInvocation.MyCommand.Path
 #----------------------
 
 class NitpickCorrection {
-    [psobject] $TextEdit
+    # One correction is one complete fix for a finding: its text edits apply
+    # all-or-nothing. Line/column fields project the first edit for display;
+    # ReplacementText projects only single-edit corrections for interop.
+    [psobject[]] $TextEdits = @()
     [int] $StartLineNumber
     [int] $EndLineNumber
     [int] $StartColumnNumber
     [int] $EndColumnNumber
-    [int] $StartOffset = -1
-    [int] $EndOffset = -1
-    [bool] $HasOffsets
-    [string] $ExpectedText
     [string] $Applicability = 'Safe'
-    [string] $ChangeSetId
     [string] $RuleId
-    [string] $RuleName
     [string] $ReplacementText
     [string] $FilePathOrContext
     [string] $Description
@@ -33,12 +30,11 @@ class NitpickCorrection {
         [string] $filePathOrContext,
         [string] $description
     ) {
-        $this.TextEdit = New-AstTextEdit `
+        $this.TextEdits = @(New-AstTextEdit `
             -Extent $ViolationExtent `
             -ReplacementText $replacementText `
-            -Reason $description
+            -Reason $description)
         $this.SetTextEditProjections()
-        $this.ReplacementText = $replacementText
         $this.FilePathOrContext = $filePathOrContext
         $this.Description = $description
         $this.Validate()
@@ -64,8 +60,14 @@ class NitpickCorrection {
     }
 
     NitpickCorrection([hashtable] $properties) {
-        if ($properties.ContainsKey('TextEdit')) {
-            $this.TextEdit = $properties.TextEdit
+        foreach ($Key in $properties.Keys) {
+            if (-not $this.PSObject.Properties[$Key]) {
+                throw "Unknown NitpickCorrection constructor key '$Key'. Rule identity uses the qualified RuleId."
+            }
+        }
+
+        if ($properties.ContainsKey('TextEdits')) {
+            $this.TextEdits = @($properties.TextEdits)
             $this.SetTextEditProjections()
         } else {
             $this.StartLineNumber = $properties.StartLineNumber
@@ -73,48 +75,60 @@ class NitpickCorrection {
             $this.StartColumnNumber = $properties.StartColumnNumber
             $this.EndColumnNumber = $properties.EndColumnNumber
         }
+
         if ($properties.ContainsKey('Applicability')) {
             $this.Applicability = $properties.Applicability
         }
-        if ($properties.ContainsKey('ChangeSetId')) {
-            $this.ChangeSetId = $properties.ChangeSetId
+
+        if ($properties.ContainsKey('RuleId')) {
+            Assert-NitpickRuleId -Value $properties.RuleId
+            $this.RuleId = $properties.RuleId
         }
-        if ($properties.ContainsKey('RuleName')) {
-            $this.RuleName = $properties.RuleName
-        }
-        if (-not $this.TextEdit) {
+
+        if ($this.TextEdits.Count -eq 0) {
             $this.ReplacementText = $properties.ReplacementText
         }
+
         $this.FilePathOrContext = $properties.FilePathOrContext
         $this.Description = $properties.Description
         $this.Validate()
     }
 
     hidden [void] SetTextEditProjections() {
-        $this.StartLineNumber = $this.TextEdit.StartLineNumber
-        $this.EndLineNumber = $this.TextEdit.EndLineNumber
-        $this.StartColumnNumber = $this.TextEdit.StartColumnNumber
-        $this.EndColumnNumber = $this.TextEdit.EndColumnNumber
-        $this.StartOffset = $this.TextEdit.StartOffset
-        $this.EndOffset = $this.TextEdit.EndOffset
-        $this.HasOffsets = $true
-        $this.ExpectedText = $this.TextEdit.ExpectedText
-        $this.ReplacementText = $this.TextEdit.ReplacementText
+        $Primary = $this.TextEdits[0]
+        $this.StartLineNumber = $Primary.StartLineNumber
+        $this.EndLineNumber = $Primary.EndLineNumber
+        $this.StartColumnNumber = $Primary.StartColumnNumber
+        $this.EndColumnNumber = $Primary.EndColumnNumber
+        $this.ReplacementText = if ($this.TextEdits.Count -eq 1) {
+            $Primary.ReplacementText
+        } else {
+            $null
+        }
     }
 
     hidden [void] Validate() {
+        foreach ($Edit in $this.TextEdits) {
+            if ($null -eq $Edit -or $Edit.GetType().Name -ne 'AstTextEdit') {
+                throw 'TextEdits must contain only AstEditor AstTextEdit objects.'
+            }
+        }
+
         if ($this.StartLineNumber -lt 1 -or $this.EndLineNumber -lt 1) {
             throw 'Line numbers must be greater than zero.'
         }
+
         if ($this.StartColumnNumber -lt 1 -or $this.EndColumnNumber -lt 1) {
             throw 'Column numbers must be greater than zero.'
         }
+
         if ($this.EndLineNumber -lt $this.StartLineNumber -or
             ($this.EndLineNumber -eq $this.StartLineNumber -and
                 $this.EndColumnNumber -lt $this.StartColumnNumber)
         ) {
             throw 'The correction end position must not precede its start position.'
         }
+
         if ($this.Applicability -notin 'Safe', 'Review', 'Unsafe') {
             throw "Applicability must be Safe, Review, or Unsafe. Received '$($this.Applicability)'."
         }
@@ -127,6 +141,10 @@ class NitpickCorrection {
         [object] # Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent
     #>
     [object] ToCorrectionExtent() {
+        if ($this.TextEdits.Count -gt 1) {
+            throw 'A multi-edit correction cannot be converted to a single PSScriptAnalyzer CorrectionExtent.'
+        }
+
         # Using `New-Object` to avoid type resolution issues at parse time
         $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent' -ArgumentList (
             $this.StartLineNumber,
@@ -149,35 +167,23 @@ class NitpickFinding {
     [IScriptExtent] $ViolationExtent
     [string] $Message
     [string] $RuleId
-    [string] $RuleName
-    [string] $RuleSuppressionID
     [string] $Severity
     [NitpickCorrection[]] $Corrections
     [string] $Location
 
-    NitpickFinding(
-        [IScriptExtent] $ViolationExtent,
-        [string] $replacementText,
-        [string] $filePathOrContext,
-        [string] $description
-    ) {
-        $this.ViolationExtent = $ViolationExtent
-        $this.Message = $replacementText
-        $this.RuleName = $filePathOrContext
-        $this.RuleSuppressionID = $description
-        $this.Severity = $description
-        $this.Corrections = @()
-        $this.Location =
-            $this.ViolationExtent.File + ':' +
-            $this.ViolationExtent.StartLineNumber + ':' +
-            $this.ViolationExtent.StartColumnNumber
-    }
-
     NitpickFinding([hashtable] $properties) {
+        foreach ($Key in $properties.Keys) {
+            # ScriptPath, Explanation, and RunCondition are accepted helper inputs
+            # that are not stored as finding properties.
+            if (-not ($this.PSObject.Properties[$Key] -or
+                $Key -in 'ScriptPath', 'Explanation', 'RunCondition')) {
+                throw "Unknown NitpickFinding constructor key '$Key'. Rule identity uses the qualified RuleId."
+            }
+        }
+        Assert-NitpickRuleId -Value $properties.RuleId
+        $this.RuleId = $properties.RuleId
         $this.ViolationExtent = $properties.ViolationExtent
         $this.Message = $properties.Message
-        $this.RuleName = $properties.RuleName
-        $this.RuleSuppressionID = $properties.RuleSuppressionID
         $this.Severity = $properties.Severity
         $this.Corrections = $properties.Corrections
         $LocationPath = if ($this.ViolationExtent.File) {
@@ -194,11 +200,14 @@ class NitpickFinding {
     }
 
     [object] ToDiagnosticRecord() {
+        Assert-NitpickRuleId -Value $this.RuleId
+        $LocalName = $this.RuleId.Split('/')[1]
         # Using `New-Object` to avoid type resolution issues at parse time
         $CorrectionExtents = New-Object 'System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]'
         foreach ($Correction in $this.Corrections) {
-            # ScriptAnalyzer cannot enforce all-or-nothing selection of a change set.
-            if ($Correction.ChangeSetId) {
+            # ScriptAnalyzer cannot enforce all-or-nothing application of a
+            # multi-edit fix, so only single-edit corrections are exported.
+            if ($Correction.TextEdits.Count -gt 1) {
                 continue
             }
             $CorrectionExtents.Add($Correction.ToCorrectionExtent())
@@ -207,10 +216,10 @@ class NitpickFinding {
         $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord' -ArgumentList (
             $this.Message,
             $this.ViolationExtent,
-            $this.RuleName,
+            $LocalName,
             $this.Severity,
             $this.ViolationExtent.File,
-            $this.RuleSuppressionID,
+            $LocalName,
             $CorrectionExtents.PSObject.BaseObject
         )
         return $Result
@@ -237,12 +246,16 @@ Update-TypeData `
 class NitpickSummary {
     [int] $TargetCount
     [int] $RuleCount
+    [string] $FixMode = 'Off'
     [int] $FindingCount
     [int] $ErrorCount
     [int] $WarningCount
     [int] $InformationCount
-    [int] $FindingsWithCommittedCorrectionsCount
-    [int] $SkippedCorrectionCount
+    [int] $CorrectedFindingCount
+    [int] $CorrectableFindingCount
+    [int] $UndecidedFindingCount
+    [int] $UnresolvedFindingCount
+    [int] $SkippedFindingCount
     [int] $ConflictedTargetCount
     [int] $FailedTargetCount
     [timespan] $Duration
@@ -251,15 +264,56 @@ class NitpickSummary {
         $FindingLabel = if ($this.FindingCount -eq 1) { 'finding' } else { 'findings' }
         $TargetLabel = if ($this.TargetCount -eq 1) { 'target' } else { 'targets' }
 
-        return '{0} {1} ({2} errors, {3} warnings, {4} information) across {5} {6} in {7:N0} ms' -f `
+        # FindingCount and the severity counters describe detected findings; zero severities are omitted.
+        $SeverityParts = @(
+            if ($this.ErrorCount -gt 0) {
+                '{0} {1}' -f $this.ErrorCount, $(if ($this.ErrorCount -eq 1) { 'error' } else { 'errors' })
+            }
+            if ($this.WarningCount -gt 0) {
+                '{0} {1}' -f $this.WarningCount, $(if ($this.WarningCount -eq 1) { 'warning' } else { 'warnings' })
+            }
+            if ($this.InformationCount -gt 0) {
+                '{0} information' -f $this.InformationCount
+            }
+        )
+
+        # The correction clause appears only in fix modes, labeled by whichever outcome is in play.
+        $CorrectionParts = @(
+            if ($this.FixMode -ne 'Off') {
+                if ($this.CorrectedFindingCount -gt 0) {
+                    '{0} corrected' -f $this.CorrectedFindingCount
+                }
+                if ($this.CorrectableFindingCount -gt 0) {
+                    '{0} correctable' -f $this.CorrectableFindingCount
+                }
+                if ($this.UndecidedFindingCount -gt 0) {
+                    '{0} undecided' -f $this.UndecidedFindingCount
+                }
+                '{0} unresolved' -f $this.UnresolvedFindingCount
+            }
+        )
+
+        $Groups = @(
+            if ($SeverityParts.Count -gt 0) { $SeverityParts -join ', ' }
+            if ($CorrectionParts.Count -gt 0) { $CorrectionParts -join ', ' }
+        )
+        $Detail = if ($Groups.Count -gt 0) { ' ({0})' -f ($Groups -join '; ') } else { '' }
+
+        # Undecided findings need a human choice; point at the mode that offers one.
+        $Hint = if ($this.UndecidedFindingCount -gt 0 -and $this.FixMode -ne 'Guided') {
+            '. Use -FixMode Guided to choose between alternative or non-Safe corrections.'
+        } else {
+            ''
+        }
+
+        return '{0} {1}{2} across {3} {4} in {5:N0} ms{6}' -f `
             $this.FindingCount,
             $FindingLabel,
-            $this.ErrorCount,
-            $this.WarningCount,
-            $this.InformationCount,
+            $Detail,
             $this.TargetCount,
             $TargetLabel,
-            $this.Duration.TotalMilliseconds
+            $this.Duration.TotalMilliseconds,
+            $Hint
     }
 }
 
@@ -432,11 +486,8 @@ class NitpickRule {
                 continue
             }
             $Finding.RuleId = $this.Id
-            $Finding.RuleName = $this.Name
-            $Finding.RuleSuppressionID = $this.Name
             foreach ($Correction in $Finding.Corrections) {
                 $Correction.RuleId = $this.Id
-                $Correction.RuleName = $this.Name
             }
         }
         return $Results
@@ -659,13 +710,19 @@ class ScriptBlockAstTransform : ArgumentTransformationAttribute {
 
 class NitpickCorrectionProposal {
     [string] $Path = '<ScriptBlock>'
+    # Origin file when the snapshot has source provenance; informational only, never a write target.
+    [string] $SourcePath
     [psobject] $Document
     [string] $OriginalFingerprint
     [string] $Status = 'NoChanges'
     [string] $OriginalText
+    [string] $OriginalFragmentText
     [NitpickFinding[]] $OriginalFindings = @()
     [string] $CandidateText
+    [string] $CandidateFragmentText
     [NitpickFinding[]] $CandidateFindings = @()
+    [NitpickFinding[]] $UndecidedFindings = @()
+    [NitpickFinding[]] $SkippedFindings = @()
     [bool] $WasReanalyzed
     [NitpickCorrection[]] $AcceptedCorrections = @()
     [object[]] $SkippedCorrections = @()
@@ -676,7 +733,7 @@ class NitpickCorrectionProposal {
 
 class NitpickCorrectionApplication {
     [string] $Status = 'NotAttempted'
-    [NitpickCorrection[]] $CommittedCorrections = @()
+    [NitpickCorrection[]] $AppliedCorrections = @()
     [psobject] $WriteResult
     [ErrorRecord] $ErrorRecord
 }
@@ -685,7 +742,8 @@ class NitpickCorrectionReport {
     [string] $AnalysisSource = 'None'
     [string] $EffectiveText
     [NitpickFinding[]] $EffectiveFindings = @()
-    [NitpickFinding[]] $FindingsWithCommittedCorrections = @()
+    [NitpickFinding[]] $FindingsWithAppliedCorrections = @()
+    [NitpickFinding[]] $FindingsWithAcceptedCorrections = @()
 }
 
 class NitpickCorrectionResult {
@@ -724,8 +782,37 @@ foreach ($Path in $Paths) {
 }
 
 
-# Register built-in rules
-# Get-ChildItem -Path "$ModuleRoot/Public/Rules" -Recurse -Filter '*.ps1' |
-#     ForEach-Object {
-#         Register-Nitpick -
-#     }
+# MARK: EXPORTS
+#
+# Prevent `Should-Process` from triggering invalid verb warning because
+# `Import-Module` uses everything by default if `Export-ModuleMember` is
+# not specified even if the manifest gets applied afterwards. Don't feel
+# like aliasing `Should-Process` to avoid the invalid verb warning.
+#
+# Powershell module loading is so unnecessarily bad...
+$ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'Nitpick.psd1'
+if (-not (Test-Path -Path $ManifestPath)) {
+    throw "Module manifest not found at '$ManifestPath'."
+}
+
+try {
+    $Manifest = Import-PowerShellDataFile -LiteralPath $ManifestPath -ErrorAction Stop
+} catch {
+    throw "Failed to load module manifest '$ManifestPath'. Error: $_"
+}
+
+$ExportParams = @{}
+if ($Manifest.FunctionsToExport.Count -gt 0) {
+    $ExportParams.Function = $Manifest.FunctionsToExport
+}
+if ($Manifest.CmdletsToExport.Count -gt 0) {
+    $ExportParams.Cmdlet = $Manifest.CmdletsToExport
+}
+if ($Manifest.VariablesToExport.Count -gt 0) {
+    $ExportParams.Variable = $Manifest.VariablesToExport
+}
+if ($Manifest.AliasesToExport.Count -gt 0) {
+    $ExportParams.Alias = $Manifest.AliasesToExport
+}
+
+Export-ModuleMember @ExportParams

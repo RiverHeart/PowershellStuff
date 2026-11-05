@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Management.Automation.Language
 
 <#
@@ -13,6 +14,8 @@ using namespace System.Management.Automation.Language
 
     Findings are diagnostic-only: adding a pipe or separating statements requires
     the author's intent, which cannot be inferred from formatting.
+    Standalone native findings use Nitpick/AvoidAmbiguousPipelineContinuation.
+    Coordinated execution replaces that identity with the executing descriptor's ID.
 
 .NOTES
     Warns when a separate command on the next physical line is aligned with
@@ -49,14 +52,14 @@ using namespace System.Management.Automation.Language
 #>
 function Test-AvoidAmbiguousPipelineContinuation {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
     param(
         [Parameter(Mandatory, ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
         [ScriptBlockAst] $ScriptBlockAst,
 
         [Parameter(ParameterSetName='ScriptBlockAst')]
-        [System.Collections.IDictionary] $Context,
+        [IDictionary] $Context,
 
         [Parameter(ParameterSetName='Details')]
         [switch] $Details
@@ -64,6 +67,8 @@ function Test-AvoidAmbiguousPipelineContinuation {
 
     $Command = $PSCmdlet.MyInvocation.MyCommand
     $RuleName = if ($Command.Noun) { $Command.Noun } else { $Command.Name }
+    $RuleId = "Nitpick/$RuleName"
+
     $Metadata = [pscustomobject]@{
         Name = $RuleName
         CommandName = $Command.Name
@@ -72,11 +77,17 @@ function Test-AvoidAmbiguousPipelineContinuation {
         Severity = 'Warning'
         Explanation = 'Adjacent commands aligned with an indented pipeline continuation can conceal a missing pipe or an intended statement boundary.'
     }
+
     if ($Details) { return $Metadata }
 
     $Behavior = $Context.RuleBehavior
-    $ShouldRecurse = if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false } else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs = if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' } else { $Behavior.OutputType }
+    $ShouldRecurse =
+        if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
+        else { $Behavior.SearchNestedScriptBlocks }
+
+    $OutputAs =
+        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
+        else { $Behavior.OutputType }
 
     $Pipelines = $ScriptBlockAst.FindAll({
         param($Node)
@@ -92,16 +103,22 @@ function Test-AvoidAmbiguousPipelineContinuation {
         if ($Pipeline.Parent -is [AssignmentStatementAst] -and $Pipeline.Parent.Right -eq $Pipeline) {
             $Statement = $Pipeline.Parent
         }
+
         $Container = $Statement.Parent
-        if ($Container -isnot [StatementBlockAst] -and $Container -isnot [NamedBlockAst]) {
+        if ($Container -isnot [StatementBlockAst] -and
+            $Container -isnot [NamedBlockAst]
+        ) {
             continue
         }
 
         $Statements = $Container.Statements
         $Index = $Statements.IndexOf($Statement)
         if ($Index -lt 0 -or $Index + 1 -ge $Statements.Count) { continue }
+
         $Next = $Statements[$Index + 1]
-        if ($Next -isnot [PipelineAst] -or $Next.PipelineElements[0] -isnot [CommandAst]) {
+        if ($Next -isnot [PipelineAst] -or
+            $Next.PipelineElements[0] -isnot [CommandAst]
+        ) {
             continue
         }
 
@@ -109,7 +126,8 @@ function Test-AvoidAmbiguousPipelineContinuation {
         if ($LastCommand -isnot [CommandAst] -or
             $LastCommand.Extent.StartLineNumber -le $Pipeline.Extent.StartLineNumber -or
             $LastCommand.Extent.StartColumnNumber -le $Statement.Extent.StartColumnNumber -or
-            $Next.Extent.StartLineNumber -ne $Statement.Extent.EndLineNumber + 1) {
+            $Next.Extent.StartLineNumber -ne $Statement.Extent.EndLineNumber + 1
+        ) {
             continue
         }
 
@@ -123,12 +141,12 @@ function Test-AvoidAmbiguousPipelineContinuation {
         $NextCommand = $Next.PipelineElements[0]
         $CommandText = $NextCommand.CommandElements[0].Extent.Text
         $FilePath = if ($Next.Extent.File) { $Next.Extent.File } else { '<ScriptBlock>' }
+
         New-NitpickFinding `
-            -RuleName $RuleName `
+            -RuleId $RuleId `
             -Message "Ambiguous pipeline continuation: '$CommandText' is aligned with the preceding pipeline but starts a separate statement. Add '|' to continue the pipeline, or insert a blank line or dedent the command to make the separation explicit." `
             -ViolationExtent $NextCommand.CommandElements[0].Extent `
             -Severity $Metadata.Severity `
-            -RuleSuppressionID $RuleName `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
             -OutputAs $OutputAs

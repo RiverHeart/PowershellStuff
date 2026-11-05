@@ -1,6 +1,8 @@
+using namespace System
 using namespace System.Collections.Generic
 using namespace System.IO
 using namespace System.Management.Automation.Language
+using namespace System.Text
 
 <#
 .SYNOPSIS
@@ -89,37 +91,179 @@ class AstTextEditResult {
     }
 }
 
+class AstParseData {
+    [Ast] $Ast
+    [Token[]] $Tokens
+    [ParseError[]] $ParseErrors
+}
+
 class AstDocument {
-    # Preserves source provenance and gives Save-AstDocument a default target path.
+    # A default save target, distinct from the parser's informational source file.
     [string] $Path
     [string] $OriginalText
     [string] $OriginalFingerprint
     [bool] $IsFileBacked
-    [System.Text.Encoding] $SourceEncoding = [System.Text.UTF8Encoding]::new($false, $true)
+    [Encoding] $SourceEncoding = [UTF8Encoding]::new($false, $true)
     [string] $NewLineSequence = "`n"
     [Ast] $Ast
+    [AstParseData] $Root = [AstParseData]::new()
+    [bool] $IsFragment
     [Token[]] $Tokens
     [ParseError[]] $ParseErrors
     [List[AstTextEdit]] $Edits = [List[AstTextEdit]]::new()
 
     AstDocument(
-        [string] $Path,
-        [string] $Text,
-        [Ast] $Ast,
-        [Token[]] $Tokens,
-        [ParseError[]] $ParseErrors
+        [ScriptBlock] $ScriptBlock
     ) {
+        $this.InitFromAst($ScriptBlock.Ast)
+    }
+
+    AstDocument(
+        [Ast] $Ast
+    ) {
+        $this.InitFromAst($Ast)
+    }
+
+    AstDocument(
+        [string] $Text
+    ) {
+        $this.Init('<memory>', $Text, $null)
+    }
+
+    AstDocument(
+        [string] $Path,
+        [string] $Text
+    ) {
+        $this.Init($Path, $Text, $Path)
+    }
+
+    hidden [void] InitFromAst([Ast] $InputAst) {
+        $Extent = $InputAst.Extent
+        $Snapshot = $Extent.StartScriptPosition.GetFullScript()
+        if ($null -eq $Snapshot) {
+            $this.Init('<memory>', $Extent.Text, $Extent.File)
+        } else {
+            if ($Extent.StartOffset -lt 0 -or
+                $Extent.EndOffset -lt $Extent.StartOffset -or
+                $Extent.EndOffset -gt $Snapshot.Length -or
+                $Snapshot.Substring($Extent.StartOffset, $Extent.EndOffset - $Extent.StartOffset) -cne $Extent.Text
+            ) {
+                throw [ArgumentException]::new('The supplied AST extent does not match its source snapshot.')
+            }
+
+            $this.Init('<memory>', $Snapshot, $Extent.File)
+            $this.Ast = $this.FindFragment($this.Root.Ast, $InputAst, $Extent.EndOffset)
+            $this.IsFragment = -not [object]::ReferenceEquals($this.Ast, $this.Root.Ast)
+            if ($this.IsFragment) {
+                $this.Tokens = $this.GetFragmentTokens($this.Root.Tokens)
+                $this.ParseErrors = @($this.Root.ParseErrors | Where-Object {
+                    $_.Extent.StartOffset -ge $this.Ast.Extent.StartOffset
+                })
+            }
+        }
+    }
+
+    hidden [Token[]] GetFragmentTokens([Token[]] $SourceTokens) {
+        $SelectedTokens = [List[Token]]::new()
+        foreach ($Token in $SourceTokens) {
+            if ($Token.Extent.StartOffset -ge $this.Ast.Extent.StartOffset -and
+                $Token.Extent.EndOffset -le $this.Ast.Extent.EndOffset
+            ) {
+                $SelectedTokens.Add($Token)
+            } elseif ($Token -is [StringExpandableToken]) {
+                # The parser nests tokens for $() inside expandable strings.
+                foreach ($NestedToken in $this.GetFragmentTokens($Token.NestedTokens)) {
+                    $SelectedTokens.Add($NestedToken)
+                }
+            }
+        }
+        return $SelectedTokens.ToArray()
+    }
+
+    hidden [Ast] FindFragment([Ast] $Root, [Ast] $Fragment, [int] $EndOffset) {
+        $Depth = 0
+        $Ancestor = $Fragment
+        while ($null -ne $Ancestor.Parent) {
+            $Depth++
+            $Ancestor = $Ancestor.Parent
+        }
+
+        $Candidates = @($Root.FindAll({
+            param($Node)
+
+            if ($Node.GetType() -ne $Fragment.GetType() -or
+                $Node.Extent.StartOffset -ne $Fragment.Extent.StartOffset -or
+                $Node.Extent.EndOffset -ne $EndOffset
+            ) {
+                return $false
+            }
+
+            $NodeDepth = 0
+            $Parent = $Node
+            while ($null -ne $Parent.Parent) {
+                $NodeDepth++
+                $Parent = $Parent.Parent
+            }
+            return $NodeDepth -eq $Depth
+        }, $true))
+
+        if ($Candidates.Count -ne 1) {
+            throw [InvalidOperationException]::new(
+                "Could not uniquely locate the submitted fragment ($($Fragment.GetType().Name), depth $Depth) at offsets [$($Fragment.Extent.StartOffset), $EndOffset) in the source snapshot; found $($Candidates.Count) matches."
+            )
+        }
+        return $Candidates[0]
+    }
+
+    hidden [int] GetRenderedFragmentEndOffset() {
+        $EndOffset = $this.Ast.Extent.EndOffset
+        foreach ($Edit in $this.Edits) {
+            $EndOffset += $Edit.ReplacementText.Length - ($Edit.EndOffset - $Edit.StartOffset)
+        }
+        return $EndOffset
+    }
+
+    hidden [void] Init([string] $Path, [string] $Text, [string] $SourcePath) {
         $this.Path = $Path
         $this.OriginalText = $Text
         $this.OriginalFingerprint = Get-AstSourceFingerprint -Bytes (
-            $this.SourceEncoding.GetBytes($Text)
+            $this.SourceEncoding.GetBytes($this.OriginalText)
         )
-        $this.Ast = $Ast
-        $this.Tokens = $Tokens
-        $this.ParseErrors = $ParseErrors
+        $ParsedTokens = $null
+        $Errors = $null
+        $this.Root.Ast = [Parser]::ParseInput(
+            $this.OriginalText, $SourcePath, [ref] $ParsedTokens, [ref] $Errors
+        )
+        $this.Ast = $this.Root.Ast
+        $this.Root.Tokens = $ParsedTokens
+        $this.Tokens = $this.Root.Tokens
+        $this.Root.ParseErrors = $Errors
+        $this.ParseErrors = $this.Root.ParseErrors
+        $this.NewLineSequence = if ($this.OriginalText.Contains("`r`n")) { "`r`n" } else { "`n" }
+    }
+
+    hidden [void] ValidateEditTarget([AstTextEdit] $Edit) {
+        if ($this.IsFragment -and
+            ($Edit.StartOffset -lt $this.Ast.Extent.StartOffset -or
+            $Edit.EndOffset -gt $this.Ast.Extent.EndOffset)
+        ) {
+            $Exception = [InvalidOperationException]::new(
+                "Edit '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset)) falls outside the submitted fragment [$($this.Ast.Extent.StartOffset), $($this.Ast.Extent.EndOffset))."
+            )
+            $Exception.Data['FailureKind'] = 'OutsideTarget'
+            $Exception.Data['IncomingEdit'] = @{
+                StartOffset = $Edit.StartOffset
+                EndOffset = $Edit.EndOffset
+                ReplacementText = $Edit.ReplacementText
+                ExpectedText = $Edit.ExpectedText
+                Reason = $Edit.Reason
+            }
+            throw $Exception
+        }
     }
 
     hidden [void] AddEdit([AstTextEdit] $Edit) {
+        $this.ValidateEditTarget($Edit)
         foreach ($Existing in $this.Edits) {
             $HasSharedInsertionOffset =
                 $Existing.StartOffset -eq $Existing.EndOffset -and
@@ -326,18 +470,40 @@ foreach ($Path in $Paths) {
         }
 }
 
-$Manifest = Import-PowerShellDataFile -LiteralPath (Join-Path $ModuleRoot 'AstEditor.psd1')
-Export-ModuleMember `
-    -Function $Manifest.FunctionsToExport `
-    -Cmdlet $Manifest.CmdletsToExport `
-    -Variable $Manifest.VariablesToExport `
-    -Alias $Manifest.AliasesToExport
+# MARK: EXPORTS
+#
+# Prevent `Should-Process` from triggering invalid verb warning because
+# `Import-Module` uses everything by default if `Export-ModuleMember` is
+# not specified even if the manifest gets applied afterwards. Don't feel
+# like aliasing `Should-Process` to avoid the invalid verb warning.
+#
+# Powershell module loading is so unnecessarily bad...
+$ManifestPath = Join-Path -Path $ModuleRoot -ChildPath 'AstEditor.psd1'
+if (-not (Test-Path -Path $ManifestPath)) {
+    throw "Module manifest not found at '$ManifestPath'."
+}
 
+try {
+    $Manifest = Import-PowerShellDataFile -LiteralPath $ManifestPath -ErrorAction Stop
+} catch {
+    throw "Failed to load module manifest '$ManifestPath'. Error: $_"
+}
 
+$ExportParams = @{}
+if ($Manifest.FunctionsToExport.Count -gt 0) {
+    $ExportParams.Function = $Manifest.FunctionsToExport
+}
+if ($Manifest.CmdletsToExport.Count -gt 0) {
+    $ExportParams.Cmdlet = $Manifest.CmdletsToExport
+}
+if ($Manifest.VariablesToExport.Count -gt 0) {
+    $ExportParams.Variable = $Manifest.VariablesToExport
+}
+if ($Manifest.AliasesToExport.Count -gt 0) {
+    $ExportParams.Alias = $Manifest.AliasesToExport
+}
 
-
-
-
+Export-ModuleMember @ExportParams
 
 
 

@@ -9,6 +9,40 @@ AfterAll {
 }
 
 Describe 'Set-AstFunction' {
+    It 'replaces a function inside the fragment without selecting a host function of the same name' {
+        $Text = 'function Get-Value { 0 }; function Get-Host { & { function Get-Value { 1 } } }'
+        $Root = [Parser]::ParseInput($Text, [ref] $null, [ref] $null)
+        $Fragment = $Root.Find({
+            param($Node)
+            $Node -is [ScriptBlockExpressionAst]
+        }, $true).ScriptBlock
+
+        $Document = New-AstDocument -InputObject $Fragment
+        $Plan = Set-AstFunction -Document $Document -Name Get-Value -Replacement 'function Get-Value { 22 }'
+        $Result = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.Name | Should -Be 'Get-Value'
+        $Result.ParseErrorCount | Should -Be 0
+        $Result.RenderedFragmentText | Should -BeExactly '{ function Get-Value { 22 } }'
+        $Result.RenderedText | Should -BeExactly (
+            'function Get-Value { 0 }; function Get-Host { & { function Get-Value { 22 } } }'
+        )
+    }
+
+    It 'does not replace host help outside a function fragment' {
+        $Help = "<#`r`n.SYNOPSIS`r`nHost help`r`n#>"
+        $Text = "$Help`r`nfunction Get-Value { 1 }"
+        $Root = [Parser]::ParseInput($Text, [ref] $null, [ref] $null)
+        $Document = New-AstDocument -InputObject $Root.EndBlock.Statements[0]
+
+        $Plan = Set-AstFunction -Document $Document -Name Get-Value -Replacement 'function Get-Value { 2 }'
+        $Result = Resolve-AstDocument -Document $Document -PassThruText
+
+        $Plan.IncludedHelp | Should -BeFalse
+        $Result.ParseErrorCount | Should -Be 0
+        $Result.RenderedText | Should -BeExactly "$Help`r`nfunction Get-Value { 2 }"
+    }
+
     It 'replaces one top-level function and its adjacent help' {
         $Source = @'
 <#

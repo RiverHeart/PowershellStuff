@@ -14,12 +14,12 @@
     consumers must not modify queued edits between resolution and application.
 
 .PARAMETER Application
-    Status, CommittedCorrections, WriteResult, and ErrorRecord for application.
-    Defaults to NotAttempted with no committed corrections or diagnostics.
+    Status, AppliedCorrections, WriteResult, and ErrorRecord for application.
+    Defaults to NotAttempted with no applied corrections or diagnostics.
 
 .PARAMETER Report
-    AnalysisSource, EffectiveText, EffectiveFindings, and
-    FindingsWithCommittedCorrections. Defaults to no analysis and empty findings.
+    AnalysisSource, EffectiveText, EffectiveFindings, FindingsWithAppliedCorrections,
+    and FindingsWithAcceptedCorrections. Defaults to no analysis and empty findings.
     AnalysisSource identifies the source analyzed by EffectiveFindings, not necessarily
     EffectiveText. Candidate text can accompany original findings without reanalysis.
 
@@ -44,13 +44,17 @@ function New-NitpickCorrectionResult {
     )
 
     foreach ($Name in $Application.Keys) {
-        if ($Name -notin 'Status', 'CommittedCorrections', 'WriteResult', 'ErrorRecord') {
+        if ($Name -notin 'Status', 'AppliedCorrections', 'WriteResult', 'ErrorRecord') {
             throw "Unknown Application property '$Name'."
         }
     }
 
     foreach ($Name in $Report.Keys) {
-        if ($Name -notin 'AnalysisSource', 'EffectiveText', 'EffectiveFindings', 'FindingsWithCommittedCorrections') {
+        if ($Name -notin @(
+                'AnalysisSource', 'EffectiveText', 'EffectiveFindings',
+                'FindingsWithAppliedCorrections', 'FindingsWithAcceptedCorrections'
+            )
+        ) {
             throw "Unknown Report property '$Name'."
         }
     }
@@ -76,8 +80,8 @@ function New-NitpickCorrectionResult {
 
     $ApplicationData = [NitpickCorrectionApplication]@{
         Status = $ApplicationStatus
-        CommittedCorrections = @(
-            if ($Application.ContainsKey('CommittedCorrections')) { $Application.CommittedCorrections }
+        AppliedCorrections = @(
+            if ($Application.ContainsKey('AppliedCorrections')) { $Application.AppliedCorrections }
         )
         WriteResult = $Application['WriteResult']
         ErrorRecord = $Application['ErrorRecord']
@@ -88,9 +92,14 @@ function New-NitpickCorrectionResult {
         EffectiveFindings = @(
             if ($Report.ContainsKey('EffectiveFindings')) { $Report.EffectiveFindings }
         )
-        FindingsWithCommittedCorrections = @(
-            if ($Report.ContainsKey('FindingsWithCommittedCorrections')) {
-                $Report.FindingsWithCommittedCorrections
+        FindingsWithAppliedCorrections = @(
+            if ($Report.ContainsKey('FindingsWithAppliedCorrections')) {
+                $Report.FindingsWithAppliedCorrections
+            }
+        )
+        FindingsWithAcceptedCorrections = @(
+            if ($Report.ContainsKey('FindingsWithAcceptedCorrections')) {
+                $Report.FindingsWithAcceptedCorrections
             }
         )
     }
@@ -114,7 +123,8 @@ function New-NitpickCorrectionResult {
     if ($AnalysisSource -eq 'None' -and (
             $null -ne $Result.Report.EffectiveText -or
             $Result.Report.EffectiveFindings.Count -gt 0 -or
-            $Result.Report.FindingsWithCommittedCorrections.Count -gt 0
+            $Result.Report.FindingsWithAppliedCorrections.Count -gt 0 -or
+            $Result.Report.FindingsWithAcceptedCorrections.Count -gt 0
         )
     ) {
         throw 'A report with no analysis cannot contain effective text or findings.'
@@ -143,11 +153,11 @@ function New-NitpickCorrectionResult {
         throw 'Only a Ready proposal permits an application attempt.'
     }
 
-    if (($Result.Application.CommittedCorrections.Count -gt 0 -or
-        $Result.Report.FindingsWithCommittedCorrections.Count -gt 0) -and
-        $ApplicationStatus -ne 'Written'
+    if (($Result.Application.AppliedCorrections.Count -gt 0 -or
+        $Result.Report.FindingsWithAppliedCorrections.Count -gt 0) -and
+        $ApplicationStatus -notin 'Written', 'InMemory'
     ) {
-        throw 'Committed corrections and their attributed findings require a Written application.'
+        throw 'Applied corrections and their attributed findings require a Written or InMemory application.'
     }
 
     if ($ApplicationStatus -eq 'Written') {
@@ -160,17 +170,27 @@ function New-NitpickCorrectionResult {
         ) {
             throw 'Written requires a Ready proposal and a successful AstEditor write result.'
         }
+    }
 
-        foreach ($Correction in $Result.Application.CommittedCorrections) {
+    if ($ApplicationStatus -in 'Written', 'InMemory') {
+        foreach ($Correction in $Result.Application.AppliedCorrections) {
             if ($Correction -notin $Proposal.AcceptedCorrections) {
-                throw 'Committed corrections must belong to the proposal accepted corrections.'
+                throw 'Applied corrections must belong to the proposal accepted corrections.'
             }
         }
 
-        if ($Result.Report.FindingsWithCommittedCorrections.Count -gt 0 -and
-            $Result.Application.CommittedCorrections.Count -eq 0) {
-            throw 'Findings cannot be attributed to committed corrections when none were committed.'
+        if ($Result.Report.FindingsWithAppliedCorrections.Count -gt 0 -and
+            $Result.Application.AppliedCorrections.Count -eq 0) {
+            throw 'Findings cannot be attributed to applied corrections when none were applied.'
         }
+    }
+
+    if ($Result.Report.FindingsWithAcceptedCorrections.Count -gt 0 -and (
+            $null -eq $Proposal -or
+            $Proposal.AcceptedCorrections.Count -eq 0
+        )
+    ) {
+        throw 'Findings cannot be attributed to accepted corrections when none were accepted.'
     }
 
     if ($AnalysisSource -eq 'Candidate' -and (

@@ -48,6 +48,40 @@ Resolve-AstDocument -Document $document
 `AstDocument` remains an internal implementation type. Consumers create documents through
 `New-AstDocument` and detached edits through `New-AstTextEdit` or structural edit commands.
 
+Document constructors share initialization and parsing. ScriptBlock and AST inputs parse
+their complete parse-time snapshot from `Extent.StartScriptPosition.GetFullScript()`,
+not just the submitted node's text. `Ast` is the submitted node relocated in that parse;
+`Root` groups the complete snapshot's typed `Ast`, `Tokens`, and `ParseErrors`.
+Type, exact offsets, and parent depth identify the node
+(a root and a nested scriptblock can have identical type and offsets). Missing or
+ambiguous matches, or extent text inconsistent with the snapshot, throw. If
+`GetFullScript()` is null, extent text is parsed as standalone input instead.
+
+`OriginalText` and all extents and edits use snapshot coordinates. `IsFragment` means
+`Ast` is not `Root.Ast`, regardless of how much text it covers. `Tokens` contains only
+tokens fully inside the fragment, descending into expandable-string nested tokens
+when the fragment is inside interpolation. `Root.Tokens` retains the parser's original
+token structure.
+`Root.ParseErrors` contains every snapshot error. `ParseErrors` omits only errors
+positioned strictly before the fragment start; errors after its end may still have
+been caused by it and are retained. For strings and root ASTs, fragment and root views
+coincide. A fragment's parent nodes provide context, not additional editing targets.
+
+ScriptBlock and AST inputs remain in-memory documents (`Path = '<memory>'`,
+`IsFileBacked = false`), even when their extents identify a file. Parser file names
+are provenance, not save targets; only `-Path` captures a transactional file snapshot.
+The source is not reread from disk, so later disk changes can make navigation stale.
+Use AST and token extents directly for source paths and one-based line/column positions;
+no coordinate translation is needed.
+
+`Resolve-AstDocument -PassThruText` returns the complete rendered snapshot as
+`RenderedText` and the submitted fragment's slice as `RenderedFragmentText`; they are
+equal for non-fragments. Validation reparses the entire snapshot with the source file
+name and never filters parse errors. If a syntactically valid replacement no longer
+has the submitted fragment's type, depth, and adjusted offsets, validation reports
+`FragmentNotFound` rather than selecting a different node. Replacing a whole fragment
+with another kind of construct (or deleting it) therefore fails validation.
+
 ## Core Model
 
 - `AstTextEdit`: class-based detached edit contract with source coordinates, expected text, replacement text, and reason
@@ -95,7 +129,12 @@ $result.RenderedText
 Use `New-AstTextEdit -Extent` when an `IScriptExtent` identifies the complete edit range.
 `New-AstCollectionEdit` returns the same contract for token-aware collection removal. Batch
 queueing validates expected text, ranges, overlaps, and same-offset insertions before queueing any
-member. Conflict exceptions expose the existing and incoming edits through `ExistingEdit` and
+member. Fragment documents also reject edits outside `Ast.Extent` with
+`Exception.Data['FailureKind'] = 'OutsideTarget'`, leaving the complete batch unqueued.
+Direct document methods enforce the same boundary. Zero-length insertions may occur at
+either endpoint, but rendering must still locate the fragment at its adjusted offsets;
+for example, inserting whitespace before its opening brace fails relocation validation.
+Conflict exceptions expose the existing and incoming edits through `ExistingEdit` and
 `IncomingEdit` entries in `Exception.Data`. The offset and extent parameter sets on
 `Add-AstTextEdit` remain convenience surfaces for one edit.
 
@@ -235,3 +274,8 @@ Output is written to:
 
 - AstEditor intentionally avoids mutating PowerShell AST objects in-place.
 - It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+
+## Todo
+
+- AstEditor conflict exceptions carry field snapshots, not edit instances (Data['ExistingEdit'] is a hashtable). That forced the field-matching `$FindOwner` logic in the resolver to map conflicts back to owning corrections — workable, but brittle if AstTextEdit fields ever change. If AstEditor could attach the actual instances (or a correlation token), the resolver's attribution would collapse to a dictionary lookup.
+  - `$FindOwner` lives in `Resolve-NitpickCorrectionProposal` around line 230.

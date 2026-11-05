@@ -65,7 +65,7 @@ function Edit-PSFunction {
             throw "Cannot apply function replacement. Parse errors detected: $($Validation.ParseErrorCount)."
         }
 
-        if ($PSCmdlet.ShouldProcess($Document.Path, "Replace function '$Name'")) {
+        if (Should-Process $Document.Path "Replace function '$Name'") {
             $WriteResult = Save-AstDocument -Document $Document -Confirm:$false
             if ($WriteResult.ErrorRecord) {
                 $PSCmdlet.WriteError($WriteResult.ErrorRecord)

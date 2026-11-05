@@ -19,10 +19,14 @@ Describe 'Format-NitpickText' {
                 $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
                     '  $Value = 1', $FilePath, [ref] $Tokens, [ref] $Errors
                 )
-                $Finding = New-NitpickFinding -RuleName TestRule -RuleSuppressionID TestRule `
-                    -Message 'Test message' -Severity Warning `
+
+                $Finding = New-NitpickFinding `
+                    -RuleId 'Local/TestRule' `
+                    -Message 'Test message' `
+                    -Severity Warning `
                     -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
-                    -ScriptPath $FilePath -Explanation 'Test finding'
+                    -ScriptPath $FilePath `
+                    -Explanation 'Test finding'
 
                 Format-NitpickText -Ast $Ast -Finding $Finding
             }
@@ -51,12 +55,21 @@ Describe 'Format-NitpickText' {
                 $Ast = [System.Management.Automation.Language.Parser]::ParseInput(
                     '$Value = 1', $FilePath, [ref] $Tokens, [ref] $Errors
                 )
-                $Finding = New-NitpickFinding -RuleName TestRule -RuleSuppressionID TestRule `
-                    -Message 'Test message' -Severity Warning `
+
+                $Finding = New-NitpickFinding `
+                    -RuleId 'Local/TestRule' `
+                    -Message 'Test message' `
+                    -Severity Warning `
                     -ViolationExtent $Ast.EndBlock.Statements[0].Extent `
-                    -ScriptPath $FilePath -Explanation 'Test finding'
-                $Correction = New-NitpickCorrection -ViolationExtent $Ast.Extent `
-                    -ReplacementText '$Value = 2' -FilePathOrContext $FilePath -Description 'Reason'
+                    -ScriptPath $FilePath `
+                    -Explanation 'Test finding'
+
+                $Correction = New-NitpickCorrection `
+                    -ViolationExtent $Ast.Extent `
+                    -ReplacementText '$Value = 2' `
+                    -FilePathOrContext $FilePath `
+                    -Description 'Reason'
+
                 $Proposal = [NitpickCorrectionProposal]@{
                     Status = 'Ready'
                     AcceptedCorrections = @($Correction)
@@ -64,7 +77,10 @@ Describe 'Format-NitpickText' {
                     Conflicts = @()
                     Diff = "1:1  Reason`n  1 - old`n    + new"
                 }
-                $CorrectionResult = New-NitpickCorrectionResult -Path $FilePath -Proposal $Proposal `
+
+                $CorrectionResult = New-NitpickCorrectionResult `
+                    -Path $FilePath `
+                    -Proposal $Proposal `
                     -Application @{ Status = 'Preview' }
 
                 Format-NitpickText -Ast $Ast -Finding $Finding -CorrectionResult $CorrectionResult

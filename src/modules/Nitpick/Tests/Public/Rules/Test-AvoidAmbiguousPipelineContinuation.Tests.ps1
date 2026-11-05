@@ -39,7 +39,7 @@ Describe 'Test-AvoidAmbiguousPipelineContinuation' {
     ) {
         $Result = @(Invoke-ContinuationRule -Source $Source)
         $Result | Should -HaveCount 1
-        $Result[0].RuleName | Should -Be 'AvoidAmbiguousPipelineContinuation'
+        $Result[0].RuleId | Should -Be 'Nitpick/AvoidAmbiguousPipelineContinuation'
         $Result[0].Severity | Should -Be 'Warning'
         $Result[0].Message | Should -BeLike 'Ambiguous pipeline continuation:*'
         $Result[0].Message | Should -BeLike "*Add '|'*blank line*dedent*"

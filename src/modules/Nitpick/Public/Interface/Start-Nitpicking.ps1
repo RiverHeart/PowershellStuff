@@ -61,8 +61,11 @@ using namespace System.Management.Automation.Language
     Specifies the mode for applying corrections.
     'Off'     - Do not apply any corrections.
     'Preview' - Report safe corrections as proposals for file-backed or in-memory inputs.
-    'Guided'  - Interactive correction process (not yet implemented).
-    'Apply'   - Apply safe corrections.
+    'Guided'  - Apply safe corrections; when a finding needs a choice (several
+                corrections, or only non-Safe ones), select it in the editor via
+                PowerShell Editor Services when available and prompt for the
+                correction to apply. Requires an interactive host.
+    'Apply'   - Apply safe corrections. Findings needing a choice are reported as undecided.
 
     NOTE: Previewing or applying against in-memory inputs returns candidate text
     in object output under `Report.EffectiveText` without modifying the input.
@@ -128,7 +131,6 @@ function Start-Nitpicking {
         [ValidateSet('Text', 'Object')]
         [string] $Output = 'Text',
 
-        # TODO: Implement guided mode as an interactive correction process.
         [ValidateSet('Off', 'Preview', 'Guided', 'Apply')]
         [string] $FixMode = 'Off',
 
@@ -139,6 +141,18 @@ function Start-Nitpicking {
 
     # MARK: BEGIN BLK
     begin {
+        # A plain `return` here would only exit `begin`; `process` and `end` would still run.
+        if ($FixMode -eq 'Guided' -and -not (Test-NitpickInteractiveSession)) {
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    [InvalidOperationException]::new('Guided mode requires an interactive session.'),
+                    'NitpickGuidedModeNonInteractive',
+                    [ErrorCategory]::InvalidOperation,
+                    $FixMode
+                )
+            )
+        }
+
         [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
             -Module $Module `
             -IncludeRule $IncludeRule `
@@ -148,6 +162,7 @@ function Start-Nitpicking {
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
+        $Summary.FixMode = $FixMode
         $Stopwatch = [Stopwatch]::StartNew()
         $SeverityRank = @{
             Information = 0
@@ -236,12 +251,7 @@ function Start-Nitpicking {
                     New-AstDocument -InputObject $Target
                 }
 
-                # WARNING: Keep original extent context for rules; reparsing memory input resets it.
-                $Ast = if ($PSCmdlet.ParameterSetName -eq 'Script' -and $FixMode -eq 'Off') {
-                    $Target
-                } else {
-                    $Document.Ast
-                }
+                $Ast = $Document.Ast
                 $ParseErrors = $Document.ParseErrors
             } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
                 $Summary.TargetCount++
@@ -270,16 +280,14 @@ function Start-Nitpicking {
             $TargetFindings = [List[object]]::new()
             foreach ($ParseError in $ParseErrors) {
                 $ParserFinding = New-NitpickFinding `
-                    -RuleName 'PowerShellParseError' `
+                    -RuleId 'Nitpick/PowerShellParseError' `
                     -Message $ParseError.Message `
                     -ViolationExtent $ParseError.Extent `
                     -Severity Error `
-                    -RuleSuppressionID 'PowerShellParseError' `
                     -ScriptPath $TargetPath `
                     -Explanation 'The PowerShell parser could not parse this source.' `
                     -OutputAs NitpickFinding
 
-                $ParserFinding.RuleId = 'Nitpick/PowerShellParseError'
                 $TargetFindings.Add($ParserFinding)
             }
 
@@ -307,16 +315,24 @@ function Start-Nitpicking {
             $FinalFindings = $TargetFindings.ToArray()
             if ($FixMode -ne 'Off') {
                 $CorrectionResult = Resolve-NitpickTargetCorrection `
-                    -Preview:($FixMode -eq 'Preview') `
+                    -FixMode $FixMode `
                     -Document $Document `
                     -Finding $TargetFindings.ToArray() `
                     -Rule $ApplicableRules.ToArray()
 
                 $FinalFindings = $CorrectionResult.Report.EffectiveFindings
-                $Summary.FindingsWithCommittedCorrectionsCount +=
-                    $CorrectionResult.Report.FindingsWithCommittedCorrections.Count
 
-                $Summary.SkippedCorrectionCount += $CorrectionResult.Proposal.SkippedCorrections.Count
+                $Summary.CorrectedFindingCount +=
+                    $CorrectionResult.Report.FindingsWithAppliedCorrections.Count
+                foreach ($AcceptedFinding in $CorrectionResult.Report.FindingsWithAcceptedCorrections) {
+                    if ($AcceptedFinding -notin $CorrectionResult.Report.FindingsWithAppliedCorrections) {
+                        $Summary.CorrectableFindingCount++
+                    }
+                }
+                $Summary.UnresolvedFindingCount += $FinalFindings.Count
+                $Summary.UndecidedFindingCount += $CorrectionResult.Proposal.UndecidedFindings.Count
+
+                $Summary.SkippedFindingCount += $CorrectionResult.Proposal.SkippedFindings.Count
 
                 if ($CorrectionResult.Proposal.Conflicts.Count -gt 0) {
                     $Summary.ConflictedTargetCount++
@@ -329,14 +345,18 @@ function Start-Nitpicking {
                 }
             }
 
-            foreach ($Finding in $FinalFindings) {
+            # FindingCount and the severity counters describe detected findings (original analysis,
+            # parse errors included). Pipeline output and the -ErrorOn threshold use effective findings.
+            foreach ($Finding in $TargetFindings) {
                 $Summary.FindingCount++
                 switch ($Finding.Severity) {
                     'Error' { $Summary.ErrorCount++ }
                     'Warning' { $Summary.WarningCount++ }
                     'Information' { $Summary.InformationCount++ }
                 }
+            }
 
+            foreach ($Finding in $FinalFindings) {
                 if ($ErrorOn -and
                     $SeverityRank.ContainsKey($Finding.Severity) -and
                     $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]
@@ -358,7 +378,11 @@ function Start-Nitpicking {
                     -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
                               @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
 
-                $TargetText = Format-NitpickText -Ast $Ast -Finding $SortedFindings -CorrectionResult $CorrectionResult
+                $TargetText = Format-NitpickText `
+                    -Ast $Ast `
+                    -Finding $SortedFindings `
+                    -CorrectionResult $CorrectionResult `
+                    -IsFragment:$Document.IsFragment
 
                 if ($TargetText) {
                     if ($HasWrittenTextBlock) { Write-Host '' }

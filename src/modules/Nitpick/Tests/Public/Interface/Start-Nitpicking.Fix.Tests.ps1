@@ -1,17 +1,22 @@
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
+    . "$PSScriptRoot\..\..\Support\CorrectionFixtures.ps1"
 
     # Keep text assertions independent of the host terminal's hyperlink support.
     $PreviousNoHyperlink = $env:NO_HYPERLINK
     $PreviousForceHyperlink = $env:FORCE_HYPERLINK
     $env:NO_HYPERLINK = '1'
     $env:FORCE_HYPERLINK = $null
+
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
+    $env:WHATIF__QUIET = 'True'
 }
 
 AfterAll {
     $env:NO_HYPERLINK = $PreviousNoHyperlink
     $env:FORCE_HYPERLINK = $PreviousForceHyperlink
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
     Remove-Module Nitpick -Force -ErrorAction SilentlyContinue
 }
 
@@ -43,26 +48,25 @@ Describe 'Start-Nitpicking transactional fixes' {
                         -ReplacementText $Replacement `
                         -FilePathOrContext $Context `
                         -Description 'Replace value' `
-                        -RuleName TransactionRule
+                        -RuleId 'Local/TransactionRule'
                 )
                 if ($Assignment.Extent.File -like '*Stale.ps1') {
                     [System.IO.File]::WriteAllText($Assignment.Extent.File, '$Value = 3')
                 }
             }
             New-NitpickFinding `
-                -RuleName TransactionRule `
+                -RuleId 'Local/TransactionRule' `
                 -Message 'Transaction finding' `
                 -ViolationExtent $Assignment.Extent `
                 -Severity $Severity `
-                -RuleSuppressionID TransactionRule `
                 -ScriptPath $Context `
                 -Corrections $Corrections `
-                -Explanation 'Verifies committed versus candidate analysis.'
+                -Explanation 'Verifies applied versus candidate analysis.'
         }
         Register-Nitpick -Callable $Rule -Name TransactionRule -Source Tests
     }
 
-    It 'commits a file and calculates output, severity counts, and threshold from final analysis' {
+    It 'commits a file, counts detected severities, and thresholds on final analysis' {
         $Path = Join-Path $TestDrive 'Apply.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
@@ -74,18 +78,22 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
         $Result.Application.Status | Should -Be 'Written'
-        $Result.Application.CommittedCorrections | Should -HaveCount 1
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 1
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 1
         $Result.Report.EffectiveFindings | Should -HaveCount 1
         $Result.Report.EffectiveFindings[0].Location | Should -Be "${Path}:1:1"
-        $Result.Report.FindingsWithCommittedCorrections[0] | Should -Be $Result.Proposal.OriginalFindings[0]
-        $Result.Report.FindingsWithCommittedCorrections[0].Severity | Should -Be 'Error'
+        $Result.Report.FindingsWithAppliedCorrections[0] | Should -Be $Result.Proposal.OriginalFindings[0]
+        $Result.Report.FindingsWithAppliedCorrections[0].Severity | Should -Be 'Error'
 
         $Findings[0].Severity | Should -Be 'Warning'
 
-        $Summary.ErrorCount | Should -Be 0
-        $Summary.WarningCount | Should -Be 1
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 1
+        $Summary.FindingCount | Should -Be 1
+        $Summary.ErrorCount | Should -Be 1
+        $Summary.WarningCount | Should -Be 0
+        $Summary.CorrectedFindingCount | Should -Be 1
+        $Summary.CorrectableFindingCount | Should -Be 0
+        $Summary.UnresolvedFindingCount | Should -Be 1
+        $Summary.FixMode | Should -Be 'Apply'
         $Summary.PSObject.Properties.Name | Should -Not -Contain 'FixedFindingCount'
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 2'
@@ -105,13 +113,15 @@ Describe 'Start-Nitpicking transactional fixes' {
         $ExpectedBytes = [byte[]](@($Encoding.GetPreamble()) + @($Encoding.GetBytes($Expected)))
 
         $Result.Application.WriteResult.WasWritten | Should -BeTrue
-        $Result.Application.CommittedCorrections | Should -HaveCount 2
-        $Result.Report.FindingsWithCommittedCorrections | Should -HaveCount 2
+        $Result.Application.AppliedCorrections | Should -HaveCount 2
+        $Result.Report.FindingsWithAppliedCorrections | Should -HaveCount 2
         $Result.Report.EffectiveFindings.GetType().IsArray | Should -BeTrue
         $Result.Report.EffectiveFindings | Should -HaveCount 0
 
-        $Summary.FindingCount | Should -Be 0
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 2
+        $Summary.FindingCount | Should -Be 2
+        $Summary.InformationCount | Should -Be 2
+        $Summary.CorrectedFindingCount | Should -Be 2
+        $Summary.UnresolvedFindingCount | Should -Be 0
 
         [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) |
             Should -Be ([Convert]::ToBase64String($ExpectedBytes))
@@ -127,19 +137,24 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'Preview'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
     }
 
-    It 'shows proposed edits in text output without claiming they were committed' {
+    It 'shows proposed edits in text output without claiming they were applied' {
         $Path = Join-Path $TestDrive 'PreviewText.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
 
         $Output = @(
-            Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Preview `
-                -Output Text -NoSummary -ErrorAction Stop
+            Start-Nitpicking `
+                -Path $Path `
+                -IncludeRule Local/TransactionRule `
+                -FixMode Preview `
+                -Output Text `
+                -NoSummary `
+                -ErrorAction Stop
         ) -join "`n"
 
         $Lines = $Output -split '\r?\n'
@@ -150,7 +165,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         [regex]::Matches($Output, '\|   \^{10}').Count | Should -Be 2
         $Lines[-1] | Should -BeExactly '  1 proposed correction.'
         $Output | Should -Not -MatchExactly '\(preview\)|No files changed'
-        $Output | Should -Not -Match 'committed'
+        $Output | Should -Not -Match 'applied|committed'
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
     }
 
@@ -202,7 +217,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Output | Should -Match 'Transaction finding'
         $Output | Should -Not -Match 'proposal:'
         $Output | Should -Not -Match 'No queued edits'
-        $Output | Should -Not -Match 'committed, .* accepted, .* skipped'
+        $Output | Should -Not -Match 'applied, .* accepted, .* skipped'
     }
 
     It 'honors WhatIf and restores native rule invocation context' {
@@ -210,14 +225,22 @@ Describe 'Start-Nitpicking transactional fixes' {
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
         Remove-Variable NitpickInvocationContext -Scope Global -ErrorAction SilentlyContinue
 
-        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Apply -WhatIf `
-            -Output Object -NoSummary -ErrorAction Stop)
+        $Results = @(
+            Start-Nitpicking `
+                -Path $Path `
+                -IncludeRule Local/TransactionRule `
+                -FixMode Apply `
+                -WhatIf `
+                -Output Object `
+                -NoSummary `
+                -ErrorAction Stop
+        )
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'WhatIf'
         $Result.Application.WriteResult | Should -BeNullOrEmpty
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
 
@@ -226,8 +249,8 @@ Describe 'Start-Nitpicking transactional fixes' {
     }
 
     It 'reports <Status> for script input in <FixMode> mode while returning candidate analysis' -ForEach @(
-        @{ FixMode = 'Preview'; Status = 'Preview' }
-        @{ FixMode = 'Apply'; Status = 'InMemory' }
+        @{ FixMode = 'Preview'; Status = 'Preview'; AppliedCount = 0; CorrectableCount = 1 }
+        @{ FixMode = 'Apply'; Status = 'InMemory'; AppliedCount = 1; CorrectableCount = 0 }
     ) {
         $Source = [scriptblock]::Create('$Value = 1')
         $Results = @(Start-Nitpicking -Script $Source -IncludeRule Local/TransactionRule -FixMode $FixMode `
@@ -237,13 +260,16 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Result.Application.Status | Should -Be $Status
         $Result.Application.WriteResult | Should -BeNullOrEmpty
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount $AppliedCount
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
         $Result.Report.EffectiveText | Should -Be '$Value = 2'
         $Result.Report.EffectiveFindings[0].Severity | Should -Be 'Warning'
-        $Summary.ErrorCount | Should -Be 0
-        $Summary.WarningCount | Should -Be 1
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 0
+        $Summary.FindingCount | Should -Be 1
+        $Summary.ErrorCount | Should -Be 1
+        $Summary.WarningCount | Should -Be 0
+        $Summary.CorrectedFindingCount | Should -Be $AppliedCount
+        $Summary.CorrectableFindingCount | Should -Be $CorrectableCount
+        $Summary.UnresolvedFindingCount | Should -Be 1
         $Source.ToString() | Should -Be '$Value = 1'
     }
 
@@ -279,6 +305,139 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Result.Proposal.Document.IsFileBacked | Should -BeFalse
     }
 
+    It 'resolves a kicker-style nested scriptblock in Guided mode' {
+        Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+        Mock Read-Host -ModuleName Nitpick { '0' }
+        $Source = {
+            param([Parameter(Mandatory=$true)] $MyParam)
+        }
+
+        $Results = @(Start-Nitpicking -Script $Source `
+            -IncludeRule Nitpick/AvoidParameterAttributeBool -FixMode Guided `
+            -Output Object -NoSummary -ErrorAction Stop)
+
+        $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+        $Result.Proposal.Status | Should -Be 'Ready'
+        $Result.Application.Status | Should -Be 'InMemory'
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
+        $Result.Report.EffectiveText | Should -Match '\[Parameter\(Mandatory\)\]'
+        $Result.Report.EffectiveText | Should -Not -Match 'Mandatory=\$true'
+        $Result.Proposal.Document.IsFileBacked | Should -BeFalse
+        Should -Invoke Read-Host -ModuleName Nitpick -Times 0 -Exactly
+    }
+
+    It 'terminates Guided mode in a non-interactive host before analysis' {
+        $ModulePath = (Get-Module Nitpick).Path
+        $ModuleRoot = (Resolve-Path (Join-Path (Split-Path $ModulePath) '..')).Path
+        $ScriptPath = Join-Path $TestDrive 'NonInteractiveGuided.ps1'
+        @(
+            '$env:PSModulePath = "{0}" + [IO.Path]::PathSeparator + $env:PSModulePath' -f $ModuleRoot
+            'Import-Module "{0}" -Force' -f $ModulePath
+            '$Output = @()'
+            'try {'
+            '    $Output = @(Start-Nitpicking -Script ''param([Parameter(Mandatory=$true)] $MyParam)'' `'
+            '        -IncludeRule Nitpick/AvoidParameterAttributeBool -FixMode Guided -Output Object)'
+            '} catch {'
+            '    "Error=$($_.FullyQualifiedErrorId)"'
+            '}'
+            '"Outputs=$($Output.Count)"'
+        ) | Set-Content -LiteralPath $ScriptPath -Encoding UTF8
+
+        $HostPath = (Get-Process -Id $PID).Path
+        $Lines = @(& $HostPath -NoProfile -NonInteractive -File $ScriptPath 2>&1 | ForEach-Object { "$_" })
+
+        $Lines | Should -Contain 'Error=NitpickGuidedModeNonInteractive,Start-Nitpicking'
+        $Lines | Should -Contain 'Outputs=0'
+    }
+
+    Context 'findings that require a choice' {
+        BeforeEach {
+            Register-TestAlternativesRule -Name ChoiceRule -Trigger '$Choice = 1' -Alternative @(
+                @{ ReplacementText = '$Choice = 2'; Applicability = 'Review' }
+                @{ ReplacementText = '$Choice = 3'; Applicability = 'Unsafe' }
+            )
+            $Path = Join-Path $TestDrive 'Choice.ps1'
+            [System.IO.File]::WriteAllText($Path, '$Choice = 1')
+        }
+
+        It 'applies the correction chosen in Guided mode, including a non-Safe one' {
+            Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+            Mock Write-Host -ModuleName Nitpick { }
+            Mock Read-Host -ModuleName Nitpick { '1' }
+
+            $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Guided `
+                -Output Object -Confirm:$false -ErrorAction Stop)
+
+            $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+            $Summary = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickSummary' }
+
+            $Result.Application.Status | Should -Be 'Written'
+            $Result.Application.AppliedCorrections | Should -HaveCount 1
+            $Result.Application.AppliedCorrections[0].Applicability | Should -Be 'Unsafe'
+            $Result.Proposal.UndecidedFindings | Should -HaveCount 0
+
+            [System.IO.File]::ReadAllText($Path) | Should -Be '$Choice = 3'
+
+            $Summary.CorrectedFindingCount | Should -Be 1
+            $Summary.UndecidedFindingCount | Should -Be 0
+            $Summary.ToString() | Should -Not -Match 'FixMode Guided'
+            Should -Invoke Read-Host -ModuleName Nitpick -Times 1 -Exactly
+        }
+
+        It 'reports an undecided finding in <FixMode> mode and hints at Guided' -ForEach @(
+            @{ FixMode = 'Apply' }
+            @{ FixMode = 'Preview' }
+        ) {
+            $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode $FixMode `
+                -Output Object -Confirm:$false -ErrorAction Stop)
+
+            $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
+            $Summary = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickSummary' }
+
+            $Result.Proposal.Status | Should -Be 'NoChanges'
+            $Result.Proposal.UndecidedFindings | Should -HaveCount 1
+            $Result.Proposal.SkippedCorrections | Should -HaveCount 2
+
+            [System.IO.File]::ReadAllText($Path) | Should -Be '$Choice = 1'
+
+            $Summary.UndecidedFindingCount | Should -Be 1
+            $Summary.CorrectedFindingCount | Should -Be 0
+            $Summary.ToString() | Should -Match '1 undecided'
+            $Summary.ToString() | Should -Match 'Use -FixMode Guided to choose'
+        }
+
+        It 'prints a clean trailer when the chosen correction resolves the finding' {
+            Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+            Mock Read-Host -ModuleName Nitpick { '1' }
+
+            $Text = (Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Guided `
+                -Output Text -NoSummary -Confirm:$false -ErrorAction Stop 6>$null) -join "`n"
+
+            $Text | Should -Match '\n  1 correction applied\.$'
+            $Text | Should -Not -Match 'skipped'
+        }
+
+        It 'prints the Guided hint in the text summary' {
+            $Text = (Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Apply `
+                -Output Text -Confirm:$false -ErrorAction Stop 6>$null) -join "`n"
+
+            $Text | Should -Match '1 undecided'
+            $Text | Should -Match 'Use -FixMode Guided to choose between alternative or non-Safe corrections\.'
+        }
+    }
+
+    It 'uses the bare source path for whole-file AST input without enabling writes' {
+        $Path = Join-Path $TestDrive 'Origin.ps1'
+        [System.IO.File]::WriteAllText($Path, "# prefix`n`$Value = 1")
+        $Ast = Import-ScriptBlockAst -FilePath $Path
+
+        $Text = (Start-Nitpicking -Script $Ast -IncludeRule Local/TransactionRule -FixMode Preview `
+            -Output Text -NoSummary -ErrorAction Stop) -join "`n"
+
+        ($Text -split '\r?\n')[0] | Should -BeExactly $Path
+        [System.IO.File]::ReadAllText($Path) | Should -Be "# prefix`n`$Value = 1"
+    }
+
     It 'does not write a file-backed AST supplied through Script' {
         $Path = Join-Path $TestDrive 'AstInput.ps1'
         [System.IO.File]::WriteAllText($Path, '$Value = 1')
@@ -289,7 +448,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'InMemory'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 1
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
     }
@@ -306,7 +465,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Result.Application.Status | Should -Be 'StaleSource'
         $Result.Application.WriteResult.WasWritten | Should -BeFalse
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         $Result.Report.EffectiveFindings[0].Severity | Should -Be 'Error'
         $Result.Report.EffectiveText | Should -Be '$Value = 1'
         $Result.Report.AnalysisSource | Should -Be 'Original'
@@ -315,7 +474,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Summary.ErrorCount | Should -Be 1
         $Summary.FailedTargetCount | Should -Be 1
-        $Summary.SkippedCorrectionCount | Should -Be 0
+        $Summary.SkippedFindingCount | Should -Be 0
         $Errors | Should -Not -BeNullOrEmpty
 
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 3'
@@ -344,7 +503,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Invalid.Proposal.CandidateText | Should -Be 'if ('
 
         $Invalid.Application.Status | Should -Be 'NotAttempted'
-        $Invalid.Application.CommittedCorrections | Should -HaveCount 0
+        $Invalid.Application.AppliedCorrections | Should -HaveCount 0
 
         $Invalid.Report.EffectiveFindings[0].Severity | Should -Be 'Error'
         $Invalid.Report.AnalysisSource | Should -Be 'Original'
@@ -354,8 +513,8 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Summary.TargetCount | Should -Be 2
         $Summary.FailedTargetCount | Should -Be 1
-        $Summary.SkippedCorrectionCount | Should -Be 1
-        $Summary.FindingsWithCommittedCorrectionsCount | Should -Be 1
+        $Summary.SkippedFindingCount | Should -Be 1
+        $Summary.CorrectedFindingCount | Should -Be 1
 
         [System.IO.File]::ReadAllText($InvalidPath) | Should -Be '$Value = 1'
         [System.IO.File]::ReadAllText($ValidPath) | Should -Be '$Value = 2'
@@ -374,7 +533,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Application.Status | Should -Be 'FailedWrite'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         $Result.Application.WriteResult.WasWritten | Should -BeFalse
 
         $Result.Report.EffectiveFindings[0].Severity | Should -Be 'Error'
@@ -411,7 +570,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Invalid.Proposal | Should -BeNullOrEmpty
 
         $Invalid.Application.Status | Should -Be 'FailedRead'
-        $Invalid.Application.CommittedCorrections | Should -HaveCount 0
+        $Invalid.Application.AppliedCorrections | Should -HaveCount 0
         $Invalid.Application.WriteResult | Should -BeNullOrEmpty
         $Invalid.Application.ErrorRecord | Should -Not -BeNullOrEmpty
 
@@ -419,8 +578,8 @@ Describe 'Start-Nitpicking transactional fixes' {
         ($null -eq $Invalid.Report.EffectiveText) | Should -BeTrue
         $Invalid.Report.EffectiveFindings -is [array] | Should -BeTrue
         $Invalid.Report.EffectiveFindings | Should -HaveCount 0
-        $Invalid.Report.FindingsWithCommittedCorrections -is [array] | Should -BeTrue
-        $Invalid.Report.FindingsWithCommittedCorrections | Should -HaveCount 0
+        $Invalid.Report.FindingsWithAppliedCorrections -is [array] | Should -BeTrue
+        $Invalid.Report.FindingsWithAppliedCorrections | Should -HaveCount 0
 
         $Valid.Application.WriteResult.WasWritten | Should -BeTrue
 
@@ -442,7 +601,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Result = $Results | Where-Object { $_.PSTypeNames -contains 'NitpickCorrectionResult' }
         $Result.Proposal.Status | Should -Be 'NoChanges'
         $Result.Application.Status | Should -Be 'NotAttempted'
-        $Result.Application.CommittedCorrections | Should -HaveCount 0
+        $Result.Application.AppliedCorrections | Should -HaveCount 0
         $Result.Report.EffectiveFindings | Should -HaveCount 1
         $Result.Report.AnalysisSource | Should -Be 'Candidate'
         Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly

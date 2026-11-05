@@ -336,7 +336,7 @@ Describe 'Start-Nitpicking' {
                 -WarningAction SilentlyContinue `
                 -ErrorAction SilentlyContinue
         )
-        $ParseFinding = $Results | Where-Object RuleName -eq 'PowerShellParseError'
+        $ParseFinding = $Results | Where-Object RuleId -eq 'Nitpick/PowerShellParseError'
         $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
         $ParseFinding | Should -Not -BeNullOrEmpty
@@ -357,7 +357,7 @@ Describe 'Start-Nitpicking' {
                     -WarningAction SilentlyContinue `
                     -ErrorAction SilentlyContinue
             )
-            $ParseFinding = $Results | Where-Object RuleName -eq 'PowerShellParseError'
+            $ParseFinding = $Results | Where-Object RuleId -eq 'Nitpick/PowerShellParseError'
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
 
             $ParseFinding | Should -Not -BeNullOrEmpty
@@ -446,11 +446,10 @@ Describe 'Start-Nitpicking' {
             }
 
             New-NitpickFinding `
-                -RuleName ScopedRule `
+                -RuleId 'Local/ScopedRule' `
                 -Message 'Scoped rule ran' `
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity Information `
-                -RuleSuppressionID ScopedRule `
                 -ScriptPath $ScriptBlockAst.Extent.File `
                 -Explanation 'Verifies scoped dispatch.' `
                 -OutputAs NitpickFinding
@@ -483,7 +482,7 @@ Describe 'Start-Nitpicking' {
         $PathResults.Count | Should -Be 1
         $PathResults[0].Location | Should -Match 'included\.dsl\.ps1:'
         $ScriptResults.Count | Should -Be 1
-        $ScriptResults[0].RuleName | Should -Be 'ScopedRule'
+        $ScriptResults[0].RuleId | Should -Be 'Local/ScopedRule'
     }
 
     It 'returns only findings when NoSummary is specified' {
@@ -535,7 +534,7 @@ Describe 'Start-Nitpicking' {
         $Results[0] | Should -BeOfType ([string])
         $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool$'
         $Results[1] | Should -BeOfType ([string])
-        $Results[1] | Should -Match '^1 finding \(0 errors, 0 warnings, 1 information\) across 1 target in [\d,]+ ms$'
+        $Results[1] | Should -Match '^1 finding \(1 information\) across 1 target in [\d,]+ ms$'
     }
 
     It 'separates consecutive target findings with host-only blank lines' {
@@ -571,11 +570,10 @@ Describe 'Start-Nitpicking' {
             }, $false))
             foreach ($Variable in $Variables | Sort-Object { $_.Extent.StartLineNumber } -Descending) {
                 New-NitpickFinding `
-                    -RuleName OutOfOrder `
+                    -RuleId 'Local/OutOfOrder' `
                     -Message "$($Variable.VariablePath.UserPath) finding" `
                     -ViolationExtent $Variable.Extent `
                     -Severity Information `
-                    -RuleSuppressionID OutOfOrder `
                     -ScriptPath '<ScriptBlock>' `
                     -Explanation 'Returns findings out of order.' `
                     -OutputAs NitpickFinding
@@ -595,7 +593,7 @@ Describe 'Start-Nitpicking' {
         $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+Local/OutOfOrder$'
     }
 
-    It 'previews corrections and summarizes final findings for in-memory input' {
+    It 'previews corrections and summarizes detected findings for in-memory input' {
         $Source = 'param([Parameter(Mandatory=$true)] [string] $Name)'
         [array] $Results = Start-Nitpicking `
             -Script $Source `
@@ -611,10 +609,12 @@ Describe 'Start-Nitpicking' {
         $Preview.Proposal.Diff | Should -Match 'Mandatory=\$true'
         $Preview.Proposal.Diff | Should -Match 'Mandatory'
         $Preview.Proposal.AcceptedCorrections | Should -HaveCount 1
-        $Preview.Application.CommittedCorrections | Should -HaveCount 0
+        $Preview.Application.AppliedCorrections | Should -HaveCount 0
 
-        $Summary.FindingCount | Should -Be 0
-        $Summary.InformationCount | Should -Be 0
+        $Summary.FindingCount | Should -Be 1
+        $Summary.InformationCount | Should -Be 1
+        $Summary.CorrectableFindingCount | Should -Be 1
+        $Summary.UnresolvedFindingCount | Should -Be 0
     }
 
     It 'reports rejected corrections and conflicts in object and text output' {
@@ -622,32 +622,26 @@ Describe 'Start-Nitpicking' {
             param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
 
             $Extent = $ScriptBlockAst.EndBlock.Statements[0].Extent
-            $Corrections = @(
-                New-NitpickCorrection `
+            # Conflicting fixes must come from separate findings; two Safe
+            # corrections on one finding are skipped as ambiguous alternatives.
+            foreach ($Replacement in '$Value = 456', '$Value = 789') {
+                $Correction = New-NitpickCorrection `
                     -ViolationExtent $Extent `
-                    -ReplacementText '$Value = 456' `
+                    -ReplacementText $Replacement `
                     -FilePathOrContext '<ScriptBlock>' `
-                    -Description 'First replacement.' `
-                    -RuleName 'ConflictingRule'
+                    -Description "Replace with $Replacement." `
+                    -RuleId 'Local/ConflictingRule'
 
-                New-NitpickCorrection `
+                New-NitpickFinding `
+                    -RuleId 'Local/ConflictingRule' `
+                    -Message 'Conflicting correction test.' `
                     -ViolationExtent $Extent `
-                    -ReplacementText '$Value = 789' `
-                    -FilePathOrContext '<ScriptBlock>' `
-                    -Description 'Second replacement.' `
-                    -RuleName 'ConflictingRule'
-            )
-
-            New-NitpickFinding `
-                -RuleName 'ConflictingRule' `
-                -Message 'Conflicting correction test.' `
-                -ViolationExtent $Extent `
-                -Severity Information `
-                -RuleSuppressionID 'ConflictingRule' `
-                -Corrections $Corrections `
-                -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
-                -OutputAs NitpickFinding
+                    -Severity Information `
+                    -Corrections $Correction `
+                    -ScriptPath '<ScriptBlock>' `
+                    -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
+                    -OutputAs NitpickFinding
+            }
         }
         Register-Nitpick -Callable $Rule -Name ConflictingRule -Source Tests
 
@@ -677,7 +671,7 @@ Describe 'Start-Nitpicking' {
                 -NoSummary
         ) -join "`n"
         $Text | Should -Match '(?m)^<ScriptBlock>\r?$'
-        $Text | Should -Match '  0 corrections committed, 0 corrections accepted, 2 edits skipped, 1 conflict \(proposal: Rejected; application: NotAttempted\)\.'
+        $Text | Should -Match '  0 corrections applied, 0 corrections accepted, 2 findings skipped, 1 conflict \(proposal: Rejected; application: NotAttempted\)\.'
     }
 
     It 'errors for <FindingSeverity> findings at the <ErrorOn> threshold: <ShouldError>' -ForEach $SeverityThresholdCases {
@@ -687,11 +681,10 @@ Describe 'Start-Nitpicking' {
             param([System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst)
 
             New-NitpickFinding `
-                -RuleName $RuleName `
+                -RuleId "Local/$RuleName" `
                 -Message 'Threshold test finding' `
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity $RuleSeverity `
-                -RuleSuppressionID $RuleName `
                 -ScriptPath '<ScriptBlock>' `
                 -Explanation 'Threshold test finding' `
                 -OutputAs NitpickFinding

@@ -6,21 +6,28 @@
     Creates a new Nitpick finding object with the specified properties. When OutputAs is not
     specified, returns NitpickFinding regardless of which assemblies are loaded.
     ScriptAnalyzer-compatible rules must explicitly request DiagnosticRecord output.
-    Diagnostic conversion omits corrections with a ChangeSetId because ScriptAnalyzer
-    cannot preserve their all-or-nothing selection. Ungrouped suggestions remain available.
-    Standalone findings retain producer-supplied local labels and have no qualified RuleId.
-    NitpickRule. Invoke assigns descriptor-owned RuleId and RuleName to native findings
-    and nested corrections, and assigns the same local name to findings' RuleSuppressionID.
+    Diagnostic conversion omits multi-edit corrections because ScriptAnalyzer
+    cannot preserve their all-or-nothing application. Single-edit corrections remain available.
+    Findings require a qualified RuleId. Diagnostic conversion derives local RuleName
+    and RuleSuppressionID values at the external boundary; native objects carry only RuleId.
+    NitpickRule.Invoke replaces producer-supplied identity on native findings and nested
+    corrections with the executing descriptor's identity.
+
+.PARAMETER RuleId
+    Required identity in Namespace/Name form, without wildcard syntax.
+    It does not infer or assign
+    identity to nested corrections; supply their RuleId separately when needed.
 
 .EXAMPLE
     Creates a new Nitpick finding object with the specified properties.
 
     $Finding = New-NitpickFinding `
-        -RuleName 'MyRule' `
+        -RuleId 'Local/MyRule' `
         -Message 'This is a test message' `
         -ViolationExtent $extent `
         -Severity 'Warning' `
-        -RuleSuppressionID 'None' `
+        -ScriptPath '<ScriptBlock>' `
+        -Explanation 'Why this rule applies.' `
         -Corrections @() `
         -OutputAs 'NitpickFinding'
 #>
@@ -29,7 +36,8 @@ function New-NitpickFinding {
     [OutputType('NitpickFinding')]
     param(
         [Parameter(Mandatory)]
-        [string] $RuleName,
+        [ValidateNotNullOrEmpty()]
+        [string] $RuleId,
 
         [Parameter(Mandatory)]
         [string] $Message,
@@ -40,9 +48,6 @@ function New-NitpickFinding {
         [Parameter(Mandatory)]
         [ValidateSet('Information', 'Warning', 'Error')]
         [string] $Severity,
-
-        [Parameter(Mandatory)]
-        [string] $RuleSuppressionID,
 
         [Parameter(Mandatory)]
         [string] $ScriptPath,
@@ -64,11 +69,10 @@ function New-NitpickFinding {
     $FindingParams = @{
         ViolationExtent = $ViolationExtent
         Message = $Message
-        RuleName = $RuleName
-        RuleSuppressionID = $RuleSuppressionID
         Severity = $Severity
         ScriptPath = $ScriptPath
         Explanation = $Explanation
+        RuleId = $RuleId
     }
     if ($Corrections) { $FindingParams.Corrections = $Corrections }
     if ($RunCondition) { $FindingParams.RunCondition = $RunCondition }

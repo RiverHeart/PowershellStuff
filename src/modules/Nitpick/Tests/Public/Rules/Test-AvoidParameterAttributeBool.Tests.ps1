@@ -110,7 +110,7 @@ Describe 'Test-AvoidParameterAttributeBool' {
         $ScriptBlockAst = [scriptblock]::Create($Source).Ast
         $Rule = New-Nitpick -Callable Test-AvoidParameterAttributeBool
         $Findings = $Rule.Invoke($ScriptBlockAst)
-        $Edit = $Findings[0].Corrections[0].TextEdit
+        $Edit = $Findings[0].Corrections[0].TextEdits[0]
         $Edit.StartOffset | Should -Be ($Source.IndexOf('Mandatory') + 'Mandatory'.Length)
         $Edit.ExpectedText | Should -BeExactly $ExpectedText
         $Edit.ReplacementText | Should -BeExactly ''

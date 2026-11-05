@@ -28,16 +28,22 @@ using namespace System.Text
 .PARAMETER CorrectionResult
     The NitpickCorrectionResult for the target, when corrections were requested.
 
+.PARAMETER IsFragment
+    Identifies a submitted fragment rather than a complete snapshot root. For a
+    file-sourced fragment, places its line range above the bare path so native
+    terminal path detection remains available.
+
 .EXAMPLE
     Format findings for a specific AST and display them as console-friendly text
 
     $Ast = {}.Ast
     $Finding = New-NitpickFinding `
-        -RuleName 'MyRule' `
+        -RuleId 'Local/MyRule' `
         -Message 'This is a test message' `
         -ViolationExtent $extent `
         -Severity 'Warning' `
-        -RuleSuppressionID 'None' `
+        -ScriptPath '<ScriptBlock>' `
+        -Explanation 'Why this rule applies.' `
         -Corrections @() `
         -OutputAs 'NitpickFinding'
 
@@ -55,7 +61,10 @@ function Format-NitpickText {
         [object[]] $Finding = @(),
 
         [Parameter()]
-        [NitpickCorrectionResult] $CorrectionResult
+        [NitpickCorrectionResult] $CorrectionResult,
+
+        [Parameter()]
+        [switch] $IsFragment
     )
 
     $CorrectionText = if ($CorrectionResult) {
@@ -75,6 +84,10 @@ function Format-NitpickText {
     }
 
     $Builder = [StringBuilder]::new()
+    if ($IsFragment -and $Ast.Extent.File) {
+        $Builder.AppendLine(('(fragment, lines {0}-{1})' -f
+            $Ast.Extent.StartLineNumber, $Ast.Extent.EndLineNumber)) | Out-Null
+    }
     $Builder.AppendLine($FilePath) | Out-Null
 
     # Convert each finding into a structured row for display so we can calculate
