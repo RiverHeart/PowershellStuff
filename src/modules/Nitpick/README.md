@@ -14,10 +14,6 @@ Start-Nitpicking -Script {
 }
 ```
 
-The resulting output starts by identifying the lines that were considered. The filepath is followed up by each finding from that file. Those findings are formatted as `N:M severity Description RuleName`. An uninterrupted filepath followed by `N:M` at the start of each line allows VSCode to mark them lines as hyperlinks to the violation area.
-
-Finally, the number of findings, their severity, the number of files evaluated, and the time taken to do so is listed.
-
 **Output**
 ```
 (fragment, lines 8-10)
@@ -26,6 +22,10 @@ C:\path\to\file.ps1
 
 1 finding (1 information) across 1 target in 39 ms
 ```
+
+The resulting output starts by identifying the lines that were considered. The filepath is followed up by each finding from that file. Those findings are formatted as `N:M severity Description RuleName`. An uninterrupted filepath followed by `N:M` at the start of each line allows VSCode to mark them as hyperlinks to the violation area.
+
+Finally, the number of findings, their severity, the number of files evaluated, and the time taken to do so is listed.
 
 ### Remediation
 
@@ -36,10 +36,6 @@ Start-Nitpicking -FixMode Apply -Script {
     param([Parameter(Mandatory=$true)] $MyParam)
 }
 ```
-
-The resulting output starts by identifying the lines that were considered. The filepath is followed up by the correction applied to each finding. Those corrections are formatted as `N:M Description`. An uninterrupted filepath followed by `N:M` at the start of each line allows VSCode to mark them lines as hyperlinks to the violation area. A diff is presented that highlights the change area. A note is made that the change was made in memory because a scriptblock is not backed by a file even though it appears in one.
-
-Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
 **Output**
 ```plaintext
@@ -54,6 +50,10 @@ C:\path\to\file.ps1
 
 1 finding (1 information; 1 corrected, 0 unresolved) across 1 target in 510 ms
 ```
+
+The resulting output starts by identifying the lines that were considered. The filepath is followed up by the correction applied to each finding. Those corrections are formatted as `N:M Description`. An uninterrupted filepath followed by `N:M` at the start of each line allows VSCode to mark them as hyperlinks to the violation area. A diff is presented that highlights the change area. A note is made that the change was made in memory because a scriptblock is not backed by a file even though it appears in one.
+
+Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
 ## Guided navigation
 
