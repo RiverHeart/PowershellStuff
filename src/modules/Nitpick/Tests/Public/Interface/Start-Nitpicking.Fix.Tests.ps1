@@ -10,7 +10,7 @@ BeforeAll {
     $env:FORCE_HYPERLINK = $null
 
     $PreviousQuietWhatIf = $env:WHATIF__QUIET
-    $env:WHATIF__QUIET = 'True'
+    $env:WHATIF__QUIET = $true
 }
 
 AfterAll {

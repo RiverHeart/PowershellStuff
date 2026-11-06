@@ -1,10 +1,12 @@
 BeforeAll {
     Import-Module "$PSScriptRoot\..\..\AstEditor.psd1" -Force
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
     $env:WHATIF__QUIET = $true
 }
 
 AfterAll {
     Remove-Module AstEditor -Force -ErrorAction SilentlyContinue
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
 }
 
 BeforeDiscovery {

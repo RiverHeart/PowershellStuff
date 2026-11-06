@@ -1,6 +1,6 @@
 BeforeAll {
     $PreviousQuietWhatIf = $env:WHATIF__QUIET
-    $env:WHATIF__QUIET = 'True'
+    $env:WHATIF__QUIET = $true
 
     Import-Module -Name "$PSScriptRoot\..\..\..\AstEditor\AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot\..\..\Nitpick.psd1" -Force

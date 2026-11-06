@@ -52,7 +52,7 @@ Describe '<Module> Should-Process confirmation behavior' -ForEach $WrapperCases 
     }
 
     It 'returns false for quiet WhatIf even when confirmation is requested' {
-        $env:WHATIF__QUIET = 'True'
+        $env:WHATIF__QUIET = $true
         [void] $Runspace.AddScript({
             param ($Path)
             . $Path

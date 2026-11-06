@@ -1,5 +1,7 @@
 BeforeAll {
     Import-Module -Name "$PSScriptRoot\..\Nitpick.psd1" -Force
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
+    $env:WHATIF__QUIET = $true
 
     <#
     .SYNOPSIS
@@ -47,6 +49,7 @@ BeforeAll {
 
 AfterAll {
     Remove-Module -Name Nitpick -Force -ErrorAction SilentlyContinue
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
 }
 
 Describe 'Built-in producer identity migration' {
