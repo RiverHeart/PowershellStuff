@@ -55,6 +55,59 @@ The resulting output starts by identifying the lines that were considered. The f
 
 Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
+## Whole-target rule suppression
+
+Put a standalone directive in a file's leading comment/whitespace preamble:
+
+```powershell
+# nitpick disable-target Nitpick/AvoidParameterAttributeBool -- Intentional fixture.
+# nitpick disable-target WPF/*, */AvoidTrailingWhitespace
+```
+
+For a directly submitted ScriptBlock, put the directive at the start of its body:
+
+```powershell
+Start-Nitpicking -Script {
+    # nitpick disable-target Nitpick/AvoidParameterAttributeBool
+    param([Parameter(Mandatory=$true)] $Name)
+}
+```
+
+The target is the complete file or the ScriptBlock submitted through `-Script`,
+not an arbitrary lexical scope. A nested ScriptBlock cannot declare whole-target
+suppression when its enclosing file or block is being analyzed. If that nested
+ScriptBlock is submitted separately, it becomes the target.
+
+Selectors are qualified rule IDs, separated by whitespace or commas, and use the
+same case-insensitive wildcard matching as `-ExcludeRule`. Use `*` to disable all
+selected rules for that target. Unmatched qualified selectors are allowed; bare
+rule names and command names are invalid. An optional whitespace-delimited `--`
+introduces a reason.
+
+Suppressed rules do not execute or offer corrections for that target. Other files
+are unaffected, and selected-rule totals are unchanged. Fix modes read directives
+again from candidate text, so an unsuppressed rule's edit can add or remove a
+suppression. Suppression is not protection against edits by other rules.
+
+Only single-line `#` comments are directives. Shebangs, comments, and whitespace
+may precede them; any code token ends the preamble. Trailing directives, block
+comments, and text inside strings cannot disable rules. In-memory source strings
+use the same policy. AST fragments see only their own tokens, not surrounding
+comments, and retain snapshot coordinates. Only the submitted ScriptBlock's own
+opening `{` is exempt from ending the preamble. Directives must be on their own
+line after it, before `param`, attributes, statements, or nested blocks.
+
+Malformed or unsupported directives produce `Nitpick/InvalidSuppressionDirective`
+Warning findings and are ignored as a whole. Neither these warnings nor
+`Nitpick/PowerShellParseError` findings can be suppressed, even by `*`.
+Invocation-level rule selection and validation still apply.
+
+This MVP implements only `disable-target`. Regional and line directives
+(`disable`, `enable`, `disable-line`, `disable-next-line`) remain proposed in
+[ADR 0002](Docs/adr/0002-comment-based-rule-suppression.md) and currently produce
+unsupported-action warnings. PSScriptAnalyzer suppression behavior is unchanged.
+The former `disable-file` spelling is unsupported; it is not an alias.
+
 ## Guided navigation
 
 `-FixMode Guided` applies Safe corrections like `Apply`, and prompts only when a finding

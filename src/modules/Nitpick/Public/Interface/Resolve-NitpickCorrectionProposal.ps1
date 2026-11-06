@@ -41,6 +41,8 @@ using module AstEditor
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
     findings require qualified RuleId; detached corrections may omit identity.
+    Whole-target disable-target directives exclude original findings before correction
+    selection and are read again from the rendered candidate before rule execution.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -96,10 +98,12 @@ using module AstEditor
             -ReplacementText '$Second = 3' `
             -Reason 'Replace the coupled assignments.'
     )
+
     $Correction = New-NitpickCorrection `
         -TextEdit $Edits `
         -FilePathOrContext '<ScriptBlock>' `
         -Description 'Replace the coupled assignments.'
+
     $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
     When $Finding carries $Correction, both of its edits are accepted or skipped together.
@@ -169,6 +173,35 @@ function Resolve-NitpickCorrectionProposal {
     $UndecidedFindings = [List[NitpickFinding]]::new()
     $Conflicts = [List[object]]::new()
     $FinalFindings = [List[object]]::new()
+
+    $Suppression = Get-NitpickSuppression -Document $Document
+    $Finding = @(
+        foreach ($SourceFinding in $Finding) {
+            # Coordinator diagnostics are regenerated from this exact snapshot.
+            if ($SourceFinding.RuleId -eq 'Nitpick/InvalidSuppressionDirective') {
+                continue
+            }
+
+            $RuleIsSuppressed = Test-NitpickRuleSuppressed `
+                -RuleId $SourceFinding.RuleId `
+                -Suppression $Suppression
+
+            if ($RuleIsSuppressed) {
+                foreach ($Correction in $SourceFinding.Corrections) {
+                    $SkippedCorrections.Add([pscustomobject]@{
+                        Correction = $Correction
+                        Reason = 'The finding is suppressed by a disable-target directive.'
+                    })
+                }
+
+                continue
+            }
+
+            $SourceFinding
+        }
+
+        $Suppression.Diagnostics
+    )
 
     # MARK: CORRECTION SELECTION
     # A correction is one whole fix; its edits apply all-or-nothing. Automatic
@@ -389,7 +422,18 @@ function Resolve-NitpickCorrectionProposal {
         }
 
         $RenderedDocument = New-AstDocument -InputObject $RenderedAst
+        $CandidateSuppression = Get-NitpickSuppression -Document $RenderedDocument
+        foreach ($Diagnostic in $CandidateSuppression.Diagnostics) {
+            $FinalFindings.Add($Diagnostic)
+        }
+
         foreach ($SelectedRule in $Rule) {
+            $RuleIsSuppressed = Test-NitpickRuleSuppressed `
+                -RuleId $SelectedRule.Id `
+                -Suppression $CandidateSuppression
+
+            if ($RuleIsSuppressed) { continue }
+
             foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument, @{})) {
                 $FinalFindings.Add($FinalFinding)
             }

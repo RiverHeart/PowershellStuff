@@ -33,5 +33,6 @@ to step through locally.
   known, documented interop cost now in exchange for a simpler, more consistent identity model,
   rather than solving every external-compatibility edge case immediately.
 - Test coverage for PSScriptAnalyzer-hosted suppression behavior is not maintained alongside
-  the native identity work; native `Start-Nitpicking` does not implement suppression-checking
-  at all today, and that remains a separate, deferred suppression-semantics decision.
+  the native identity work. Native comment suppression is a separate policy;
+  [ADR 0002](0002-comment-based-rule-suppression.md) now has a `disable-target` MVP,
+  without changing PSScriptAnalyzer-hosted suppression.
