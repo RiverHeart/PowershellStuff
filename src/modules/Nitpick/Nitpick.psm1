@@ -1,4 +1,5 @@
 using namespace System
+using namespace System.Collections
 using namespace System.Collections.Generic
 using namespace System.Collections.ObjectModel
 using namespace System.Management.Automation
@@ -202,8 +203,10 @@ class NitpickFinding {
     [object] ToDiagnosticRecord() {
         Assert-NitpickRuleId -Value $this.RuleId
         $LocalName = $this.RuleId.Split('/')[1]
+
         # Using `New-Object` to avoid type resolution issues at parse time
         $CorrectionExtents = New-Object 'System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]'
+
         foreach ($Correction in $this.Corrections) {
             # ScriptAnalyzer cannot enforce all-or-nothing application of a
             # multi-edit fix, so only single-edit corrections are exported.
@@ -328,6 +331,8 @@ class NitpickRule {
     [string] $Category
     [bool] $EditorEnabled
     [string] $CallableType
+    [type] $DispatchType
+    [string] $DispatchParameterName
     [object] $Callable
     [string] $Source
     [string] $Description
@@ -348,10 +353,11 @@ class NitpickRule {
             }
         }
 
-        Assert-CallableSignature `
+        $DispatchSignature = Resolve-NitpickDispatchSignature `
             -Callable $TargetCallable `
-            -RequiredParams 'ScriptBlockAst' `
             -ErrorAction Stop
+        $this.DispatchType = $DispatchSignature.DispatchType
+        $this.DispatchParameterName = $DispatchSignature.DispatchParameterName
 
         $this.Category = 'Other'
         $this.EditorEnabled = $true
@@ -452,14 +458,25 @@ class NitpickRule {
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
     [object[]] Invoke([ScriptBlockAst] $Ast) {
-        return $this.Invoke($Ast, @{
-            Caller = 'Nitpick'
-            File = $Ast.Extent.File
-            RuleBehavior = @{
-                SearchNestedScriptBlocks = $true
-                OutputType = 'NitpickFinding'
+        $Target = if ($this.DispatchType.Name -eq 'AstDocument') {
+            New-AstDocument -InputObject $Ast
+        } else {
+            $Ast
+        }
+
+        $Parameters = @{
+            Context = @{
+                Caller = 'Nitpick'
+                File = $Ast.Extent.File
+                RuleBehavior = @{
+                    SearchNestedScriptBlocks = $true
+                    OutputType = 'NitpickFinding'
+                }
             }
-        })
+        }
+        $Parameters[$this.DispatchParameterName] = $Target
+
+        return $this.Invoke($Parameters)
     }
 
     <#
@@ -474,13 +491,122 @@ class NitpickRule {
     #>
     [object[]] Invoke(
         [ScriptBlockAst] $Ast,
-        [System.Collections.IDictionary] $Context
+        [IDictionary] $Context
     ) {
-        $Parameters = @{ ScriptBlockAst = $Ast }
-        if (Get-CallableParameter -Callable $this.Callable -Name Context) {
-            $Parameters.Context = $Context
+        $Target = if ($this.DispatchType.Name -eq 'AstDocument') {
+            New-AstDocument -InputObject $Ast
+        } else {
+            $Ast
         }
-        [object[]] $Results = @(& $this.Callable @Parameters)
+
+        $Parameters = @{ Context = $Context }
+        $Parameters[$this.DispatchParameterName] = $Target
+
+        return $this.Invoke($Parameters)
+    }
+
+    <#
+    .SYNOPSIS
+        Invokes the rule against an AstDocument or its selected AST.
+    .PARAMETER Document
+        The document to dispatch to document rules or whose AST is dispatched to
+        root-AST rules.
+    .OUTPUTS
+        [object[]] # NitpickFinding or DiagnosticRecord instances
+    #>
+    [object[]] Invoke([object] $Document) {
+        if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
+            throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
+        }
+
+        return $this.Invoke($Document, @{
+            Caller = 'Nitpick'
+            File = $Document.Ast.Extent.File
+            RuleBehavior = @{
+                SearchNestedScriptBlocks = $true
+                OutputType = 'NitpickFinding'
+            }
+        })
+    }
+
+    [object[]] Invoke(
+        [object] $Document,
+        [IDictionary] $Context
+    ) {
+        if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
+            throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
+        }
+        $Target = if ($this.DispatchType.Name -eq 'AstDocument') {
+            $Document
+        } else {
+            $Document.Ast
+        }
+        $Parameters = @{ Context = $Context }
+        $Parameters[$this.DispatchParameterName] = $Target
+        return $this.Invoke($Parameters)
+    }
+
+    <#
+    .SYNOPSIS
+        Invokes the rule against the specified parameters dictionary.
+    .PARAMETER Parameters
+        The parameters dictionary to pass to the rule invocation.
+    .OUTPUTS
+        [object[]] # NitpickFinding or DiagnosticRecord instances
+    #>
+    [object[]] Invoke(
+        [IDictionary] $Parameters
+    ) {
+        $InvocationParameters = @{}
+        foreach ($Key in $Parameters.Keys) {
+            $InvocationParameters[$Key] = $Parameters[$Key]
+        }
+
+        $Target = $InvocationParameters[$this.DispatchParameterName]
+        if ($null -eq $Target -and $InvocationParameters.Contains('ScriptBlockAst')) {
+            $Target = $InvocationParameters.ScriptBlockAst
+            $InvocationParameters.Remove('ScriptBlockAst')
+        }
+
+        if ($this.DispatchType.Name -eq 'AstDocument') {
+            if ($Target -is [ScriptBlockAst]) {
+                $Target = New-AstDocument -InputObject $Target
+            } elseif ($null -eq $Target -or $Target.GetType().Name -ne 'AstDocument') {
+                throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
+            }
+            $Ast = $Target.Ast
+        } else {
+            if ($null -ne $Target -and $Target.GetType().Name -eq 'AstDocument') {
+                $Target = $Target.Ast
+            } elseif ($Target -isnot [ScriptBlockAst]) {
+                throw [ArgumentException]::new('Rule invocation requires a ScriptBlockAst.')
+            }
+            $Ast = $Target
+        }
+
+        $InvocationParameters[$this.DispatchParameterName] = $Target
+        if (Get-CallableParameter -Callable $this.Callable -Name Context) {
+            $Context = $InvocationParameters.Context
+            if ($null -eq $Context) {
+                $Context = @{}
+            }
+            if ($Context -isnot [IDictionary]) {
+                throw [ArgumentException]::new('Rule invocation Context must be a dictionary.')
+            }
+            if (-not $Context.Contains('Caller')) { $Context.Caller = 'Nitpick' }
+            if (-not $Context.Contains('File')) { $Context.File = $Ast.Extent.File }
+            if ($null -eq $Context.RuleBehavior) {
+                $Context.RuleBehavior = @{
+                    SearchNestedScriptBlocks = $true
+                    OutputType = 'NitpickFinding'
+                }
+            }
+            $InvocationParameters.Context = $Context
+        } else {
+            $InvocationParameters.Remove('Context')
+        }
+
+        [object[]] $Results = @(& $this.Callable @InvocationParameters)
         foreach ($Finding in $Results) {
             if ($Finding -isnot [NitpickFinding]) {
                 continue
@@ -531,7 +657,7 @@ class DirectedAcyclicGraph {
 
     [string[]] GetOutgoingEdges([string] $Node) {
         if (-not $this.ContainsNode($Node)) {
-            throw [System.ArgumentException]::new("Node '$Node' does not exist.")
+            throw [ArgumentException]::new("Node '$Node' does not exist.")
         }
 
         return [string[]] $this.Edges[$Node]
@@ -539,16 +665,16 @@ class DirectedAcyclicGraph {
 
     [void] AddEdge([string] $From, [string] $To) {
         if ($this.Nodes -notcontains $From) {
-            throw [System.ArgumentException]::new("Node '$From' does not exist.")
+            throw [ArgumentException]::new("Node '$From' does not exist.")
         }
         if ($this.Nodes -notcontains $To) {
-            throw [System.ArgumentException]::new("Node '$To' does not exist.")
+            throw [ArgumentException]::new("Node '$To' does not exist.")
         }
         if ($this.Edges[$From] -contains $To) {
             return
         }
         if ($From -eq $To -or $this.IsReachable($To, $From)) {
-            throw [System.InvalidOperationException]::new(
+            throw [InvalidOperationException]::new(
                 "Adding edge from '$From' to '$To' would create a cycle."
             )
         }
@@ -702,7 +828,7 @@ class ScriptBlockAstTransform : ArgumentTransformationAttribute {
             return $Input.Ast
         }
         if ($Input -is [string]) {
-            return [System.Management.Automation.Language.Parser]::ParseInput($Input, [ref] $null, [ref] $null)
+            return [Parser]::ParseInput($Input, [ref] $null, [ref] $null)
         }
         return $Input
     }

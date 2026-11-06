@@ -298,8 +298,10 @@ scopes remain unchanged; applicability of every rule-target pair is not validate
 Rules can opt into an optional `[System.Collections.IDictionary] $Context` parameter.
 `NitpickRule.Invoke($Ast)` supplies `Caller = 'Nitpick'`, the AST's file path in `File`,
 and `RuleBehavior` settings for recursive traversal (`SearchNestedScriptBlocks = $true`)
-and native output (`OutputType = 'NitpickFinding'`). Initial lint and fix reanalysis use
-the same defaults. Callables without a `Context` parameter remain supported.
+and native output (`OutputType = 'NitpickFinding'`). `AstDocument`-dispatched rules
+receive the document as their target argument; the context carries behavior and caller
+information, not a second copy of the document. Initial lint and fix reanalysis use the
+same defaults. Callables without a `Context` parameter remain supported.
 
 `Invoke($Ast, $Context)` passes the explicit dictionary unchanged to opted-in rules.
 The built-in rules use behavior settings rather than caller identity. Without context,
@@ -312,6 +314,9 @@ ScriptAnalyzer-compatible rules must explicitly pass `-OutputAs DiagnosticRecord
 No global `NitpickInvocationContext` variable is used.
 
 ### Module-defined output types
+
+> [!WARNING]
+> Loading a custom (PowerShell) class through separate module-loading paths (`Import-Module`, `using module`) can produce types with the same name but distinct identities, so typed parameters or `-is` checks may reject an object created by the other path. Recommend avoiding cross-module class types in signatures and validating at runtime when needed.
 
 Public function files dot-sourced by a script module are parsed separately from classes declared in the root `.psm1`. Referencing one of those classes as a type literal in an `OutputType` attribute, such as `[OutputType([NitpickFinding])]`, can therefore fail with `Unable to find type` while the function file is being parsed.
 

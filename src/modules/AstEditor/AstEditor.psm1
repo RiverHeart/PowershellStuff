@@ -4,6 +4,64 @@ using namespace System.IO
 using namespace System.Management.Automation.Language
 using namespace System.Text
 
+class AstScriptPosition : IScriptPosition {
+    hidden [string] $SourceFile
+    hidden [string] $SourceText
+    hidden [string] $LineText
+    hidden [int] $SourceOffset
+    hidden [int] $SourceLine
+    hidden [int] $SourceColumn
+
+    AstScriptPosition(
+        [string] $File,
+        [string] $Text,
+        [int] $Offset,
+        [int] $LineNumber,
+        [int] $ColumnNumber,
+        [string] $Line
+    ) {
+        $this.SourceFile = $File
+        $this.SourceText = $Text
+        $this.SourceOffset = $Offset
+        $this.SourceLine = $LineNumber
+        $this.SourceColumn = $ColumnNumber
+        $this.LineText = $Line
+    }
+
+    [string] get_File() { return $this.SourceFile }
+    [int] get_LineNumber() { return $this.SourceLine }
+    [int] get_ColumnNumber() { return $this.SourceColumn }
+    [int] get_Offset() { return $this.SourceOffset }
+    [string] get_Line() { return $this.LineText }
+    [string] GetFullScript() { return $this.SourceText }
+}
+
+class AstScriptExtent : IScriptExtent {
+    hidden [IScriptPosition] $StartPosition
+    hidden [IScriptPosition] $EndPosition
+
+    AstScriptExtent([IScriptPosition] $Start, [IScriptPosition] $End) {
+        $this.StartPosition = $Start
+        $this.EndPosition = $End
+    }
+
+    [string] get_File() { return $this.StartPosition.File }
+    [IScriptPosition] get_StartScriptPosition() { return $this.StartPosition }
+    [IScriptPosition] get_EndScriptPosition() { return $this.EndPosition }
+    [int] get_StartLineNumber() { return $this.StartPosition.LineNumber }
+    [int] get_StartColumnNumber() { return $this.StartPosition.ColumnNumber }
+    [int] get_EndLineNumber() { return $this.EndPosition.LineNumber }
+    [int] get_EndColumnNumber() { return $this.EndPosition.ColumnNumber }
+    [int] get_StartOffset() { return $this.StartPosition.Offset }
+    [int] get_EndOffset() { return $this.EndPosition.Offset }
+    [string] get_Text() {
+        return $this.StartPosition.GetFullScript().Substring(
+            $this.StartPosition.Offset,
+            $this.EndPosition.Offset - $this.StartPosition.Offset
+        )
+    }
+}
+
 <#
 .SYNOPSIS
     Represents a detached text edit with source coordinates, expected text,
@@ -504,7 +562,6 @@ if ($Manifest.AliasesToExport.Count -gt 0) {
 }
 
 Export-ModuleMember @ExportParams
-
 
 
 

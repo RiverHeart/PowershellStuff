@@ -87,6 +87,7 @@ with another kind of construct (or deleting it) therefore fails validation.
 - `AstTextEdit`: class-based detached edit contract with source coordinates, expected text, replacement text, and reason
 - `AstDocument`: internal immutable parse data plus a queued edit list
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
+- `New-AstScriptExtent`: describes arbitrary snapshot ranges as offset-aware `IScriptExtent` objects, including whitespace without an AST node
 - `New-AstTextEdit`: creates a detached edit from an extent or document-bound offset range
 - `New-AstCollectionEdit`: creates the same detached edit contract for a structural collection removal
 - `Add-AstTextEdit`: atomically validates and queues one or more detached edits
@@ -107,6 +108,29 @@ preserved; highlighted widths count UTF-16 units rather than terminal display ce
 so highlighted tabs and wide/combining characters may not align visually.
 
 ## Generic Text Edits
+
+`Find-AstNode -Document $document` searches the submitted AST without reparsing or
+changing node identity. `-Ast`, `-ScriptBlock`, and `-FilePath` inputs remain available.
+`-Range` accepts an `IScriptExtent` or two Int32 offsets (`@(start, end)`) and returns
+only nodes fully contained in that zero-based, end-exclusive range. It is not an
+overlap query and should not be used to distinguish whitespace from token content.
+
+For a range with no AST node, create an extent from the document's original snapshot:
+
+```powershell
+$document = New-AstDocument -InputObject '$Value = 1  '
+$extent = New-AstScriptExtent -Document $document -StartOffset 10 -EndOffset 12
+$edit = New-AstTextEdit -Extent $extent -ReplacementText '' -Reason 'Remove trailing whitespace.'
+```
+
+The extent retains exact text, source-file provenance, and complete snapshot positions.
+Offsets are zero-based and end-exclusive; line and column numbers are one-based UTF-16
+positions. CRLF, LF, and CR terminators are preserved, and endpoint positions expose
+the complete snapshot through `GetFullScript()`. Fragment documents reject ranges
+outside the submitted target with `Exception.Data['FailureKind'] = 'OutsideTarget'`;
+empty ranges at either endpoint are allowed. Match indexes from `document.Ast.Extent.Text`
+must be added to `document.Ast.Extent.StartOffset` before calling this helper.
+Creating an extent does not queue an edit or decide whether a change is semantically safe.
 
 Offset ranges are zero-based and end-exclusive. Construct edits without side effects, then submit
 the selected target batch to `Add-AstTextEdit`:

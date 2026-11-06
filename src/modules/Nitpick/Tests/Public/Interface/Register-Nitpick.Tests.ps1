@@ -2,9 +2,12 @@ BeforeAll {
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 
     function Test-DriftedNitpickRule {
-        [CmdletBinding()]
+        [CmdletBinding(DefaultParameterSetName='Rule')]
         param (
+            [Parameter(Mandatory,ParameterSetName='Rule')]
             $ScriptBlockAst,
+
+            [Parameter(Mandatory,ParameterSetName='Details')]
             [switch] $Details
         )
 

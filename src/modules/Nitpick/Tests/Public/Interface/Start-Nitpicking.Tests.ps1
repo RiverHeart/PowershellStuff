@@ -432,7 +432,7 @@ Describe 'Start-Nitpicking' {
                 [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
                 [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
 
-                [Parameter(ParameterSetName='Details')]
+                [Parameter(Mandatory,ParameterSetName='Details')]
                 [switch] $Details
             )
 

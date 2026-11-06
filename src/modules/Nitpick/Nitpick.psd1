@@ -84,10 +84,14 @@ FunctionsToExport = @(
     'Register-Nitpick'
     'Resolve-NitpickCorrectionProposal'
     'Start-Nitpicking'
+    'Unregister-Nitpick'
+
+    # Rules
     'Test-AvoidParameterAttributeBool'
     'Test-AvoidAmbiguousPipelineContinuation'
+    'Test-AvoidTrailingWhitespace'
+    'Measure-AvoidTrailingWhitespace'
     'Test-UseIsNotOperator'
-    'Unregister-Nitpick'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -113,6 +117,14 @@ AliasesToExport = @(
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
+    Linting = @{
+        Rules = @(
+            'Test-AvoidParameterAttributeBool'
+            'Test-AvoidAmbiguousPipelineContinuation'
+            'Measure-AvoidTrailingWhitespace'
+            'Test-UseIsNotOperator'
+        )
+    }
 
     PSData = @{
 

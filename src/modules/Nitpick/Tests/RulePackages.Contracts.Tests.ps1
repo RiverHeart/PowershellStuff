@@ -252,8 +252,12 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
         It 'does not accept namespace ownership from callable Details metadata' {
             $Module = New-Module -Name IdentityMetadataRules -ScriptBlock {
                 function Test-IdentityMetadata {
+                    [CmdletBinding(DefaultParameterSetName='Rule')]
                     param(
+                        [Parameter(Mandatory,ParameterSetName='Rule')]
                         $ScriptBlockAst,
+
+                        [Parameter(Mandatory,ParameterSetName='Details')]
                         [switch] $Details
                     )
                     if ($Details) {

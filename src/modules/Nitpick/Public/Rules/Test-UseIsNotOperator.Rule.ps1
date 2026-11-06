@@ -49,7 +49,7 @@ function Test-UseIsNotOperator {
         [Parameter(ParameterSetName='ScriptBlockAst')]
         [IDictionary] $Context,
 
-        [Parameter(ParameterSetName='Details')]
+        [Parameter(Mandatory, ParameterSetName='Details')]
         [switch] $Details
     )
 

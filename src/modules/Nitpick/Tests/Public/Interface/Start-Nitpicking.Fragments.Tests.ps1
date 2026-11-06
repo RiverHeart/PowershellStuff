@@ -1,3 +1,5 @@
+using namespace System.Collections
+using namespace System.IO
 using namespace System.Management.Automation.Language
 
 BeforeAll {
@@ -18,7 +20,10 @@ Describe 'Snapshot-backed Nitpick fragments' {
             -Prefix "`$Value = 1`r`n"
 
         $Rule = {
-            param([ScriptBlockAst] $ScriptBlockAst, $Context)
+            param(
+                [ScriptBlockAst] $ScriptBlockAst,
+                [IDictionary] $Context
+            )
 
             $Statement = $ScriptBlockAst.EndBlock.Statements[0]
             $Corrections = @()
@@ -47,7 +52,7 @@ Describe 'Snapshot-backed Nitpick fragments' {
         @{ FixMode = 'Preview' }
         @{ FixMode = 'Apply' }
     ) {
-        $Bytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Fixture.Path))
+        $Bytes = [Convert]::ToBase64String([File]::ReadAllBytes($Fixture.Path))
         $Output = @(
             Start-Nitpicking `
                 -Script $Fixture.FragmentAst `
@@ -76,7 +81,7 @@ Describe 'Snapshot-backed Nitpick fragments' {
         $Finding.Message | Should -BeExactly "File=$($Fixture.Path)"
         $Result.Proposal.Document.IsFileBacked | Should -BeFalse
 
-        [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Fixture.Path)) |
+        [Convert]::ToBase64String([File]::ReadAllBytes($Fixture.Path)) |
             Should -BeExactly $Bytes
     }
 

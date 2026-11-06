@@ -305,8 +305,7 @@ function Start-Nitpicking {
                 }
 
                 $ApplicableRules.Add($Rule)
-
-                foreach ($Finding in $Rule.Invoke($Ast)) {
+                foreach ($Finding in $Rule.Invoke($Document, @{})) {
                     $TargetFindings.Add($Finding)
                 }
             }

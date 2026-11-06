@@ -85,7 +85,7 @@ Describe 'New-Nitpick' {
                 [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
                 [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
 
-                [Parameter(ParameterSetName='Details')]
+                [Parameter(Mandatory,ParameterSetName='Details')]
                 [switch] $Details
             )
 
@@ -113,7 +113,7 @@ Describe 'New-Nitpick' {
                 [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
                 [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst,
 
-                [Parameter(ParameterSetName='Details')]
+                [Parameter(Mandatory,ParameterSetName='Details')]
                 [switch] $Details
             )
 

@@ -42,6 +42,23 @@ using namespace System.Management.Automation.Language
 .PARAMETER ExpectedText
     Optional source text guard for an offset-based edit. Matching is case-sensitive.
     Mandatory for an explicit-coordinate edit, since no document is available to derive it.
+
+.EXAMPLE
+    Describe trailing spaces and create a detached deletion for that exact range
+    so it can be trimmed from the document.
+
+    $Document = New-AstDocument -InputObject '$Value = 1  '
+    $Extent = New-AstScriptExtent -Document $Document -StartOffset 10 -EndOffset 12
+    New-AstTextEdit `
+        -Extent $Extent `
+        -ReplacementText '' `
+        -Reason 'Remove trailing whitespace.' |
+        Add-AstTextEdit -Document $Document
+
+    $Result = Resolve-AstDocument $Document -PassThruText
+
+    Write-Host "Old: $($Document.OriginalText) ($($Document.OriginalText.Length)) "
+    Write-Host "New: $($Result.RenderedText) ($($Result.RenderedText.Length))"
 #>
 function New-AstTextEdit {
     [CmdletBinding(DefaultParameterSetName = 'ByExtent')]

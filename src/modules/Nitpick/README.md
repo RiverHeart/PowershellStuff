@@ -85,6 +85,31 @@ Plain strings have no exact source provenance and do not navigate. Navigation re
 to the original source location; it does not track subsequent editor changes or
 launch VS Code from an ordinary PowerShell terminal.
 
+## Source-oriented rules
+
+`NitpickRule` supports both root-`ScriptBlockAst` rules and document-wide rules
+typed to receive `AstDocument`. `Start-Nitpicking` creates one document per target
+and dispatches it directly to document rules; AST rules continue to receive the
+document's selected AST. Correction reanalysis uses a fresh document for the
+rendered snapshot. Document rules should not duplicate that target in context.
+PSScriptAnalyzer entry points remain separate AST-based adapters.
+
+`AstEditor\Find-AstScriptExtent` searches target text and returns snapshot-coordinate
+extents suitable for both findings and detached edits. Use tokens, not enclosing AST
+nodes, to distinguish meaningful token content from ordinary whitespace.
+
+`Measure-AvoidTrailingWhitespace` is the native document rule;
+`Test-AvoidTrailingWhitespace` is its PSScriptAnalyzer adapter.
+`Nitpick/AvoidTrailingWhitespace` reports trailing spaces and tabs, including blank
+lines and an unterminated final line, without changing line terminators. It preserves
+whitespace inside meaningful tokens, including strings, here-strings, and escaped
+spaces/tabs. Expandable strings are conservatively protected in their entirety,
+including interpolation. Comment whitespace is eligible for trimming. Candidates
+from malformed snapshots are diagnostic-only, with no automatic correction.
+Native execution includes nested scopes once; direct calls default to scope-local
+analysis for PSScriptAnalyzer compatibility. Explicit fragments never edit outside
+their submitted extent, and a fragment endpoint is not assumed to be a physical EOL.
+
 ## Why Not Use PSScriptAnalyzer?
 
 ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unlikely that I can fully replicate all the functionality it offers, however, it doesn't possess the ergonomics I care about. For starters, you can't run it from the VSCode Powershell Extension which means you have to switch to a different terminal anytime you want to run it and you can't run the VSCode debugger against anything that calls it. As I work almost exclusively in Powershell that's unacceptable.
@@ -114,7 +139,7 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | Criterion | PSScriptAnalyzer | Nitpick | Explanation |
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 3 Rules |  |
+| **Built-In Ruleset** | 75 Rules | 4 Rules |  |
 | **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |
