@@ -12,7 +12,7 @@
         'Add-AstTextEdit'
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
-        'Find-AEAstNode'
+        'Find-AstNode'
         'Find-AstScriptExtent'
         'Get-AstExtractedFunction'
         'New-AstDocument'

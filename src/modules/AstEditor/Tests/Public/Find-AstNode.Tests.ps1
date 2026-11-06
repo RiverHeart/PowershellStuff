@@ -8,20 +8,56 @@ AfterAll {
     Remove-Module -Name AstEditor -Force -ErrorAction SilentlyContinue
 }
 
-Describe 'Find-AEAstNode' {
-    It 'is exported under the AstEditor-specific name' {
-        (Get-Command Find-AEAstNode).ModuleName | Should -Be 'AstEditor'
-        @(Get-Command -Module AstEditor).Name | Should -Contain 'Find-AEAstNode'
-        @(Get-Command -Module AstEditor).Name | Should -Not -Contain 'Find-AstNode'
+Describe 'Find-AstNode' {
+    It 'is exported under its primary name' {
+        (Get-Command Find-AstNode).ModuleName | Should -Be 'AstEditor'
+        @(Get-Command -Module AstEditor).Name | Should -Contain 'Find-AstNode'
+        @(Get-Command -Module AstEditor).Name | Should -Not -Contain 'Find-AEAstNode'
     }
 
     It 'rejects Query scriptblocks that emit multiple values' {
         {
-            Find-AEAstNode -ScriptBlock { Write-Host 'one' } -Type CommandAst -Query {
-                $_
-                $true
+            $FindParams = @{
+                ScriptBlock = { Write-Host 'one' }
+                Type = 'CommandAst'
+                Query = { $_; $true }
+                ErrorAction = 'Stop'
             }
-        } | Should -Throw '*Find-AEAstNode query emitted 2 values*CommandAst*'
+            Find-AstNode @FindParams
+        } | Should -Throw '*Find-AstNode query emitted 2 values*CommandAst*'
+    }
+
+    It 'searches an existing document without changing node identity' {
+        $Document = New-AstDocument -InputObject 'Get-One; Get-Two'
+        $Nodes = @(AstEditor\Find-AstNode -Document $Document -Type CommandAst -All)
+        $Nodes | Should -HaveCount 2
+        [object]::ReferenceEquals($Nodes[0], $Document.Ast.EndBlock.Statements[0].PipelineElements[0]) |
+            Should -BeTrue
+    }
+
+    It 'accepts an extent or a two-integer range and returns contained nodes' {
+        $Document = New-AstDocument -InputObject 'Get-One; Get-Two'
+        $Extent = $Document.Ast.EndBlock.Statements[1].Extent
+        foreach ($Range in @($Extent, @($Extent.StartOffset, $Extent.EndOffset))) {
+            $Nodes = @(AstEditor\Find-AstNode -Document $Document -Type CommandAst -Range $Range -All)
+            $Nodes | Should -HaveCount 1
+            $Nodes[0].GetCommandName() | Should -Be 'Get-Two'
+        }
+        @(AstEditor\Find-AstNode -Document $Document -Type CommandAst -Range @(1, 3) -All) |
+            Should -HaveCount 0
+    }
+
+    It 'rejects invalid ranges rather than coercing them' {
+        foreach ($Range in @($null, 1, @(0), @(0, 1, 2), @('0', '1'), @(-1, 1), @(2, 1))) {
+            {
+                $FindParams = @{
+                    ScriptBlock = { Get-One }
+                    Range = $Range
+                    ErrorAction = 'Stop'
+                }
+                AstEditor\Find-AstNode @FindParams
+            } | Should -Throw '*Range*'
+        }
     }
 }
 

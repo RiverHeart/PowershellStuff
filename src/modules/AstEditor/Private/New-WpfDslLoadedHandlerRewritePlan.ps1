@@ -26,7 +26,7 @@ function New-WpfDslLoadedHandlerRewritePlan {
         [switch] $Force
     )
 
-    $WindowCommand = Find-AEAstNode -Ast $Document.Ast -Recurse -Query {
+    $WindowCommand = Find-AstNode -Ast $Document.Ast -Recurse -Query {
         param($Node)
 
         if (-not ($Node -is [CommandAst])) {
@@ -53,7 +53,7 @@ function New-WpfDslLoadedHandlerRewritePlan {
     }
 
     $WindowScriptBlockAst = $WindowScriptBlockExpression.ScriptBlock
-    $LoadedWhenCommands = Find-AEAstNode -Ast $WindowScriptBlockAst -Recurse -All -Query {
+    $LoadedWhenCommands = Find-AstNode -Ast $WindowScriptBlockAst -Recurse -All -Query {
         param($Node)
 
         if (-not ($Node -is [CommandAst])) {

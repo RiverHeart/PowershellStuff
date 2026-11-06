@@ -109,6 +109,12 @@ so highlighted tabs and wide/combining characters may not align visually.
 
 ## Generic Text Edits
 
+`Find-AstNode -Document $document` searches the submitted AST without reparsing or
+changing node identity. `-Ast`, `-ScriptBlock`, and `-FilePath` inputs remain available.
+`-Range` accepts an `IScriptExtent` or two Int32 offsets (`@(start, end)`) and returns
+only nodes fully contained in that zero-based, end-exclusive range. It is not an
+overlap query and should not be used to distinguish whitespace from token content.
+
 For a range with no AST node, create an extent from the document's original snapshot:
 
 ```powershell
