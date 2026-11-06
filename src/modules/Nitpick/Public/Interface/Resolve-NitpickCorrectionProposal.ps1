@@ -379,13 +379,21 @@ function Resolve-NitpickCorrectionProposal {
         )
 
         $RenderedAst = if ($Document.IsFragment) {
-            $Document.FindFragment($RenderedRoot, $Document.Ast, $Document.GetRenderedFragmentEndOffset())
+            $Document.FindFragment(
+                $RenderedRoot,
+                $Document.Ast,
+                $Document.GetRenderedFragmentEndOffset()
+            )
         } else {
             $RenderedRoot
         }
 
+        $RenderedDocument = New-AstDocument -InputObject $RenderedAst
         foreach ($SelectedRule in $Rule) {
-            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedAst)) {
+            foreach ($FinalFinding in $SelectedRule.Invoke(
+                $RenderedDocument.Ast,
+                @{ Document = $RenderedDocument }
+            )) {
                 $FinalFindings.Add($FinalFinding)
             }
         }

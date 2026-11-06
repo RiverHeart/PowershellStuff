@@ -15,6 +15,10 @@ using namespace System.Management.Automation.Language
     Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
     and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
     Without these settings, traversal is scope-local and output is DiagnosticRecord.
+    `Context.Document` supplies the shared snapshot during coordinated execution.
+    Direct invocation creates an in-memory document from the submitted AST.
+    Candidates overlapping meaningful tokens are ignored. Parse errors prevent
+    automatic corrections, but unprotected candidates still produce findings.
 
 .EXAMPLE
     Test-AvoidTrailingWhitespace -ScriptBlockAst {
@@ -56,47 +60,87 @@ function Test-AvoidTrailingWhitespace {
         # Pattern to match trailing whitespace at the end of lines
         # while preserving line endings and a final unterminated line.
         $CandidatePattern = '[ \t]+(?=\r\n|\n|\r|\z)'
+
     }
 
     process {
         if ($Details) { return $Metadata }
 
         try {
-            Find-AstScriptExtent `
-                -Document $Document `
-                -Pattern $CandidatePattern `
-                -Multiline |
-            ForEach-Object {
-                $Extent = $_
+            $Document =
+                if ($null -ne $Context.Document) { $Context.Document }
+                else { New-AstDocument -InputObject $ScriptBlockAst }
 
-                $CorrectionParams = @{}
-                $CorrectionParams.TextEdit = New-AstTextEdit `
-                    -Extent $Extent `
-                    -ReplacementText '' `
-                    -Reason 'Remove trailing whitespace.'
+            $ShouldRecurse = $Behavior.SearchNestedScriptBlocks -eq $true
+            $NestedScopes = if (-not $ShouldRecurse) {
+                $Document.Ast.FindAll({
+                    param($Node)
 
-                $FilePath = if ($ScriptBlockAst.Extent.FileName) {
-                    $ScriptBlockAst.Extent.FileName
-                } else {
-                    '<ScriptBlock>'
+                    $Node -is [ScriptBlockAst] -and
+                    -not [object]::ReferenceEquals($Node, $Document.Ast)
+                }, $true) -as [array]
+            } else { @() }
+
+            [array] $ProtectedTokens = $Document.Root.Tokens | Where-Object {
+                $_.Kind -notin 'Comment', 'NewLine', 'LineContinuation', 'EndOfInput'
+            }
+
+            $FilePath =
+                if ($Document.Ast.Extent.File) { $Document.Ast.Extent.File }
+                else { '<ScriptBlock>' }
+
+            foreach ($Extent in (
+                AstEditor\Find-AstScriptExtent `
+                    -Document $Document `
+                    -Pattern $CandidatePattern
+            )) {
+                # A fragment's end may be in the middle of a physical source line.
+                if ($Extent.EndOffset -lt $Document.OriginalText.Length -and
+                    $Document.OriginalText[$Extent.EndOffset] -notin [char] 13, [char] 10
+                ) {
+                    continue
                 }
 
-                $CorrectionParams.FilePathOrContext = $FilePath
-                $CorrectionParams.Description = 'Remove trailing whitespace.'
-                $CorrectionParams.RuleId = $RuleId
-                $Correction = New-NitpickCorrection @CorrectionParams
+                $IsProtected = $false
+                foreach ($Token in $ProtectedTokens) {
+                    if ($Token.Extent.StartOffset -lt $Extent.EndOffset -and
+                        $Extent.StartOffset -lt $Token.Extent.EndOffset
+                    ) {
+                        $IsProtected = $true
+                        break
+                    }
+                }
 
-                $Finding = New-NitpickFinding `
+                foreach ($Scope in $NestedScopes) {
+                    if ($Scope.Extent.StartOffset -lt $Extent.EndOffset -and
+                        $Extent.StartOffset -lt $Scope.Extent.EndOffset
+                    ) {
+                        $IsProtected = $true
+                        break
+                    }
+                }
+
+                if ($IsProtected) { continue }
+
+                $Corrections = @()
+                if ($Document.Root.ParseErrors.Count -eq 0) {
+                    $Edit = New-AstTextEdit -Extent $Extent -ReplacementText '' -Reason 'Remove trailing whitespace.'
+                    $Corrections = @(
+                        New-NitpickCorrection -TextEdit $Edit `
+                            -FilePathOrContext $FilePath `
+                            -Description 'Remove trailing whitespace.' `
+                            -RuleId $RuleId -Applicability Safe
+                    )
+                }
+                New-NitpickFinding `
                     -RuleId $RuleId `
                     -Message "Avoid trailing whitespace" `
-                    -ViolationExtent $ScriptBlockAst.Extent `
+                    -ViolationExtent $Extent `
                     -Severity $Metadata.Severity `
-                    -Corrections $Correction `
+                    -Corrections $Corrections `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `
                     -OutputAs $OutputAs
-
-                Write-Output $Finding
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

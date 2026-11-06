@@ -476,11 +476,70 @@ class NitpickRule {
         [ScriptBlockAst] $Ast,
         [System.Collections.IDictionary] $Context
     ) {
-        $Parameters = @{ ScriptBlockAst = $Ast }
-        if (Get-CallableParameter -Callable $this.Callable -Name Context) {
-            $Parameters.Context = $Context
+        return $this.Invoke(@{ ScriptBlockAst = $Ast; Context = $Context })
+    }
+
+    <#
+    .SYNOPSIS
+        Invokes the rule against the specified parameters dictionary.
+    .PARAMETER Parameters
+        The parameters dictionary to pass to the rule invocation.
+    .OUTPUTS
+        [object[]] # NitpickFinding or DiagnosticRecord instances
+    #>
+    [object[]] Invoke(
+        [System.Collections.IDictionary] $Parameters
+    ) {
+        $InvocationParameters = @{}
+        foreach ($Key in $Parameters.Keys) {
+            $InvocationParameters[$Key] = $Parameters[$Key]
         }
-        [object[]] $Results = @(& $this.Callable @Parameters)
+        $Ast = $InvocationParameters.ScriptBlockAst
+        if ($Ast -isnot [ScriptBlockAst]) {
+            throw 'Rule invocation requires a ScriptBlockAst.'
+        }
+        if (Get-CallableParameter -Callable $this.Callable -Name Context) {
+            $Context = $InvocationParameters.Context
+            if ($null -eq $Context) {
+                $Context = @{}
+            }
+            if ($Context -isnot [System.Collections.IDictionary]) {
+                throw 'Rule invocation Context must be a dictionary.'
+            }
+            if ($null -eq $Context.Document) {
+                $Context.Document = New-AstDocument -InputObject $Ast
+            } elseif (-not [object]::ReferenceEquals($Context.Document.Ast, $Ast)) {
+                $DocumentAst = $Context.Document.Ast
+                $Snapshot = $Ast.Extent.StartScriptPosition.GetFullScript()
+                if ($null -eq $Snapshot) { $Snapshot = $Ast.Extent.Text }
+                $AstDepth = 0
+                for ($Parent = $Ast.Parent; $null -ne $Parent; $Parent = $Parent.Parent) { $AstDepth++ }
+                $DocumentDepth = 0
+                for ($Parent = $DocumentAst.Parent; $null -ne $Parent; $Parent = $Parent.Parent) { $DocumentDepth++ }
+                if ($null -eq $DocumentAst -or
+                    $DocumentAst.GetType() -ne $Ast.GetType() -or
+                    $AstDepth -ne $DocumentDepth -or
+                    $Context.Document.OriginalText -cne $Snapshot -or
+                    $DocumentAst.Extent.StartOffset -ne $Ast.Extent.StartOffset -or
+                    $DocumentAst.Extent.EndOffset -ne $Ast.Extent.EndOffset
+                ) {
+                    throw 'Context.Document.Ast must represent the same snapshot and target as the AST supplied to the rule.'
+                }
+            }
+            if (-not $Context.Contains('Caller')) { $Context.Caller = 'Nitpick' }
+            if (-not $Context.Contains('File')) { $Context.File = $Ast.Extent.File }
+            if ($null -eq $Context.RuleBehavior) {
+                $Context.RuleBehavior = @{
+                    SearchNestedScriptBlocks = $true
+                    OutputType = 'NitpickFinding'
+                }
+            }
+            $InvocationParameters.Context = $Context
+        } else {
+            $InvocationParameters.Remove('Context')
+        }
+
+        [object[]] $Results = @(& $this.Callable @InvocationParameters)
         foreach ($Finding in $Results) {
             if ($Finding -isnot [NitpickFinding]) {
                 continue
