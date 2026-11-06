@@ -67,8 +67,12 @@ function Get-NitpickPackage {
                 continue
             }
             $ImportedInstance.ExportedCommands.Values |
-                Where-Object { $_.Name -like 'Test-*' -or $_.Name -like 'Measure-*' } |
-                Where-Object { $_.Parameters.Keys -contains 'ScriptBlockAst' } |
+                Where-Object {
+                    ($_.Name -like 'Test-*' -or $_.Name -like 'Measure-*') -and (
+                        $_.Parameters.Keys -contains 'ScriptBlockAst' -or
+                        $_.Parameters.Values.ParameterType.Name -contains 'AstDocument'
+                    )
+                } |
                 ForEach-Object {
                     New-Nitpick -Namespace $Namespace -Callable $_ -ErrorAction Stop
                 }
@@ -81,7 +85,10 @@ function Get-NitpickPackage {
                 throw "Manifest '$($NodeModule.ManifestPath)' declares Rules entry '$RuleName', but it is not an exported command on '$($NodeModule.Name)'."
             }
             try {
-                Assert-CallableSignature -Callable $Command -RequiredParams 'ScriptBlockAst' -ErrorAction Stop
+                Assert-CallableSignature `
+                    -Callable $Command `
+                    -DispatchTypes 'ScriptBlockAst', 'AstDocument' `
+                    -ErrorAction Stop
             } catch {
                 throw "Manifest '$($NodeModule.ManifestPath)' declares Rules entry '$RuleName', but it is not a compatible Nitpick rule: $($_.Exception.Message)"
             }

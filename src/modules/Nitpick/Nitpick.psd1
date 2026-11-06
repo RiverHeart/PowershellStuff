@@ -90,6 +90,7 @@ FunctionsToExport = @(
     'Test-AvoidParameterAttributeBool'
     'Test-AvoidAmbiguousPipelineContinuation'
     'Test-AvoidTrailingWhitespace'
+    'Measure-AvoidTrailingWhitespace'
     'Test-UseIsNotOperator'
 )
 
@@ -116,6 +117,14 @@ AliasesToExport = @(
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
+    Linting = @{
+        Rules = @(
+            'Test-AvoidParameterAttributeBool'
+            'Test-AvoidAmbiguousPipelineContinuation'
+            'Measure-AvoidTrailingWhitespace'
+            'Test-UseIsNotOperator'
+        )
+    }
 
     PSData = @{
 

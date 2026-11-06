@@ -20,10 +20,10 @@ Describe 'AvoidTrailingWhitespace' {
         $Source = '$Value = 1  ' + $NewLine + " `t" + $NewLine + '# comment  ' + $NewLine + '$Other = 2' + "`t "
         $Expected = '$Value = 1' + $NewLine + $NewLine + '# comment' + $NewLine + '$Other = 2'
         $Document = New-AstDocument -InputObject $Source
-        $Rule = New-Nitpick -Callable Test-AvoidTrailingWhitespace
+        $Rule = New-Nitpick -Callable Measure-AvoidTrailingWhitespace
 
         #=== Act ===#
-        $Findings = @($Rule.Invoke($Document.Ast, @{ Document = $Document }))
+        $Findings = @($Rule.Invoke($Document))
 
         #=== Assert ===#
         $Findings | Should -HaveCount 4
@@ -60,10 +60,10 @@ Describe 'AvoidTrailingWhitespace' {
         #=== Arrange ===#
         $Document = New-AstDocument -InputObject $Source
         $Document.Root.ParseErrors | Should -HaveCount 0
-        $Rule = New-Nitpick -Callable Test-AvoidTrailingWhitespace
+        $Rule = New-Nitpick -Callable Measure-AvoidTrailingWhitespace
 
         #=== Act ===#
-        $Findings = @($Rule.Invoke($Document.Ast, @{ Document = $Document }))
+        $Findings = @($Rule.Invoke($Document))
 
         #=== Assert ===#
         $Findings | Should -HaveCount $Count
@@ -87,13 +87,22 @@ Describe 'AvoidTrailingWhitespace' {
         $Findings[0].SuggestedCorrections | Should -HaveCount 1
     }
 
+    It 'discovers the document implementation without registering its ScriptAnalyzer adapter' {
+        $Rule = @(Find-Nitpick -IncludeRule 'Nitpick/AvoidTrailingWhitespace')
+
+        $Rule | Should -HaveCount 1
+        $Rule[0].DispatchType | Should -BeExactly 'AstDocument'
+        $Rule[0].Callable.Name | Should -BeExactly 'Measure-AvoidTrailingWhitespace'
+        (Test-AvoidTrailingWhitespace -Details).Name | Should -BeExactly 'AvoidTrailingWhitespace'
+    }
+
     It 'reports but does not automatically correct malformed snapshots' {
         #=== Arrange ===#
         $Document = New-AstDocument -InputObject "if (  `n"
-        $Rule = New-Nitpick -Callable Test-AvoidTrailingWhitespace
+        $Rule = New-Nitpick -Callable Measure-AvoidTrailingWhitespace
 
         #=== Act ===#
-        $Findings = @($Rule.Invoke($Document.Ast, @{ Document = $Document }))
+        $Findings = @($Rule.Invoke($Document))
 
         #=== Assert ===#
         $Document.Root.ParseErrors.Count | Should -BeGreaterThan 0
@@ -107,7 +116,7 @@ Describe 'AvoidTrailingWhitespace' {
 
         #=== Act ===#
         $Root = [Parser]::ParseInput($Source, [ref] $null, [ref] $null)
-        $Rule = New-Nitpick -Callable Test-AvoidTrailingWhitespace
+        $Rule = New-Nitpick -Callable Measure-AvoidTrailingWhitespace
 
         #=== Assert ===#
         @($Rule.Invoke($Root)) | Should -HaveCount 2
@@ -123,10 +132,10 @@ Describe 'AvoidTrailingWhitespace' {
         $Root = [Parser]::ParseInput($Source, $File, [ref] $null, [ref] $null)
         $Nested = $Root.Find({ param($Node) $Node -is [ScriptBlockExpressionAst] }, $true).ScriptBlock
         $Document = New-AstDocument -InputObject $Nested
-        $Rule = New-Nitpick -Callable Test-AvoidTrailingWhitespace
+        $Rule = New-Nitpick -Callable Measure-AvoidTrailingWhitespace
 
         #=== Act ===#
-        $Findings = @($Rule.Invoke($Document.Ast, @{ Document = $Document }))
+        $Findings = @($Rule.Invoke($Document))
 
         #=== Assert ===#
         $Findings | Should -HaveCount 1

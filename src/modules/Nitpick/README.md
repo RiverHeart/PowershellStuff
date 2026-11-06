@@ -87,18 +87,19 @@ launch VS Code from an ordinary PowerShell terminal.
 
 ## Source-oriented rules
 
-Coordinated rule calls receive the target's `AstDocument` as `Context.Document`,
-alongside `RuleBehavior`. The AST-only `NitpickRule.Invoke()` overload creates a
-document when none is supplied. Existing documents are reused; correction reanalysis
-shares a fresh document for the rendered snapshot, never the original edited document.
-An explicitly supplied document must describe the same snapshot and target as the AST.
-Rules invoked directly (including by PSScriptAnalyzer) can create a document with
-`New-AstDocument -InputObject $ScriptBlockAst` when context is absent.
+`NitpickRule` supports both root-`ScriptBlockAst` rules and document-wide rules
+typed to receive `AstDocument`. `Start-Nitpicking` creates one document per target
+and dispatches it directly to document rules; AST rules continue to receive the
+document's selected AST. Correction reanalysis uses a fresh document for the
+rendered snapshot. Document rules should not duplicate that target in context.
+PSScriptAnalyzer entry points remain separate AST-based adapters.
 
 `AstEditor\Find-AstScriptExtent` searches target text and returns snapshot-coordinate
 extents suitable for both findings and detached edits. Use tokens, not enclosing AST
 nodes, to distinguish meaningful token content from ordinary whitespace.
 
+`Measure-AvoidTrailingWhitespace` is the native document rule;
+`Test-AvoidTrailingWhitespace` is its PSScriptAnalyzer adapter.
 `Nitpick/AvoidTrailingWhitespace` reports trailing spaces and tabs, including blank
 lines and an unterminated final line, without changing line terminators. It preserves
 whitespace inside meaningful tokens, including strings, here-strings, and escaped

@@ -13,7 +13,8 @@ function Assert-CallableSignature {
         [object] $Callable,
 
         [string[]] $RequiredParams = @(),
-        [string[]] $OptionalParams = @()
+        [string[]] $OptionalParams = @(),
+        [string[]] $DispatchTypes = @()
     )
 
     $CallableParamNames = @(
@@ -36,6 +37,26 @@ function Assert-CallableSignature {
             "Invalid callable '$CallableName'. " +
             "Missing required parameter(s): $MissingParamDisplay. " +
             "Expected parameter(s): $RequiredParamDisplay."
+        )
+    }
+
+    if ($DispatchTypes.Count -le 0) { return }
+
+    $DispatchParameters = Get-CallableParameter -Callable $Callable |
+        Where-Object {
+            $_.Name -eq 'ScriptBlockAst' -or
+            $_.ParameterType.Name -in $DispatchTypes
+        }
+
+    if ($DispatchParameters.Count -ne 1) {
+        $CallableName =
+            if ($Callable -is [scriptblock]) { '<scriptblock>'}
+            else { $Callable.Name }
+
+        $DispatchTypeDisplay = $DispatchTypes -join ' or '
+        throw (
+            "Invalid callable '$CallableName'. Expected exactly one dispatch parameter " +
+            "named ScriptBlockAst or typed as $DispatchTypeDisplay; found $($DispatchParameters.Count)."
         )
     }
 }

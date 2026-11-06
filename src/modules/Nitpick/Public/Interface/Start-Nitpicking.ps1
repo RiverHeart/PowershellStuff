@@ -305,12 +305,7 @@ function Start-Nitpicking {
                 }
 
                 $ApplicableRules.Add($Rule)
-                $RuleArgs = @{
-                    ScriptblockAst = $Ast
-                    Context = @{ Document = $Document }
-                }
-
-                foreach ($Finding in $Rule.Invoke($RuleArgs)) {
+                foreach ($Finding in $Rule.Invoke($Document, @{})) {
                     $TargetFindings.Add($Finding)
                 }
             }

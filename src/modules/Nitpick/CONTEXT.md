@@ -5,7 +5,7 @@ Nitpick is this repository's PowerShell linting/autocorrection engine: rule auth
 ## Language
 
 **Rule**:
-A single check, backed by either a PowerShell command or a scriptblock, that inspects a ScriptBlockAst and reports findings.
+A single check, backed by either a PowerShell command or a scriptblock, that inspects a Target and reports findings.
 _Avoid_: Check, linter, analyzer (reserve "analyzer" for PSScriptAnalyzer specifically)
 
 **Coordinator**:

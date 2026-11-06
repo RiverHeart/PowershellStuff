@@ -328,6 +328,8 @@ class NitpickRule {
     [string] $Category
     [bool] $EditorEnabled
     [string] $CallableType
+    [string] $DispatchType
+    [string] $DispatchParameterName
     [object] $Callable
     [string] $Source
     [string] $Description
@@ -350,8 +352,22 @@ class NitpickRule {
 
         Assert-CallableSignature `
             -Callable $TargetCallable `
-            -RequiredParams 'ScriptBlockAst' `
+            -DispatchTypes 'ScriptBlockAst', 'AstDocument' `
             -ErrorAction Stop
+
+        $DispatchParameter = @(
+            Get-CallableParameter -Callable $TargetCallable |
+                Where-Object {
+                    $_.Name -eq 'ScriptBlockAst' -or
+                    $_.ParameterType.Name -eq 'AstDocument'
+                }
+        )[0]
+        $this.DispatchType = if ($DispatchParameter.ParameterType.Name -eq 'AstDocument') {
+            'AstDocument'
+        } else {
+            'ScriptBlockAst'
+        }
+        $this.DispatchParameterName = $DispatchParameter.Name
 
         $this.Category = 'Other'
         $this.EditorEnabled = $true
@@ -452,14 +468,25 @@ class NitpickRule {
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
     [object[]] Invoke([ScriptBlockAst] $Ast) {
-        return $this.Invoke($Ast, @{
-            Caller = 'Nitpick'
-            File = $Ast.Extent.File
-            RuleBehavior = @{
-                SearchNestedScriptBlocks = $true
-                OutputType = 'NitpickFinding'
+        $Target = if ($this.DispatchType -eq 'AstDocument') {
+            New-AstDocument -InputObject $Ast
+        } else {
+            $Ast
+        }
+
+        $Parameters = @{
+            Context = @{
+                Caller = 'Nitpick'
+                File = $Ast.Extent.File
+                RuleBehavior = @{
+                    SearchNestedScriptBlocks = $true
+                    OutputType = 'NitpickFinding'
+                }
             }
-        })
+        }
+        $Parameters[$this.DispatchParameterName] = $Target
+
+        return $this.Invoke($Parameters)
     }
 
     <#
@@ -476,7 +503,57 @@ class NitpickRule {
         [ScriptBlockAst] $Ast,
         [System.Collections.IDictionary] $Context
     ) {
-        return $this.Invoke(@{ ScriptBlockAst = $Ast; Context = $Context })
+        $Target = if ($this.DispatchType -eq 'AstDocument') {
+            New-AstDocument -InputObject $Ast
+        } else {
+            $Ast
+        }
+
+        $Parameters = @{ Context = $Context }
+        $Parameters[$this.DispatchParameterName] = $Target
+
+        return $this.Invoke($Parameters)
+    }
+
+    <#
+    .SYNOPSIS
+        Invokes the rule against an AstDocument or its selected AST.
+    .PARAMETER Document
+        The document to dispatch to document rules or whose AST is dispatched to
+        root-AST rules.
+    .OUTPUTS
+        [object[]] # NitpickFinding or DiagnosticRecord instances
+    #>
+    [object[]] Invoke([object] $Document) {
+        if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
+            throw [System.ArgumentException]::new('Rule invocation requires an AstDocument.')
+        }
+
+        return $this.Invoke($Document, @{
+            Caller = 'Nitpick'
+            File = $Document.Ast.Extent.File
+            RuleBehavior = @{
+                SearchNestedScriptBlocks = $true
+                OutputType = 'NitpickFinding'
+            }
+        })
+    }
+
+    [object[]] Invoke(
+        [object] $Document,
+        [System.Collections.IDictionary] $Context
+    ) {
+        if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
+            throw [System.ArgumentException]::new('Rule invocation requires an AstDocument.')
+        }
+        $Target = if ($this.DispatchType -eq 'AstDocument') {
+            $Document
+        } else {
+            $Document.Ast
+        }
+        $Parameters = @{ Context = $Context }
+        $Parameters[$this.DispatchParameterName] = $Target
+        return $this.Invoke($Parameters)
     }
 
     <#
@@ -494,37 +571,37 @@ class NitpickRule {
         foreach ($Key in $Parameters.Keys) {
             $InvocationParameters[$Key] = $Parameters[$Key]
         }
-        $Ast = $InvocationParameters.ScriptBlockAst
-        if ($Ast -isnot [ScriptBlockAst]) {
-            throw 'Rule invocation requires a ScriptBlockAst.'
+
+        $Target = $InvocationParameters[$this.DispatchParameterName]
+        if ($null -eq $Target -and $InvocationParameters.Contains('ScriptBlockAst')) {
+            $Target = $InvocationParameters.ScriptBlockAst
+            $InvocationParameters.Remove('ScriptBlockAst')
         }
+
+        if ($this.DispatchType -eq 'AstDocument') {
+            if ($Target -is [ScriptBlockAst]) {
+                $Target = New-AstDocument -InputObject $Target
+            } elseif ($null -eq $Target -or $Target.GetType().Name -ne 'AstDocument') {
+                throw [System.ArgumentException]::new('Rule invocation requires an AstDocument.')
+            }
+            $Ast = $Target.Ast
+        } else {
+            if ($null -ne $Target -and $Target.GetType().Name -eq 'AstDocument') {
+                $Target = $Target.Ast
+            } elseif ($Target -isnot [ScriptBlockAst]) {
+                throw [System.ArgumentException]::new('Rule invocation requires a ScriptBlockAst.')
+            }
+            $Ast = $Target
+        }
+
+        $InvocationParameters[$this.DispatchParameterName] = $Target
         if (Get-CallableParameter -Callable $this.Callable -Name Context) {
             $Context = $InvocationParameters.Context
             if ($null -eq $Context) {
                 $Context = @{}
             }
             if ($Context -isnot [System.Collections.IDictionary]) {
-                throw 'Rule invocation Context must be a dictionary.'
-            }
-            if ($null -eq $Context.Document) {
-                $Context.Document = New-AstDocument -InputObject $Ast
-            } elseif (-not [object]::ReferenceEquals($Context.Document.Ast, $Ast)) {
-                $DocumentAst = $Context.Document.Ast
-                $Snapshot = $Ast.Extent.StartScriptPosition.GetFullScript()
-                if ($null -eq $Snapshot) { $Snapshot = $Ast.Extent.Text }
-                $AstDepth = 0
-                for ($Parent = $Ast.Parent; $null -ne $Parent; $Parent = $Parent.Parent) { $AstDepth++ }
-                $DocumentDepth = 0
-                for ($Parent = $DocumentAst.Parent; $null -ne $Parent; $Parent = $Parent.Parent) { $DocumentDepth++ }
-                if ($null -eq $DocumentAst -or
-                    $DocumentAst.GetType() -ne $Ast.GetType() -or
-                    $AstDepth -ne $DocumentDepth -or
-                    $Context.Document.OriginalText -cne $Snapshot -or
-                    $DocumentAst.Extent.StartOffset -ne $Ast.Extent.StartOffset -or
-                    $DocumentAst.Extent.EndOffset -ne $Ast.Extent.EndOffset
-                ) {
-                    throw 'Context.Document.Ast must represent the same snapshot and target as the AST supplied to the rule.'
-                }
+                throw [System.ArgumentException]::new('Rule invocation Context must be a dictionary.')
             }
             if (-not $Context.Contains('Caller')) { $Context.Caller = 'Nitpick' }
             if (-not $Context.Contains('File')) { $Context.File = $Ast.Extent.File }

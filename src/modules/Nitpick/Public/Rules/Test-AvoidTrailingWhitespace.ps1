@@ -1,24 +1,14 @@
 using namespace System.Collections
 using namespace System.Management.Automation.Language
+using module AstEditor
 
 <#
 .SYNOPSIS
-    PSScriptAnalyzer rule to detect instances of trailing whitespace.
+    PSScriptAnalyzer adapter for the native trailing-whitespace rule.
 
 .DESCRIPTION
-    PSScriptAnalyzer rule to detect instances of trailing whitespace.
-
-    Preserves whitespace in multiline strings and here-strings as well
-    as backtick escaped spaces.
-
-.PARAMETER Context
-    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
-    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
-    Without these settings, traversal is scope-local and output is DiagnosticRecord.
-    `Context.Document` supplies the shared snapshot during coordinated execution.
-    Direct invocation creates an in-memory document from the submitted AST.
-    Candidates overlapping meaningful tokens are ignored. Parse errors prevent
-    automatic corrections, but unprotected candidates still produce findings.
+    Converts the ScriptBlockAst supplied by PSScriptAnalyzer to an AstDocument
+    and delegates to Measure-AvoidTrailingWhitespace.
 
 .EXAMPLE
     Test-AvoidTrailingWhitespace -ScriptBlockAst {
@@ -36,6 +26,50 @@ function Test-AvoidTrailingWhitespace {
         [ScriptBlockAst] $ScriptBlockAst,
 
         [Parameter(ParameterSetName='ScriptBlockAst')]
+        [IDictionary] $Context,
+
+        [Parameter(ParameterSetName='Details')]
+        [switch] $Details
+    )
+
+    if ($Details) {
+        return Measure-AvoidTrailingWhitespace -Details
+    }
+
+    $Document = New-AstDocument -InputObject $ScriptBlockAst
+    Measure-AvoidTrailingWhitespace -InputObject $Document -Context $Context
+}
+
+<#
+.SYNOPSIS
+    Finds and corrects trailing whitespace in an AstDocument.
+
+.DESCRIPTION
+    Preserves whitespace in multiline strings and here-strings as well as
+    backtick-escaped spaces. Candidates overlapping meaningful tokens are ignored.
+    Parse errors prevent automatic corrections, but unprotected candidates still
+    produce findings.
+
+.PARAMETER Document
+    The complete source snapshot and parsed metadata to analyze.
+
+.PARAMETER Context
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
+    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
+    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+
+.EXAMPLE
+    $Document = New-AstDocument -InputObject '$Value = 1  '
+    Measure-AvoidTrailingWhitespace -Document $Document
+#>
+function Measure-AvoidTrailingWhitespace {
+    [CmdletBinding(DefaultParameterSetName='Document')]
+    [OutputType([object[]], [hashtable])]
+    param(
+        [Parameter(Mandatory,ParameterSetName='Document',ValueFromPipeline)]
+        [AstDocument] $InputObject,
+
+        [Parameter(ParameterSetName='Document')]
         [IDictionary] $Context,
 
         [Parameter(ParameterSetName='Details')]
@@ -60,17 +94,14 @@ function Test-AvoidTrailingWhitespace {
         # Pattern to match trailing whitespace at the end of lines
         # while preserving line endings and a final unterminated line.
         $CandidatePattern = '[ \t]+(?=\r\n|\n|\r|\z)'
-
     }
 
     process {
         if ($Details) { return $Metadata }
 
-        try {
-            $Document =
-                if ($null -ne $Context.Document) { $Context.Document }
-                else { New-AstDocument -InputObject $ScriptBlockAst }
+        $Document = $InputObject
 
+        try {
             $ShouldRecurse = $Behavior.SearchNestedScriptBlocks -eq $true
             $NestedScopes = if (-not $ShouldRecurse) {
                 $Document.Ast.FindAll({
@@ -126,10 +157,12 @@ function Test-AvoidTrailingWhitespace {
                 if ($Document.Root.ParseErrors.Count -eq 0) {
                     $Edit = New-AstTextEdit -Extent $Extent -ReplacementText '' -Reason 'Remove trailing whitespace.'
                     $Corrections = @(
-                        New-NitpickCorrection -TextEdit $Edit `
+                        New-NitpickCorrection `
+                            -TextEdit $Edit `
                             -FilePathOrContext $FilePath `
                             -Description 'Remove trailing whitespace.' `
-                            -RuleId $RuleId -Applicability Safe
+                            -RuleId $RuleId `
+                            -Applicability Safe
                     )
                 }
                 New-NitpickFinding `

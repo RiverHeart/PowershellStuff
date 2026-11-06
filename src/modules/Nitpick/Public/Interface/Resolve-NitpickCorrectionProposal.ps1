@@ -390,10 +390,7 @@ function Resolve-NitpickCorrectionProposal {
 
         $RenderedDocument = New-AstDocument -InputObject $RenderedAst
         foreach ($SelectedRule in $Rule) {
-            foreach ($FinalFinding in $SelectedRule.Invoke(
-                $RenderedDocument.Ast,
-                @{ Document = $RenderedDocument }
-            )) {
+            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument, @{})) {
                 $FinalFindings.Add($FinalFinding)
             }
         }
