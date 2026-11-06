@@ -1,3 +1,5 @@
+using namespace System.Management.Automation.Language
+
 <#
 .SYNOPSIS
     Acquires a rule package's declared or standalone-discovered rules.
@@ -69,8 +71,12 @@ function Get-NitpickPackage {
             $ImportedInstance.ExportedCommands.Values |
                 Where-Object {
                     ($_.Name -like 'Test-*' -or $_.Name -like 'Measure-*') -and (
-                        $_.Parameters.Keys -contains 'ScriptBlockAst' -or
-                        $_.Parameters.Values.ParameterType.Name -contains 'AstDocument'
+                        $_.Parameters.Values.ParameterType -contains [ScriptBlockAst] -or
+                        $_.Parameters.Values.ParameterType.Name -contains 'AstDocument' -or
+                        (
+                            $_.Parameters.ContainsKey('ScriptBlockAst') -and
+                            $_.Parameters['ScriptBlockAst'].ParameterType -eq [object]
+                        )
                     )
                 } |
                 ForEach-Object {
@@ -85,10 +91,10 @@ function Get-NitpickPackage {
                 throw "Manifest '$($NodeModule.ManifestPath)' declares Rules entry '$RuleName', but it is not an exported command on '$($NodeModule.Name)'."
             }
             try {
-                Assert-CallableSignature `
+                [void] (Resolve-NitpickDispatchSignature `
                     -Callable $Command `
-                    -DispatchTypes 'ScriptBlockAst', 'AstDocument' `
                     -ErrorAction Stop
+                )
             } catch {
                 throw "Manifest '$($NodeModule.ManifestPath)' declares Rules entry '$RuleName', but it is not a compatible Nitpick rule: $($_.Exception.Message)"
             }

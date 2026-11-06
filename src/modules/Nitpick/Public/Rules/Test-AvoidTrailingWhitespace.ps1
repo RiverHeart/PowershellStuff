@@ -28,7 +28,7 @@ function Test-AvoidTrailingWhitespace {
         [Parameter(ParameterSetName='ScriptBlockAst')]
         [IDictionary] $Context,
 
-        [Parameter(ParameterSetName='Details')]
+        [Parameter(Mandatory,ParameterSetName='Details')]
         [switch] $Details
     )
 
@@ -72,7 +72,7 @@ function Measure-AvoidTrailingWhitespace {
         [Parameter(ParameterSetName='Document')]
         [IDictionary] $Context,
 
-        [Parameter(ParameterSetName='Details')]
+        [Parameter(Mandatory,ParameterSetName='Details')]
         [switch] $Details
     )
 

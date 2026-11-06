@@ -26,7 +26,7 @@ Describe 'NitpickRule' {
         $Result = @($Rule.Invoke($Document, $Context))[0]
 
         #=== Assert ===#
-        $Rule.DispatchType | Should -BeExactly 'AstDocument'
+        $Rule.DispatchType | Should -Be ([AstDocument])
         [object]::ReferenceEquals($Result.Document, $Document) | Should -BeTrue
         [object]::ReferenceEquals($Result.Context, $Context) | Should -BeTrue
         $Context.Contains('Document') | Should -BeFalse
@@ -50,6 +50,86 @@ Describe 'NitpickRule' {
         #=== Assert ===#
         $Direct.OriginalText | Should -BeExactly '# text'
         [object]::ReferenceEquals($Dictionary, $Document) | Should -BeTrue
+    }
+
+    It 'dispatches typed ScriptBlockAst parameters under their declared name' {
+        $Rule = New-Nitpick -Name TypedAst -Source Tests -Callable {
+            param(
+                [System.Management.Automation.Language.ScriptBlockAst] $InputObject
+            )
+            $InputObject
+        }
+        $Ast = { '$value' }.Ast
+
+        $Result = @($Rule.Invoke($Ast))[0]
+
+        $Rule.DispatchType | Should -Be ([System.Management.Automation.Language.ScriptBlockAst])
+        $Rule.DispatchParameterName | Should -BeExactly 'InputObject'
+        [object]::ReferenceEquals($Result, $Ast) | Should -BeTrue
+    }
+
+    It 'preserves the legacy ScriptBlockAst name fallback for untyped and object parameters' {
+        foreach ($Callable in @(
+            { param ($ScriptBlockAst) $ScriptBlockAst },
+            { param ([object] $ScriptBlockAst) $ScriptBlockAst }
+        )) {
+            $Rule = New-Nitpick -Name LegacyAst -Source Tests -Callable $Callable
+            $Ast = { '$value' }.Ast
+
+            $Result = @($Rule.Invoke($Ast))[0]
+
+            $Rule.DispatchType | Should -Be ([System.Management.Automation.Language.ScriptBlockAst])
+            [object]::ReferenceEquals($Result, $Ast) | Should -BeTrue
+        }
+    }
+
+    It 'rejects incompatible types declared on the legacy parameter name' {
+        {
+            New-Nitpick -Name InvalidAst -Source Tests -Callable {
+                param ([string] $ScriptBlockAst)
+            }
+        } | Should -Throw "*Parameter 'ScriptBlockAst'*"
+    }
+
+    It 'rejects callable parameters outside the dispatch, Context, and Details contract' {
+        {
+            New-Nitpick -Name ExtraParameter -Source Tests -Callable {
+                param (
+                    [System.Management.Automation.Language.ScriptBlockAst] $InputObject,
+                    [string] $Configuration
+                )
+            }
+        } | Should -Throw "*Unsupported parameter 'Configuration'*"
+    }
+
+    It 'rejects Context parameters that cannot bind with the dispatch parameter' {
+        {
+            New-Nitpick -Name SeparateContextSet -Source Tests -Callable {
+                [CmdletBinding()]
+                param(
+                    [Parameter(Mandatory,ParameterSetName='Rule')]
+                    [System.Management.Automation.Language.ScriptBlockAst] $InputObject,
+
+                    [Parameter(ParameterSetName='Context')]
+                    [System.Collections.IDictionary] $Context
+                )
+            }
+        } | Should -Throw '*Context and the dispatch parameter must share an ordinary parameter set*'
+    }
+
+    It 'requires Details to be mandatory in its own parameter set' {
+        {
+            New-Nitpick -Name OptionalDetails -Source Tests -Callable {
+                [CmdletBinding(DefaultParameterSetName='Rule')]
+                param(
+                    [Parameter(Mandatory,ParameterSetName='Rule')]
+                    [System.Management.Automation.Language.ScriptBlockAst] $InputObject,
+
+                    [Parameter(ParameterSetName='Details')]
+                    [switch] $Details
+                )
+            }
+        } | Should -Throw '*Details must be mandatory in one separate parameter set*'
     }
 
     It 'rejects callables with more than one dispatch parameter' {

@@ -91,7 +91,7 @@ Describe 'AvoidTrailingWhitespace' {
         $Rule = @(Find-Nitpick -IncludeRule 'Nitpick/AvoidTrailingWhitespace')
 
         $Rule | Should -HaveCount 1
-        $Rule[0].DispatchType | Should -BeExactly 'AstDocument'
+        $Rule[0].DispatchType.Name | Should -BeExactly 'AstDocument'
         $Rule[0].Callable.Name | Should -BeExactly 'Measure-AvoidTrailingWhitespace'
         (Test-AvoidTrailingWhitespace -Details).Name | Should -BeExactly 'AvoidTrailingWhitespace'
     }
