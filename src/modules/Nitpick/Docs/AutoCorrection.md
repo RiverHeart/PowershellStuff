@@ -26,14 +26,16 @@ final-analysis summary counts describe the historical contract, superseded by
 [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
 
 Leading `# nitpick disable-target Namespace/Rule` comments skip matching
-producers before correction collection. `disable-line` and `disable-next-line`
-instead filter native findings by their start line after coordinator attribution.
+producers before correction collection. `disable-line`, `disable-next-line`, and
+regional `disable`/`enable` instead filter native findings by their start line
+after coordinator attribution. The last preceding matching regional directive
+sets state without stacking; enables never undo whole-target or line suppression.
 Neither automatic nor guided selection sees suppressed findings.
 Direct resolver calls filter suppressed
 native findings before automatic or guided selection, record their corrections
 as skipped with a suppression reason, and omit them from `OriginalFindings`.
 Producer-owned correction arrays are not modified. Candidate reanalysis reads
-directives afresh, including changed physical line positions, and can reenable
+directives afresh, including changed physical line positions and regional order, and can reenable
 originally suppressed descriptors when another rule removes their directive.
 An unsuppressed finding may still propose edits spanning a suppressed line.
 `OriginalFindings` and `CandidateFindings` each

@@ -102,9 +102,9 @@ Warning findings and are ignored as a whole. Neither these warnings nor
 `Nitpick/PowerShellParseError` findings can be suppressed, even by `*`.
 Invocation-level rule selection and validation still apply.
 
-Regional directives (`disable`, `enable`) remain proposed in
-[ADR 0002](Docs/adr/0002-comment-based-rule-suppression.md) and currently produce
-unsupported-action warnings. PSScriptAnalyzer suppression behavior is unchanged.
+All five directive actions described in
+[ADR 0002](Docs/adr/0002-comment-based-rule-suppression.md) are implemented.
+PSScriptAnalyzer suppression behavior is unchanged.
 The former `disable-file` spelling is unsupported; it is not an alias.
 
 ### Line-specific suppression
@@ -134,6 +134,36 @@ edits cross a suppressed line: suppression is not an edit-protection mechanism.
 Candidate analysis reads directives and line positions afresh. For AST fragments,
 comments outside the submitted extent cannot suppress findings inside it.
 Parser errors and invalid-directive warnings remain unsuppressible.
+
+### Regional suppression
+
+Use standalone `disable` and `enable` comments to change which rules report
+findings over a region:
+
+```powershell
+# nitpick disable * -- Intentional fixture region.
+-not ($First -is [int])
+
+# nitpick enable Nitpick/UseIsNotOperator
+-not ($Second -is [int]) # This rule reports again; other rules remain disabled.
+```
+
+Each directive takes effect on the next physical line. Rules start enabled, and
+the last preceding matching `disable` or `enable` wins for each qualified Rule ID.
+This is not a stack: repeated disables need only one matching enable. An unmatched
+enable is a no-op; an unclosed disable extends to the end of the target. Selectors
+support the same case-insensitive wildcards, lists, and reasons as other actions.
+
+Regions are textual, not lexically scoped: entering or leaving a function or
+ScriptBlock does not reset state. A separately submitted fragment starts enabled
+and ignores directives outside its extent. Regional suppression uses the finding's
+start line, runs producers, and excludes findings and their complete corrections
+through the same policy as line suppression. Candidate snapshots recompute state.
+
+`enable` never overrides `disable-target`, invocation-level `-ExcludeRule`, or
+line-specific suppression. Parser errors and invalid-directive warnings cannot
+be disabled. Trailing regional directives are malformed and warn; use
+`disable-line` for trailing comments.
 
 ## Guided navigation
 

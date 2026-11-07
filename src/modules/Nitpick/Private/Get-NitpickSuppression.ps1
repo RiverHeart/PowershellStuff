@@ -4,7 +4,7 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    Reads target and physical-line suppression directives from snapshot tokens.
+    Reads target, physical-line, and ordered regional directives from snapshot tokens.
 #>
 function Get-NitpickSuppression {
     [CmdletBinding()]
@@ -16,6 +16,7 @@ function Get-NitpickSuppression {
 
     $Selectors = [List[string]]::new()
     $LineSelectors = @{}
+    $Regions = [List[object]]::new()
     $Diagnostics = [List[object]]::new()
     $Tokens = [List[Token]]::new()
     $Pending = [Queue[Token]]::new()
@@ -69,14 +70,14 @@ function Get-NitpickSuppression {
                 0, $Token.Extent.StartColumnNumber - 1
             ) -notmatch '\S'
 
-            if ($Action -notin 'disable-target', 'disable-line', 'disable-next-line') {
-                $Problem = "Unsupported action '$Action'. Supported actions are disable-target, disable-line, and disable-next-line."
+            if ($Action -notin 'disable-target', 'disable-line', 'disable-next-line', 'disable', 'enable') {
+                $Problem = "Unsupported action '$Action'. Supported actions are disable-target, disable-line, disable-next-line, disable, and enable."
             } elseif (
                 $Action -eq 'disable-target' -and (-not $InPreamble -or -not $IsStandalone)
             ) {
                 $Problem = 'disable-target must be a standalone comment in the leading comment/whitespace preamble.'
-            } elseif ($Action -eq 'disable-next-line' -and -not $IsStandalone) {
-                $Problem = 'disable-next-line must be a standalone comment.'
+            } elseif ($Action -ne 'disable-line' -and -not $IsStandalone) {
+                $Problem = "$Action must be a standalone comment."
             } else {
                 $SelectorText = ($Arguments -split '\s+--(?:\s|$)', 2)[0].Trim()
 
@@ -122,6 +123,12 @@ function Get-NitpickSuppression {
             ))
         } elseif ($Action -eq 'disable-target') {
             $Selectors.AddRange($DirectiveSelectors)
+        } elseif ($Action -in 'disable', 'enable') {
+            $Regions.Add([pscustomobject]@{
+                StartLineNumber = $Token.Extent.StartLineNumber + 1
+                Disabled = $Action -eq 'disable'
+                Selectors = $DirectiveSelectors.ToArray()
+            })
         } else {
             $Line = $Token.Extent.StartLineNumber
             if ($Action -eq 'disable-next-line') { $Line++ }
@@ -137,6 +144,7 @@ function Get-NitpickSuppression {
     [pscustomobject]@{
         Selectors = $Selectors.ToArray()
         LineSelectors = $LineSelectors
+        Regions = $Regions.ToArray()
         Diagnostics = $Diagnostics.ToArray()
     }
 }

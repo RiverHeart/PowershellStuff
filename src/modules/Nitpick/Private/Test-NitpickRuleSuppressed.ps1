@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Matches target selectors and optional finding start-line selectors.
+    Matches target selectors and optional finding start-line and regional selectors.
 #>
 function Test-NitpickRuleSuppressed {
     [CmdletBinding()]
@@ -31,6 +31,20 @@ function Test-NitpickRuleSuppressed {
                 return $true
             }
         }
+
+        $Disabled = $false
+        foreach ($Region in $Suppression.Regions) {
+            if ($Region.StartLineNumber -gt $StartLineNumber) { break }
+
+            foreach ($Selector in $Region.Selectors) {
+                if ($RuleId -like $Selector) {
+                    $Disabled = $Region.Disabled
+                    break
+                }
+            }
+        }
+
+        return $Disabled
     }
 
     return $false

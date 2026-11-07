@@ -71,8 +71,6 @@ Describe 'Whole-target suppression grammar' {
         @{ Directive = '# nitpick disable-target Namespace/' }
         @{ Directive = '# nitpick disable-target A/B/C' }
         @{ Directive = '# nitpick disable-target Nitpick/[' }
-        @{ Directive = '# nitpick disable Nitpick/*' }
-        @{ Directive = '# nitpick enable Nitpick/*' }
         @{ Directive = '# nitpick unknown Nitpick/*' }
         @{ Directive = '# nitpick disable-file Nitpick/*' }
     ) {

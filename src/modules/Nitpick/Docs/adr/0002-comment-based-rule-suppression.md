@@ -6,13 +6,13 @@ status: proposed
 
 ## Status and scope
 
-The broader design remains proposed. The implemented actions are `disable-target`,
-`disable-line`, and `disable-next-line`, with qualified wildcard selectors,
+The implemented actions are `disable-target`, `disable-line`, `disable-next-line`,
+`disable`, and `enable`, with qualified wildcard selectors,
 optional reasons, unsuppressible malformed-directive warnings, direct resolver
 filtering, and snapshot-specific candidate reanalysis. Whole-target suppression
-gates producers; line suppression filters attributed native findings before
-reporting and correction selection. Regional `disable` and `enable` remain
-unimplemented and produce unsupported-action warnings.
+gates producers; line and regional suppression filter attributed native findings
+before reporting and correction selection. Regional state follows the last
+preceding matching directive, without stacking or lexical-scope resets.
 See the [usage and limits](../../README.md#whole-target-rule-suppression).
 PSScriptAnalyzer compatibility remains separate, as recorded in
 [ADR 0001](0001-defer-scriptanalyzer-adapter.md).
@@ -303,8 +303,10 @@ It adds shared analysis policy and a correction-selection handoff, rather than o
 text filter. Line-based anchors are predictable but cannot distinguish two findings
 from the same rule starting on the same line.
 
-## Review decisions still open
+## Deferred extensions
 
-- Accept non-stacking regional state and unconditional whole-target exclusions.
-- Accept Warning findings for malformed directives, optional reasons, and
-  initially deferring block-comment directives and unused-directive reporting.
+Block-comment directives, unused-directive reporting, public suppressed-findings
+collections/counters, an ignore-suppressions switch, and producer-side optimization
+remain deferred. All five single-line directive actions above are implemented;
+malformed directives warn, optional reasons are supported, and whole-target
+exclusions remain unconditional.

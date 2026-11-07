@@ -27,6 +27,9 @@ using namespace System.Management.Automation.Language
     disable-line comments (standalone or trailing) and standalone disable-next-line
     comments suppress native findings starting on that physical line or the next
     physical line, including their corrections. Candidate analysis rereads directives.
+    Standalone disable/enable comments change regional state from the next physical
+    line. The last matching directive wins without stacking or lexical-scope resets;
+    enable cannot override whole-target, invocation-level, or line exclusions.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or

@@ -41,9 +41,10 @@ using module AstEditor
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
     findings require qualified RuleId; detached corrections may omit identity.
-    disable-target, disable-line, and disable-next-line directives exclude original
-    findings before correction selection. Candidate analysis rereads directives from
-    rendered text: whole-target matches skip rule execution, while line matches
+    disable-target, disable-line, disable-next-line, and regional disable/enable
+    directives exclude original findings before correction selection. Candidate
+    analysis rereads directives and regional order from rendered text:
+    whole-target matches skip rule execution, while line and regional matches
     filter attributed findings by ViolationExtent.StartLineNumber after execution.
 
 .PARAMETER Script
@@ -193,7 +194,7 @@ function Resolve-NitpickCorrectionProposal {
                 foreach ($Correction in $SourceFinding.Corrections) {
                     $SkippedCorrections.Add([pscustomobject]@{
                         Correction = $Correction
-                        Reason = 'The finding is suppressed by a Nitpick comment directive (disable-target, disable-line, or disable-next-line).'
+                        Reason = 'The finding is suppressed by a Nitpick comment directive (disable-target, disable-line, disable-next-line, or regional disable).'
                     })
                 }
 
