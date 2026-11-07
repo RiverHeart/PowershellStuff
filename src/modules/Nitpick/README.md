@@ -102,11 +102,38 @@ Warning findings and are ignored as a whole. Neither these warnings nor
 `Nitpick/PowerShellParseError` findings can be suppressed, even by `*`.
 Invocation-level rule selection and validation still apply.
 
-This MVP implements only `disable-target`. Regional and line directives
-(`disable`, `enable`, `disable-line`, `disable-next-line`) remain proposed in
+Regional directives (`disable`, `enable`) remain proposed in
 [ADR 0002](Docs/adr/0002-comment-based-rule-suppression.md) and currently produce
 unsupported-action warnings. PSScriptAnalyzer suppression behavior is unchanged.
 The former `disable-file` spelling is unsupported; it is not an alias.
+
+### Line-specific suppression
+
+Use `disable-line` in a standalone or trailing comment, or `disable-next-line`
+in a standalone comment:
+
+```powershell
+-not ($Value -is [int]) # nitpick disable-line Nitpick/UseIsNotOperator -- Intentional.
+
+# nitpick disable-next-line Nitpick/UseIsNotOperator
+-not ($Other -is [int])
+```
+
+These actions use the same qualified selectors, wildcards, lists, and optional
+reasons as `disable-target`. They may appear after code or inside nested blocks.
+Only native findings whose `ViolationExtent.StartLineNumber` matches the physical
+line are suppressed. A multiline finding is not suppressed just because another
+part of its extent overlaps that line. `disable-next-line` covers exactly the
+next physical line, even if it is blank or a comment; it does not seek a statement.
+
+Unlike whole-target suppression, line suppression runs the producer and filters
+its attributed findings before reporting, totals, severity thresholds, or automatic
+and guided correction selection. All corrections on a suppressed finding are
+excluded as complete fixes. Unsuppressed findings remain eligible, even if their
+edits cross a suppressed line: suppression is not an edit-protection mechanism.
+Candidate analysis reads directives and line positions afresh. For AST fragments,
+comments outside the submitted extent cannot suppress findings inside it.
+Parser errors and invalid-directive warnings remain unsuppressible.
 
 ## Guided navigation
 

@@ -69,16 +69,26 @@ rewriting proposal facts or splitting a correction's atomic `TextEdits`.
 ### Native comment suppression
 
 [ADR 0002](adr/0002-comment-based-rule-suppression.md) proposes whole-target,
-regional, and line suppression. The implemented MVP supports only leading,
-standalone `disable-target` comments. `Get-NitpickSuppression` reads target tokens,
+regional, and line suppression. Implemented actions are leading, standalone
+`disable-target`, standalone or trailing `disable-line`, and standalone
+`disable-next-line`. `Get-NitpickSuppression` reads target tokens,
 including actual comments nested in expandable strings; `Test-NitpickRuleSuppressed`
-matches the executing descriptor's ID using PowerShell wildcards. The coordinator
-skips matching producers, retaining all path-applicable selected descriptors for
+matches the executing descriptor's ID using PowerShell wildcards. Without a
+start-line argument it checks whole-target selectors only; with a finding's
+`ViolationExtent.StartLineNumber` it also checks selectors indexed by that physical
+snapshot line. The coordinator skips whole-target-suppressed producers and filters
+line-suppressed native findings after attribution, retaining all path-applicable selected descriptors for
 candidate reanalysis. The public correction resolver also filters directly supplied
 native findings before selection and regenerates directive warnings per snapshot.
 Parser errors and invalid-directive warnings are never suppressible. Unsupported
 actions warn rather than silently doing nothing. External local-name suppression
 compatibility is unchanged.
+
+Line suppression does not infer qualified identity from non-native output. The
+correction resolver uses the same matcher before selection and after candidate
+execution; suppressed findings never reach guided selection. Original and candidate
+snapshots retain independent decisions, and line positions are never reused across
+rendering. Regional `disable`/`enable` remain unsupported.
 
 For a directly submitted braced ScriptBlock, only its own opening-brace token
 (at the submitted AST's start offset) is exempt from ending the preamble.

@@ -4,7 +4,7 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    Reads whole-target suppression directives from the analyzed snapshot's tokens.
+    Reads target and physical-line suppression directives from snapshot tokens.
 #>
 function Get-NitpickSuppression {
     [CmdletBinding()]
@@ -15,6 +15,7 @@ function Get-NitpickSuppression {
     )
 
     $Selectors = [List[string]]::new()
+    $LineSelectors = @{}
     $Diagnostics = [List[object]]::new()
     $Tokens = [List[Token]]::new()
     $Pending = [Queue[Token]]::new()
@@ -64,15 +65,18 @@ function Get-NitpickSuppression {
             $Action = $Matches[1]
             [string] $Arguments = $Matches[2]
 
-            if ($Action -ine 'disable-target') {
-                $Problem = "Unsupported action '$Action'. Only disable-target is currently supported."
+            $IsStandalone = $Token.Extent.StartScriptPosition.Line.Substring(
+                0, $Token.Extent.StartColumnNumber - 1
+            ) -notmatch '\S'
+
+            if ($Action -notin 'disable-target', 'disable-line', 'disable-next-line') {
+                $Problem = "Unsupported action '$Action'. Supported actions are disable-target, disable-line, and disable-next-line."
             } elseif (
-                -not $InPreamble -or
-                $Token.Extent.StartScriptPosition.Line.Substring(
-                    0, $Token.Extent.StartColumnNumber - 1
-                ) -match '\S'
+                $Action -eq 'disable-target' -and (-not $InPreamble -or -not $IsStandalone)
             ) {
                 $Problem = 'disable-target must be a standalone comment in the leading comment/whitespace preamble.'
+            } elseif ($Action -eq 'disable-next-line' -and -not $IsStandalone) {
+                $Problem = 'disable-next-line must be a standalone comment.'
             } else {
                 $SelectorText = ($Arguments -split '\s+--(?:\s|$)', 2)[0].Trim()
 
@@ -83,7 +87,9 @@ function Get-NitpickSuppression {
                     }
 
                     foreach ($Selector in ($Entry.Trim() -split '\s+')) {
-                        if ($Selector -ne '*' -and $Selector -notmatch '^[^/\s,]+/[^/\s,]+$') {
+                        if ($Selector -ne '*' -and
+                            $Selector -notmatch '^[^/\s,]+/[^/\s,]+$'
+                        ) {
                             $Problem = "Invalid selector '$Selector'. Use a qualified rule ID or '*'."
                             break
                         }
@@ -114,13 +120,23 @@ function Get-NitpickSuppression {
                 -Explanation 'Malformed or unsupported suppression directives are ignored as a whole.' `
                 -OutputAs NitpickFinding
             ))
-        } else {
+        } elseif ($Action -eq 'disable-target') {
             $Selectors.AddRange($DirectiveSelectors)
+        } else {
+            $Line = $Token.Extent.StartLineNumber
+            if ($Action -eq 'disable-next-line') { $Line++ }
+
+            if (-not $LineSelectors.ContainsKey($Line)) {
+                $LineSelectors[$Line] = [List[string]]::new()
+            }
+
+            $LineSelectors[$Line].AddRange($DirectiveSelectors)
         }
     }
 
     [pscustomobject]@{
         Selectors = $Selectors.ToArray()
+        LineSelectors = $LineSelectors
         Diagnostics = $Diagnostics.ToArray()
     }
 }

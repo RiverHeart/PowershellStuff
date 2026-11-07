@@ -25,13 +25,18 @@ final-analysis summary counts describe the historical contract, superseded by
 [the correction remodel](CorrectionRemodel.md) and
 [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
 
-Leading `# nitpick disable-target Namespace/Rule` comments now skip matching
-producers before correction collection. Direct resolver calls filter suppressed
+Leading `# nitpick disable-target Namespace/Rule` comments skip matching
+producers before correction collection. `disable-line` and `disable-next-line`
+instead filter native findings by their start line after coordinator attribution.
+Neither automatic nor guided selection sees suppressed findings.
+Direct resolver calls filter suppressed
 native findings before automatic or guided selection, record their corrections
 as skipped with a suppression reason, and omit them from `OriginalFindings`.
 Producer-owned correction arrays are not modified. Candidate reanalysis reads
-directives afresh and can reenable originally suppressed descriptors when another
-rule removes their directive. `OriginalFindings` and `CandidateFindings` each
+directives afresh, including changed physical line positions, and can reenable
+originally suppressed descriptors when another rule removes their directive.
+An unsuppressed finding may still propose edits spanning a suppressed line.
+`OriginalFindings` and `CandidateFindings` each
 reflect their own snapshot; application/report selection is unchanged.
 See [whole-target suppression](../README.md#whole-target-rule-suppression) for MVP limits,
 including leading body directives in directly submitted braced ScriptBlocks.

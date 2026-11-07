@@ -6,12 +6,14 @@ status: proposed
 
 ## Status and scope
 
-The broader design remains proposed. An MVP implements only `disable-target`:
-leading standalone single-line comments, qualified wildcard selectors, optional
-reasons, producer gating, unsuppressible malformed-directive warnings, direct
-resolver filtering, and snapshot-specific candidate reanalysis.
-Regional and line directives remain unimplemented and produce unsupported-action
-warnings. See the [usage and limits](../../README.md#whole-target-rule-suppression).
+The broader design remains proposed. The implemented actions are `disable-target`,
+`disable-line`, and `disable-next-line`, with qualified wildcard selectors,
+optional reasons, unsuppressible malformed-directive warnings, direct resolver
+filtering, and snapshot-specific candidate reanalysis. Whole-target suppression
+gates producers; line suppression filters attributed native findings before
+reporting and correction selection. Regional `disable` and `enable` remain
+unimplemented and produce unsupported-action warnings.
+See the [usage and limits](../../README.md#whole-target-rule-suppression).
 PSScriptAnalyzer compatibility remains separate, as recorded in
 [ADR 0001](0001-defer-scriptanalyzer-adapter.md).
 
@@ -303,8 +305,6 @@ from the same rule starting on the same line.
 
 ## Review decisions still open
 
-- Accept start-line anchoring and physical next-line behavior rather than
-  statement-aware or extent-overlap suppression.
 - Accept non-stacking regional state and unconditional whole-target exclusions.
 - Accept Warning findings for malformed directives, optional reasons, and
   initially deferring block-comment directives and unused-directive reporting.

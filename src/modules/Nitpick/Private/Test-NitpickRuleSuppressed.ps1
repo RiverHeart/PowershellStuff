@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Matches whole-target selectors without suppressing coordinator diagnostics.
+    Matches target selectors and optional finding start-line selectors.
 #>
 function Test-NitpickRuleSuppressed {
     [CmdletBinding()]
@@ -10,7 +10,9 @@ function Test-NitpickRuleSuppressed {
         [string] $RuleId,
 
         [Parameter(Mandatory)]
-        [psobject] $Suppression
+        [psobject] $Suppression,
+
+        [int] $StartLineNumber
     )
 
     if ($RuleId -in 'Nitpick/PowerShellParseError', 'Nitpick/InvalidSuppressionDirective') {
@@ -20,6 +22,14 @@ function Test-NitpickRuleSuppressed {
     foreach ($Selector in $Suppression.Selectors) {
         if ($RuleId -like $Selector) {
             return $true
+        }
+    }
+
+    if ($PSBoundParameters.ContainsKey('StartLineNumber')) {
+        foreach ($Selector in $Suppression.LineSelectors[$StartLineNumber]) {
+            if ($RuleId -like $Selector) {
+                return $true
+            }
         }
     }
 

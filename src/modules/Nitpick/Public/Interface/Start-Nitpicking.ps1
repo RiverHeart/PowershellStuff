@@ -24,6 +24,9 @@ using namespace System.Management.Automation.Language
     rules for that target, including correction reanalysis. Selectors support wildcards.
     For a directly submitted braced ScriptBlock, place directives at the start of
     its body, on their own lines before code. Nested blocks do not start new targets.
+    disable-line comments (standalone or trailing) and standalone disable-next-line
+    comments suppress native findings starting on that physical line or the next
+    physical line, including their corrections. Candidate analysis rereads directives.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
@@ -321,6 +324,15 @@ function Start-Nitpicking {
                 if ($RuleIsSuppressed) { continue }
 
                 foreach ($Finding in $Rule.Invoke($Document, @{})) {
+                    if ($Finding -is [NitpickFinding] -and (
+                        Test-NitpickRuleSuppressed `
+                            -RuleId $Finding.RuleId `
+                            -StartLineNumber $Finding.ViolationExtent.StartLineNumber `
+                            -Suppression $Suppression
+                    )) {
+                        continue
+                    }
+
                     $TargetFindings.Add($Finding)
                 }
             }

@@ -41,8 +41,10 @@ using module AstEditor
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
     findings require qualified RuleId; detached corrections may omit identity.
-    Whole-target disable-target directives exclude original findings before correction
-    selection and are read again from the rendered candidate before rule execution.
+    disable-target, disable-line, and disable-next-line directives exclude original
+    findings before correction selection. Candidate analysis rereads directives from
+    rendered text: whole-target matches skip rule execution, while line matches
+    filter attributed findings by ViolationExtent.StartLineNumber after execution.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -184,13 +186,14 @@ function Resolve-NitpickCorrectionProposal {
 
             $RuleIsSuppressed = Test-NitpickRuleSuppressed `
                 -RuleId $SourceFinding.RuleId `
+                -StartLineNumber $SourceFinding.ViolationExtent.StartLineNumber `
                 -Suppression $Suppression
 
             if ($RuleIsSuppressed) {
                 foreach ($Correction in $SourceFinding.Corrections) {
                     $SkippedCorrections.Add([pscustomobject]@{
                         Correction = $Correction
-                        Reason = 'The finding is suppressed by a disable-target directive.'
+                        Reason = 'The finding is suppressed by a Nitpick comment directive (disable-target, disable-line, or disable-next-line).'
                     })
                 }
 
@@ -423,6 +426,7 @@ function Resolve-NitpickCorrectionProposal {
 
         $RenderedDocument = New-AstDocument -InputObject $RenderedAst
         $CandidateSuppression = Get-NitpickSuppression -Document $RenderedDocument
+
         foreach ($Diagnostic in $CandidateSuppression.Diagnostics) {
             $FinalFindings.Add($Diagnostic)
         }
@@ -435,6 +439,15 @@ function Resolve-NitpickCorrectionProposal {
             if ($RuleIsSuppressed) { continue }
 
             foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument, @{})) {
+                if ($FinalFinding -is [NitpickFinding] -and (
+                    Test-NitpickRuleSuppressed `
+                        -RuleId $FinalFinding.RuleId `
+                        -StartLineNumber $FinalFinding.ViolationExtent.StartLineNumber `
+                        -Suppression $CandidateSuppression
+                )) {
+                    continue
+                }
+
                 $FinalFindings.Add($FinalFinding)
             }
         }
