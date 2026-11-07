@@ -222,10 +222,16 @@ their submitted extent, and a fragment endpoint is not assumed to be a physical 
 
 ## Why Not Use PSScriptAnalyzer?
 
-ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unlikely that I can fully replicate all the functionality it offers, however, it doesn't possess the ergonomics I care about. For starters, you can't run it from the VSCode Powershell Extension which means you have to switch to a different terminal anytime you want to run it and you can't run the VSCode debugger against anything that calls it. As I work almost exclusively in Powershell that's unacceptable.
+ScriptAnalyzer is clearly king when it comes to Powershell linting, and it's unlikely that I can fully replicate all the functionality it offers, however, it has issues with ergonomics (how easy it is to use) and the default ruleset. As the PSScriptAnalyzer.psd1 of this repo can attest, ScriptAnalyzer has quite a few rules which are sometimes useful but often times produce false positives because they don't understand context well and cannot be easily suppressed.
 
-**Other issues:**
+`PSReviewUnusedParameter` has issues with scriptblocks which capture state and reuse it elsewhere; typically closures but the Pester/Psake modules use this pattern a lot. `TypeNotFound` regularly fails when applied to custom Powershell classes which exist outside the current file but which would exist in module scope. Whoever wrote `PSAvoidUsingWriteHost` seems to think that even with PSv5+ that no one should ever use `Write-Host` under any circumstance because older versions had issues. `PSShouldProcess` doesn't acknowledge that downstream cmdlets consume `WhatIfPreference` regardless of whether the function itself calls `ShouldProcess`.
 
+I could go on but hopefully you get the point. By contrast, Nitpick aims for solve problems where Powershell accepts your code but that code isn't doing what you think it is or is going to fail in some preventable way.
+
+**Issues:**
+
+* You can't run it from the VSCode Powershell Extension which means you have to switch to a different terminal anytime you want to run it.
+  * It also means you can't use the VSCode debugger with it, which makes authoring custom rules harder than necessary.
 * It doesn't allow you to limit a test to certain file types/names.
   * Rule suppression doesn't behave well in Pester so if you're writing PSSA rules and want to test them, which requires purposefully incorrect code, you're going to have issues.
 * Doesn't allow throwing an error for findings of a given severity.
@@ -313,3 +319,19 @@ External DiagnosticRecord-only scaffolds are not native producers and remain unc
   - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
   - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.
   - Add Nitpick rule for using `return` in `Begin` and `Process` blocks.
+  - Add rule `MisleadingBooleanConversion` - `[bool]'false'` evaluates to `$true`. Flag provable nonempty-string conversions, including `[bool]` parameters with string-literal defaults. Suggest parsing rather than casting when appropriate.
+  - Add rule `CollectionComparisonUsedAsAPredicate` - `if ($Values -eq $Expected)` filters a collection, then tests the returned values’ truthiness. Matching `0`, `$false`, or `''` can therefore produce a false condition. Recommend `-contains` when membership is intended—not for every collection comparison.
+  - Add rule `ComparisonResultUsedAsAnExistenceTest` - `if ($Values -match $Pattern)` has the same filtering-versus-Boolean distinction. Deserves an explanation separate from an ordinary operator-style suggestion.
+  - Add rule `StringArgToSwitchParameter` - `Invoke-Thing -Force 'false'` does not mean `-Force:$false`; the string becomes another argument. Diagnose only when parameter metadata is known.
+  - Add rule `SuccessStreamLeakage` - A known value-returning call such as `$ArrayList.Add($Item)` emits its return value from a function. Focus on calls whose return values are conventionally incidental; don’t flag every unassigned expression.
+  - Add rule `ArrayMutationDuringEnumeration` - Removing entries from a collection while directly enumerating that same collection. Start with obvious same-variable cases and known collection types; suggest enumerating a snapshot when appropriate.
+  - Add rule `InvalidHashtableAssignment` - `$Options += @{ Name = 'new' }` throws when `Name` already exists; it isn’t an overwrite/merge operation. Detect statically provable duplicate keys.
+  - Add rule `MisleadingBreakContinueContext` - Inside `ForEach-Object`, these are not substitutes for loop control in a language foreach statement and can affect enclosing execution unexpectedly. Explain the actual enclosing control structure.
+  - Add rule `MatchesUsedTwiceWithoutSuccess` - `$Text -match $Pattern; Use-Value $Matches[1]` A failed match does not clear a previous `$Matches` value. Collection-input `-match` also does not populate it like scalar matching does. Should start with obvious local cases, no pretending to prove correctness across arbitrary control flow.
+  - Add rule `TryCatchNonTerminatingError` - `try { Get-Item -LiteralPath $Path } catch { recover }` `Get-Item` generally produces nonterminating errors and has no effective terminating-error policy. Awareness of `$ErrorActionPreference` required but code should function if run without a higher scope variable setting it. If catch defines errors we know to be terminating those could be ignored.
+  - Add rule `NativeCmdFailuresAreNotErrors` - `try { & git @Arguments } catch { # Assumes a nonzero exit code reaches here }`. This should be edition/version/policy-aware. PSv6+ have `$PSNativeCommandUseErrorActionPreference` so this is important for PSv5 compatibility. Checking `$LASTEXITCODE` only after another native commad has overwritten it may be worth detecting.
+  - Add rule `AvoidMyCommandPath` - `$MyInvocation.MyCommand.Path` used as the current script's path inside a function should be avoided and `$PSCommandPath` or `$PSScriptRoot` suggested when the intent is identifiable. Invocation metadata describes different things depending on where it's accessed.
+  - Add rule for **Null comparisons:** collection-sensitive $Value -eq $null, with precise explanations.
+  - Add rules for **identical comparison operands / duplicate branches:** strong copy-and-paste bug signals.
+  - Add rules for **Unreachable statements:** after unconditional return, throw, or applicable loop control.
+  - Add rules for **Compatibility:** unsupported syntax, commands, parameters, and types for declared targets.
