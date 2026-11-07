@@ -255,7 +255,7 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | Criterion | PSScriptAnalyzer | Nitpick | Explanation |
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 4 Rules |  |
+| **Built-In Ruleset** | 75 Rules | 7 Rules |  |
 | **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |
@@ -264,6 +264,25 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | **Nested Module Support** | No | Yes |  |
 | **Errors On Failures** | No | Yes | ScriptAnalyzer doesn't throw for failures so Powershell task runners have to call it from a subprocess with `-EnableExit` or sort through the objects and throw itself. |
 | **Text Mode** | No | Yes | Text mode returns text instead of objects, formatted like regular linter output. |
+
+## Built-in correctness rules
+
+Nitpick includes these three rules for common PowerShell value-semantics mistakes:
+
+- **MisleadingBooleanConversion** reports nonempty string literals cast to
+  Boolean and string-literal defaults for `[bool]` parameters. PowerShell treats
+  every nonempty string, including `'false'`, as `$true`; parse textual Boolean
+  values when that is the intended meaning.
+- **CollectionComparisonUsedAsAPredicate** reports equality comparisons against
+  array expressions or explicitly collection-typed parameters when used as
+  `if`, `while`, `do`, or `for` conditions. Collection comparisons filter and
+  return matching elements; use `-contains` or `-notcontains` for membership
+  tests. Variables whose collection type cannot be established are not reported.
+- **StringArgToSwitchParameter** reports Boolean-like string literals such as
+  `'false'` immediately following a switch parameter when the command's
+  parameter metadata is available. The switch is enabled by its presence, and
+  the string is a separate argument; use an explicit value such as
+  `-Force:$false` to disable it.
 
 ## Dependencies
 

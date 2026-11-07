@@ -91,6 +91,9 @@ FunctionsToExport = @(
     'Test-AvoidAmbiguousPipelineContinuation'
     'Test-AvoidTrailingWhitespace'
     'Measure-AvoidTrailingWhitespace'
+    'Test-CollectionComparisonUsedAsAPredicate'
+    'Test-MisleadingBooleanConversion'
+    'Test-StringArgToSwitchParameter'
     'Test-UseIsNotOperator'
 )
 
@@ -121,7 +124,10 @@ PrivateData = @{
         Rules = @(
             'Test-AvoidParameterAttributeBool'
             'Test-AvoidAmbiguousPipelineContinuation'
+            'Test-CollectionComparisonUsedAsAPredicate'
+            'Test-MisleadingBooleanConversion'
             'Measure-AvoidTrailingWhitespace'
+            'Test-StringArgToSwitchParameter'
             'Test-UseIsNotOperator'
         )
     }
