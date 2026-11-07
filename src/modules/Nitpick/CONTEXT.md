@@ -54,6 +54,18 @@ the fragment's own slice of the rendered snapshot for a fragment. Never the whol
 snapshot of a fragment.
 _Avoid_: Candidate text (for what is returned to the user), rendered text
 
+### Suppression
+
+**Directive**:
+A recognized Nitpick instruction in a source comment.
+_Avoid_: Attribute, invocation option
+
+**Whole-target suppression**:
+Exclusion of matching rules throughout the submitted target, without changing
+invocation-wide rule selection or other targets. The coordinator enforces it;
+producers remain suppression-unaware.
+_Avoid_: Excluded package, protected edit range
+
 ### Correction lifecycle
 
 **Correction**:

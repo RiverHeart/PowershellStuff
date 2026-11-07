@@ -20,6 +20,16 @@ using namespace System.Management.Automation.Language
     any targets are read.
     Native findings and corrections carry the executing rule's qualified RuleId.
     Parser findings use Nitpick/PowerShellParseError without introducing a selectable rule.
+    Leading standalone '# nitpick disable-target Namespace/Rule' comments skip matching
+    rules for that target, including correction reanalysis. Selectors support wildcards.
+    For a directly submitted braced ScriptBlock, place directives at the start of
+    its body, on their own lines before code. Nested blocks do not start new targets.
+    disable-line comments (standalone or trailing) and standalone disable-next-line
+    comments suppress native findings starting on that physical line or the next
+    physical line, including their corrections. Candidate analysis rereads directives.
+    Standalone disable/enable comments change regional state from the next physical
+    line. The last matching directive wins without stacking or lexical-scope resets;
+    enable cannot override whole-target, invocation-level, or line exclusions.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
@@ -291,6 +301,11 @@ function Start-Nitpicking {
                 $TargetFindings.Add($ParserFinding)
             }
 
+            $Suppression = Get-NitpickSuppression -Document $Document
+            foreach ($Diagnostic in $Suppression.Diagnostics) {
+                $TargetFindings.Add($Diagnostic)
+            }
+
             $ApplicableRules = [List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
@@ -305,7 +320,22 @@ function Start-Nitpicking {
                 }
 
                 $ApplicableRules.Add($Rule)
+                $RuleIsSuppressed = Test-NitpickRuleSuppressed `
+                    -RuleId $Rule.Id `
+                    -Suppression $Suppression
+
+                if ($RuleIsSuppressed) { continue }
+
                 foreach ($Finding in $Rule.Invoke($Document, @{})) {
+                    if ($Finding -is [NitpickFinding] -and (
+                        Test-NitpickRuleSuppressed `
+                            -RuleId $Finding.RuleId `
+                            -StartLineNumber $Finding.ViolationExtent.StartLineNumber `
+                            -Suppression $Suppression
+                    )) {
+                        continue
+                    }
+
                     $TargetFindings.Add($Finding)
                 }
             }
@@ -323,14 +353,15 @@ function Start-Nitpicking {
 
                 $Summary.CorrectedFindingCount +=
                     $CorrectionResult.Report.FindingsWithAppliedCorrections.Count
+
                 foreach ($AcceptedFinding in $CorrectionResult.Report.FindingsWithAcceptedCorrections) {
                     if ($AcceptedFinding -notin $CorrectionResult.Report.FindingsWithAppliedCorrections) {
                         $Summary.CorrectableFindingCount++
                     }
                 }
+
                 $Summary.UnresolvedFindingCount += $FinalFindings.Count
                 $Summary.UndecidedFindingCount += $CorrectionResult.Proposal.UndecidedFindings.Count
-
                 $Summary.SkippedFindingCount += $CorrectionResult.Proposal.SkippedFindings.Count
 
                 if ($CorrectionResult.Proposal.Conflicts.Count -gt 0) {
@@ -339,7 +370,8 @@ function Start-Nitpicking {
 
                 if ($CorrectionResult.Proposal.Status -eq 'FailedValidation' -or
                     $CorrectionResult.Application.Status -in
-                        'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget') {
+                        'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget'
+                ) {
                     $Summary.FailedTargetCount++
                 }
             }
@@ -348,6 +380,7 @@ function Start-Nitpicking {
             # parse errors included). Pipeline output and the -ErrorOn threshold use effective findings.
             foreach ($Finding in $TargetFindings) {
                 $Summary.FindingCount++
+
                 switch ($Finding.Severity) {
                     'Error' { $Summary.ErrorCount++ }
                     'Warning' { $Summary.WarningCount++ }
@@ -385,6 +418,7 @@ function Start-Nitpicking {
 
                 if ($TargetText) {
                     if ($HasWrittenTextBlock) { Write-Host '' }
+
                     Write-Output $TargetText
                     $HasWrittenTextBlock = $true
                 }

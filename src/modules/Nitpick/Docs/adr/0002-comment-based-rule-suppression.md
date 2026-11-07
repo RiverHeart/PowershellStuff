@@ -6,9 +6,22 @@ status: proposed
 
 ## Status and scope
 
-This is a draft for review, not an accepted decision or an implemented feature.
-The syntax and policies below are recommendations. Native comment-based suppression
-is currently unimplemented, as recorded in [ADR 0001](0001-defer-scriptanalyzer-adapter.md).
+The implemented actions are `disable-target`, `disable-line`, `disable-next-line`,
+`disable`, and `enable`, with qualified wildcard selectors,
+optional reasons, unsuppressible malformed-directive warnings, direct resolver
+filtering, and snapshot-specific candidate reanalysis. Whole-target suppression
+gates producers; line and regional suppression filter attributed native findings
+before reporting and correction selection. Regional state follows the last
+preceding matching directive, without stacking or lexical-scope resets.
+See the [usage and limits](../../README.md#whole-target-rule-suppression).
+PSScriptAnalyzer compatibility remains separate, as recorded in
+[ADR 0001](0001-defer-scriptanalyzer-adapter.md).
+
+The implemented whole-target action is `disable-target`, with no `disable-file`
+compatibility alias. It applies to a file, an in-memory source string, or a
+directly submitted ScriptBlock target. For a braced ScriptBlock target, its own
+opening brace is a boundary rather than preamble code; nested blocks within the
+target do not establish new preambles.
 
 Add suppression for individual source targets analyzed through Nitpick, including
 file-backed and in-memory inputs. Do not change invocation-wide rule selection,
@@ -56,7 +69,7 @@ For a file input, this is file-wide; it does not affect other files in the invoc
 ## Proposed syntax
 
 ```powershell
-# nitpick disable-file Nitpick/AvoidParameterAttributeBool -- Intentional test fixture.
+# nitpick disable-target Nitpick/AvoidParameterAttributeBool -- Intentional test fixture.
 
 # nitpick disable Nitpick/UseIsNotOperator
 if (-not ($Value -is [int])) { }
@@ -68,12 +81,12 @@ if (-not ($Other -is [int])) { } # nitpick disable-line Nitpick/UseIsNotOperator
 if (-not ($Third -is [int])) { }
 ```
 
-The examples illustrate directives independently; `disable-file` is not a prerequisite
+The examples illustrate directives independently; `disable-target` is not a prerequisite
 for the other forms.
 
 | Action | Placement | Effect |
 | --- | --- | --- |
-| `disable-file` | Standalone comment in the leading comment/whitespace preamble | Suppresses matching rules throughout the target |
+| `disable-target` | Standalone comment in the leading comment/whitespace preamble | Suppresses matching rules throughout the target |
 | `disable` | Standalone comment | Disables matching rules beginning on the next physical line |
 | `enable` | Standalone comment | Enables matching rules beginning on the next physical line |
 | `disable-line` | Standalone or trailing comment | Suppresses findings starting on that physical line |
@@ -95,8 +108,15 @@ for the other forms.
   introducing a second pattern language.
 - A standalone directive has only whitespace before its comment token on that line.
   A misplaced directive is malformed, not an implicit change of scope.
-- For `disable-file`, preceding comments, a shebang, and whitespace are allowed.
-  A preceding non-comment, non-newline source token ends the preamble.
+- For `disable-target`, preceding comments, a shebang, and whitespace are allowed.
+  When the submitted target is a braced ScriptBlock, its own opening brace is
+  skipped before evaluating its body's preamble. The directive must still be
+  standalone on its physical line, not trailing the opening brace.
+  Any other preceding non-comment, non-newline source token ends the preamble,
+  including `param`, attributes, statements, and nested opening braces.
+  Analyzing a file or root source string does not grant nested ScriptBlocks
+  their own whole-target suppression. A nested ScriptBlock submitted separately
+  becomes the target and can have a leading body directive.
 - Ordinary comments not beginning with the `nitpick` marker are ignored.
   Matching-looking text in strings or here-strings is not a directive.
 - Discover actual comment tokens inside expandable-string subexpressions through
@@ -105,7 +125,7 @@ for the other forms.
 ### Scope and precedence
 
 Whole-target suppression is unconditional for that target. `enable` cannot override
-`disable-file` or invocation-level `ExcludeRule`.
+`disable-target` or invocation-level `ExcludeRule`.
 
 For each Rule ID, regional state starts enabled. Process regional directives in source
 order: the last preceding matching `disable` or `enable` determines regional state.
@@ -132,7 +152,7 @@ filtering, and path applicability unchanged. Source comments are evaluated only 
 the target is read. They cannot acquire rules, undo exclusions, or make invalid
 invocation selection succeed.
 
-An eligible rule suppressed by `disable-file` need not execute for that target.
+An eligible rule suppressed by `disable-target` need not execute for that target.
 All eligible rules being suppressed in one target is a successful no-findings result,
 not the existing invocation-level "no eligible rules" error.
 
@@ -166,22 +186,23 @@ would require executing it and would defeat that optimization.
 Suppression must prevent correction selection, not merely hide the final diagnostic.
 There are two important constraints.
 
-### Preserve complete change sets
+### Preserve complete corrections
 
-`ChangeSetId` is target-wide and can intentionally couple corrections from multiple
-findings or rules. Filtering suppressed findings before collecting their change-set
-membership would allow an incomplete change set to be applied.
+Under [ADR 0003](0003-corrections-are-whole-fixes-with-atomic-edits.md), one
+correction is one complete fix containing atomic `TextEdits`. `ChangeSetId` is
+retired; corrections are not coupled across findings or rules by a grouping ID.
 
-Retain enough original finding/correction membership to mark every change set touched
-by a suppressed finding as ineligible. Skip the entire change set, including members
-attached to unsuppressed findings, with an explicit suppression reason in proposal
-diagnostics. Ungrouped corrections on suppressed findings are simply not selected.
-Do not mutate producer-owned correction arrays to accomplish filtering.
+Exclude suppressed findings before automatic or guided correction selection.
+None of their corrections may be selected, and the selector must not be invoked
+for them. Direct resolver calls receiving suppressed findings record their complete
+corrections as skipped with an explicit suppression reason. A whole-target rule
+skipped before execution generates neither findings nor corrections to record.
+Do not mutate producer-owned correction arrays or remove individual edits.
 
-Unsuppressed findings remain reportable even when a shared change set is blocked.
-Suppression does not introduce a new application status or transfer correction policy
-out of the resolver. The exact internal handoff of blocked change-set membership must
-be designed with the existing resolver inputs during implementation.
+Unsuppressed findings and their complete corrections remain eligible under the
+existing resolver policy. AstEditor retains atomic target-batch validation and
+queueing. Suppression introduces no new application status or cross-finding
+membership handoff and does not transfer correction policy out of the resolver.
 
 Suppression is not an edit-protection mechanism: an unsuppressed finding can propose
 an edit spanning a suppressed line. Do not add correction-range suppression implicitly;
@@ -195,7 +216,7 @@ comments. Reevaluate whole-target exclusions using the candidate's directives.
 
 Retain the path-applicable, invocation-selected descriptors for candidate analysis,
 including descriptors skipped only because of original whole-target suppression.
-Otherwise a candidate that removes a file directive could never reenable those rules.
+Otherwise a candidate that removes a whole-target directive could never reenable those rules.
 
 Both `OriginalFindings` and `CandidateFindings` exposed by the proposal must use their
 own snapshot's suppression decisions. Preserve the existing effective-report policy
@@ -208,22 +229,23 @@ qualified native inputs and candidate analysis. All native findings, including s
 ## Source-coordinate requirement
 
 For file-backed inputs, document tokens and findings normally share coordinates.
-For in-memory AST inputs, ordinary lint currently retains the supplied AST's original
-extent context, while AstEditor reparses `Extent.Text` into document-relative coordinates.
-Nested or extracted ASTs can therefore have nonzero original line, column, and offset
-origins.
+For in-memory AST inputs, AstEditor now retains the complete parse-time snapshot
+and selects the submitted fragment in it, as recorded in
+[ADR 0004](0004-fragments-are-analyzed-in-their-snapshot.md). Tokens and findings
+share snapshot coordinates, including nonzero fragment origins.
 
-Directive matching must explicitly map into the finding's coordinate space, or compare
-through a shared source-relative representation. Do not reparse and replace the original
-AST merely to align lines: that would change existing finding locations. Whole-target
+The MVP reads only `Document.Tokens`, preserving their snapshot extents. Whole-target
 suppression refers only to the analyzed input, not comments outside a supplied nested
-AST's extent.
+AST's extent. Only a directly submitted ScriptBlock's own opening brace is exempt
+from the preamble's code-token boundary. Matching uses the submitted AST and token
+offsets, not arbitrary brace text or lexical nesting. No reparse of isolated
+fragment text or line-number remapping is needed.
 
 ## Implementation outline
 
 1. Add private token-based directive parsing and shared Rule ID/location matching.
-2. Wire original target analysis to whole-target gating and finding suppression,
-   retaining correction membership needed to block complete change sets.
+2. Wire original target analysis to whole-target gating and finding suppression
+   before correction selection, preserving each correction's complete atomic edits.
 3. Extend correction selection and candidate analysis to apply the same policy.
    Keep persistence in AstEditor and application/report selection in their existing owners.
 4. Add focused parser, coordinator, correction, and coordinate contract tests.
@@ -250,12 +272,16 @@ internal result shapes are implementation details, not decisions of this ADR.
   all rules suppressed in a target succeeds without bypassing invocation validation.
 - Object/text output and severity totals exclude suppressed findings without changing
   selected-rule totals.
-- Suppressed corrections never apply. A mixed suppressed/unsuppressed change set,
-  including one shared across rules, is skipped atomically.
+- Suppressed corrections never apply or reach the guided selector. Unsuppressed
+  corrections remain independently eligible; multi-edit corrections stay atomic,
+  and producer-owned correction arrays remain unchanged.
 - Candidate edits moving/removing directives, candidate re-enablement, original versus
   candidate reports, WhatIf, declined/failed writes, and direct resolver calls.
 - File inputs, string inputs, and nested AST inputs retain correct directive matching
   and existing finding locations, including CRLF and LF source text.
+- Submitted braced ScriptBlocks accept leading body directives in original and
+  candidate analysis. Nested blocks within another target do not start preambles;
+  comments outside the submitted fragment cannot affect it.
 - No-directive inputs preserve existing results. Follow the repository test runner and
   retain Windows PowerShell 5.1 compatibility.
 
@@ -268,8 +294,8 @@ boundary; optional producer optimization remains a possible later enhancement.
 **Output-only filtering** is simpler but can silently apply corrections for hidden
 findings. Reject it.
 
-**Treating a leading `disable` as file-wide** avoids a separate action but makes
-placement determine whether the producer executes. Prefer explicit `disable-file`,
+**Treating a leading `disable` as whole-target** avoids a separate action but makes
+placement determine whether the producer executes. Prefer explicit `disable-target`,
 reserving `disable`/`enable` for ordered regional state.
 
 The proposed design centralizes correctness without changing rule-authoring contracts.
@@ -277,12 +303,10 @@ It adds shared analysis policy and a correction-selection handoff, rather than o
 text filter. Line-based anchors are predictable but cannot distinguish two findings
 from the same rule starting on the same line.
 
-## Review decisions still open
+## Deferred extensions
 
-- Accept the explicit `disable-file` form and its leading-preamble restriction, or
-  prefer a different whole-target syntax.
-- Accept start-line anchoring and physical next-line behavior rather than
-  statement-aware or extent-overlap suppression.
-- Accept non-stacking regional state and unconditional whole-target exclusions.
-- Accept Warning findings for malformed directives, optional reasons, and
-  initially deferring block-comment directives and unused-directive reporting.
+Block-comment directives, unused-directive reporting, public suppressed-findings
+collections/counters, an ignore-suppressions switch, and producer-side optimization
+remain deferred. All five single-line directive actions above are implemented;
+malformed directives warn, optional reasons are supported, and whole-target
+exclusions remain unconditional.

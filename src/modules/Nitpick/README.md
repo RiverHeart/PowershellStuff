@@ -55,6 +55,116 @@ The resulting output starts by identifying the lines that were considered. The f
 
 Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
+## Whole-target rule suppression
+
+Put a standalone directive in a file's leading comment/whitespace preamble:
+
+```powershell
+# nitpick disable-target Nitpick/AvoidParameterAttributeBool -- Intentional fixture.
+# nitpick disable-target WPF/*, */AvoidTrailingWhitespace
+```
+
+For a directly submitted ScriptBlock, put the directive at the start of its body:
+
+```powershell
+Start-Nitpicking -Script {
+    # nitpick disable-target Nitpick/AvoidParameterAttributeBool
+    param([Parameter(Mandatory=$true)] $Name)
+}
+```
+
+The target is the complete file or the ScriptBlock submitted through `-Script`,
+not an arbitrary lexical scope. A nested ScriptBlock cannot declare whole-target
+suppression when its enclosing file or block is being analyzed. If that nested
+ScriptBlock is submitted separately, it becomes the target.
+
+Selectors are qualified rule IDs, separated by whitespace or commas, and use the
+same case-insensitive wildcard matching as `-ExcludeRule`. Use `*` to disable all
+selected rules for that target. Unmatched qualified selectors are allowed; bare
+rule names and command names are invalid. An optional whitespace-delimited `--`
+introduces a reason.
+
+Suppressed rules do not execute or offer corrections for that target. Other files
+are unaffected, and selected-rule totals are unchanged. Fix modes read directives
+again from candidate text, so an unsuppressed rule's edit can add or remove a
+suppression. Suppression is not protection against edits by other rules.
+
+Only single-line `#` comments are directives. Shebangs, comments, and whitespace
+may precede them; any code token ends the preamble. Trailing directives, block
+comments, and text inside strings cannot disable rules. In-memory source strings
+use the same policy. AST fragments see only their own tokens, not surrounding
+comments, and retain snapshot coordinates. Only the submitted ScriptBlock's own
+opening `{` is exempt from ending the preamble. Directives must be on their own
+line after it, before `param`, attributes, statements, or nested blocks.
+
+Malformed or unsupported directives produce `Nitpick/InvalidSuppressionDirective`
+Warning findings and are ignored as a whole. Neither these warnings nor
+`Nitpick/PowerShellParseError` findings can be suppressed, even by `*`.
+Invocation-level rule selection and validation still apply.
+
+All five directive actions described in
+[ADR 0002](Docs/adr/0002-comment-based-rule-suppression.md) are implemented.
+PSScriptAnalyzer suppression behavior is unchanged.
+The former `disable-file` spelling is unsupported; it is not an alias.
+
+### Line-specific suppression
+
+Use `disable-line` in a standalone or trailing comment, or `disable-next-line`
+in a standalone comment:
+
+```powershell
+-not ($Value -is [int]) # nitpick disable-line Nitpick/UseIsNotOperator -- Intentional.
+
+# nitpick disable-next-line Nitpick/UseIsNotOperator
+-not ($Other -is [int])
+```
+
+These actions use the same qualified selectors, wildcards, lists, and optional
+reasons as `disable-target`. They may appear after code or inside nested blocks.
+Only native findings whose `ViolationExtent.StartLineNumber` matches the physical
+line are suppressed. A multiline finding is not suppressed just because another
+part of its extent overlaps that line. `disable-next-line` covers exactly the
+next physical line, even if it is blank or a comment; it does not seek a statement.
+
+Unlike whole-target suppression, line suppression runs the producer and filters
+its attributed findings before reporting, totals, severity thresholds, or automatic
+and guided correction selection. All corrections on a suppressed finding are
+excluded as complete fixes. Unsuppressed findings remain eligible, even if their
+edits cross a suppressed line: suppression is not an edit-protection mechanism.
+Candidate analysis reads directives and line positions afresh. For AST fragments,
+comments outside the submitted extent cannot suppress findings inside it.
+Parser errors and invalid-directive warnings remain unsuppressible.
+
+### Regional suppression
+
+Use standalone `disable` and `enable` comments to change which rules report
+findings over a region:
+
+```powershell
+# nitpick disable * -- Intentional fixture region.
+-not ($First -is [int])
+
+# nitpick enable Nitpick/UseIsNotOperator
+-not ($Second -is [int]) # This rule reports again; other rules remain disabled.
+```
+
+Each directive takes effect on the next physical line. Rules start enabled, and
+the last preceding matching `disable` or `enable` wins for each qualified Rule ID.
+This is not a stack: repeated disables need only one matching enable. An unmatched
+enable is a no-op; an unclosed disable extends to the end of the target. Selectors
+support the same case-insensitive wildcards, lists, and reasons as other actions.
+
+Regions are textual, not lexically scoped: entering or leaving a function or
+ScriptBlock does not reset state. A separately submitted fragment starts enabled
+and ignores directives outside its extent. Regional suppression uses the finding's
+start line, runs producers, and excludes findings and their complete corrections
+through the same policy as line suppression. Candidate snapshots recompute state.
+
+`enable` never overrides `disable-target`, invocation-level `-ExcludeRule`, or
+line-specific suppression. Parser errors and invalid-directive warnings cannot
+be disabled. Trailing regional directives are malformed and warn; use
+`disable-line` for trailing comments.
+
 ## Guided navigation
 
 `-FixMode Guided` applies Safe corrections like `Apply`, and prompts only when a finding

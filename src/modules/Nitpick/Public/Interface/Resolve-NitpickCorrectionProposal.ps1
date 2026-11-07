@@ -41,6 +41,11 @@ using module AstEditor
     Execution attribution is retained from the supplied findings and corrections.
     Candidate reanalysis assigns identity through NitpickRule.Invoke. Direct standalone
     findings require qualified RuleId; detached corrections may omit identity.
+    disable-target, disable-line, disable-next-line, and regional disable/enable
+    directives exclude original findings before correction selection. Candidate
+    analysis rereads directives and regional order from rendered text:
+    whole-target matches skip rule execution, while line and regional matches
+    filter attributed findings by ViolationExtent.StartLineNumber after execution.
 
 .PARAMETER Script
     The exact source snapshot from which the correction offsets were calculated.
@@ -96,10 +101,12 @@ using module AstEditor
             -ReplacementText '$Second = 3' `
             -Reason 'Replace the coupled assignments.'
     )
+
     $Correction = New-NitpickCorrection `
         -TextEdit $Edits `
         -FilePathOrContext '<ScriptBlock>' `
         -Description 'Replace the coupled assignments.'
+
     $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
     When $Finding carries $Correction, both of its edits are accepted or skipped together.
@@ -169,6 +176,36 @@ function Resolve-NitpickCorrectionProposal {
     $UndecidedFindings = [List[NitpickFinding]]::new()
     $Conflicts = [List[object]]::new()
     $FinalFindings = [List[object]]::new()
+
+    $Suppression = Get-NitpickSuppression -Document $Document
+    $Finding = @(
+        foreach ($SourceFinding in $Finding) {
+            # Coordinator diagnostics are regenerated from this exact snapshot.
+            if ($SourceFinding.RuleId -eq 'Nitpick/InvalidSuppressionDirective') {
+                continue
+            }
+
+            $RuleIsSuppressed = Test-NitpickRuleSuppressed `
+                -RuleId $SourceFinding.RuleId `
+                -StartLineNumber $SourceFinding.ViolationExtent.StartLineNumber `
+                -Suppression $Suppression
+
+            if ($RuleIsSuppressed) {
+                foreach ($Correction in $SourceFinding.Corrections) {
+                    $SkippedCorrections.Add([pscustomobject]@{
+                        Correction = $Correction
+                        Reason = 'The finding is suppressed by a Nitpick comment directive (disable-target, disable-line, disable-next-line, or regional disable).'
+                    })
+                }
+
+                continue
+            }
+
+            $SourceFinding
+        }
+
+        $Suppression.Diagnostics
+    )
 
     # MARK: CORRECTION SELECTION
     # A correction is one whole fix; its edits apply all-or-nothing. Automatic
@@ -389,8 +426,29 @@ function Resolve-NitpickCorrectionProposal {
         }
 
         $RenderedDocument = New-AstDocument -InputObject $RenderedAst
+        $CandidateSuppression = Get-NitpickSuppression -Document $RenderedDocument
+
+        foreach ($Diagnostic in $CandidateSuppression.Diagnostics) {
+            $FinalFindings.Add($Diagnostic)
+        }
+
         foreach ($SelectedRule in $Rule) {
+            $RuleIsSuppressed = Test-NitpickRuleSuppressed `
+                -RuleId $SelectedRule.Id `
+                -Suppression $CandidateSuppression
+
+            if ($RuleIsSuppressed) { continue }
+
             foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument, @{})) {
+                if ($FinalFinding -is [NitpickFinding] -and (
+                    Test-NitpickRuleSuppressed `
+                        -RuleId $FinalFinding.RuleId `
+                        -StartLineNumber $FinalFinding.ViolationExtent.StartLineNumber `
+                        -Suppression $CandidateSuppression
+                )) {
+                    continue
+                }
+
                 $FinalFindings.Add($FinalFinding)
             }
         }

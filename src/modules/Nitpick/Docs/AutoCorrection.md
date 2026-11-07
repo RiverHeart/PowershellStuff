@@ -25,6 +25,24 @@ final-analysis summary counts describe the historical contract, superseded by
 [the correction remodel](CorrectionRemodel.md) and
 [ADR 0003](adr/0003-corrections-are-whole-fixes-with-atomic-edits.md).
 
+Leading `# nitpick disable-target Namespace/Rule` comments skip matching
+producers before correction collection. `disable-line`, `disable-next-line`, and
+regional `disable`/`enable` instead filter native findings by their start line
+after coordinator attribution. The last preceding matching regional directive
+sets state without stacking; enables never undo whole-target or line suppression.
+Neither automatic nor guided selection sees suppressed findings.
+Direct resolver calls filter suppressed
+native findings before automatic or guided selection, record their corrections
+as skipped with a suppression reason, and omit them from `OriginalFindings`.
+Producer-owned correction arrays are not modified. Candidate reanalysis reads
+directives afresh, including changed physical line positions and regional order, and can reenable
+originally suppressed descriptors when another rule removes their directive.
+An unsuppressed finding may still propose edits spanning a suppressed line.
+`OriginalFindings` and `CandidateFindings` each
+reflect their own snapshot; application/report selection is unchanged.
+See [whole-target suppression](../README.md#whole-target-rule-suppression) for MVP limits,
+including leading body directives in directly submitted braced ScriptBlocks.
+
 The Phase 0 contracts live in `AstEditor/Tests/Autocorrection.Contracts.Tests.ps1` and `Nitpick/Tests/Autocorrection.Contracts.Tests.ps1`. Contracts supported by the current implementation execute now. Contracts owned by later phases are discoverable as skipped tests whose messages identify the implementing phase.
 
 ## Goals

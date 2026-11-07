@@ -34,7 +34,7 @@ qualified IDs. Native findings and corrections carry only `RuleId`; the legacy
 Descriptors still retain `Name` and `Namespace` as identity components.
 `ToDiagnosticRecord()` validates the current ID and derives both external local-name
 fields at conversion time. PSScriptAnalyzer compatibility remains local-name based;
-native comment suppression is not yet implemented.
+native comment suppression instead matches qualified Rule IDs.
 
 Parser findings use `Nitpick/PowerShellParseError`; that attribution does not create a
 selectable rule or registry entry. Direct producer/helper invocation bypasses coordinated
@@ -66,13 +66,40 @@ from the parent finding.
 Identity is retained across the correction proposal, application, and report without
 rewriting proposal facts or splitting a correction's atomic `TextEdits`.
 
-### Proposed native comment suppression
+### Native comment suppression
 
-[ADR 0002](adr/0002-comment-based-rule-suppression.md) drafts coordinator-owned
-comment suppression using qualified Rule IDs, including whole-target, regional,
-and line directives. It covers correction atomicity, candidate reanalysis,
-and in-memory source coordinates. The proposal is not yet accepted or implemented;
-it does not change the current compatibility behavior described above.
+[ADR 0002](adr/0002-comment-based-rule-suppression.md) proposes whole-target,
+regional, and line suppression. Implemented actions are leading, standalone
+`disable-target`, standalone or trailing `disable-line`, and standalone
+`disable-next-line`, `disable`, and `enable`. `Get-NitpickSuppression` reads target tokens,
+including actual comments nested in expandable strings; `Test-NitpickRuleSuppressed`
+matches the executing descriptor's ID using PowerShell wildcards. Without a
+start-line argument it checks whole-target selectors only; with a finding's
+`ViolationExtent.StartLineNumber` it also checks selectors indexed by that physical
+snapshot line and ordered regional transitions. Regional entries take effect on
+the next physical line; the last preceding matching entry sets enabled/disabled
+state for each Rule ID. Entries do not stack or reset at lexical boundaries.
+Whole-target and line matches take precedence over regional enables.
+The coordinator skips whole-target-suppressed producers and filters
+line- and region-suppressed native findings after attribution, retaining all path-applicable selected descriptors for
+candidate reanalysis. The public correction resolver also filters directly supplied
+native findings before selection and regenerates directive warnings per snapshot.
+Parser errors and invalid-directive warnings are never suppressible. Unsupported
+actions warn rather than silently doing nothing. External local-name suppression
+compatibility is unchanged.
+
+Line and regional suppression do not infer qualified identity from non-native output. The
+correction resolver uses the same matcher before selection and after candidate
+execution; suppressed findings never reach guided selection. Original and candidate
+snapshots retain independent decisions, and line positions are never reused across
+rendering. Each submitted target starts regionally enabled; fragments do not
+inherit state from comments outside their extent.
+
+For a directly submitted braced ScriptBlock, only its own opening-brace token
+(at the submitted AST's start offset) is exempt from ending the preamble.
+Nested blocks within a file or another submitted block do not create new
+whole-target boundaries. The same AST/token policy applies after candidate
+fragment relocation. `disable-file` is unsupported, not a compatibility alias.
 
 ## Autocorrection
 
