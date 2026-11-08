@@ -87,10 +87,16 @@ FunctionsToExport = @(
     'Unregister-Nitpick'
 
     # Rules
+    'Test-ArrayShapeLostThroughControlFlow'
     'Test-AvoidParameterAttributeBool'
     'Test-AvoidAmbiguousPipelineContinuation'
     'Test-AvoidTrailingWhitespace'
     'Measure-AvoidTrailingWhitespace'
+    'Test-CollectionComparisonUsedAsAPredicate'
+    'Test-EmptyCollectionMemberAccess'
+    'Test-MisleadingBooleanConversion'
+    'Test-PossibleNullItemFromIndexedLookup'
+    'Test-StringArgToSwitchParameter'
     'Test-UseIsNotOperator'
 )
 
@@ -115,13 +121,23 @@ AliasesToExport = @(
 # List of all files packaged with this module
 # FileList = @()
 
-# Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
+# Private data to pass to the module specified in RootModule/ModuleToProcess.
+# This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
     Linting = @{
+        # Linting rules to apply for this module
+        # NOTE: PSSA (PowerShell Script Analyzer) adapters should be excluded
+        # from this list so Nitpick doesn't attempt to use them.
         Rules = @(
+            'Test-ArrayShapeLostThroughControlFlow'
             'Test-AvoidParameterAttributeBool'
             'Test-AvoidAmbiguousPipelineContinuation'
+            'Test-CollectionComparisonUsedAsAPredicate'
+            'Test-EmptyCollectionMemberAccess'
+            'Test-MisleadingBooleanConversion'
+            'Test-PossibleNullItemFromIndexedLookup'
             'Measure-AvoidTrailingWhitespace'
+            'Test-StringArgToSwitchParameter'
             'Test-UseIsNotOperator'
         )
     }

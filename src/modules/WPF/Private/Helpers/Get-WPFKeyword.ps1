@@ -105,7 +105,9 @@ function Get-WPFKeyword {
 
         if ($ContextualKeywordParents.ContainsKey($CommandName)) {
             $Kind = 'Contextual'
-            $AllowedParents = @($ContextualKeywordParents[$CommandName])
+            if ($null -ne $ContextualKeywordParents[$CommandName]) {
+                $AllowedParents += $ContextualKeywordParents[$CommandName]
+            }
 
             if (-not $HasParentContext) {
                 $ValidationState = 'ContextRequired'
