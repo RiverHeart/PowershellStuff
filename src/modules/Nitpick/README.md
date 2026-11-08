@@ -255,7 +255,7 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | Criterion | PSScriptAnalyzer | Nitpick | Explanation |
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 7 Rules |  |
+| **Built-In Ruleset** | 75 Rules | 10 Rules |  |
 | **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |
@@ -267,12 +267,41 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 
 ## Built-in correctness rules
 
-Nitpick includes these three rules for common PowerShell value-semantics mistakes:
+Nitpick includes these rules for common PowerShell value-semantics mistakes:
+
+- **EmptyCollectionMemberAccess** reports direct `@($Items.Property)` captures
+  on array expressions, explicit array casts, and array-typed parameters in the
+  current lexical scope. Empty arrays can contribute a null item rather than
+  zero projected items. Prefer `@($Items | ForEach-Object { $_.Property })` when
+  per-item projection is intended. Real collection properties (`Count`, `Length`,
+  etc.), methods, dynamic member names, transformed output, and unknown receiver
+  types are excluded. Local variable assignment inference, lists, and nested
+  property-chain type inference are not supported yet. No automatic fix or null
+  filtering is offered, and nonempty cardinality is not proven.
+
+- **ArrayShapeLostThroughControlFlow** reports explicit array expressions emitted
+  by branches of an `if` assigned directly to a variable. Output enumeration can
+  turn an empty array into absent output and a singleton array into a scalar.
+  Even `[array] $Items = if (...) { @() }` can leave the destination null.
+  This is an intent warning, not proof of incorrect runtime behavior.
+  Local assignments, arguments, redirected output, `return`, unary-comma-protected
+  arrays, and outer array capture are excluded. Variable/list output and other
+  control-flow or function-output boundaries are not analyzed yet.
+  No automatic correction is offered.
 
 - **MisleadingBooleanConversion** reports nonempty string literals cast to
   Boolean and string-literal defaults for `[bool]` parameters. PowerShell treats
   every nonempty string, including `'false'`, as `$true`; parse textual Boolean
   values when that is the intended meaning.
+- **PossibleNullItemFromIndexedLookup** is an Information-level intent warning
+  for all direct `@(indexed lookup)` captures, including `$Items = @($Map['Key'])`
+  and parenthesized lookups. If the lookup returns explicit null, the capture
+  contains one null item rather than zero items. The indexed type, missing-key
+  status, and desired null policy are not inferred. Pipelines, presence guards,
+  multiple statements, and transformed or redirected lookup output are excluded.
+  Destination/expression `[array]` or `[object]` casts do not exempt the capture:
+  typing does not specify whether null items are intended. No automatic fix is
+  offered; use native suppression when null capture is intentional.
 - **CollectionComparisonUsedAsAPredicate** reports equality comparisons against
   array expressions or explicitly collection-typed parameters when used as
   `if`, `while`, `do`, or `for` conditions. Collection comparisons filter and
@@ -283,6 +312,51 @@ Nitpick includes these three rules for common PowerShell value-semantics mistake
   parameter metadata is available. The switch is enabled by its presence, and
   the string is a separate argument; use an explicit value such as
   `-Force:$false` to disable it.
+
+### Keeping a destination collection stable
+
+Instead of assigning an `if`'s enumerated output to the destination, initialize
+the destination separately and add the emitted items:
+
+```powershell
+$Items = [System.Collections.Generic.List[object]]::new()
+$(if ($Condition) {
+    Get-Something
+} else {
+    @()
+}) | ForEach-Object {
+    $Items.Add($_)
+}
+```
+
+The empty branch invokes no callbacks. Explicit `$null` items still invoke the
+callback and are preserved; filter them only when the application's contract
+requires it. For a normal array, initialize `$Items = @()` separately and use
+`$Items += $_`, noting the repeated allocation/copying cost.
+
+Outer `@(if (...) { ... })` is another option for an array-of-output contract:
+it captures zero/one/many items as an array, but does not preserve the identity
+or nesting of each emitted collection. Unary comma preserves an array as a
+single output object and therefore expresses a different contract.
+`-as [array]` does not normalize absent output to an empty array.
+A missing hashtable key evaluates to an explicit null item; use `ContainsKey()`
+when absence should produce no output instead of treating it as a null value.
+
+For example, preserve a present null value while omitting a missing key:
+
+```powershell
+$Items = @(
+    if ($Map.ContainsKey('Key')) {
+        $Map['Key']
+    }
+)
+```
+
+If null items are intentional, document that policy with suppression:
+
+```powershell
+$Items = @($Map['Key']) # nitpick disable-line Nitpick/PossibleNullItemFromIndexedLookup -- Null is a valid item.
+```
 
 ## Dependencies
 
