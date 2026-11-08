@@ -70,6 +70,7 @@ Copyright = '2025'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
+    'Add-ToCollection'
     'Convert-PSObjectToHashtable'
     'ConvertFrom-Json'
     'ConvertFrom-StringTable'
@@ -120,6 +121,7 @@ AliasesToExport = '*'
 
 # List of all files packaged with this module
 FileList = @(
+    'Public/Add-ToCollection.ps1'
     'Public/Convert-PSObjectToHashtable.ps1'
     'Public/ConvertFrom-Json.ps1'
     'Public/ConvertFrom-StringTable.ps1'
@@ -193,4 +195,3 @@ PrivateData = @{
 # DefaultCommandPrefix = ''
 
 }
-
