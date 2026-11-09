@@ -72,3 +72,7 @@ The document model could later support structural editing:
 * Remove-MarkdownSection
 * Add-MarkdownSection (append or insert)
 * Find-MarkdownSection (find sections with relevant text)
+
+## Todo
+
+* Add Search-MarkdownSection (return sections containing search text)
