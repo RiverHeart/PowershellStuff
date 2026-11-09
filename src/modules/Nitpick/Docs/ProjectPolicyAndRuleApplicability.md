@@ -2,9 +2,10 @@
 
 ## Status
 
-Design proposal with agreed scope and behavioral contracts; not implemented.
-This document is a basis for an implementation plan. Remaining implementation
-details and follow-ups are distinguished from the agreements below.
+Implementation plan with agreed scope and behavioral contracts; runtime changes
+are not implemented. Concrete implementation choices below translate those
+agreements into proposed APIs, change locations, and validation gates. Proposed
+internal names can change without reopening the behavioral contracts.
 
 [ADR 0005](adr/0005-coordinate-applicability-with-isolated-context.md) records
 the accepted invocation/context ownership decision. This proposal retains its
@@ -143,8 +144,8 @@ Accept only a documented catalog of supported released major/minor language
 versions, starting at 5.1. Configuration values are two-component strings such
 as `'5.1'` and `'7.4'`, normalized to `System.Version` internally. Reject preview
 labels, patch-specific values, older unsupported versions, and unknown future
-versions. The catalog is independent of the current analysis host. Its exact
-initial entries must be enumerated and tested during implementation.
+versions. The catalog is independent of the current analysis host. The initial
+entries are enumerated in the implementation details below.
 
 ### Effective context
 
@@ -269,8 +270,8 @@ declare them through `-Details`; local rules supply them through creation and
 registration parameters. The predicate receives one `IDictionary` context
 argument. Preserve the declaration through discovery, reconstruction, and
 registration overrides. Named predicate commands and executable predicates in
-project configuration are outside the initial scope. Exact property/parameter
-names remain open.
+project configuration are outside the initial scope. Proposed field names and
+dispatch APIs are specified in the concrete implementation details below.
 
 The agreed target execution order is invocation-level selection, declarative
 path eligibility, whole-target suppression, context applicability, host
@@ -281,9 +282,8 @@ Whole-target suppression bypasses the predicate and host checks. Line/regional
 suppression does not bypass them, because those actions require produced
 findings. Parser findings remain unsuppressible.
 
-A compatibility rule's predicate could require a configured PowerShell version
-policy. A narrowly focused ternary rule could additionally require a minimum
-version below 7. The exact predicate API and granularity remain open.
+The ternary proof's predicate requires a configured minimum version below 7.0.
+It does not inspect the target's syntax to decide whether to run.
 
 The predicate must return exactly one Boolean: true means applicable and false
 means inapplicable. Missing output, multiple output objects, non-Boolean values,
@@ -314,8 +314,8 @@ required analysis on an unsupported host errors.
 
 `Start-Nitpicking` retains ownership of configuration loading, path eligibility,
 suppression, and execution reporting. Reuse shared applicability/host evaluation
-logic without invoking a predicate twice for one dispatch. The dispatch/result
-mechanism needed to achieve this remains open.
+logic without invoking a predicate twice for one dispatch. The outcome-producing
+dispatch proposed below keeps both paths consistent.
 
 Direct raw producer invocation bypasses coordinator-owned applicability and
 host-prerequisite enforcement, just as it bypasses coordinated attribution.
@@ -371,9 +371,10 @@ validation should occur before target processing where possible.
 Host prerequisites are initially optional minimum analysis-host PowerShell
 version metadata, declared through the rule's metadata/creation surfaces.
 Rules without a declaration preserve existing behavior. The ternary proof
-declares 7.0; validate and check it after applicability, not during discovery.
-Discovery and `-Details` must remain executable on 5.1 without unconditional
-references to newer syntax or unavailable types.
+declares 7.0. Validate declaration shape during discovery, but check whether the
+host meets it only after applicability. Discovery and `-Details` must remain
+executable on 5.1 without unconditional references to newer syntax or unavailable
+types.
 
 The general policy/context and applicability framework retains PowerShell 5.1
 support. The first newer-syntax proof rule requires PowerShell 7 for analysis.
@@ -393,70 +394,378 @@ Distinguish parser findings from compatibility findings, and define behavior
 when parsing fails. A runtime compatibility target does not automatically imply
 that Nitpick itself can analyze every input while running on that target runtime.
 
-## Remaining Implementation Details
+## Code Integration Map
 
-These details must be resolved and covered by tests while producing the concrete
-implementation plan; they do not reopen the behavioral agreements above:
+The following paths were traced before writing the phases. Links identify
+existing files; helper and test names introduced below are planned additions.
 
-- Enumerate the initial supported major/minor release catalog.
-- Enumerate supported numeric and immutable scalar types; implement dictionary
-  and array copying without carrying ETS members or permitting cycles.
-- Name the ScriptBlock applicability and minimum-analysis-host metadata fields,
-  preserving them through every creation, discovery, and registration surface.
-- Define context construction/default ownership for direct descriptor/resolver
-  calls while preserving legacy producer behavior.
-- Choose a shared dispatch/result mechanism that evaluates the predicate once
-  per dispatch, enforces prerequisites for direct descriptor invocation, and
-  exposes inapplicable outcomes to verbose reporting.
-- Validate nested schema container types and distinguish omission from invalid
-  null/scalar values without silent defaults.
+| Surface | Current behavior | Planned change |
+| --- | --- | --- |
+| [NitpickRule](../Nitpick.psm1) | Reads `-Details`, applies overrides, funnels invocation overloads through a parameter dictionary, fills context defaults, and stamps native identity. | Add metadata and one shared outcome-producing dispatch path; construct isolated context before evaluating the predicate. |
+| [New-Nitpick](../Public/Interface/New-Nitpick.ps1) | Copies explicitly bound metadata into constructor overrides. | Add applicability and host-version parameters to the explicit override list. |
+| [Register-Nitpick](../Public/Interface/Register-Nitpick.ps1) | Either retains a descriptor or reconstructs it when metadata is overridden. | Preserve new fields on reconstruction, including an override of unrelated metadata such as category. |
+| [Get-NitpickPackage](../Private/Get-NitpickPackage.ps1) | Obtains declared/exported commands and constructs descriptors through `New-Nitpick`. | Let descriptor construction carry new metadata; do not add target policy to package manifests. |
+| [Find-Nitpick](../Public/Interface/Find-Nitpick.ps1) | Returns package descriptors filtered by rule ID. | Discover rules regardless of invocation policy or current host capability. |
+| [Resolve-NitpickEffectiveRuleSet](../Private/Resolve-NitpickEffectiveRuleSet.ps1) | Validates include selectors and merges discovered/registered rules; registered metadata wins for the same callable. | Preserve that precedence; do not filter context-inapplicable rules here. |
+| [Start-Nitpicking](../Public/Interface/Start-Nitpicking.ps1) | Resolves rules in `begin`, gathers targets in `process`, analyzes them in `end`, and passes empty context to rules. | Read configuration once in `begin`; construct target context in `end`; dispatch with outcomes and propagate canonical context to correction handling. |
+| [Resolve-NitpickTargetCorrection](../Private/Resolve-NitpickTargetCorrection.ps1) | Builds resolver arguments, obtains the proposal, then applies/saves corrections. | Forward optional context without loading configuration; let execution errors escape before saving. |
+| [Resolve-NitpickCorrectionProposal](../Public/Interface/Resolve-NitpickCorrectionProposal.ps1) | Rebuilds the candidate document and suppression, then invokes supplied rules with empty context. | Accept optional context; preserve original target identity/policy across candidate construction and use the shared dispatch path. |
+| [New-AstDocument](../../AstEditor/Public/New-AstDocument.ps1) | File-path inputs are file-backed; AST/string inputs are in-memory even when their extents have file provenance. | Reuse that distinction; no AstEditor runtime changes are planned. |
+| [Nitpick manifest](../Nitpick.psd1) | Separately lists exported functions and built-in `PrivateData.Linting.Rules`. | Add the proof rule to both lists; keep helper functions private and the global minimum at 5.1. |
 
-Automatic discovery boundaries/precedence, independent correction enforcement,
-and richer compatibility metadata remain follow-up design work, not blockers
-for this implementation.
+Important existing contracts:
 
-## Suggested Implementation Sequence
+- The first test in [NitpickRule.Tests.ps1](../Tests/Private/NitpickRule.Tests.ps1)
+  currently asserts reference equality between the supplied and producer-visible
+  context. Cloning intentionally changes that contract. Replace the equality
+  assertion with value preservation, distinct identity, and mutation isolation;
+  retain the assertion that the dispatched document itself is unchanged.
+- `Start-Nitpicking` adds path-eligible descriptors to its correction reanalysis
+  list before checking whole-target suppression. Preserve that behavior. The
+  [suppression tests](../Tests/Public/Interface/Start-Nitpicking.Suppression.Tests.ps1)
+  require a candidate edit that removes a directive to re-enable a rule.
+  Do not narrow the candidate set to producers that executed initially.
+- Candidate documents are rebuilt from ASTs and are therefore in-memory.
+  Re-deriving identity from the candidate's file-backed flag would incorrectly
+  turn an original file target into a fragment.
 
-### 1. Translate agreed contracts into an implementation plan
+## Concrete Implementation Details
 
-Use the agreements above to settle the remaining implementation details and
-write focused contract tests. Record architectural decisions in an ADR only
-where the trade-off warrants it. This document describes intended behavior, not
-proof that the behavior is implemented.
+These are implementation choices for the agreed behavior, not additional
+configuration features.
 
-### 2. Implement policy loading and context construction
+### Configuration validation and supported versions
 
-Add validated data-file loading and explicit effective-policy construction.
-Preserve behavior for callers without configuration and producers without a
-`Context` parameter. Establish isolation before sharing policy across rules.
+Introduce private `Read-NitpickConfiguration` to read one explicitly selected
+filesystem file and return normalized policy. Use literal-path resolution and
+the repository's existing `Import-PowerShellDataFile -ErrorAction Stop` pattern.
+Reject non-filesystem paths, directories, missing/unreadable files, and invalid
+data explicitly. Do not execute configuration or borrow the package loader's
+permissive absent-metadata defaults.
 
-### 3. Wire the complete analysis lifecycle
+Use case-insensitive known-key validation. Every present container
+(`Compatibility` and `PowerShell`) must be a string-keyed dictionary, not null,
+a scalar, or an array. Empty dictionaries and an omitted `MinimumVersion` mean
+no requirement; a present null/empty/invalid minimum is an error. Unknown keys
+error at every level, including when no minimum is present. Normalize equivalent
+empty configurations to an empty `Policy` dictionary.
 
-Propagate effective policy through initial analysis, target correction handling,
-and candidate reanalysis. Follow the existing component ownership boundaries
-instead of adding policy resolution independently at each invocation site.
+Initially accept these exact major/minor strings:
 
-### 4. Add coordinator-enforced applicability
+```text
+5.1
+6.0  6.1  6.2
+7.0  7.1  7.2  7.3  7.4  7.5  7.6
+```
 
-Carry the declaration through rule creation, discovery, registration, and
-effective-rule resolution. Validate predicates and expose a distinct execution
-outcome for inapplicable rules. Preserve selection and suppression semantics.
+These are language-version identifiers, not a promise of vendor servicing or
+complete feature coverage. PowerShell 7.6 is a released version documented in
+[Microsoft's release notes](https://learn.microsoft.com/en-us/powershell/scripting/whats-new/what-s-new-in-powershell-76?view=powershell-7.6).
+Test every accepted entry and reject `5`, `5.0`, `7`, `7.4.0`, preview suffixes,
+whitespace-padded values, numeric literals, and unlisted versions such as `99.0`.
+Normalize to a clean two-component `System.Version`. Maintain one catalog shared
+by file validation and direct-context policy normalization, not host detection.
 
-### 5. Prove the model with compatibility behavior
+### Context construction and copy helpers
 
-Implement a detection-only ternary compatibility rule under the chosen host
-strategy. An automatic ternary rewrite is outside the initial scope. Use a
-focused test producer to exercise refusal to offer an incompatible correction
-and test policy propagation into candidate reanalysis; do not introduce an
-unrelated production style rule solely to prove the infrastructure. Do not add
-independent compatibility rejection to correction acceptance in this basic
-implementation.
+Introduce private `Copy-NitpickContextValue` and `New-NitpickInvocationContext`.
+Keep validation/copying in these helpers rather than repeating it in producers,
+descriptor overloads, and correction coordinators.
 
-### 6. Publish the accepted contract
+- Support null, strings, Boolean, the CLR numeric types `SByte`, `Byte`, `Int16`,
+  `UInt16`, `Int32`, `UInt32`, `Int64`, `UInt64`, `Single`, `Double`, and `Decimal`,
+  plus `System.Version`.
+- Support string-keyed `IDictionary` values and one-dimensional arrays, including
+  typed arrays. Normalize them to case-insensitive hashtables and `object[]`.
+  Reject ambiguous case-duplicate keys, non-string keys, other collection types,
+  multidimensional arrays, and unsupported scalars such as custom classes.
+- Track the active recursion path by reference identity to reject cycles.
+  Repeated non-cyclic references are allowed but produce independent copies,
+  not shared mutable subgraphs.
+- Read dictionary entries and array elements, not the object's ETS property
+  enumeration. Materialize clean scalar values, including reconstructing
+  `System.Version`, without carrying attached instance members. Test ETS
+  additions on scalar values as well as dictionaries; immutable value equality
+  is not permission to leak an instance wrapper.
+- Preserve null entries and empty/singleton/nested array shapes without
+  PowerShell pipeline enumeration or incidental success-stream output.
+- Do not use serialization round-trips that change types or silently truncate
+  graph depth. Unsupported values error with their context key/index path.
 
-Update user-facing configuration examples and rule-authoring documentation.
-Document standalone invocation, analysis-host limitations, and observable
-outcomes. Add stable terminology to the glossary only once agreed.
+The constructor fills existing defaults without mutating caller input. Preserve
+explicit legacy `Caller`, `File`, and `RuleBehavior` values and existing
+partial-`RuleBehavior` behavior; do not change output/traversal defaults in
+unrelated producers. Missing new metadata is coordinator-generated:
+
+| Key | Value |
+| --- | --- |
+| `Policy` | Empty dictionary or normalized syntax requirement. |
+| `TargetKind` | `File` or `Fragment`. |
+| `TargetPath` | Absolute file path for file targets; null for fragments. |
+| `AnalysisHost.PowerShellVersion` | Actual current host version, not caller policy. |
+
+For direct AST/document invocation, default identity comes from the actual
+submitted document: only file-backed documents identify file targets. A
+provenance path alone does not. In correction reanalysis, carry the original
+coordinator-owned identity explicitly instead of recomputing it from the
+rendered in-memory document. Validate supplied reserved-key shapes; do not let
+direct callers spoof the host version or turn an AST provenance path into a
+writable file. Normalized direct policy may supply the minimum as either a
+supported configuration string or a two-component `System.Version`.
+
+Retain unknown top-level direct-context entries only when they satisfy the
+plain-data contract, preserving the existing dictionary extension surface.
+The project-file schema remains strict and cannot populate those entries.
+
+### Descriptor metadata and single-evaluation dispatch
+
+Use these proposed field and creation/registration parameter names:
+
+| Name | Type and contract |
+| --- | --- |
+| `Applicability` | Optional ScriptBlock accepting one `IDictionary` context argument and returning exactly one Boolean. |
+| `MinimumAnalysisHostVersion` | Optional `System.Version` prerequisite, independent of the project syntax minimum. |
+
+Validate metadata types at descriptor construction before implicit property
+conversion can disguise an invalid value. Validate a positive major/minor host
+minimum; it is a host prerequisite, not a member of the syntax-policy catalog.
+Validate declaration shape during discovery, but evaluate applicability and
+enforce host capability only during dispatch.
+
+Preserve both fields through `-Details`, explicit creation/registration,
+registered-over-discovered precedence, and descriptor reconstruction.
+Distinguish an omitted override from an explicitly null override that clears an
+optional declaration. A category-only override must not discard a predicate
+that was supplied when registering a scriptblock.
+
+Add a small module-scoped `NitpickRuleInvocationResult` class before
+`NitpickRule`, containing `Status` (`Executed` or `Inapplicable`) and `Results`
+(`object[]`). This is an execution outcome, not a predicate result or a finding.
+Introduce `InvokeWithResult` on the descriptor, with dictionary and
+document/context entry points. Both delegate to one core dispatch implementation:
+
+1. Validate/normalize the target and construct a private canonical context.
+2. Invoke the predicate once with an isolated copy, capturing success output.
+   Require exactly one actual Boolean. Promote predicate errors to terminating
+   execution errors; do not convert them to a false result.
+3. If false, return `Inapplicable` with an empty result array.
+4. If true or absent, check the actual host against the optional prerequisite.
+   An unmet prerequisite throws with rule ID, required version, and actual host.
+5. Invoke the producer with a separate context copy if it accepts `Context`;
+   otherwise omit that argument as today.
+6. Stamp native findings/corrections with descriptor identity exactly as today.
+   Return `Executed`, including when the producer emits zero findings.
+
+All existing `Invoke` overloads continue to return only `object[]`, unwrapping
+this outcome. Preserve declared dispatch parameter names, the legacy
+`ScriptBlockAst` dictionary fallback, AstDocument dispatch, and non-native
+producer output. Coordinators call `InvokeWithResult` instead of pre-running
+the predicate. There is no public "already applicable" bypass flag or cached
+approval object that can become stale.
+
+This preserves existing raw producer signatures; the generic callable-signature
+validator does not need new producer parameters. Predicate declarations are
+trusted rule code, not config values. Preserve their original module/session
+binding; test a `-Details` predicate that calls a module-private helper.
+
+### Lifecycle propagation and execution errors
+
+Add optional `[IDictionary] Context` to the target correction coordinator and
+public correction resolver. The resolver normalizes it before correction
+selection, including when no candidate reanalysis will occur. Neither loads
+configuration. Direct callers must supply the policy used in initial analysis;
+Nitpick cannot recover omitted policy from findings.
+
+Keep the path-eligible descriptor set available for candidate reanalysis,
+including initially suppressed descriptors. Evaluate the new predicate and host
+prerequisite only after candidate whole-target suppression. If a candidate edit
+removes suppression and exposes an unsupported-host rule, terminate before save.
+Keep line/regional suppression after producer execution.
+
+Emit verbose outcome messages containing the qualified rule ID and whether the
+phase is original or candidate analysis. Do not add execution records to finding
+output or change summary types/counters. All-inapplicable targets remain
+successful no-ops apart from parser/directive findings.
+
+Use terminating error records with stable, testable IDs distinguishing invalid
+configuration, invalid context, invalid applicability output, predicate failure,
+and unsupported analysis host. Include configuration/key paths or rule identity
+as appropriate; preserve the underlying exception. A helper's non-terminating
+`Write-Error` followed by an empty/success result is not sufficient. In `begin`,
+use a terminating error rather than `return`, since `process`/`end` still run
+after a plain return. Leave existing unrelated target read/write-error policy
+unchanged.
+
+Proposed error IDs are `NitpickInvalidConfiguration`, `NitpickInvalidContext`,
+`NitpickInvalidApplicabilityResult`, `NitpickApplicabilityFailed`, and
+`NitpickUnsupportedAnalysisHost`. Contract tests should assert these categories
+without depending on localized framework exception text.
+
+## Implementation Phases and Test Gates
+
+Perform targeted implementation and tests phase by phase. Each phase depends on
+the preceding completed phase; publish directly related help alongside each
+runtime API rather than waiting until the end. New test files below are planned
+paths relative to the module, not files that already exist.
+
+### Phase 1: Validated policy and isolated context
+
+Changes:
+
+- Add the configuration reader, copy helper, and context constructor under
+  `Private`, reusing the module's recursive private-file loading.
+- Refactor descriptor context construction through the new helpers while
+  retaining current dispatch and identity behavior.
+- Intentionally replace the context-reference-equality test with the new
+  isolation contract. Do not retain both contradictory expectations.
+
+Tests:
+
+- New `Tests\Private\Read-NitpickConfiguration.Tests.ps1`: all accepted versions,
+  invalid/missing paths, literal filenames, null/scalar containers, unknown keys,
+  empty dictionaries, omitted versus invalid minimum, and normalized output.
+- New `Tests\Private\NitpickInvocationContext.Tests.ps1`: every supported type,
+  cycles versus repeated references, nested arrays/nulls, case-duplicate keys,
+  unsupported objects, ETS shadowing, and caller-input non-mutation.
+- Extend [NitpickRule.Tests.ps1](../Tests/Private/NitpickRule.Tests.ps1) for
+  isolated nested values and unchanged traversal/output/dispatch behavior.
+
+Gate: these targeted paths pass on 5.1 and 7 before introducing applicability.
+
+### Phase 2: Rule metadata and descriptor outcomes
+
+Changes:
+
+- Add metadata fields/parameters, outcome class, and shared `InvokeWithResult`
+  dispatch; route every `Invoke` overload through it.
+- Wire constructor override lists and registration reconstruction. Keep
+  applicability out of discovery and invocation-level selection filtering.
+
+Tests:
+
+- Extend [New-Nitpick](../Tests/Public/Interface/New-Nitpick.Tests.ps1),
+  [Register-Nitpick](../Tests/Public/Interface/Register-Nitpick.Tests.ps1), and
+  [Find-Nitpick](../Tests/Public/Interface/Find-Nitpick.Tests.ps1) tests for field
+  propagation, null clears, malformed metadata, unrelated overrides, and
+  module-private predicate binding.
+- Extend [NitpickRule.Tests.ps1](../Tests/Private/NitpickRule.Tests.ps1) for true,
+  false, absent, missing/multiple/non-Boolean predicate output, predicate errors,
+  host checks, direct invocation overloads, and producers without `Context`.
+- Counter probes must show one predicate call per dispatch and no producer call
+  for false or failed prerequisites. Predicate mutation must not affect its
+  producer, another invocation, caller input, or metadata defaults.
+- Rerun [identity contracts](../Tests/Identity.Contracts.Tests.ps1) and
+  [package contracts](../Tests/RulePackages.Contracts.Tests.ps1); execution
+  gating must not change rule attribution, selectors, or metadata precedence.
+
+Gate: targeted descriptor/metadata and existing identity/package tests pass on
+both hosts; an intentionally impossible host prerequisite errors only on dispatch.
+
+### Phase 3: Configuration through initial and candidate analysis
+
+Changes:
+
+- Add `Start-Nitpicking -ConfigurationPath`, load once in `begin`, construct
+  canonical context per target, and consume descriptor outcomes.
+- Forward optional context through target correction and proposal resolution.
+  Preserve original target identity for candidate analysis and the existing
+  path-eligible reanalysis set.
+
+Tests:
+
+- New `Tests\Public\Interface\Start-Nitpicking.Policy.Tests.ps1`: one config read
+  per invocation, relative/literal paths, file/fragment identity, verbose-only
+  inapplicability, selected-rule totals, no-policy behavior, fail-fast errors
+  without `-ErrorAction Stop`, and no policy leaks between invocations.
+- New `Tests\Public\Interface\Resolve-NitpickCorrectionProposal.Context.Tests.ps1`:
+  direct optional context, normalization errors before selection, candidate
+  producer policy, and file identity retained on rendered documents.
+- Extend [target correction tests](../Tests/Private/Resolve-NitpickTargetCorrection.Tests.ps1)
+  to verify context forwarding and no save after candidate execution failure.
+- Extend [whole-target suppression tests](../Tests/Public/Interface/Start-Nitpicking.Suppression.Tests.ps1)
+  for skipped predicates/host checks and candidate re-enablement with policy.
+  Retain [line](../Tests/Public/Interface/Start-Nitpicking.LineSuppression.Tests.ps1)
+  and [regional](../Tests/Public/Interface/Start-Nitpicking.RegionalSuppression.Tests.ps1)
+  tests proving those actions do not bypass producer execution.
+- Run existing [fragment](../Tests/Public/Interface/Start-Nitpicking.Fragments.Tests.ps1)
+  and [fix](../Tests/Public/Interface/Start-Nitpicking.Fix.Tests.ps1) tests across
+  Off, Preview, Guided with mocked interaction, Apply, and WhatIf as applicable.
+  Assert current-target bytes are unchanged after candidate predicate/host
+  failure; earlier successful writes need not roll back.
+
+Gate: targeted lifecycle paths pass on both hosts with fixture rules, before the
+production compatibility rule is added. Parser/directive diagnostics remain
+visible when selected producers are inapplicable or whole-target suppressed.
+
+### Phase 4: Detection-only compatibility proof and user documentation
+
+Changes:
+
+- Add `Public\Rules\Test-AvoidUnsupportedTernarySyntax.Rule.ps1`, with local name
+  `AvoidUnsupportedTernarySyntax` and native ID
+  `Nitpick/AvoidUnsupportedTernarySyntax`.
+- Its predicate is true only when a configured minimum is below 7.0; its
+  `MinimumAnalysisHostVersion` is 7.0. Use a PS5.1-parseable body and `-Details`
+  path, avoiding static references to unavailable newer AST types during import.
+- Detect ternary nodes under PS7, report Warning findings at snapshot coordinates,
+  and offer no corrections. Follow existing `RuleBehavior` traversal/output
+  handling and standalone producer conventions without adding a PSSA adapter.
+- Add the rule to both manifest lists. Do not expand global category validation
+  or add the deferred mandatory compatibility-constraint metadata here.
+- Update [README.md](../README.md) with configuration usage, context/predicate
+  authoring, host errors, detection coverage, and the lack of universal
+  compatibility guarantees for corrections.
+
+Tests:
+
+- New `Tests\Public\Rules\Test-AvoidUnsupportedTernarySyntax.Tests.ps1`: on PS7,
+  5.1/6.x minima flag ternary, 7.x minima do not, absent policy skips execution,
+  nested traversal and fragment coordinates work, and no corrections are offered.
+- Store newer syntax as strings parsed at runtime, never as PS7-only syntax in
+  the test file. On 5.1, verify import/discovery, no-policy and 7.x-minimum no-ops,
+  explicit host errors for an applicable 5.1 requirement, and whole-target versus
+  line-suppression ordering. PS7 syntax-node assertions run only on PS7, with
+  their 5.1 prerequisite-error counterparts still mandatory.
+- Use a fixture correction producer to prove refusal of an incompatible fix and
+  ordinary compatibility reporting after a deliberately non-compliant fix.
+  Assert that findings alone do not introduce the deferred acceptance veto.
+
+Gate: targeted proof tests pass on both hosts, followed by the complete Nitpick
+suite on both hosts. Only investigate broader suites if a shared dependency or
+targeted regression requires them; no AstEditor/WPF runtime change is planned.
+
+### Validation commands for implementation
+
+These commands are a future execution recipe, not tests run for this
+documentation-only planning task. Paths are relative to the Nitpick suite
+configuration, as required by the repository runner. After reading the test
+runner skill, combine related paths in one call per host; do not run the full
+suite first. Example for phase 1:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Invoke-Test.ps1 `
+    -Suite Nitpick `
+    -Path Tests\Private\Read-NitpickConfiguration.Tests.ps1,Tests\Private\NitpickInvocationContext.Tests.ps1,Tests\Private\NitpickRule.Tests.ps1 `
+    -ExitOnError
+
+pwsh.exe -NoProfile -File .\tools\Invoke-Test.ps1 `
+    -Suite Nitpick `
+    -Path Tests\Private\Read-NitpickConfiguration.Tests.ps1,Tests\Private\NitpickInvocationContext.Tests.ps1,Tests\Private\NitpickRule.Tests.ps1 `
+    -ExitOnError
+```
+
+Rerun known failures first, then the phase's remaining targeted paths. Final
+validation after all targeted gates pass:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Invoke-Test.ps1 -Suite Nitpick -ExitOnError
+pwsh.exe -NoProfile -File .\tools\Invoke-Test.ps1 -Suite Nitpick -ExitOnError
+```
+
+Keep output compact. Coverage is a separate, explicitly requested follow-up,
+not part of the default implementation loop. Before runtime changes, read the
+applicable PowerShell instructions. No new test runner, serialization package,
+immutable-collection dependency, or C# context wrapper is required.
 
 ## Follow-Ups
 
