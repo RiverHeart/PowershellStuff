@@ -407,15 +407,11 @@ ScriptAnalyzer diagnostic conversion still emits local names and suppression IDs
 External DiagnosticRecord-only scaffolds are not native producers and remain unchanged.
 
 **TODO:**
-  - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
   - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
   - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
   - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.
   - Add Nitpick rule for using `return` in `Begin` and `Process` blocks.
-  - Add rule `MisleadingBooleanConversion` - `[bool]'false'` evaluates to `$true`. Flag provable nonempty-string conversions, including `[bool]` parameters with string-literal defaults. Suggest parsing rather than casting when appropriate.
-  - Add rule `CollectionComparisonUsedAsAPredicate` - `if ($Values -eq $Expected)` filters a collection, then tests the returned values’ truthiness. Matching `0`, `$false`, or `''` can therefore produce a false condition. Recommend `-contains` when membership is intended—not for every collection comparison.
   - Add rule `ComparisonResultUsedAsAnExistenceTest` - `if ($Values -match $Pattern)` has the same filtering-versus-Boolean distinction. Deserves an explanation separate from an ordinary operator-style suggestion.
-  - Add rule `StringArgToSwitchParameter` - `Invoke-Thing -Force 'false'` does not mean `-Force:$false`; the string becomes another argument. Diagnose only when parameter metadata is known.
   - Add rule `SuccessStreamLeakage` - A known value-returning call such as `$ArrayList.Add($Item)` emits its return value from a function. Focus on calls whose return values are conventionally incidental; don’t flag every unassigned expression.
   - Add rule `ArrayMutationDuringEnumeration` - Removing entries from a collection while directly enumerating that same collection. Start with obvious same-variable cases and known collection types; suggest enumerating a snapshot when appropriate.
   - Add rule `InvalidHashtableAssignment` - `$Options += @{ Name = 'new' }` throws when `Name` already exists; it isn’t an overwrite/merge operation. Detect statically provable duplicate keys.

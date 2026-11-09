@@ -25,7 +25,10 @@ function Complete-NitpickCategory {
         [IDictionary] $FakeBoundParameters
     )
 
-    $Categories = 'Style', 'Quality', 'Security', 'Performance', 'Maintainability', 'Other'
+    $Categories = @(
+        'Style', 'Quality', 'Security', 'Performance', 'Maintainability',
+        'Correctness', 'Compatibility', 'Other'
+    )
 
     $Completions = $Categories |
         Where-Object { $_ -ilike "*$WordToComplete*" } |
