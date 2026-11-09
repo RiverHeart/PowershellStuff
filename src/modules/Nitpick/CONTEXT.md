@@ -54,6 +54,25 @@ the fragment's own slice of the rendered snapshot for a fragment. Never the whol
 snapshot of a fragment.
 _Avoid_: Candidate text (for what is returned to the user), rendered text
 
+### Compatibility policy
+
+**Syntax compatibility requirement**:
+The oldest PowerShell language version a target is required to support; syntax
+introduced after that version violates the requirement. It is not a guarantee
+of command, API, platform, or later-runtime compatibility.
+_Avoid_: Analysis-host version, runtime compatibility guarantee
+
+**Rule applicability**:
+Whether a selected rule is relevant to a target under its effective policy and
+target characteristics. An inapplicable rule is distinct from a suppressed rule
+or a rule that executed without findings.
+_Avoid_: Rule selection, suppression, clean result
+
+**Compatibility constraint**:
+A rule's declared compatibility-policy dimension and the feature support
+boundary it checks, such as PowerShell syntax introduced in version 7.0.
+_Avoid_: Target, project minimum version, analysis-host prerequisite
+
 ### Suppression
 
 **Directive**:
