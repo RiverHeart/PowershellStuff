@@ -452,6 +452,8 @@ class NitpickRule {
     .DESCRIPTION
         Assigns descriptor-owned identity to native findings and nested corrections.
         Non-native outputs, including explicit DiagnosticRecords, are returned unchanged.
+        Producers receive recursively isolated plain-data context, with normalized
+        policy, submitted-target identity, and actual analysis-host metadata.
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .OUTPUTS
@@ -485,7 +487,9 @@ class NitpickRule {
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .PARAMETER Context
-        The context dictionary to pass to the rule invocation.
+        Plain-data context to copy for the rule invocation. Nested mutation and ETS
+        additions do not affect caller input or subsequent invocations. Unsupported
+        values and invalid reserved metadata terminate with NitpickInvalidContext.
     .OUTPUTS
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
@@ -536,13 +540,8 @@ class NitpickRule {
         if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
             throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
         }
-        $Target = if ($this.DispatchType.Name -eq 'AstDocument') {
-            $Document
-        } else {
-            $Document.Ast
-        }
         $Parameters = @{ Context = $Context }
-        $Parameters[$this.DispatchParameterName] = $Target
+        $Parameters[$this.DispatchParameterName] = $Document
         return $this.Invoke($Parameters)
     }
 
@@ -550,7 +549,8 @@ class NitpickRule {
     .SYNOPSIS
         Invokes the rule against the specified parameters dictionary.
     .PARAMETER Parameters
-        The parameters dictionary to pass to the rule invocation.
+        The parameters dictionary to pass to the rule invocation. Context is
+        validated and recursively copied without mutating the supplied dictionary.
     .OUTPUTS
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
@@ -568,12 +568,14 @@ class NitpickRule {
             $InvocationParameters.Remove('ScriptBlockAst')
         }
 
+        $ContextTarget = $Target
         if ($this.DispatchType.Name -eq 'AstDocument') {
             if ($Target -is [ScriptBlockAst]) {
                 $Target = New-AstDocument -InputObject $Target
             } elseif ($null -eq $Target -or $Target.GetType().Name -ne 'AstDocument') {
                 throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
             }
+
             $Ast = $Target.Ast
         } else {
             if ($null -ne $Target -and $Target.GetType().Name -eq 'AstDocument') {
@@ -581,26 +583,16 @@ class NitpickRule {
             } elseif ($Target -isnot [ScriptBlockAst]) {
                 throw [ArgumentException]::new('Rule invocation requires a ScriptBlockAst.')
             }
+
             $Ast = $Target
         }
 
+        $Context = New-NitpickInvocationContext `
+            -Target $ContextTarget `
+            -Context $InvocationParameters.Context
+
         $InvocationParameters[$this.DispatchParameterName] = $Target
         if (Get-CallableParameter -Callable $this.Callable -Name Context) {
-            $Context = $InvocationParameters.Context
-            if ($null -eq $Context) {
-                $Context = @{}
-            }
-            if ($Context -isnot [IDictionary]) {
-                throw [ArgumentException]::new('Rule invocation Context must be a dictionary.')
-            }
-            if (-not $Context.Contains('Caller')) { $Context.Caller = 'Nitpick' }
-            if (-not $Context.Contains('File')) { $Context.File = $Ast.Extent.File }
-            if ($null -eq $Context.RuleBehavior) {
-                $Context.RuleBehavior = @{
-                    SearchNestedScriptBlocks = $true
-                    OutputType = 'NitpickFinding'
-                }
-            }
             $InvocationParameters.Context = $Context
         } else {
             $InvocationParameters.Remove('Context')

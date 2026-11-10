@@ -20,7 +20,7 @@ Describe 'NitpickRule' {
             [pscustomobject]@{ Document = $Document; Context = $Context }
         }
         $Document = New-AstDocument -InputObject '# text'
-        $Context = @{}
+        $Context = @{ Extra = @{ Values = @(1, 2) } }
 
         #=== Act ===#
         $Result = @($Rule.Invoke($Document, $Context))[0]
@@ -28,7 +28,11 @@ Describe 'NitpickRule' {
         #=== Assert ===#
         $Rule.DispatchType | Should -Be ([AstDocument])
         [object]::ReferenceEquals($Result.Document, $Document) | Should -BeTrue
-        [object]::ReferenceEquals($Result.Context, $Context) | Should -BeTrue
+        [object]::ReferenceEquals($Result.Context, $Context) | Should -BeFalse
+        $Result.Context.Extra.Values | Should -Be @(1, 2)
+        $Result.Context.Extra.Values[0] = 9
+        $Context.Extra.Values[0] | Should -Be 1
+        $Context.Contains('Caller') | Should -BeFalse
         $Context.Contains('Document') | Should -BeFalse
     }
 
@@ -50,6 +54,72 @@ Describe 'NitpickRule' {
         #=== Assert ===#
         $Direct.OriginalText | Should -BeExactly '# text'
         [object]::ReferenceEquals($Dictionary, $Document) | Should -BeTrue
+    }
+
+    It 'isolates every invocation from producer mutations and ETS shadowing' {
+        $Rule = New-Nitpick -Name MutatingContext -Source Tests -Callable {
+            param(
+                [System.Management.Automation.Language.ScriptBlockAst] $InputObject,
+                [System.Collections.IDictionary] $Context
+            )
+            $Original = $Context.Policy.Compatibility.PowerShell.MinimumVersion
+            $Context.Policy.Compatibility.PowerShell.MinimumVersion = [version] '7.4'
+            $Context.Extra.Values[0] = 9
+            Add-Member -InputObject $Context -NotePropertyName Caller -NotePropertyValue 'shadow' -Force
+            $Original
+        }
+        $Context = @{
+            Policy = @{ Compatibility = @{ PowerShell = @{ MinimumVersion = '5.1' } } }
+            Extra = @{ Values = @(1) }
+        }
+        $Ast = {}.Ast
+        $Document = New-AstDocument -InputObject $Ast
+        foreach ($Results in @(
+            $Rule.Invoke($Ast, $Context),
+            $Rule.Invoke($Document, $Context),
+            $Rule.Invoke(@{ InputObject = $Ast; Context = $Context }),
+            $Rule.Invoke(@{ ScriptBlockAst = $Ast; Context = $Context })
+        )) {
+            $Results[0] | Should -Be ([version] '5.1')
+        }
+        $Context.Policy.Compatibility.PowerShell.MinimumVersion | Should -BeExactly '5.1'
+        $Context.Extra.Values[0] | Should -Be 1
+        $Context.Contains('Caller') | Should -BeFalse
+    }
+
+    It 'preserves file identity when a document is dispatched to an AST producer' {
+        $Rule = New-Nitpick -Name FileIdentity -Source Tests -Callable {
+            param(
+                [System.Management.Automation.Language.ScriptBlockAst] $InputObject,
+                [System.Collections.IDictionary] $Context
+            )
+            [pscustomobject]@{ Ast = $InputObject; Context = $Context }
+        }
+        $Path = Join-Path $TestDrive 'identity.ps1'
+        Set-Content -LiteralPath $Path -Value '# text'
+        $Document = New-AstDocument -Path $Path
+        foreach ($Result in @(
+            $Rule.Invoke($Document),
+            $Rule.Invoke($Document, @{}),
+            $Rule.Invoke(@{ InputObject = $Document })
+        )) {
+            [object]::ReferenceEquals($Result.Ast, $Document.Ast) | Should -BeTrue
+            $Result.Context.TargetKind | Should -BeExactly 'File'
+            $Result.Context.TargetPath | Should -BeExactly $Document.Path
+        }
+        $Fragment = $Rule.Invoke($Document.Ast, @{})[0]
+        $Fragment.Context.TargetKind | Should -BeExactly 'Fragment'
+        $Fragment.Context.TargetPath | Should -BeNullOrEmpty
+    }
+
+    It 'validates context even when a producer does not accept it' {
+        $Rule = New-Nitpick -Name NoContext -Source Tests -Callable {
+            param([System.Management.Automation.Language.ScriptBlockAst] $InputObject)
+            'unchanged'
+        }
+        { $Rule.Invoke({}.Ast, @{ Extra = [pscustomobject]@{} }) } |
+            Should -Throw -ErrorId '*NitpickInvalidContext*'
+        $Rule.Invoke({}.Ast, @{ Extra = @(1, 2) })[0] | Should -BeExactly 'unchanged'
     }
 
     It 'dispatches typed ScriptBlockAst parameters under their declared name' {
@@ -240,7 +310,9 @@ Describe 'NitpickRule' {
 
             #=== Assert ===#
             $Results | Should -HaveCount 1
-            [object]::ReferenceEquals($Results[0], $Context) | Should -BeTrue
+            [object]::ReferenceEquals($Results[0], $Context) | Should -BeFalse
+            $Results[0].Caller | Should -BeExactly 'TestHost'
+            $Results[0].Extra | Should -BeExactly 'preserved'
         }
     }
 

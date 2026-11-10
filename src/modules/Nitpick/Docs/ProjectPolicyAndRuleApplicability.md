@@ -2,10 +2,11 @@
 
 ## Status
 
-Implementation plan with agreed scope and behavioral contracts; runtime changes
-are not implemented. Concrete implementation choices below translate those
-agreements into proposed APIs, change locations, and validation gates. Proposed
-internal names can change without reopening the behavioral contracts.
+Implementation plan with agreed scope and behavioral contracts. Phase 1 (validated
+policy loading and isolated descriptor context) is implemented; later phases
+remain planned. Concrete implementation choices below translate those agreements
+into APIs, change locations, and validation gates. Proposed internal names can
+change without reopening the behavioral contracts.
 
 [ADR 0005](adr/0005-coordinate-applicability-with-isolated-context.md) records
 the accepted invocation/context ownership decision. This proposal retains its
@@ -72,9 +73,11 @@ process running Nitpick.
 
 - [Start-Nitpicking](../Public/Interface/Start-Nitpicking.ps1) invokes selected rules
   with an empty context dictionary.
-- [NitpickRule.Invoke](../Nitpick.psm1) accepts a context dictionary and fills in
-  invocation defaults such as `Caller`, `File`, and `RuleBehavior`. It only passes
-  context to producers that declare a `Context` parameter.
+- [NitpickRule.Invoke](../Nitpick.psm1) validates and recursively copies a
+  plain-data context dictionary, preserving invocation defaults such as `Caller`,
+  `File`, and `RuleBehavior`. It adds normalized `Policy`, submitted-target
+  `TargetKind`/`TargetPath`, and actual `AnalysisHost.PowerShellVersion`. It only
+  passes context to producers that declare a `Context` parameter.
   Descriptors already support `IncludePath`, `ExcludePath`, and `AppliesToPath`
   for declarative file-path eligibility.
 - [Resolve-NitpickEffectiveRuleSet](../Private/Resolve-NitpickEffectiveRuleSet.ps1)
@@ -84,8 +87,9 @@ process running Nitpick.
 - Whole-target suppression prevents producer execution; line and regional
   suppression filter produced findings.
 
-There is not yet a project-policy loading or applicability contract. The existing
-terminology and correction ownership boundaries are documented in
+The private configuration reader is implemented, but public configuration
+selection, applicability dispatch, and correction-policy propagation are not yet
+wired. The existing terminology and correction ownership boundaries are documented in
 [CONTEXT.md](../CONTEXT.md).
 
 ## Proposed Ownership
@@ -416,10 +420,10 @@ existing files; helper and test names introduced below are planned additions.
 Important existing contracts:
 
 - The first test in [NitpickRule.Tests.ps1](../Tests/Private/NitpickRule.Tests.ps1)
-  currently asserts reference equality between the supplied and producer-visible
-  context. Cloning intentionally changes that contract. Replace the equality
-  assertion with value preservation, distinct identity, and mutation isolation;
-  retain the assertion that the dispatched document itself is unchanged.
+  previously asserted reference equality between the supplied and producer-visible
+  context. Phase 1 intentionally replaced that contract with value preservation,
+  distinct identity, and mutation isolation; the dispatched document itself is
+  still unchanged.
 - `Start-Nitpicking` adds path-eligible descriptors to its correction reanalysis
   list before checking whole-target suppression. Preserve that behavior. The
   [suppression tests](../Tests/Public/Interface/Start-Nitpicking.Suppression.Tests.ps1)
@@ -609,6 +613,13 @@ runtime API rather than waiting until the end. New test files below are planned
 paths relative to the module, not files that already exist.
 
 ### Phase 1: Validated policy and isolated context
+
+Implemented. The shared private `ConvertTo-NitpickPolicy` owns schema validation
+and the release catalog for both file loading and direct-context normalization.
+The reader is not exported and `Start-Nitpicking -ConfigurationPath` is not
+available until the coordinator phase. Each descriptor invocation receives a
+fresh context; file identity is retained even when a file-backed document is
+dispatched to an AST producer.
 
 Changes:
 

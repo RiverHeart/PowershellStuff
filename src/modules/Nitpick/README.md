@@ -55,6 +55,30 @@ The resulting output starts by identifying the lines that were considered. The f
 
 Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
+## Descriptor invocation context
+
+Rules invoked through a descriptor's `Invoke` method receive a fresh, recursively
+isolated context when they declare a `Context` parameter. Caller dictionaries,
+nested values, and attached ETS members are not shared across invocations.
+Supported context data is string-keyed dictionaries, one-dimensional arrays,
+null, strings, Booleans, CLR numeric values, and `System.Version`. Unsupported
+objects, cycles, and invalid reserved metadata terminate with
+`NitpickInvalidContext`.
+
+Legacy `Caller`, `File`, and `RuleBehavior` values are preserved. Added metadata
+includes `Policy` (empty by default), `TargetKind`, nullable `TargetPath`, and
+`AnalysisHost.PowerShellVersion`. Only a file-backed `AstDocument` establishes
+file identity; a ScriptBlockAst's file provenance does not.
+
+Direct context may declare
+`Policy.Compatibility.PowerShell.MinimumVersion` as a supported major/minor
+string or two-component `System.Version`. Supported releases are `5.1`, `6.0`,
+`6.1`, `6.2`, and `7.0` through `7.6`; the value normalizes to `System.Version`.
+This does not yet enable compatibility checking. Configuration-file loading is
+private infrastructure; public configuration selection, applicability, and
+correction-policy propagation remain later phases of the
+[implementation plan](Docs/ProjectPolicyAndRuleApplicability.md).
+
 ## Whole-target rule suppression
 
 Put a standalone directive in a file's leading comment/whitespace preamble:
