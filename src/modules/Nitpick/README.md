@@ -279,7 +279,7 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | Criterion | PSScriptAnalyzer | Nitpick | Explanation |
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 10 Rules |  |
+| **Built-In Ruleset** | 75 Rules | 11 Rules |  |
 | **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |
@@ -292,6 +292,21 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 ## Built-in correctness rules
 
 Nitpick includes these rules for common PowerShell value-semantics mistakes:
+
+- **AvoidLiveCollectionMutation** reports mutations inside `foreach` over the
+  same collection, its live `.Keys`/`.Values` view, or `.GetEnumerator()`.
+  This includes dictionary index/property writes (even updates to existing
+  values), indexed writes to dictionary/list-typed parameters, and common
+  mutating methods such as `Add`, `Remove`, and `Clear`. Enumerate a snapshot
+  such as `foreach ($Key in @($Map.Keys))`, or defer changes until after the
+  loop. Ordinary array index writes and `+=` reassignment do not invalidate
+  the original array enumerator and are not reported.
+  Matching covers variables and static property chains, not aliases, dynamic
+  receivers, local type inference, or pipeline iteration. Unknown receiver
+  methods are potential hazards, not proof of failure; explicitly concurrent
+  parameter types are excluded. Nested deferred scriptblocks are not treated
+  as loop-body mutations. Reachability and receiver reassignment are not
+  analyzed. No automatic correction is offered.
 
 - **EmptyCollectionMemberAccess** reports direct `@($Items.Property)` captures
   on array expressions, explicit array casts, and array-typed parameters in the
