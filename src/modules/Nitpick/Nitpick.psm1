@@ -324,6 +324,16 @@ class NitpickSummary {
 # MARK: NP_RULE
 #------------------
 
+class NitpickRuleInvocationResult {
+    [string] $Status
+    [object[]] $Results
+
+    NitpickRuleInvocationResult([string] $Status, [object[]] $Results) {
+        $this.Status = $Status
+        $this.Results = $Results
+    }
+}
+
 class NitpickRule {
     [string] $Name
     [string] $Namespace
@@ -340,6 +350,8 @@ class NitpickRule {
     [string] $Explanation
     [string[]] $IncludePath
     [string[]] $ExcludePath
+    [scriptblock] $Applicability
+    [version] $MinimumAnalysisHostVersion
 
     NitpickRule([object] $TargetCallable, [hashtable] $Overrides) {
         if ($TargetCallable -is [string]) {
@@ -356,6 +368,7 @@ class NitpickRule {
         $DispatchSignature = Resolve-NitpickDispatchSignature `
             -Callable $TargetCallable `
             -ErrorAction Stop
+
         $this.DispatchType = $DispatchSignature.DispatchType
         $this.DispatchParameterName = $DispatchSignature.DispatchParameterName
 
@@ -384,12 +397,21 @@ class NitpickRule {
         $HasDetails = $TargetCallable |
             Get-CallableParameter -Name 'Details' -Type 'SwitchParameter'
 
+        $ExecutionMetadata = @{
+            Applicability = $null
+            MinimumAnalysisHostVersion = $null
+        }
+
         if ($HasDetails) {
             $Details = & $TargetCallable -Details
             foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source', 'Description', 'Severity', 'Explanation', 'IncludePath', 'ExcludePath') {
                 if ($null -ne $Details.$Property) {
                     $this.$Property = $Details.$Property
                 }
+            }
+
+            foreach ($Property in @($ExecutionMetadata.Keys)) {
+                $ExecutionMetadata[$Property] = $Details.$Property
             }
         }
 
@@ -409,6 +431,31 @@ class NitpickRule {
         Assert-NitpickIdentitySegment -Value $this.Name -SegmentType Name
         Assert-NitpickIdentitySegment -Value $this.Namespace -SegmentType Namespace
         $this.Id = '{0}/{1}' -f $this.Namespace, $this.Name
+
+        foreach ($Property in @($ExecutionMetadata.Keys)) {
+            if ($Overrides.ContainsKey($Property)) {
+                $ExecutionMetadata[$Property] = $Overrides[$Property]
+            }
+        }
+
+        if ($null -ne $ExecutionMetadata.Applicability -and
+            $ExecutionMetadata.Applicability -isnot [scriptblock]
+        ) {
+            throw [ArgumentException]::new("Rule '$($this.Id)' Applicability must be a ScriptBlock or null.")
+        }
+
+        $HostMinimum = $ExecutionMetadata.MinimumAnalysisHostVersion
+        if ($null -ne $HostMinimum -and (
+            $HostMinimum -isnot [version] -or $HostMinimum.Major -lt 1 -or
+            $HostMinimum.Minor -lt 0 -or $HostMinimum.Build -ne -1 -or
+            $HostMinimum.Revision -ne -1
+        )) {
+            throw [ArgumentException]::new(
+                "Rule '$($this.Id)' MinimumAnalysisHostVersion must be a positive major/minor System.Version or null."
+            )
+        }
+        $this.Applicability = $ExecutionMetadata.Applicability
+        $this.MinimumAnalysisHostVersion = $HostMinimum
     }
 
     <#
@@ -557,6 +604,46 @@ class NitpickRule {
     [object[]] Invoke(
         [IDictionary] $Parameters
     ) {
+        return $this.InvokeWithResult($Parameters).Results
+    }
+
+    <#
+    .SYNOPSIS
+        Dispatches a document or AST and returns execution status and producer results.
+    .DESCRIPTION
+        Applicability is evaluated once with an isolated context before host
+        prerequisites. The producer receives a different isolated copy.
+    .EXAMPLE
+        $Outcome = $Rule.InvokeWithResult($Document, @{})
+        $Outcome.Status
+        $Outcome.Results
+
+        Distinguishes Inapplicable from Executed, including an empty execution.
+    #>
+    [NitpickRuleInvocationResult] InvokeWithResult(
+        [object] $Document,
+        [IDictionary] $Context
+    ) {
+        $Parameters = @{ Context = $Context }
+        $Parameters[$this.DispatchParameterName] = $Document
+        return $this.InvokeWithResult($Parameters)
+    }
+
+    <#
+    .SYNOPSIS
+        Validates and dispatches rule parameters through the shared execution gates.
+    .DESCRIPTION
+        Returns Inapplicable only for one Boolean false predicate result.
+        Predicate failures, invalid output, and unmet host prerequisites terminate
+        with rule-specific error records. Existing Invoke methods unwrap Results.
+    .EXAMPLE
+        $Outcome = $Rule.InvokeWithResult(@{ ScriptBlockAst = { Get-Process }.Ast })
+
+        Uses the legacy AST parameter fallback and default invocation context.
+    #>
+    [NitpickRuleInvocationResult] InvokeWithResult(
+        [IDictionary] $Parameters
+    ) {
         $InvocationParameters = @{}
         foreach ($Key in $Parameters.Keys) {
             $InvocationParameters[$Key] = $Parameters[$Key]
@@ -575,25 +662,46 @@ class NitpickRule {
             } elseif ($null -eq $Target -or $Target.GetType().Name -ne 'AstDocument') {
                 throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
             }
-
-            $Ast = $Target.Ast
         } else {
             if ($null -ne $Target -and $Target.GetType().Name -eq 'AstDocument') {
                 $Target = $Target.Ast
             } elseif ($Target -isnot [ScriptBlockAst]) {
                 throw [ArgumentException]::new('Rule invocation requires a ScriptBlockAst.')
             }
-
-            $Ast = $Target
         }
 
         $Context = New-NitpickInvocationContext `
             -Target $ContextTarget `
             -Context $InvocationParameters.Context
 
+        if ($null -ne $this.Applicability) {
+            $IsApplicable = Test-NitpickRuleApplicability `
+                -Applicability $this.Applicability `
+                -Context (Copy-NitpickContextValue -Value $Context) `
+                -RuleId $this.Id
+
+            if (-not $IsApplicable) {
+                return [NitpickRuleInvocationResult]::new('Inapplicable', @())
+            }
+        }
+
+        $HostVersion = $Context.AnalysisHost.PowerShellVersion
+
+        if ($null -ne $this.MinimumAnalysisHostVersion -and
+            $HostVersion -lt $this.MinimumAnalysisHostVersion) {
+            throw [ErrorRecord]::new(
+                [InvalidOperationException]::new(
+                    "Rule '$($this.Id)' requires analysis host PowerShell $($this.MinimumAnalysisHostVersion); actual host is $HostVersion."
+                ),
+                'NitpickUnsupportedAnalysisHost',
+                [ErrorCategory]::NotImplemented,
+                $this.Id
+            )
+        }
+
         $InvocationParameters[$this.DispatchParameterName] = $Target
         if (Get-CallableParameter -Callable $this.Callable -Name Context) {
-            $InvocationParameters.Context = $Context
+            $InvocationParameters.Context = Copy-NitpickContextValue -Value $Context
         } else {
             $InvocationParameters.Remove('Context')
         }
@@ -603,12 +711,14 @@ class NitpickRule {
             if ($Finding -isnot [NitpickFinding]) {
                 continue
             }
+
             $Finding.RuleId = $this.Id
+
             foreach ($Correction in $Finding.Corrections) {
                 $Correction.RuleId = $this.Id
             }
         }
-        return $Results
+        return [NitpickRuleInvocationResult]::new('Executed', $Results)
     }
 }
 

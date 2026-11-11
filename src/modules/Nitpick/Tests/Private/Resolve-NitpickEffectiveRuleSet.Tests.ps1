@@ -30,14 +30,23 @@ Describe 'Resolve-NitpickEffectiveRuleSet' {
     }
 
     It 'prefers registered metadata for a same-Id, same-callable discovered candidate' {
-        $Registered = Register-Nitpick -Namespace Nitpick -Name UseIsNotOperator -Source Personal `
-            -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -Category Quality -PassThru
+        $Predicate = { throw 'selection must not evaluate applicability' }
+        $Registered = Register-Nitpick `
+            -Namespace Nitpick `
+            -Name UseIsNotOperator `
+            -Source Personal `
+            -Callable (Get-Command Test-UseIsNotOperator -Module Nitpick) -Category Quality `
+            -Applicability $Predicate `
+            -MinimumAnalysisHostVersion ([version] '999.0') `
+            -PassThru
 
         $Rules = InModuleScope Nitpick { Resolve-NitpickEffectiveRuleSet }
 
         $Rule = $Rules | Where-Object Id -eq 'Nitpick/UseIsNotOperator'
         [object]::ReferenceEquals($Rule, $Registered) | Should -BeTrue
         $Rule.Category | Should -Be Quality
+        [object]::ReferenceEquals($Rule.Applicability, $Predicate) | Should -BeTrue
+        $Rule.MinimumAnalysisHostVersion | Should -Be ([version] '999.0')
     }
 
     It 'throws before returning when a same-Id candidate has a different callable' {

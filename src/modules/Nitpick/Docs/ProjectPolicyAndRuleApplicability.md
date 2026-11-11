@@ -2,11 +2,11 @@
 
 ## Status
 
-Implementation plan with agreed scope and behavioral contracts. Phase 1 (validated
-policy loading and isolated descriptor context) is implemented; later phases
-remain planned. Concrete implementation choices below translate those agreements
-into APIs, change locations, and validation gates. Proposed internal names can
-change without reopening the behavioral contracts.
+Implementation plan with agreed scope and behavioral contracts. Phases 1 and 2
+(validated policy, isolated context, and descriptor applicability/outcomes) are
+implemented; later phases remain planned. Concrete implementation choices below
+translate those agreements into APIs, change locations, and validation gates.
+Proposed internal names can change without reopening the behavioral contracts.
 
 [ADR 0005](adr/0005-coordinate-applicability-with-isolated-context.md) records
 the accepted invocation/context ownership decision. This proposal retains its
@@ -87,9 +87,10 @@ process running Nitpick.
 - Whole-target suppression prevents producer execution; line and regional
   suppression filter produced findings.
 
-The private configuration reader is implemented, but public configuration
-selection, applicability dispatch, and correction-policy propagation are not yet
-wired. The existing terminology and correction ownership boundaries are documented in
+The private configuration reader and descriptor applicability/host dispatch are
+implemented. Public configuration selection, coordinator outcome reporting, and
+correction-policy propagation are not yet wired. The existing terminology and
+correction ownership boundaries are documented in
 [CONTEXT.md](../CONTEXT.md).
 
 ## Proposed Ownership
@@ -644,6 +645,15 @@ Tests:
 Gate: these targeted paths pass on 5.1 and 7 before introducing applicability.
 
 ### Phase 2: Rule metadata and descriptor outcomes
+
+Implemented. Descriptors preserve optional `Applicability` and
+`MinimumAnalysisHostVersion` declarations from Details and explicit overrides.
+All `Invoke` overloads unwrap the shared `InvokeWithResult` dispatch; predicates
+and producers receive separate context copies. Discovery and rule selection do
+not run predicates or enforce host prerequisites. Explicit metadata overrides on
+an already registered same-callable descriptor update its registration, while
+registration without overrides remains reference-preserving and idempotent.
+Public coordinator outcome reporting remains Phase 3 work.
 
 Changes:
 

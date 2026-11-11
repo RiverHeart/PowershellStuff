@@ -75,9 +75,55 @@ Direct context may declare
 string or two-component `System.Version`. Supported releases are `5.1`, `6.0`,
 `6.1`, `6.2`, and `7.0` through `7.6`; the value normalizes to `System.Version`.
 This does not yet enable compatibility checking. Configuration-file loading is
-private infrastructure; public configuration selection, applicability, and
-correction-policy propagation remain later phases of the
+private infrastructure; public configuration selection and correction-policy
+propagation remain later phases of the
 [implementation plan](Docs/ProjectPolicyAndRuleApplicability.md).
+
+### Applicability and execution outcomes
+
+Rules may declare `Applicability` (a ScriptBlock receiving one `IDictionary`
+context argument) and `MinimumAnalysisHostVersion` (a positive, two-component
+`System.Version`). Command-backed rules declare them through `-Details`;
+`New-Nitpick` and `Register-Nitpick` accept explicit overrides. Omission preserves
+declarations; explicit `$null` clears them, including when a descriptor is
+reconstructed for an unrelated metadata override. Explicit registration overrides
+also update an already registered instance of the same callable.
+
+```powershell
+$Rule = New-Nitpick `
+  -Name ProjectCheck `
+  -Source Example `
+  -Callable {
+    param($ScriptBlockAst)
+    # Inspect the target here.
+  } `
+  -Applicability {
+      param([System.Collections.IDictionary] $Context)
+      $Context.Policy.Count -gt 0
+  } `
+  -MinimumAnalysisHostVersion ([version] '7.0')
+
+$Document = New-AstDocument -InputObject '# example'
+$Outcome = $Rule.InvokeWithResult($Document, @{})
+$Outcome.Status  # Inapplicable: no policy was supplied.
+$Outcome.Results.Count  # 0
+```
+
+Each dispatch evaluates the predicate once with an isolated context. Exactly one
+actual Boolean is required; false returns `Inapplicable` without running the
+producer or checking host prerequisites. If true or absent, the dispatcher checks
+the actual host, then executes the producer with a separate context copy and
+returns `Executed`, even when no findings were produced. Existing `Invoke`
+overloads enforce the same gates but return only the producer's `object[]` results.
+`InvokeWithResult` also accepts an invocation-parameters dictionary.
+
+Discovery validates declaration types without executing predicates or rejecting
+rules whose host prerequisites are unmet. Invalid predicate output, predicate
+errors, and unmet host prerequisites terminate with
+`NitpickInvalidApplicabilityResult`, `NitpickApplicabilityFailed`, and
+`NitpickUnsupportedAnalysisHost`, respectively. Calling a raw producer directly
+bypasses these descriptor gates. Coordinator outcome reporting and policy
+propagation through candidate corrections are not yet integrated.
 
 ## Whole-target rule suppression
 

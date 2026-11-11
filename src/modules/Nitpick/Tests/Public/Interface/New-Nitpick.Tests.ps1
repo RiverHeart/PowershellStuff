@@ -23,6 +23,81 @@ AfterAll {
 }
 
 Describe 'New-Nitpick' {
+    It 'retains optional execution declarations without evaluating them at construction' {
+        $Predicate = { throw 'must not run during construction' }
+        $Rule = New-Nitpick -Name Declared -Source Tests -Callable {
+            param($ScriptBlockAst)
+        } -Applicability $Predicate -MinimumAnalysisHostVersion ([version] '999.0')
+
+        [object]::ReferenceEquals($Rule.Applicability, $Predicate) | Should -BeTrue
+        $Rule.MinimumAnalysisHostVersion | Should -Be ([version] '999.0')
+    }
+
+    It 'preserves Details declarations and supports explicit null clears' {
+        $Producer = {
+            [CmdletBinding(DefaultParameterSetName='Rule')]
+            param(
+                [Parameter(Mandatory,ParameterSetName='Rule')]
+                $ScriptBlockAst,
+
+                [Parameter(Mandatory,ParameterSetName='Details')]
+                [switch] $Details
+            )
+            if ($Details) {
+                return @{
+                    Applicability = { $false }
+                    MinimumAnalysisHostVersion = [version] '999.0'
+                }
+            }
+        }
+        $Rule = New-Nitpick -Callable $Producer -Name Declared -Source Tests
+        $Rule.Applicability | Should -BeOfType ([scriptblock])
+        $Rule.MinimumAnalysisHostVersion | Should -Be ([version] '999.0')
+        $Rule.InvokeWithResult({}.Ast, @{}).Status | Should -BeExactly 'Inapplicable'
+
+        $Cleared = New-Nitpick -Callable $Producer -Name Declared -Source Tests `
+            -Applicability $null -MinimumAnalysisHostVersion $null
+        $Cleared.Applicability | Should -BeNullOrEmpty
+        $Cleared.MinimumAnalysisHostVersion | Should -BeNullOrEmpty
+        $Cleared.InvokeWithResult({}.Ast, @{}).Status | Should -BeExactly 'Executed'
+
+        $Override = { $true }
+        $Changed = New-Nitpick -Callable $Producer -Name Declared -Source Tests `
+            -Applicability $Override -MinimumAnalysisHostVersion ([version] '5.1')
+        [object]::ReferenceEquals($Changed.Applicability, $Override) | Should -BeTrue
+        $Changed.MinimumAnalysisHostVersion | Should -Be ([version] '5.1')
+    }
+
+    It 'rejects malformed <Property> metadata before implicit conversion' -ForEach @(
+        @{ Property = 'Applicability'; Value = '$true' }
+        @{ Property = 'Applicability'; Value = $false }
+        @{ Property = 'Applicability'; Value = @{} }
+        @{ Property = 'MinimumAnalysisHostVersion'; Value = '7.0' }
+        @{ Property = 'MinimumAnalysisHostVersion'; Value = 7 }
+        @{ Property = 'MinimumAnalysisHostVersion'; Value = [version] '0.1' }
+        @{ Property = 'MinimumAnalysisHostVersion'; Value = [version] '7.0.0' }
+        @{ Property = 'MinimumAnalysisHostVersion'; Value = [version] '7.0.0.0' }
+    ) {
+        $Overrides = @{ $Property = $Value }
+        {
+            New-Nitpick -Name Malformed -Source Tests -Callable { param($ScriptBlockAst) } @Overrides
+        } | Should -Throw "*$Property*"
+
+        $Producer = {
+            [CmdletBinding(DefaultParameterSetName='Rule')]
+            param(
+                [Parameter(Mandatory,ParameterSetName='Rule')]
+                $ScriptBlockAst,
+
+                [Parameter(Mandatory,ParameterSetName='Details')]
+                [switch] $Details
+            )
+            if ($Details) { return @{ $Property = $Value } }
+        }.GetNewClosure()
+        { New-Nitpick -Callable $Producer -Name MalformedDetails -Source Tests } |
+            Should -Throw "*$Property*"
+    }
+
     It 'creates a rule from a scriptblock' {
         $Rule = New-Nitpick -Callable {
             param (

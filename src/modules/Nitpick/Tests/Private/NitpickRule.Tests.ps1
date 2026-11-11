@@ -10,6 +10,337 @@ AfterAll {
 }
 
 Describe 'NitpickRule' {
+    It 'distinguishes an inapplicable outcome from an empty execution' {
+        $Rule = New-Nitpick -Name Empty -Source Tests -Callable { param($ScriptBlockAst) }
+        $Document = New-AstDocument -InputObject '# empty'
+        $Outcome = $Rule.InvokeWithResult($Document, @{})
+        $Outcome.GetType().Name | Should -BeExactly 'NitpickRuleInvocationResult'
+        $Outcome.Status | Should -BeExactly 'Executed'
+        $Outcome.Results.GetType() | Should -Be ([object[]])
+        $Outcome.Results.Count | Should -Be 0
+
+        $Rule.Applicability = { $false }
+        $Outcome = $Rule.InvokeWithResult(@{ ScriptBlockAst = $Document.Ast })
+        $Outcome.Status | Should -BeExactly 'Inapplicable'
+        $Outcome.Results.GetType() | Should -Be ([object[]])
+        $Outcome.Results.Count | Should -Be 0
+        $Rule.Invoke($Document).Count | Should -Be 0
+    }
+
+    It 'evaluates applicability once per dispatch across all entry points for <ProducerType>' -ForEach @(
+        @{ ProducerType = 'Legacy' }
+        @{ ProducerType = 'TypedAst' }
+        @{ ProducerType = 'Document' }
+    ) {
+        $State = @{ Predicates = 0; Producers = 0 }
+        $Predicate = {
+            param([System.Collections.IDictionary] $Context)
+            $State.Predicates++
+            $Context.TargetKind -eq 'Fragment'
+        }.GetNewClosure()
+
+        $Producer = switch ($ProducerType) {
+            Legacy {
+                {
+                    param($ScriptBlockAst)
+                    $State.Producers++;
+                    $ScriptBlockAst
+                }.GetNewClosure()
+            }
+            TypedAst {
+                {
+                    param([System.Management.Automation.Language.ScriptBlockAst] $InputObject)
+                    $State.Producers++
+                    $InputObject
+                }.GetNewClosure()
+            }
+            Document {
+                {
+                    param([AstDocument] $Document)
+                    $State.Producers++;
+                    $Document
+                }.GetNewClosure()
+            }
+        }
+
+        $Rule = New-Nitpick `
+            -Name Counted `
+            -Source Tests `
+            -Callable $Producer `
+            -Applicability $Predicate
+
+        $Document = New-AstDocument -InputObject '# text'
+        $Ast = $Document.Ast
+        $Parameters = @{ Context = @{} }
+        $Parameters[$Rule.DispatchParameterName] = $Document
+        $Calls = @(
+            { $Rule.Invoke($Ast) },
+            { $Rule.Invoke($Ast, @{}) },
+            { $Rule.Invoke($Document) },
+            { $Rule.Invoke($Document, @{}) },
+            { $Rule.Invoke($Parameters) },
+            { $Rule.Invoke(@{ ScriptBlockAst = $Ast }) },
+            { $Rule.InvokeWithResult($Document, @{}).Results },
+            { $Rule.InvokeWithResult($Ast, @{}).Results },
+            { $Rule.InvokeWithResult($Parameters).Results }
+        )
+
+        foreach ($Call in $Calls) {
+            $Result = @(& $Call)
+            $Result.Count | Should -Be 1
+
+            if ($ProducerType -eq 'Document') {
+                $Result[0].OriginalText | Should -BeExactly $Document.OriginalText
+            } else {
+                [object]::ReferenceEquals($Result[0], $Ast) | Should -BeTrue
+            }
+        }
+
+        $State.Predicates | Should -Be $Calls.Count
+        $State.Producers | Should -Be $Calls.Count
+
+        $Rule.Applicability = { $State.Predicates++; $false }.GetNewClosure()
+        foreach ($Call in $Calls) { @(& $Call).Count | Should -Be 0 }
+        $State.Predicates | Should -Be ($Calls.Count * 2)
+        $State.Producers | Should -Be $Calls.Count
+    }
+
+    It 'rejects <Kind> predicate output without invoking the producer' -ForEach @(
+        @{ Kind = 'missing'; Predicate = {} }
+        @{ Kind = 'null'; Predicate = { $null } }
+        @{ Kind = 'multiple'; Predicate = { $true; $false } }
+        @{ Kind = 'string'; Predicate = { 'false' } }
+        @{ Kind = 'integer'; Predicate = { 1 } }
+        @{ Kind = 'object'; Predicate = { [pscustomobject]@{ Applicable = $true } } }
+        @{ Kind = 'unrolled-array'; Predicate = { ,@($true) } }
+        @{ Kind = 'stray output'; Predicate = { 'trace'; $true } }
+    ) {
+        $State = @{ Predicates = 0; Producers = 0 }
+        $CountedPredicate = {
+            param([System.Collections.IDictionary] $Context)
+            $State.Predicates++
+            & $Predicate $Context
+        }.GetNewClosure()
+
+        $Callable = {
+            param($ScriptBlockAst)
+            $State.Producers++
+        }.GetNewClosure()
+
+        $Rule = New-Nitpick `
+            -Name InvalidOutput `
+            -Source Tests `
+            -Callable $Callable `
+            -Applicability $CountedPredicate `
+            -MinimumAnalysisHostVersion ([version] '999.0')
+
+        { $Rule.InvokeWithResult(@{ ScriptBlockAst = {}.Ast }) } |
+            Should -Throw '*Local/InvalidOutput*' -ErrorId '*NitpickInvalidApplicabilityResult*'
+
+        $State.Predicates | Should -Be 1
+        $State.Producers | Should -Be 0
+    }
+
+    It 'terminates on <Kind> predicate errors and preserves their cause' -ForEach @(
+        @{ Kind = 'throwing'; Predicate = { throw [InvalidOperationException]::new('predicate sentinel') } }
+        @{ Kind = 'non-terminating'; Predicate = { Write-Error 'predicate sentinel'; $true } }
+        @{ Kind = 'explicit continue'; Predicate = { Write-Error 'predicate sentinel' -ErrorAction Continue; $true } }
+    ) {
+        $State = @{ Predicates = 0; Producers = 0 }
+        $CountedPredicate = {
+            param([System.Collections.IDictionary] $Context)
+            $State.Predicates++
+            & $Predicate $Context
+        }.GetNewClosure()
+
+        $Callable = {
+            param($ScriptBlockAst)
+            $State.Producers++
+        }.GetNewClosure()
+
+        $Rule = New-Nitpick `
+            -Name FailedPredicate `
+            -Source Tests `
+            -Callable $Callable `
+            -Applicability $CountedPredicate
+
+        $Caught = $null
+        try {
+            $null = $Rule.Invoke({}.Ast)
+        } catch {
+            $Caught = $_
+        }
+
+        $Caught | Should -Not -BeNullOrEmpty
+        $Caught.FullyQualifiedErrorId | Should -BeLike '*NitpickApplicabilityFailed*'
+        $Caught.Exception.Message | Should -BeLike '*Local/FailedPredicate*predicate sentinel*'
+        $Caught.Exception.InnerException | Should -Not -BeNullOrEmpty
+        $State.Predicates | Should -Be 1
+        $State.Producers | Should -Be 0
+    }
+
+    It 'checks host requirements only after applicability and against the actual host' {
+        $State = @{ Predicates = 0; Producers = 0 }
+        $Predicate = { $State.Predicates++; $false }.GetNewClosure()
+        $Callable = {
+            param($ScriptBlockAst)
+            $State.Producers++
+            'raw'
+        }.GetNewClosure()
+
+        $Rule = New-Nitpick `
+            -Name FutureHost `
+            -Source Tests `
+            -Callable $Callable `
+            -Applicability $Predicate `
+            -MinimumAnalysisHostVersion ([version] '999.0')
+
+        $Outcome = $Rule.InvokeWithResult({}.Ast, @{})
+        $Outcome.Status | Should -BeExactly 'Inapplicable'
+        $State.Predicates | Should -Be 1
+        $State.Producers | Should -Be 0
+
+        $Rule.Applicability = { $State.Predicates++; $true }.GetNewClosure()
+        { $Rule.InvokeWithResult({}.Ast, @{}) } |
+            Should -Throw '*Local/FutureHost*999.0*actual host*' -ErrorId '*NitpickUnsupportedAnalysisHost*'
+
+        $State.Predicates | Should -Be 2
+        $State.Producers | Should -Be 0
+
+        $Rule.Applicability = $null
+        { $Rule.Invoke({}.Ast) } | Should -Throw -ErrorId '*NitpickUnsupportedAnalysisHost*'
+
+        $State.Producers | Should -Be 0
+        $PSVersion = $PSVersionTable.PSVersion
+        $Rule.MinimumAnalysisHostVersion = [version]::new($PSVersion.Major, $PSVersion.Minor)
+        $Rule.Invoke({}.Ast)[0] | Should -BeExactly 'raw'
+        $State.Producers | Should -Be 1
+    }
+
+    It 'validates target and context before invoking a predicate' {
+        $State = @{ Predicates = 0; Producers = 0 }
+        $Predicate = { $State.Predicates++; $false }.GetNewClosure()
+        $Callable = { param($ScriptBlockAst) $State.Producers++ }.GetNewClosure()
+
+        $Rule = New-Nitpick `
+            -Name ValidateFirst `
+            -Source Tests `
+            -Callable $Callable `
+            -Applicability $Predicate
+
+        { $Rule.InvokeWithResult(@{ ScriptBlockAst = 'invalid' }) } |
+            Should -Throw '*ScriptBlockAst*'
+
+        { $Rule.InvokeWithResult({}.Ast, @{ Extra = [pscustomobject]@{} }) } |
+            Should -Throw -ErrorId '*NitpickInvalidContext*'
+
+        $State.Predicates | Should -Be 0
+        $State.Producers | Should -Be 0
+    }
+
+    It 'does not allow a predicate to alter authoritative host prerequisites' {
+        $Predicate = {
+            param([System.Collections.IDictionary] $Context)
+            $Context.AnalysisHost.PowerShellVersion = [version] '999.0'
+            $true
+        }
+
+        $Callable = {
+            param($ScriptBlockAst)
+            throw 'producer must not execute'
+        }
+
+        $Rule = New-Nitpick `
+            -Name ActualHost `
+            -Source Tests `
+            -Callable $Callable `
+            -MinimumAnalysisHostVersion ([version] '999.0') `
+            -Applicability $Predicate
+
+        { $Rule.InvokeWithResult({}.Ast, @{}) } |
+            Should -Throw -ErrorId '*NitpickUnsupportedAnalysisHost*'
+    }
+
+    It 'preserves native attribution and non-native output through outcomes' {
+        $Ast = { -not ($Value -is [string]) }.Ast
+        $Rule = New-Nitpick `
+            -Callable Test-UseIsNotOperator `
+            -Namespace OutcomeOwner `
+            -Applicability { $true }
+
+        $Outcome = $Rule.InvokeWithResult($Ast, @{})
+        $Outcome.Status | Should -BeExactly 'Executed'
+        $Outcome.Results.Count | Should -Be 1
+        $Outcome.Results[0].RuleId | Should -BeExactly 'OutcomeOwner/UseIsNotOperator'
+        $Outcome.Results[0].Corrections[0].RuleId | Should -BeExactly 'OutcomeOwner/UseIsNotOperator'
+
+        $Outcome = $Rule.InvokeWithResult($Ast, @{ RuleBehavior = @{ OutputType = 'DiagnosticRecord' } })
+        $Outcome.Results[0].GetType().Name | Should -BeExactly 'DiagnosticRecord'
+    }
+
+    It 'isolates predicate and producer mutation from each other, caller input, and defaults' {
+        $State = @{ Predicates = 0 }
+        $Predicate = {
+            param([System.Collections.IDictionary] $Context)
+
+            $State.Predicates++
+            $Context.Policy.Compatibility.PowerShell.MinimumVersion = [version] '7.4'
+            $Context.Extra.Values[0] = 9
+            $Context.RuleBehavior.OutputType = 'DiagnosticRecord'
+            $Context |
+                Add-Member -NotePropertyName Caller -NotePropertyValue 'shadow' -Force
+            $Context.AnalysisHost.PowerShellVersion |
+                Add-Member -NotePropertyName Marker -NotePropertyValue 1
+            $true
+        }.GetNewClosure()
+
+        $Callable = {
+            param(
+                [AstDocument] $Document,
+                [System.Collections.IDictionary] $Context
+            )
+
+            $Snapshot = [pscustomobject]@{
+                Minimum = $Context.Policy.Compatibility.PowerShell.MinimumVersion
+                Extra = $Context.Extra.Values[0]
+                OutputType = $Context.RuleBehavior.OutputType
+                Caller = $Context.Caller
+                HostMarker = $Context.AnalysisHost.PowerShellVersion.psobject.Properties['Marker']
+            }
+            $Context.Policy.Compatibility.PowerShell.MinimumVersion = [version] '7.5'
+            $Context.Extra.Values[0] = 8
+            $Snapshot
+        }
+
+        $Rule = New-Nitpick `
+            -Name Isolated `
+            -Source Tests `
+            -Callable $Callable `
+            -Applicability $Predicate
+
+        $Context = @{
+            Policy = @{ Compatibility = @{ PowerShell = @{ MinimumVersion = '5.1' } } }
+            Extra = @{ Values = @(1) }
+        }
+        $Document = New-AstDocument -InputObject '# text'
+
+        foreach ($Index in 1..2) {
+            $Outcome = $Rule.InvokeWithResult($Document, $Context)
+            $Outcome.Status | Should -BeExactly 'Executed'
+            $Value = $Outcome.Results[0]
+            $Value.Minimum | Should -Be ([version] '5.1')
+            $Value.Extra | Should -Be 1
+            $Value.OutputType | Should -BeExactly 'NitpickFinding'
+            $Value.Caller | Should -BeExactly 'Nitpick'
+            $Value.HostMarker | Should -BeNullOrEmpty
+        }
+
+        $State.Predicates | Should -Be 2
+        $Context.Policy.Compatibility.PowerShell.MinimumVersion | Should -BeExactly '5.1'
+        $Context.Extra.Values[0] | Should -Be 1
+        $Context.Contains('RuleBehavior') | Should -BeFalse
+    }
+
     It 'dispatches an AstDocument directly and keeps it out of Context' {
         #=== Arrange ===#
         $Rule = New-Nitpick -Name DocumentContext -Source Tests -Callable {
