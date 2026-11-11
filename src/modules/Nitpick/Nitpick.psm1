@@ -335,6 +335,9 @@ class NitpickRuleInvocationResult {
 }
 
 class NitpickRule {
+    # Opaque in-process marker for coordinator dispatch; not an authorization boundary.
+    static hidden [object] $CoordinatorDispatchToken = [object]::new()
+
     [string] $Name
     [string] $Namespace
     [string] $Id
@@ -371,9 +374,9 @@ class NitpickRule {
 
         $this.DispatchType = $DispatchSignature.DispatchType
         $this.DispatchParameterName = $DispatchSignature.DispatchParameterName
-
         $this.Category = 'Other'
         $this.EditorEnabled = $true
+
         if ($TargetCallable -is [scriptblock]) {
             $this.CallableType = 'ScriptBlock'
             $this.Callable = $TargetCallable
@@ -384,6 +387,7 @@ class NitpickRule {
             } else {
                 $TargetCallable.Name
             }
+
             $this.CallableType = 'Function'
             $this.Callable = $TargetCallable
             $this.Source = $TargetCallable.ModuleName
@@ -656,6 +660,19 @@ class NitpickRule {
         }
 
         $ContextTarget = $Target
+        $CoordinatorDispatch = $InvocationParameters['__NitpickCoordinatorDispatch']
+        if ($InvocationParameters.ContainsKey('__NitpickCoordinatorDispatch')) {
+            $InvocationParameters.Remove('__NitpickCoordinatorDispatch')
+
+            if (-not (Test-NitpickCoordinatorDispatch -Dispatch $CoordinatorDispatch)) {
+                throw [ArgumentException]::new(
+                    'Invalid coordinator-owned rule invocation context.'
+                )
+            }
+
+            $ContextTarget = $CoordinatorDispatch.Target
+        }
+
         if ($this.DispatchType.Name -eq 'AstDocument') {
             if ($Target -is [ScriptBlockAst]) {
                 $Target = New-AstDocument -InputObject $Target

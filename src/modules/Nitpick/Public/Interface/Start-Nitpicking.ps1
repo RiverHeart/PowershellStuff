@@ -45,6 +45,11 @@ using namespace System.Management.Automation.Language
     rule commands and supporting modules; supporting modules use the declared owner's
     namespace even when acquired directly. Does not register acquired rules.
 
+.PARAMETER ConfigurationPath
+    An explicit PSD1 project-policy file. Its policy applies uniformly to every
+    target in this invocation. Relative paths resolve from the caller's current
+    PowerShell location; omitting this parameter supplies no project policy.
+
 .PARAMETER ExcludeDefaults
     Omits the built-in Nitpick package, including when Module is also omitted (in
     which case no rules are discovered; registered rules may still apply).
@@ -129,6 +134,9 @@ function Start-Nitpicking {
 
         [string[]] $Module,
 
+        [ValidateNotNullOrEmpty()]
+        [string] $ConfigurationPath,
+
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
 
@@ -161,6 +169,11 @@ function Start-Nitpicking {
                     $FixMode
                 )
             )
+        }
+
+        $ProjectPolicy = @{}
+        if ($PSBoundParameters.ContainsKey('ConfigurationPath')) {
+            $ProjectPolicy = Read-NitpickConfiguration -LiteralPath $ConfigurationPath
         }
 
         [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
@@ -306,6 +319,10 @@ function Start-Nitpicking {
                 $TargetFindings.Add($Diagnostic)
             }
 
+            $Context = New-NitpickInvocationContext `
+                -Target $Document `
+                -Context @{ Policy = $ProjectPolicy }
+
             $ApplicableRules = [List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
@@ -326,7 +343,13 @@ function Start-Nitpicking {
 
                 if ($RuleIsSuppressed) { continue }
 
-                foreach ($Finding in $Rule.Invoke($Document, @{})) {
+                $Outcome = $Rule.InvokeWithResult($Document, $Context)
+                if ($Outcome.Status -eq 'Inapplicable') {
+                    Write-Verbose "Rule '$($Rule.Id)' was inapplicable during original analysis."
+                    continue
+                }
+
+                foreach ($Finding in $Outcome.Results) {
                     if ($Finding -is [NitpickFinding] -and (
                         Test-NitpickRuleSuppressed `
                             -RuleId $Finding.RuleId `
@@ -347,7 +370,8 @@ function Start-Nitpicking {
                     -FixMode $FixMode `
                     -Document $Document `
                     -Finding $TargetFindings.ToArray() `
-                    -Rule $ApplicableRules.ToArray()
+                    -Rule $ApplicableRules.ToArray() `
+                    -Context $Context
 
                 $FinalFindings = $CorrectionResult.Report.EffectiveFindings
 

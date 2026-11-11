@@ -2,11 +2,12 @@
 
 ## Status
 
-Implementation plan with agreed scope and behavioral contracts. Phases 1 and 2
-(validated policy, isolated context, and descriptor applicability/outcomes) are
-implemented; later phases remain planned. Concrete implementation choices below
-translate those agreements into APIs, change locations, and validation gates.
-Proposed internal names can change without reopening the behavioral contracts.
+Implementation plan with agreed scope and behavioral contracts. Phases 1 through 3
+(validated policy, isolated context, descriptor outcomes, and policy propagation
+through initial and candidate analysis) are implemented; Phase 4 remains planned.
+Concrete implementation choices below translate those agreements into APIs,
+change locations, and validation gates. Proposed internal names can change
+without reopening the behavioral contracts.
 
 [ADR 0005](adr/0005-coordinate-applicability-with-isolated-context.md) records
 the accepted invocation/context ownership decision. This proposal retains its
@@ -432,7 +433,20 @@ Important existing contracts:
   Do not narrow the candidate set to producers that executed initially.
 - Candidate documents are rebuilt from ASTs and are therefore in-memory.
   Re-deriving identity from the candidate's file-backed flag would incorrectly
-  turn an original file target into a fragment.
+  turn an original file target into a fragment. Candidate analysis is a
+  continuation of the original submitted target, not a new target submission:
+  the coordinator must carry the canonical identity established from the
+  original target through an internal-only channel, separate from the public
+  context dictionary. Rebuild each candidate invocation context from that
+  canonical identity rather than recovering identity from a predicate- or
+  producer-visible context copy. The rendered candidate remains in-memory and
+  is never made writable by retaining the original file identity. Direct
+  callers continue to derive identity from the document they submit; public
+  context or resolver parameters must not let them override `TargetKind` or
+  `TargetPath`. The internal dispatch payload uses a unique in-process token
+  checked by `NitpickRule` and is removed before invoking rule code. Treat it as
+  an accidental-misuse boundary for this internal channel, not as protection
+  against arbitrary code already running in the PowerShell process.
 
 ## Concrete Implementation Details
 
@@ -682,15 +696,16 @@ Tests:
 Gate: targeted descriptor/metadata and existing identity/package tests pass on
 both hosts; an intentionally impossible host prerequisite errors only on dispatch.
 
-### Phase 3: Configuration through initial and candidate analysis
+### Phase 3: Configuration through initial and candidate analysis (Complete)
 
 Changes:
 
 - Add `Start-Nitpicking -ConfigurationPath`, load once in `begin`, construct
   canonical context per target, and consume descriptor outcomes.
 - Forward optional context through target correction and proposal resolution.
-  Preserve original target identity for candidate analysis and the existing
-  path-eligible reanalysis set.
+  Preserve original target identity for candidate analysis through a
+  coordinator-only channel separate from caller-supplied context; keep candidate
+  documents in-memory and preserve the existing path-eligible reanalysis set.
 
 Tests:
 
@@ -700,7 +715,9 @@ Tests:
   without `-ErrorAction Stop`, and no policy leaks between invocations.
 - New `Tests\Public\Interface\Resolve-NitpickCorrectionProposal.Context.Tests.ps1`:
   direct optional context, normalization errors before selection, candidate
-  producer policy, and file identity retained on rendered documents.
+  producer policy, file identity retained on rendered documents, direct callers
+  unable to override target identity, and candidate contexts rebuilt from the
+  original coordinator-owned identity.
 - Extend [target correction tests](../Tests/Private/Resolve-NitpickTargetCorrection.Tests.ps1)
   to verify context forwarding and no save after candidate execution failure.
 - Extend [whole-target suppression tests](../Tests/Public/Interface/Start-Nitpicking.Suppression.Tests.ps1)
@@ -714,9 +731,10 @@ Tests:
   Assert current-target bytes are unchanged after candidate predicate/host
   failure; earlier successful writes need not roll back.
 
-Gate: targeted lifecycle paths pass on both hosts with fixture rules, before the
-production compatibility rule is added. Parser/directive diagnostics remain
-visible when selected producers are inapplicable or whole-target suppressed.
+Gate: targeted lifecycle paths and the complete Nitpick suite pass on Windows
+PowerShell 5.1 and PowerShell 7 with fixture rules, before the production
+compatibility rule is added. Parser/directive diagnostics remain visible when
+selected producers are inapplicable or whole-target suppressed.
 
 ### Phase 4: Detection-only compatibility proof and user documentation
 

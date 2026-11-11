@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Collections.Generic
 using module AstEditor
 
@@ -62,6 +63,11 @@ using module AstEditor
 .PARAMETER Rule
     Selected Nitpick rules to rerun against valid rendered text. When omitted, the
     correction preview is returned without final reanalysis.
+
+.PARAMETER Context
+    Optional caller-supplied invocation context. The resolver validates and
+    normalizes it against the submitted document before correction selection; it
+    does not load project configuration.
 
 .PARAMETER Path
     Optional source path used to retain file identity during final rule analysis.
@@ -148,6 +154,9 @@ function Resolve-NitpickCorrectionProposal {
         [NitpickRule[]] $Rule,
 
         [AllowNull()]
+        [IDictionary] $Context,
+
+        [AllowNull()]
         [string] $Path,
 
         [scriptblock] $CorrectionSelector
@@ -169,6 +178,10 @@ function Resolve-NitpickCorrectionProposal {
     if ($Document.Edits.Count -gt 0) {
         Write-Error "The provided AstDocument contains edits and cannot be used."
     }
+
+    $CanonicalContext = New-NitpickInvocationContext `
+        -Target $Document `
+        -Context $Context
 
     $AcceptedCorrections = [List[NitpickCorrection]]::new()
     $SkippedCorrections = [List[object]]::new()
@@ -439,7 +452,18 @@ function Resolve-NitpickCorrectionProposal {
 
             if ($RuleIsSuppressed) { continue }
 
-            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument, @{})) {
+            $Outcome = Invoke-NitpickRuleWithCoordinatorContext `
+                -Rule $SelectedRule `
+                -Target $RenderedDocument `
+                -Context $CanonicalContext `
+                -ContextTarget $Document
+
+            if ($Outcome.Status -eq 'Inapplicable') {
+                Write-Verbose "Rule '$($SelectedRule.Id)' was inapplicable during candidate analysis."
+                continue
+            }
+
+            foreach ($FinalFinding in $Outcome.Results) {
                 if ($FinalFinding -is [NitpickFinding] -and (
                     Test-NitpickRuleSuppressed `
                         -RuleId $FinalFinding.RuleId `
