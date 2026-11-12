@@ -55,6 +55,54 @@ The resulting output starts by identifying the lines that were considered. The f
 
 Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
+## Project syntax policy
+
+Pass an explicit PSD1 configuration path to apply one policy to all file and
+fragment targets in an invocation. `nitpick.psd1` is a convention, not a
+required filename:
+
+```powershell
+# nitpick.psd1
+@{
+    Compatibility = @{
+        PowerShell = @{
+            MinimumVersion = '5.1'
+        }
+    }
+}
+```
+
+```powershell
+Start-Nitpicking -Path .\src -ConfigurationPath .\nitpick.psd1
+```
+
+Relative configuration paths resolve against the caller's current PowerShell
+location. Paths are literal, configuration is loaded once per invocation, and
+missing, unreadable, malformed, or unsupported configuration terminates before
+target processing. Omit the parameter to supply no policy; Nitpick does not
+automatically discover configuration files.
+
+`MinimumVersion` is the oldest supported PowerShell **syntax** version, not a
+list of runtimes or a guarantee about commands, .NET APIs, editions, or platforms.
+The configuration accepts two-component strings from the supported catalog:
+`5.1`, `6.0`, `6.1`, `6.2`, and `7.0` through `7.6`. Unknown keys and versions
+are errors.
+
+The detection-only `Nitpick/AvoidUnsupportedTernarySyntax` rule reports
+ternary expressions when the declared minimum is below `7.0`. It offers no
+correction. With no policy or a minimum of `7.0` or later the rule is
+inapplicable, rather than a clean compatibility certification. Checking a
+minimum below `7.0` requires an analysis host running PowerShell 7 or later;
+on Windows PowerShell 5.1, an applicable check terminates with
+`NitpickUnsupportedAnalysisHost`. Whole-target suppression bypasses that check;
+line and regional suppression do not.
+
+Initial and candidate analysis receive the same project policy. Correction
+producers should use it to avoid introducing incompatible syntax, and candidate
+analysis reports violations from selected, applicable, unsuppressed rules. A
+compatibility finding alone does **not** reject a correction: independent
+enforcement of syntax policy when accepting corrections is deferred.
+
 ## Descriptor invocation context
 
 Rules invoked through a descriptor's `Invoke` method receive a fresh, recursively
@@ -74,10 +122,10 @@ Direct context may declare
 `Policy.Compatibility.PowerShell.MinimumVersion` as a supported major/minor
 string or two-component `System.Version`. Supported releases are `5.1`, `6.0`,
 `6.1`, `6.2`, and `7.0` through `7.6`; the value normalizes to `System.Version`.
-This does not yet enable compatibility checking. Configuration-file loading is
-private infrastructure; public configuration selection and correction-policy
-propagation remain later phases of the
-[implementation plan](Docs/ProjectPolicyAndRuleApplicability.md).
+`Start-Nitpicking` loads an explicit configuration and propagates its normalized
+policy to initial and candidate analysis. Direct
+`Resolve-NitpickCorrectionProposal` callers can pass the same policy with
+`-Context`; the resolver does not load configuration on their behalf.
 
 ### Applicability and execution outcomes
 
@@ -109,6 +157,13 @@ $Outcome.Status  # Inapplicable: no policy was supplied.
 $Outcome.Results.Count  # 0
 ```
 
+For a compatibility rule, its predicate can read
+`$Context.Policy.Compatibility.PowerShell.MinimumVersion` and compare the
+normalized version with the syntax feature's introduction version. Put source
+inspection in the producer, not the predicate. Producers that offer corrections
+can inspect the same policy through their optional `IDictionary Context`
+parameter; descriptor invocations isolate each predicate and producer context.
+
 Each dispatch evaluates the predicate once with an isolated context. Exactly one
 actual Boolean is required; false returns `Inapplicable` without running the
 producer or checking host prerequisites. If true or absent, the dispatcher checks
@@ -122,8 +177,9 @@ rules whose host prerequisites are unmet. Invalid predicate output, predicate
 errors, and unmet host prerequisites terminate with
 `NitpickInvalidApplicabilityResult`, `NitpickApplicabilityFailed`, and
 `NitpickUnsupportedAnalysisHost`, respectively. Calling a raw producer directly
-bypasses these descriptor gates. Coordinator outcome reporting and policy
-propagation through candidate corrections are not yet integrated.
+bypasses these descriptor gates. The coordinator reports inapplicable rules on
+the verbose stream without changing selected-rule totals or ordinary finding
+output.
 
 ## Whole-target rule suppression
 

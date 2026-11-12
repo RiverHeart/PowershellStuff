@@ -2,12 +2,12 @@
 
 ## Status
 
-Implementation plan with agreed scope and behavioral contracts. Phases 1 through 3
-(validated policy, isolated context, descriptor outcomes, and policy propagation
-through initial and candidate analysis) are implemented; Phase 4 remains planned.
-Concrete implementation choices below translate those agreements into APIs,
-change locations, and validation gates. Proposed internal names can change
-without reopening the behavioral contracts.
+Implementation plan with agreed scope and behavioral contracts. Phases 1 through 4
+implement validated policy, isolated context, descriptor outcomes, policy
+propagation through initial and candidate analysis, and a detection-only ternary
+syntax rule. Concrete implementation choices below translate those agreements
+into APIs, change locations, and validation gates. Proposed internal names can
+change without reopening the behavioral contracts.
 
 [ADR 0005](adr/0005-coordinate-applicability-with-isolated-context.md) records
 the accepted invocation/context ownership decision. This proposal retains its
@@ -73,7 +73,8 @@ process running Nitpick.
 ## Current Behavior
 
 - [Start-Nitpicking](../Public/Interface/Start-Nitpicking.ps1) invokes selected rules
-  with an empty context dictionary.
+  with isolated target context and the policy from an explicitly selected
+  configuration, if provided.
 - [NitpickRule.Invoke](../Nitpick.psm1) validates and recursively copies a
   plain-data context dictionary, preserving invocation defaults such as `Caller`,
   `File`, and `RuleBehavior`. It adds normalized `Policy`, submitted-target
@@ -84,14 +85,14 @@ process running Nitpick.
 - [Resolve-NitpickEffectiveRuleSet](../Private/Resolve-NitpickEffectiveRuleSet.ps1)
   owns invocation-level selection, exclusions, and editor-mode filtering.
 - [Resolve-NitpickCorrectionProposal](../Public/Interface/Resolve-NitpickCorrectionProposal.ps1)
-  also invokes rules with an empty context during candidate reanalysis.
+  forwards the original policy and target identity to candidate reanalysis.
 - Whole-target suppression prevents producer execution; line and regional
   suppression filter produced findings.
 
-The private configuration reader and descriptor applicability/host dispatch are
-implemented. Public configuration selection, coordinator outcome reporting, and
-correction-policy propagation are not yet wired. The existing terminology and
-correction ownership boundaries are documented in
+The ternary syntax rule requires a PowerShell 7 or later analysis host when a
+configured minimum below 7.0 makes it applicable. It is detection-only and does
+not enforce policy independently when accepting corrections. The existing
+terminology and correction ownership boundaries are documented in
 [CONTEXT.md](../CONTEXT.md).
 
 ## Proposed Ownership
@@ -402,8 +403,8 @@ that Nitpick itself can analyze every input while running on that target runtime
 
 ## Code Integration Map
 
-The following paths were traced before writing the phases. Links identify
-existing files; helper and test names introduced below are planned additions.
+The following paths were traced before writing the phases. The table records the
+baseline and planned changes, rather than describing current behavior.
 
 | Surface | Current behavior | Planned change |
 | --- | --- | --- |
@@ -624,8 +625,8 @@ without depending on localized framework exception text.
 
 Perform targeted implementation and tests phase by phase. Each phase depends on
 the preceding completed phase; publish directly related help alongside each
-runtime API rather than waiting until the end. New test files below are planned
-paths relative to the module, not files that already exist.
+runtime API rather than waiting until the end. Test paths below are relative to
+the module.
 
 ### Phase 1: Validated policy and isolated context
 
@@ -736,7 +737,7 @@ PowerShell 5.1 and PowerShell 7 with fixture rules, before the production
 compatibility rule is added. Parser/directive diagnostics remain visible when
 selected producers are inapplicable or whole-target suppressed.
 
-### Phase 4: Detection-only compatibility proof and user documentation
+### Phase 4: Detection-only compatibility proof and user documentation (Complete)
 
 Changes:
 
@@ -775,8 +776,7 @@ targeted regression requires them; no AstEditor/WPF runtime change is planned.
 
 ### Validation commands for implementation
 
-These commands are a future execution recipe, not tests run for this
-documentation-only planning task. Paths are relative to the Nitpick suite
+These commands are an execution recipe. Paths are relative to the Nitpick suite
 configuration, as required by the repository runner. After reading the test
 runner skill, combine related paths in one call per host; do not run the full
 suite first. Example for phase 1:
