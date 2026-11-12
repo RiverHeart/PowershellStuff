@@ -128,7 +128,9 @@ Describe 'Nitpick plain-data context' {
 
     It 'materializes clean scalar instances without attached ETS members' {
         InModuleScope Nitpick {
-            foreach ($Value in @('scalar', [version] '5.1', [int] 12345, [double] 1.23, $true)) {
+            # WARNING: ETS members attach to the boxed instance. A literal $true is PowerShell's shared
+            # boxed singleton, so decorating it would change every later $true in the process.
+            foreach ($Value in @('scalar', [version] '5.1', [int] 12345, [double] 1.23, [bool]::Parse('True'))) {
                 $Wrapped = [psobject]::AsPSObject($Value)
                 Add-Member -InputObject $Wrapped -NotePropertyName Extra -NotePropertyValue 'ETS'
                 Add-Member -InputObject $Wrapped -MemberType ScriptMethod -Name GetType -Value { [datetime] } -Force
