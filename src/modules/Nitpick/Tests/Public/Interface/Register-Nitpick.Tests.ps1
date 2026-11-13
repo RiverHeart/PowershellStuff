@@ -29,6 +29,36 @@ Describe 'Register-Nitpick' {
         }
     }
 
+    It 'preserves settings schemas through descriptor reconstruction and explicit clearing' {
+        $Original = New-Nitpick `
+            -Name SettingsRule `
+            -Source Tests `
+            -Settings @{
+                MaximumLength = @{ Type = 'Integer'; Default = 120; Minimum = 1 }
+            } `
+            -Callable { param($ScriptBlockAst) }
+
+        $Registered = $Original | Register-Nitpick -Category Quality -PassThru
+
+        $Registered.Settings.MaximumLength.Default | Should -Be 120
+        $Registered.Category | Should -BeExactly 'Quality'
+
+        $Cleared = $Registered | Register-Nitpick -Settings $null -PassThru
+        $Cleared.Settings.Count | Should -Be 0
+    }
+
+    It 'accepts a settings schema declared directly during registration' {
+        $Registered = Register-Nitpick `
+            -Name DirectSettings `
+            -Source Tests `
+            -Callable { param($ScriptBlockAst) } `
+            -Settings @{ Threshold = @{ Type = 'Integer'; Default = 7; Maximum = 10 } } `
+            -PassThru
+
+        $Registered.Settings.Threshold.Default | Should -Be 7
+        $Registered.Settings.Threshold.Maximum | Should -Be 10
+    }
+
     It 'preserves execution declarations through unrelated descriptor overrides' {
         $Predicate = { $false }
         $Original = New-Nitpick -Name Declared -Source Tests -Callable {

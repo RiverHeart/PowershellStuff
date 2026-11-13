@@ -69,6 +69,12 @@ using module AstEditor
     normalizes it against the submitted document before correction selection; it
     does not load project configuration.
 
+.PARAMETER RuleSettings
+    Optional map of per-rule settings keyed by qualified rule ID. This is the
+    unambiguous direct-call entry point when candidate analysis uses multiple rules.
+    Every ID must match a supplied Rule, so a misspelled ID fails instead of being
+    ignored.
+
 .PARAMETER Path
     Optional source path used to retain file identity during final rule analysis.
 
@@ -157,6 +163,9 @@ function Resolve-NitpickCorrectionProposal {
         [IDictionary] $Context,
 
         [AllowNull()]
+        [IDictionary] $RuleSettings,
+
+        [AllowNull()]
         [string] $Path,
 
         [scriptblock] $CorrectionSelector
@@ -182,6 +191,34 @@ function Resolve-NitpickCorrectionProposal {
     $CanonicalContext = New-NitpickInvocationContext `
         -Target $Document `
         -Context $Context
+
+    $HasRuleSettings = $PSBoundParameters.ContainsKey('RuleSettings')
+
+    if ($HasRuleSettings -and $CanonicalContext.ContainsKey('RuleSettings')) {
+        throw [ArgumentException]::new(
+            'Supply settings through either Context.RuleSettings for one rule or -RuleSettings keyed by rule ID, not both.'
+        )
+    }
+
+    if ($HasRuleSettings) {
+        $RuleSettings = ConvertTo-NitpickRuleSettingsMap `
+            -RuleSettings $RuleSettings `
+            -Rule $Rule `
+            -Source 'RuleSettings' `
+            -ErrorAction Stop
+    } elseif ($CanonicalContext.ContainsKey('RuleSettings')) {
+        if ($Rule.Count -ne 1) {
+            throw [ArgumentException]::new(
+                'Context.RuleSettings can be used only when exactly one rule is supplied; use -RuleSettings keyed by rule ID for multiple rules.'
+            )
+        }
+
+        $null = ConvertTo-NitpickEffectiveRuleSettings `
+            -Schema $Rule[0].Settings `
+            -Values $CanonicalContext.RuleSettings `
+            -RuleId $Rule[0].Id `
+            -ErrorAction Stop
+    }
 
     $AcceptedCorrections = [List[NitpickCorrection]]::new()
     $SkippedCorrections = [List[object]]::new()
@@ -452,10 +489,18 @@ function Resolve-NitpickCorrectionProposal {
 
             if ($RuleIsSuppressed) { continue }
 
+            $RuleContext = Copy-NitpickContextValue -Value $CanonicalContext
+            if ($HasRuleSettings) {
+                $RuleContext.Remove('RuleSettings')
+                if ($RuleSettings.ContainsKey($SelectedRule.Id)) {
+                    $RuleContext.RuleSettings = $RuleSettings[$SelectedRule.Id]
+                }
+            }
+
             $Outcome = Invoke-NitpickRuleWithCoordinatorContext `
                 -Rule $SelectedRule `
                 -Target $RenderedDocument `
-                -Context $CanonicalContext `
+                -Context $RuleContext `
                 -ContextTarget $Document
 
             if ($Outcome.Status -eq 'Inapplicable') {

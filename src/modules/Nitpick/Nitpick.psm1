@@ -355,6 +355,7 @@ class NitpickRule {
     [string[]] $ExcludePath
     [scriptblock] $Applicability
     [version] $MinimumAnalysisHostVersion
+    [hashtable] $Settings
 
     NitpickRule([object] $TargetCallable, [hashtable] $Overrides) {
         if ($TargetCallable -is [string]) {
@@ -404,6 +405,7 @@ class NitpickRule {
         $ExecutionMetadata = @{
             Applicability = $null
             MinimumAnalysisHostVersion = $null
+            Settings = $null
         }
 
         if ($HasDetails) {
@@ -460,6 +462,10 @@ class NitpickRule {
         }
         $this.Applicability = $ExecutionMetadata.Applicability
         $this.MinimumAnalysisHostVersion = $HostMinimum
+        $this.Settings = ConvertTo-NitpickRuleSettingsSchema `
+            -Settings $ExecutionMetadata.Settings `
+            -RuleId $this.Id `
+            -ErrorAction Stop
     }
 
     <#
@@ -690,6 +696,16 @@ class NitpickRule {
         $Context = New-NitpickInvocationContext `
             -Target $ContextTarget `
             -Context $InvocationParameters.Context
+        $SettingsInput = if ($Context.ContainsKey('RuleSettings')) {
+            $Context.RuleSettings
+        } else {
+            @{}
+        }
+        $Context.RuleSettings = ConvertTo-NitpickEffectiveRuleSettings `
+            -Schema $this.Settings `
+            -Values $SettingsInput `
+            -RuleId $this.Id `
+            -ErrorAction Stop
 
         if ($null -ne $this.Applicability) {
             $IsApplicable = Test-NitpickRuleApplicability `

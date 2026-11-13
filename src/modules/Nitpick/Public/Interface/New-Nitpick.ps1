@@ -21,6 +21,10 @@ using namespace System.Management.Automation
     target. Checked after applicability, not during discovery. Explicit null clears
     a declaration from Details. This is separate from project syntax policy.
 
+.PARAMETER Settings
+    Optional integer settings schema. Each setting declares Type, Default, and
+    optional Minimum and Maximum values. Explicit null clears a declaration from Details.
+
 .EXAMPLE
     Create rule from a scriptblock
 
@@ -80,6 +84,10 @@ function New-Nitpick {
         [AllowNull()]
         [object] $MinimumAnalysisHostVersion,
 
+        [Parameter(HelpMessage='Optional integer settings schema. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $Settings,
+
         [Parameter(HelpMessage='The name of the nitpick. Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
@@ -96,7 +104,7 @@ function New-Nitpick {
     begin {
         $Properties = @(
             'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source',
-            'Applicability', 'MinimumAnalysisHostVersion'
+            'Applicability', 'MinimumAnalysisHostVersion', 'Settings'
         )
     }
 

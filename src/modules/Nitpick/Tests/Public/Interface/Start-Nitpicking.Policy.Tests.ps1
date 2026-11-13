@@ -155,6 +155,73 @@ Describe 'Start-Nitpicking project policy' {
         } | Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
     }
 
+    It 'validates configured rule settings before reading any target' {
+        $ConfigurationPath = Join-Path $TestDrive 'invalid-rule-settings.psd1'
+        Set-Content -LiteralPath $ConfigurationPath -Value @'
+@{
+    Rules = @{
+        'Nitpick/AvoidLongLines' = @{ MaximumLenght = 100 }
+    }
+}
+'@
+        $MissingTarget = Join-Path $TestDrive 'not-read.ps1'
+
+        $ErrorRecord = {
+            Start-Nitpicking `
+                -Path $MissingTarget `
+                -ConfigurationPath $ConfigurationPath `
+                -IncludeRule Nitpick/AvoidLongLines
+        } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*' -PassThru
+
+        $ErrorRecord.Exception.Message | Should -BeLike (
+            "Invalid settings for Nitpick rule 'Nitpick/AvoidLongLines' in configuration '*invalid-rule-settings.psd1': " +
+            "unknown setting 'MaximumLenght' (known settings: MaximumLength)."
+        )
+    }
+
+    It 'passes configured settings for non-applicable rules through fix mode' {
+        $ConfigurationPath = Join-Path $TestDrive 'excluded-rule-settings.psd1'
+        Set-Content -LiteralPath $ConfigurationPath -Value @'
+@{
+    Rules = @{
+        'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 }
+    }
+}
+'@
+
+        {
+            Start-Nitpicking `
+                -Script '$Value = 1' `
+                -ConfigurationPath $ConfigurationPath `
+                -ExcludeRule Nitpick/AvoidLongLines `
+                -FixMode Preview `
+                -Output Object `
+                -NoSummary `
+                -ErrorAction Stop
+        } | Should -Not -Throw
+    }
+
+    It 'rejects settings for a rule unavailable to this invocation before reading targets' {
+        $ConfigurationPath = Join-Path $TestDrive 'unknown-rule-settings.psd1'
+        Set-Content -LiteralPath $ConfigurationPath -Value @'
+@{
+    Rules = @{
+        'MissingPackage/Rule' = @{ MaximumLength = 100 }
+    }
+}
+'@
+        $MissingTarget = Join-Path $TestDrive 'not-read.ps1'
+
+        $ErrorRecord = {
+            Start-Nitpicking `
+                -Path $MissingTarget `
+                -ConfigurationPath $ConfigurationPath `
+                -IncludeRule Nitpick/AvoidLongLines
+        } | Should -Throw "*unknown Nitpick rule ID 'MissingPackage/Rule'*" -PassThru
+
+        $ErrorRecord.Exception.Message | Should -BeLike "Invalid rule settings in configuration '*unknown-rule-settings.psd1':*"
+    }
+
     It 'does not save when candidate reanalysis exposes an unsupported rule' {
         $Path = Join-Path $TestDrive 'suppression-removal.ps1'
         $Source = "# nitpick disable-target Local/HostRule`n`$Value = 1"

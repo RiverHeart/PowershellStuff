@@ -102,7 +102,7 @@ Describe 'Start-Nitpicking' {
     It 'terminates when wildcard rule selection leaves no eligible rules' {
         {
             Start-Nitpicking -Script {} -IncludeRule 'Missing*' -ErrorAction Continue
-        } | Should -Throw 'No Nitpick rules were discovered or registered.*'
+        } | Should -Throw "No Nitpick rules match the IncludeRule selector(s): Missing*.*"
     }
 
     It 'allows an unmatched rule wildcard alongside a matching rule wildcard' {

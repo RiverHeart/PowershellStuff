@@ -12,6 +12,28 @@ using namespace System.Management.Automation
     copied independently; cycles and unsupported values terminate with
     NitpickInvalidContext and the offending key/index path.
 
+    Nitpick passes context and rule settings to rule code that it does not own.
+    Each predicate, producer, rule, and target receives its own copy, so one rule
+    changing a value cannot affect another rule, a later target, candidate
+    reanalysis, or the caller's original data.
+
+    Values are rebuilt rather than cloned. A clone would keep members added with
+    Add-Member, and those can leak across the whole process. For example, the
+    boxed $true is shared process-wide, so a member attached to it would appear on
+    every $true. Rebuilding strings, Booleans, and numbers drops those members.
+
+    Only plain data is accepted, which keeps context serializable and prevents
+    rules from receiving live objects such as script blocks or file handles.
+    Copied dictionaries are case-insensitive hashtables, so rule IDs and setting
+    names can be looked up without matching their casing.
+
+.PARAMETER Value
+    The value to copy.
+
+.PARAMETER Path
+    Names the root of Value in error messages. For example, 'Configuration'
+    reports an invalid nested value as 'Configuration.Rules[0]'.
+
 .EXAMPLE
     $Original = @{ Extra = @{ Values = @(1, 2) } }
     $Copy = Copy-NitpickContextValue -Value $Original

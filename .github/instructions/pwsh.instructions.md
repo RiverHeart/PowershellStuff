@@ -6,6 +6,9 @@ applyTo: "**/*.{ps1,psm1,psd1}"
 
 # Function Help Comments
 - Write comment-based help **above** the function definition, not inside it.
+- Document every parameter with `.PARAMETER`.
+- Include at least one `.EXAMPLE` that can be run on its own and states the expected result or error. For private helpers, note in `.NOTES` that examples run in the module's scope.
+- Explain **why** the function exists when it isn't obvious from its name, such as the problem it prevents or the design decision it enforces. Put this in `.DESCRIPTION` or `.NOTES`, not only in external docs.
 
 ```powershell
 # Correct

@@ -24,6 +24,9 @@ using namespace System.Management.Automation.Language
     The canonical target context, including project policy, to forward to proposal
     resolution. This coordinator does not load or alter project configuration.
 
+.PARAMETER RuleSettings
+    Optional settings keyed by qualified rule ID for candidate reanalysis.
+
 .PARAMETER Ast
     Original AST retaining source path context.
 
@@ -59,6 +62,9 @@ function Resolve-NitpickTargetCorrection {
         [AllowNull()]
         [IDictionary] $Context,
 
+        [AllowNull()]
+        [IDictionary] $RuleSettings,
+
         [Parameter(Mandatory)]
         [ValidateSet('Preview', 'Guided', 'Apply')]
         [string] $FixMode
@@ -70,6 +76,9 @@ function Resolve-NitpickTargetCorrection {
         Finding = $Finding
         Rule = $Rule
         Context = $Context
+    }
+    if ($PSBoundParameters.ContainsKey('RuleSettings')) {
+        $ResolveParameters.RuleSettings = $RuleSettings
     }
 
     if ($FixMode -eq 'Guided') {

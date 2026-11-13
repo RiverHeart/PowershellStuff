@@ -44,7 +44,8 @@ Describe 'Read-NitpickConfiguration' {
     }
 
     It 'normalizes empty policy <Text>' -TestCases @(
-        '@{}', '@{ Compatibility = @{} }', '@{ Compatibility = @{ PowerShell = @{} } }' |
+        '@{}', '@{ Compatibility = @{} }', '@{ Compatibility = @{ PowerShell = @{} } }',
+        '@{ Rules = @{} }' |
             ForEach-Object { @{ Text = $_ } }
     ) {
         param($Text)
@@ -58,6 +59,25 @@ Describe 'Read-NitpickConfiguration' {
         }
     }
 
+    It 'accepts rule settings separately from compatibility policy' {
+        InModuleScope Nitpick {
+            $Path = Join-Path $TestDrive 'settings.psd1'
+            Set-Content -LiteralPath $Path -Value @'
+@{
+    Compatibility = @{ PowerShell = @{ MinimumVersion = '5.1' } }
+    Rules = @{
+        'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 }
+    }
+}
+'@
+
+            $Configuration = Read-NitpickConfiguration -LiteralPath $Path
+
+            $Configuration.Compatibility.PowerShell.MinimumVersion | Should -Be ([version] '5.1')
+            $Configuration.Rules['Nitpick/AvoidLongLines'].MaximumLength | Should -Be 100
+        }
+    }
+
     It 'rejects malformed or unknown schema <Text>' -TestCases @(
         '@{ Compatibility = $null }',
         '@{ Compatibility = 1 }',
@@ -65,7 +85,6 @@ Describe 'Read-NitpickConfiguration' {
         '@{ Compatibility = @{ PowerShell = $null } }',
         '@{ Compatibility = @{ PowerShell = "5.1" } }',
         '@{ Compatibility = @{ PowerShell = @() } }',
-        '@{ Rules = @{} }',
         '@{ Keys = @() }',
         '@{ Compatibility = @{ Keys = @() } }',
         '@{ Compatibility = @{ PowerShell = @{ Keys = @() } } }',
@@ -73,6 +92,9 @@ Describe 'Read-NitpickConfiguration' {
         '@{ Compatibility = @{ Typo = @{} } }',
         '@{ Compatibility = @{ PowerShell = @{ MinVersion = "5.1" } } }',
         '@{ Compatibility = @{ PowerShell = @{}; Typo = 1 } }',
+        '@{ Rules = $null }',
+        '@{ Rules = @{ UnknownRule = @{} } }',
+        '@{ Rules = @{ "Nitpick/AvoidLongLines" = 1 } }',
         '@{ 1 = @{} }',
         'throw "must not execute"',
         '@{ Compatibility =' |

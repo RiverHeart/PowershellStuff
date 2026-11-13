@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Collections.Generic
 using namespace System.Management.Automation
 
@@ -7,7 +8,8 @@ using namespace System.Management.Automation
 
 .DESCRIPTION
     Combines package discovery (via Find-Nitpick) with explicitly registered rules
-    (via Get-Nitpick) into one Id-keyed effective rule set. Literal IncludeRule
+    (via Get-Nitpick) into one Id-keyed effective rule set. Configured settings are
+    validated against known descriptors before selection. Literal IncludeRule
     selectors must match a known rule Id before exclusions and editor-mode filtering.
     A registered rule's metadata wins over a same-Id discovered candidate, provided
     both share the same underlying callable; a same-Id, different-callable candidate
@@ -30,6 +32,14 @@ using namespace System.Management.Automation
 .PARAMETER EditorMode
     Keeps only rules whose EditorEnabled metadata is true.
 
+.PARAMETER RuleSettings
+    Project settings keyed by qualified rule ID. Configured settings are validated
+    against known descriptors before selection, including descriptors later excluded.
+
+.PARAMETER RuleSettingsSource
+    Describes where RuleSettings came from in error messages, such as
+    "configuration '.\nitpick.psd1'".
+
 .EXAMPLE
     Resolve-NitpickEffectiveRuleSet -IncludeRule 'Nitpick/UseIsNotOperator'
 #>
@@ -41,18 +51,39 @@ function Resolve-NitpickEffectiveRuleSet {
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
         [switch] $ExcludeDefaults,
-        [switch] $EditorMode
+        [switch] $EditorMode,
+        [AllowNull()]
+        [IDictionary] $RuleSettings,
+        [string] $RuleSettingsSource = 'RuleSettings'
     )
 
     $DiscoveredRules = [List[object]]::new()
 
-    Find-Nitpick -Module $Module -IncludeRule $IncludeRule -IncludeDefaults:(-not $ExcludeDefaults) -ErrorAction Stop |
+    Find-Nitpick -Module $Module -IncludeDefaults:(-not $ExcludeDefaults) -ErrorAction Stop |
         ForEach-Object { $DiscoveredRules.Add($_) }
 
     $RegisteredRules = Get-Nitpick
     $KnownRuleIds = [List[string]]::new()
     $DiscoveredRules | ForEach-Object { $KnownRuleIds.Add($_.Id) }
     $RegisteredRules | ForEach-Object { $KnownRuleIds.Add($_.Id) }
+    $HasKnownRuleMatch = @(
+        @($RegisteredRules) + @($DiscoveredRules) |
+            Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Wildcard
+    ).Count -gt 0
+
+    if ($null -ne $RuleSettings) {
+        # A registered descriptor is the schema authority; discovered descriptors
+        # only supply schemas for IDs that are not registered.
+        $RegisteredIds = @($RegisteredRules | ForEach-Object { $_.Id })
+        $SettingsDescriptors = @($RegisteredRules) + @(
+            $DiscoveredRules | Where-Object { $_.Id -notin $RegisteredIds }
+        )
+        $null = ConvertTo-NitpickRuleSettingsMap `
+            -RuleSettings $RuleSettings `
+            -Rule $SettingsDescriptors `
+            -Source $RuleSettingsSource `
+            -ErrorAction Stop
+    }
 
     $UnmatchedSelectors = foreach ($Selector in $IncludeRule) {
         if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
@@ -94,6 +125,12 @@ function Resolve-NitpickEffectiveRuleSet {
     if (-not $Rules) {
         if ($KnownRuleIds.Count -eq 0) {
             throw 'No Nitpick rules were discovered or registered. Import a rule module or register a rule before running Start-Nitpicking.'
+        }
+        if (-not $HasKnownRuleMatch) {
+            throw ((
+                'No Nitpick rules match the IncludeRule selector(s): {0}. ' +
+                'Use Find-Nitpick for discovery and Get-Nitpick for registered rules.'
+            ) -f ($IncludeRule -join ', '))
         }
         throw 'No eligible Nitpick rules remain after applying rule exclusions and editor-mode filtering.'
     }

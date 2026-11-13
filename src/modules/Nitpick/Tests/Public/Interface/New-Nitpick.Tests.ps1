@@ -23,6 +23,121 @@ AfterAll {
 }
 
 Describe 'New-Nitpick' {
+    It 'applies declared defaults and validates direct settings before execution' {
+        $Rule = New-Nitpick `
+            -Name SettingsProbe `
+            -Source Tests `
+            -Settings @{
+                MaximumLength = @{ Type = 'Integer'; Default = 120; Minimum = 1 }
+            } `
+            -Callable {
+                param($ScriptBlockAst, [System.Collections.IDictionary] $Context)
+                $Context.RuleSettings.MaximumLength
+            }
+
+        $Rule.InvokeWithResult({}.Ast, @{}).Results | Should -Be 120
+        $Rule.InvokeWithResult({}.Ast, @{
+            RuleSettings = @{ maximumlength = [int16] 80 }
+        }).Results | Should -Be 80
+
+        {
+            $Rule.InvokeWithResult({}.Ast, @{
+                RuleSettings = @{ MaximumLength = $true }
+            })
+        } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*'
+
+        {
+            $Rule.InvokeWithResult({}.Ast, @{
+                RuleSettings = @{ MaximumLength = $null }
+            })
+        } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*'
+
+        {
+            $Rule.InvokeWithResult({}.Ast, @{
+                RuleSettings = $null
+            })
+        } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*'
+
+        {
+            $Rule.InvokeWithResult({}.Ast, @{
+                RuleSettings = @{ MaximumLength = 0 }
+            })
+        } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*'
+    }
+
+    It 'preserves settings metadata from Details and clears it explicitly' {
+        $Producer = {
+            [CmdletBinding(DefaultParameterSetName='Rule')]
+            param(
+                [Parameter(Mandatory,ParameterSetName='Rule')]
+                $ScriptBlockAst,
+
+                [Parameter(Mandatory,ParameterSetName='Details')]
+                [switch] $Details
+            )
+
+            if ($Details) {
+                return @{
+                    Settings = @{
+                        MaximumLength = @{ Type = 'Integer'; Default = 90; Minimum = 1 }
+                    }
+                }
+            }
+        }
+
+        $Rule = New-Nitpick -Callable $Producer -Name SettingsDetails -Source Tests
+        $Rule.Settings.MaximumLength.Default | Should -Be 90
+        $Cleared = New-Nitpick -Callable $Producer -Name SettingsDetails -Source Tests -Settings $null
+        $Cleared.Settings.Count | Should -Be 0
+    }
+
+    It 'rejects invalid integer schemas and unknown schema keys' -ForEach @(
+        @{ Settings = @{ Value = @{ Type = 'String'; Default = 1 } } }
+        @{ Settings = @{ Value = @{ Type = 'Integer' } } }
+        @{ Settings = @{ Value = @{ Type = 'Integer'; Default = $null } } }
+        @{ Settings = @{ Value = @{ Type = 'Integer'; Default = 0; Minimum = 1 } } }
+        @{ Settings = @{ Value = @{ Type = 'Integer'; Default = 1; Minimum = 3; Maximum = 2 } } }
+        @{ Settings = @{ Value = @{ Type = 'Integer'; Default = 1; Unsupported = 1 } } }
+    ) {
+        {
+            New-Nitpick `
+                -Callable { param($ScriptBlockAst) } `
+                -Name InvalidSettings `
+                -Source Tests `
+                -Settings $Settings
+        } | Should -Throw '*setting*'
+    }
+
+    It 'isolates effective settings between applicability and producer contexts' {
+        $Applicability = {
+            param([System.Collections.IDictionary] $Context)
+            $Context.RuleSettings.MaximumLength = 3
+            $true
+        }
+
+        $Rule = New-Nitpick `
+            -Name SettingsIsolation `
+            -Source Tests `
+            -Settings @{
+                MaximumLength = @{ Type = 'Integer'; Default = 42; Minimum = 1 }
+            } `
+            -Applicability $Applicability `
+            -Callable {
+                param($ScriptBlockAst, [System.Collections.IDictionary] $Context)
+                $Context.RuleSettings.MaximumLength
+            }
+
+        $CallerSettings = @{ MaximumLength = 42 }
+
+        $Outcome = $Rule.InvokeWithResult({}.Ast, @{
+            RuleSettings = $CallerSettings
+        })
+
+        $Outcome.Status | Should -BeExactly 'Executed'
+        $Outcome.Results | Should -Be 42
+        $CallerSettings.MaximumLength | Should -Be 42
+    }
+
     It 'retains optional execution declarations without evaluating them at construction' {
         $Predicate = { throw 'must not run during construction' }
         $Rule = New-Nitpick -Name Declared -Source Tests -Callable {

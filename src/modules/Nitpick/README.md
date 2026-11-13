@@ -103,6 +103,82 @@ analysis reports violations from selected, applicable, unsuppressed rules. A
 compatibility finding alone does **not** reject a correction: independent
 enforcement of syntax policy when accepting corrections is deferred.
 
+## Rule settings and line length
+
+Rule-specific settings live beside, but separately from, project compatibility
+policy in the same explicitly selected PSD1 file:
+
+```powershell
+@{
+    Compatibility = @{
+        PowerShell = @{ MinimumVersion = '5.1' }
+    }
+    Rules = @{
+        'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 }
+    }
+}
+```
+
+`Start-Nitpicking -ConfigurationPath .\nitpick.psd1` validates configured rule
+IDs and values before reading targets, including settings for known rules that
+are excluded from the run. Unknown rules, misspelled setting names, malformed
+schemas, and invalid or out-of-range values are errors. No second configuration
+file or automatic discovery is used.
+
+Rule authors declare integer settings through command `-Details` metadata or
+`New-Nitpick`/`Register-Nitpick -Settings`. A declaration requires `Type` and
+`Default`, and may specify `Minimum` and `Maximum`:
+
+```powershell
+Settings = @{
+    MaximumLength = @{
+        Type = 'Integer'
+        Default = 120
+        Minimum = 1
+    }
+}
+```
+
+Values may be any integral CLR type that fits in `Int32`; Boolean, null, strings,
+decimals, floating-point values, and out-of-range values are rejected. Each
+predicate and producer receives only that descriptor's validated effective
+settings in `Context.RuleSettings`, including defaults. The predicate and
+producer receive independent context copies.
+
+Direct descriptor callers can override settings without a PSD1:
+
+```powershell
+$Rule.Invoke($Document, @{
+    RuleSettings = @{ MaximumLength = 100 }
+})
+```
+
+The raw `Measure-AvoidLongLines` producer also accepts those settings through
+`-Context`; it validates them against its own schema. Without coordinated
+`RuleBehavior.OutputType`, it retains the existing standalone
+`DiagnosticRecord` output convention.
+
+Direct `Resolve-NitpickCorrectionProposal` callers with multiple rules instead
+pass `-RuleSettings` keyed by qualified rule ID. This keeps one rule's values
+from being exposed to another descriptor.
+
+`Nitpick/AvoidLongLines` is selected by default, even when no configuration file
+is supplied. It emits one Warning and no correction for each physical line
+longer than its `MaximumLength` (default 120). Measurement uses the complete
+physical snapshot line, including trailing whitespace, and counts UTF-16 code
+units: tabs count as one, and CRLF, LF, and CR terminators do not count. Comments,
+multiline strings, and here-strings are checked as written. A final unterminated
+line is checked; empty lines cannot exceed the positive minimum.
+
+When a submitted fragment intersects a long physical line, Nitpick measures the
+complete snapshot line but anchors the finding within the fragment's overlap.
+Thus source outside a fragment can contribute to the warning without producing
+an out-of-fragment location. The line rule and trailing-whitespace rule analyze
+the same original snapshot independently. For example, 118 content units plus
+three trailing spaces trigger both rules at a 120-unit limit; if whitespace
+trimming is selected and succeeds, candidate analysis no longer reports the
+line-length warning, while original finding counts retain both detections.
+
 ## Descriptor invocation context
 
 Rules invoked through a descriptor's `Invoke` method receive a fresh, recursively
@@ -115,8 +191,10 @@ objects, cycles, and invalid reserved metadata terminate with
 
 Legacy `Caller`, `File`, and `RuleBehavior` values are preserved. Added metadata
 includes `Policy` (empty by default), `TargetKind`, nullable `TargetPath`, and
-`AnalysisHost.PowerShellVersion`. Only a file-backed `AstDocument` establishes
-file identity; a ScriptBlockAst's file provenance does not.
+`AnalysisHost.PowerShellVersion`. A descriptor also receives only its own
+validated `RuleSettings`, with declared defaults applied. Only a file-backed
+`AstDocument` establishes file identity; a ScriptBlockAst's file provenance does
+not.
 
 Direct context may declare
 `Policy.Compatibility.PowerShell.MinimumVersion` as a supported major/minor

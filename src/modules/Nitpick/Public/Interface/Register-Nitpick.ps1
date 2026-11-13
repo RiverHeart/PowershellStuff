@@ -23,6 +23,10 @@
     Optional positive major/minor System.Version host prerequisite. Enforced only
     after applicability. Explicit null clears it; omission preserves metadata.
 
+.PARAMETER Settings
+    Optional integer settings schema. Each setting declares Type, Default, and
+    optional Minimum and Maximum values. Explicit null clears it; omission preserves metadata.
+
 .EXAMPLE
     Register all discoverable Nitpick rules.
 
@@ -93,6 +97,10 @@ function Register-Nitpick {
         [AllowNull()]
         [object] $MinimumAnalysisHostVersion,
 
+        [Parameter(HelpMessage='Optional integer settings schema. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $Settings,
+
         [Parameter(HelpMessage='Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
@@ -119,7 +127,7 @@ function Register-Nitpick {
     begin {
         $Properties = @(
             'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source',
-            'Applicability', 'MinimumAnalysisHostVersion'
+            'Applicability', 'MinimumAnalysisHostVersion', 'Settings'
         )
     }
 
