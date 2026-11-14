@@ -15,6 +15,11 @@ applyTo: "**/*.{ps1,psm1,psd1}"
 <#
 .SYNOPSIS
     Does a thing.
+
+.EXAMPLE
+    <Explain how to do a thing>
+
+    <Example Code>
 #>
 function Invoke-Thing { ... }
 
@@ -23,6 +28,10 @@ function Invoke-Thing {
     <#
     .SYNOPSIS
         Does a thing.
+    .EXAMPLE
+        <Example Code>
+
+        <Code Explanation>
     #>
 }
 ```
