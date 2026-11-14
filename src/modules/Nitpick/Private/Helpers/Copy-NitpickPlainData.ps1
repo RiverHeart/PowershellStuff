@@ -5,12 +5,13 @@ using namespace System.Management.Automation
 
 <#
 .SYNOPSIS
-    Copies plain context data without retaining mutable references or ETS members.
+    Copies plain data without retaining mutable references or ETS members.
+
 .DESCRIPTION
     Accepts string-keyed dictionaries, one-dimensional arrays, null, strings,
     Booleans, CLR numeric values, and System.Version. Repeated references are
     copied independently; cycles and unsupported values terminate with
-    NitpickInvalidContext and the offending key/index path.
+    NitpickInvalidPlainData and the offending key/index path.
 
     Nitpick passes context and rule settings to rule code that it does not own.
     Each predicate, producer, rule, and target receives its own copy, so one rule
@@ -31,12 +32,12 @@ using namespace System.Management.Automation
     The value to copy.
 
 .PARAMETER Path
-    Names the root of Value in error messages. For example, 'Configuration'
+    Names the root of Value in error messages; defaults to 'Value'. For example, 'Configuration'
     reports an invalid nested value as 'Configuration.Rules[0]'.
 
 .EXAMPLE
     $Original = @{ Extra = @{ Values = @(1, 2) } }
-    $Copy = Copy-NitpickContextValue -Value $Original
+    $Copy = Copy-NitpickPlainData -Value $Original
     $Copy.Extra.Values[0] = 9
     $Original.Extra.Values[0]
 
@@ -44,7 +45,7 @@ using namespace System.Management.Automation
 
 .EXAMPLE
     $Shared = @{ Enabled = $true }
-    $Copy = Copy-NitpickContextValue -Value @{ Left = $Shared; Right = $Shared }
+    $Copy = Copy-NitpickPlainData -Value @{ Left = $Shared; Right = $Shared }
     $Copy.Left.Enabled = $false
     $Copy.Right.Enabled
 
@@ -54,14 +55,14 @@ using namespace System.Management.Automation
 .NOTES
     Private helper; examples run within Nitpick's module scope.
 #>
-function Copy-NitpickContextValue {
+function Copy-NitpickPlainData {
     [CmdletBinding()]
     [OutputType([object[]])]
     param(
         [AllowNull()]
         [object] $Value,
 
-        [string] $Path = 'Context'
+        [string] $Path = 'Value'
     )
 
     $Active = [List[object]]::new()
@@ -87,7 +88,7 @@ function Copy-NitpickContextValue {
         if ($Base -is [IDictionary] -or $Base -is [array]) {
             foreach ($Ancestor in $Active) {
                 if ([object]::ReferenceEquals($Base, $Ancestor)) {
-                    throw [ArgumentException]::new("Cyclic context value at '$ItemPath'.")
+                    throw [ArgumentException]::new("Cyclic value at '$ItemPath'.")
                 }
             }
 
@@ -158,7 +159,7 @@ function Copy-NitpickContextValue {
         }
 
         throw [ArgumentException]::new(
-            "Unsupported context type '$($Type.FullName)' at '$ItemPath'."
+            "Unsupported plain data type '$($Type.FullName)' at '$ItemPath'."
         )
     }
 
@@ -168,7 +169,7 @@ function Copy-NitpickContextValue {
     } catch {
         $PSCmdlet.ThrowTerminatingError([ErrorRecord]::new(
             $_.Exception,
-            'NitpickInvalidContext',
+            'NitpickInvalidPlainData',
             [ErrorCategory]::InvalidData,
             $Path
         ))

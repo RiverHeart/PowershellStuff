@@ -19,11 +19,11 @@ Describe 'Nitpick plain-data context' {
                 [version] '5.1', [version] '7.4.1.2'
             )
             foreach ($Value in $Values) {
-                $Copy = Copy-NitpickContextValue -Value $Value
+                $Copy = Copy-NitpickPlainData -Value $Value
                 $Copy.GetType() | Should -Be $Value.GetType()
                 $Copy | Should -BeExactly $Value
             }
-            $Copy = Copy-NitpickContextValue -Value $null
+            $Copy = Copy-NitpickPlainData -Value $null
             $Copy | Should -BeNullOrEmpty
         }
     }
@@ -31,7 +31,7 @@ Describe 'Nitpick plain-data context' {
     It 'preserves empty, singleton, nested, typed arrays and null elements' {
         InModuleScope Nitpick {
             $Value = @($null, @(), @(,$null), @(,@(1, 2)), [int[]] @(3, 4))
-            $Copy = Copy-NitpickContextValue -Value $Value
+            $Copy = Copy-NitpickPlainData -Value $Value
             $Copy.GetType() | Should -Be ([object[]])
             $Copy.Count | Should -Be 5
             $Copy[0] | Should -BeNullOrEmpty
@@ -49,7 +49,7 @@ Describe 'Nitpick plain-data context' {
     It 'copies repeated references independently and normalizes dictionary keys' {
         InModuleScope Nitpick {
             $Shared = [ordered]@{ Value = @(1) }
-            $Copy = Copy-NitpickContextValue -Value @{ Left = $Shared; Right = $Shared }
+            $Copy = Copy-NitpickPlainData -Value @{ Left = $Shared; Right = $Shared }
             $Copy.Left | Should -BeOfType ([hashtable])
             $Copy.left.value[0] = 2
             $Copy.Right.Value[0] | Should -Be 1
@@ -62,24 +62,24 @@ Describe 'Nitpick plain-data context' {
         InModuleScope Nitpick {
             $Dictionary = @{}
             $Dictionary.Self = $Dictionary
-            { Copy-NitpickContextValue -Value $Dictionary } |
-                Should -Throw '*Context.Self*' -ErrorId 'NitpickInvalidContext*'
+            { Copy-NitpickPlainData -Value $Dictionary } |
+                Should -Throw '*Value.Self*' -ErrorId 'NitpickInvalidPlainData*'
             $Array = [object[]]::new(1)
             $Array[0] = $Array
-            { Copy-NitpickContextValue -Value @{ Nested = $Array } } |
-                Should -Throw '*Context.Nested`[0`]*' -ErrorId 'NitpickInvalidContext*'
+            { Copy-NitpickPlainData -Value @{ Nested = $Array } -Path 'Settings' } |
+                Should -Throw '*Settings.Nested`[0`]*' -ErrorId 'NitpickInvalidPlainData*'
         }
     }
 
     It 'rejects non-string and case-duplicate dictionary keys' {
         InModuleScope Nitpick {
-            { Copy-NitpickContextValue -Value @{ 1 = 'value' } } |
-                Should -Throw -ErrorId 'NitpickInvalidContext*'
+            { Copy-NitpickPlainData -Value @{ 1 = 'value' } } |
+                Should -Throw -ErrorId 'NitpickInvalidPlainData*'
             $Dictionary = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
             $Dictionary.Add('Name', 1)
             $Dictionary.Add('name', 2)
-            { Copy-NitpickContextValue -Value $Dictionary } |
-                Should -Throw -ErrorId 'NitpickInvalidContext*'
+            { Copy-NitpickPlainData -Value $Dictionary } |
+                Should -Throw -ErrorId 'NitpickInvalidPlainData*'
         }
     }
 
@@ -90,8 +90,8 @@ Describe 'Nitpick plain-data context' {
                     (Get-Module Nitpick), [datetime]::Now, [char] 'a',
                     [System.Collections.ArrayList]::new(), [int[,]]::new(1, 1)
                 )) {
-                { Copy-NitpickContextValue -Value @{ Extra = $Value } } |
-                    Should -Throw '*Context.Extra*' -ErrorId 'NitpickInvalidContext*'
+                { Copy-NitpickPlainData -Value @{ Extra = $Value } } |
+                    Should -Throw '*Value.Extra*' -ErrorId 'NitpickInvalidPlainData*'
             }
         }
     }
@@ -103,7 +103,7 @@ Describe 'Nitpick plain-data context' {
             Add-Member -InputObject $Dictionary -NotePropertyName Keys -NotePropertyValue @('spoof') -Force
             Add-Member -InputObject $Dictionary -NotePropertyName Extra -NotePropertyValue 'ETS'
             Add-Member -InputObject $Dictionary -MemberType ScriptMethod -Name GetType -Value { [string] } -Force
-            $Copy = Copy-NitpickContextValue -Value $Dictionary
+            $Copy = Copy-NitpickPlainData -Value $Dictionary
             $Copy['Count'] | Should -BeExactly 'entry'
             $Copy.psbase.Count | Should -Be 2
             $Copy.psobject.Properties['Extra'] | Should -BeNullOrEmpty
@@ -118,7 +118,7 @@ Describe 'Nitpick plain-data context' {
             $Value.SetValue($null, 4)
             Add-Member -InputObject $Value -NotePropertyName Length -NotePropertyValue 999 -Force
             Add-Member -InputObject $Value -NotePropertyName Rank -NotePropertyValue 2 -Force
-            $Copy = Copy-NitpickContextValue -Value $Value
+            $Copy = Copy-NitpickPlainData -Value $Value
             $Copy.GetType() | Should -Be ([object[]])
             $Copy.Length | Should -Be 2
             $Copy[0] | Should -BeExactly 'first'
@@ -135,7 +135,7 @@ Describe 'Nitpick plain-data context' {
                 Add-Member -InputObject $Wrapped -NotePropertyName Extra -NotePropertyValue 'ETS'
                 Add-Member -InputObject $Wrapped -MemberType ScriptMethod -Name GetType -Value { [datetime] } -Force
                 Add-Member -InputObject $Wrapped -MemberType ScriptMethod -Name ToString -Value { 'shadow' } -Force
-                $Copy = Copy-NitpickContextValue -Value $Wrapped
+                $Copy = Copy-NitpickPlainData -Value $Wrapped
                 $Copy | Should -Be $Value
                 $Copy.psobject.Properties['Extra'] | Should -BeNullOrEmpty
             }
@@ -157,6 +157,13 @@ Describe 'Nitpick plain-data context' {
             $Copy.Extra.Values[0] = 2
             $Context.Extra.Values[0] | Should -Be 1
             $Context.Count | Should -Be 1
+        }
+    }
+
+    It 'reports invalid context data using the context error and path' {
+        InModuleScope Nitpick {
+            { New-NitpickInvocationContext -Target {}.Ast -Context @{ Extra = {} } } |
+                Should -Throw '*Context.Extra*' -ErrorId 'NitpickInvalidContext*'
         }
     }
 

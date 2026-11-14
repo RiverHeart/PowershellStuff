@@ -489,7 +489,7 @@ function Resolve-NitpickCorrectionProposal {
 
             if ($RuleIsSuppressed) { continue }
 
-            $RuleContext = Copy-NitpickContextValue -Value $CanonicalContext
+            $RuleContext = Copy-NitpickPlainData -Value $CanonicalContext -Path 'Context'
             if ($HasRuleSettings) {
                 $RuleContext.Remove('RuleSettings')
                 if ($RuleSettings.ContainsKey($SelectedRule.Id)) {

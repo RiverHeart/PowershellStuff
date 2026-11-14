@@ -488,7 +488,7 @@ by file validation and direct-context policy normalization, not host detection.
 
 ### Context construction and copy helpers
 
-Introduce private `Copy-NitpickContextValue` and `New-NitpickInvocationContext`.
+Introduce private `Copy-NitpickPlainData` and `New-NitpickInvocationContext`.
 Keep validation/copying in these helpers rather than repeating it in producers,
 descriptor overloads, and correction coordinators.
 

@@ -54,7 +54,7 @@ function New-NitpickInvocationContext {
             throw [ArgumentException]::new('Context must be a dictionary.')
         }
 
-        $Copy = Copy-NitpickContextValue -Value $Context
+        $Copy = Copy-NitpickPlainData -Value $Context -Path 'Context'
         $IsDocument = $Target.GetType().Name -eq 'AstDocument'
         $Ast = if ($IsDocument) { $Target.Ast } else { $Target }
 

@@ -74,7 +74,7 @@ function Read-NitpickConfiguration {
         }
 
         $Data = Import-PowerShellDataFile -LiteralPath $Resolved.ProviderPath -ErrorAction Stop
-        $Data = Copy-NitpickContextValue -Value $Data -Path 'Configuration'
+        $Data = Copy-NitpickPlainData -Value $Data -Path 'Configuration'
         if ($Data -isnot [IDictionary]) {
             throw [ArgumentException]::new('Configuration must be a string-keyed dictionary.')
         }

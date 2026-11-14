@@ -74,7 +74,7 @@ function ConvertTo-NitpickRuleSettingsMap {
         }
 
         # The copy rejects non-string and case-duplicate keys.
-        $Map = Copy-NitpickContextValue -Value $RuleSettings -Path $Source
+        $Map = Copy-NitpickPlainData -Value $RuleSettings -Path $Source
         foreach ($RuleId in $Map.Keys) {
             Assert-NitpickRuleId -Value $RuleId
             if ($Map[$RuleId] -isnot [IDictionary]) {

@@ -358,7 +358,7 @@ function Start-Nitpicking {
 
                 if ($RuleIsSuppressed) { continue }
 
-                $RuleContext = Copy-NitpickContextValue -Value $Context
+                $RuleContext = Copy-NitpickPlainData -Value $Context -Path 'Context'
                 if ($ProjectRuleSettings.ContainsKey($Rule.Id)) {
                     $RuleContext.RuleSettings = $ProjectRuleSettings[$Rule.Id]
                 }

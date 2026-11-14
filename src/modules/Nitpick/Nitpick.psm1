@@ -710,7 +710,7 @@ class NitpickRule {
         if ($null -ne $this.Applicability) {
             $IsApplicable = Test-NitpickRuleApplicability `
                 -Applicability $this.Applicability `
-                -Context (Copy-NitpickContextValue -Value $Context) `
+                -Context (Copy-NitpickPlainData -Value $Context -Path 'Context') `
                 -RuleId $this.Id
 
             if (-not $IsApplicable) {
@@ -734,7 +734,7 @@ class NitpickRule {
 
         $InvocationParameters[$this.DispatchParameterName] = $Target
         if (Get-CallableParameter -Callable $this.Callable -Name Context) {
-            $InvocationParameters.Context = Copy-NitpickContextValue -Value $Context
+            $InvocationParameters.Context = Copy-NitpickPlainData -Value $Context -Path 'Context'
         } else {
             $InvocationParameters.Remove('Context')
         }
