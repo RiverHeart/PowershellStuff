@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Management.Automation.Language
 
 <#
@@ -18,6 +19,13 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER Rule
     Selected rules to rerun against candidate text.
+
+.PARAMETER Context
+    The canonical target context, including project policy, to forward to proposal
+    resolution. This coordinator does not load or alter project configuration.
+
+.PARAMETER RuleSettings
+    Optional settings keyed by qualified rule ID for candidate reanalysis.
 
 .PARAMETER Ast
     Original AST retaining source path context.
@@ -51,6 +59,12 @@ function Resolve-NitpickTargetCorrection {
         [AllowEmptyCollection()]
         [NitpickRule[]] $Rule,
 
+        [AllowNull()]
+        [IDictionary] $Context,
+
+        [AllowNull()]
+        [IDictionary] $RuleSettings,
+
         [Parameter(Mandatory)]
         [ValidateSet('Preview', 'Guided', 'Apply')]
         [string] $FixMode
@@ -61,6 +75,10 @@ function Resolve-NitpickTargetCorrection {
         Document = $Document
         Finding = $Finding
         Rule = $Rule
+        Context = $Context
+    }
+    if ($PSBoundParameters.ContainsKey('RuleSettings')) {
+        $ResolveParameters.RuleSettings = $RuleSettings
     }
 
     if ($FixMode -eq 'Guided') {
@@ -74,8 +92,8 @@ function Resolve-NitpickTargetCorrection {
     }
 
     $Proposal = Resolve-NitpickCorrectionProposal @ResolveParameters
-
     $Application = @{ Status = 'NotAttempted' }
+
     if ($Proposal.Status -eq 'Ready') {
         if ($Preview) {
             $Application.Status = 'Preview'
@@ -124,6 +142,7 @@ function Resolve-NitpickTargetCorrection {
         } else {
             if ($UseCandidateText) { $Proposal.CandidateText } else { $Proposal.OriginalText }
         }
+
         EffectiveFindings = if ($UseCandidateFindings) {
             $Proposal.CandidateFindings
         } else {

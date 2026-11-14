@@ -11,6 +11,22 @@
     IncludeRule and ExcludeRule parameters can be used to filter which discovered rules
     are registered.
 
+    Explicit metadata overrides update an existing registration for the same
+    callable. Without overrides, repeated registration retains the existing object.
+
+.PARAMETER Applicability
+    Optional ScriptBlock receiving one isolated IDictionary context and returning
+    exactly one Boolean. Explicit null clears the predicate. When omitted,
+    preserves the existing descriptor or Details declaration.
+
+.PARAMETER MinimumAnalysisHostVersion
+    Optional positive major/minor System.Version host prerequisite. Enforced only
+    after applicability. Explicit null clears it; omission preserves metadata.
+
+.PARAMETER Settings
+    Optional integer settings schema. Each setting declares Type, Default, and
+    optional Minimum and Maximum values. Explicit null clears it; omission preserves metadata.
+
 .EXAMPLE
     Register all discoverable Nitpick rules.
 
@@ -40,6 +56,18 @@
         -Callable { param ($ScriptBlockAst) } `
         -Category Style `
         -Source Tests
+
+.EXAMPLE
+    Reconstruct a descriptor with a different category while preserving its
+    applicability and analysis-host declarations.
+
+    $Rule | Register-Nitpick -Category Quality -PassThru
+
+.EXAMPLE
+    Clear both optional execution declarations, including on an existing
+    registration of the same callable.
+
+    $Rule | Register-Nitpick -Applicability $null -MinimumAnalysisHostVersion $null
 #>
 function Register-Nitpick {
     [CmdletBinding(DefaultParameterSetName='Default')]
@@ -60,6 +88,18 @@ function Register-Nitpick {
         [string] $Category,
 
         [bool] $EditorEnabled,
+
+        [Parameter(HelpMessage='Optional scriptblock receiving one isolated IDictionary context argument. Must emit exactly one Boolean. False skips execution; errors terminate. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $Applicability,
+
+        [Parameter(HelpMessage='Optional minimum analysis host version. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $MinimumAnalysisHostVersion,
+
+        [Parameter(HelpMessage='Optional integer settings schema. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $Settings,
 
         [Parameter(HelpMessage='Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
@@ -84,6 +124,13 @@ function Register-Nitpick {
         [switch] $PassThru
     )
 
+    begin {
+        $Properties = @(
+            'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source',
+            'Applicability', 'MinimumAnalysisHostVersion', 'Settings'
+        )
+    }
+
     process {
         if (-not $Callable) {
             Write-Verbose "No callable provided. Running discovery."
@@ -96,7 +143,7 @@ function Register-Nitpick {
             $Callable = Find-Nitpick @FindParams
         }
 
-        $HasOverrides = @('Name', 'Namespace', 'Category', 'EditorEnabled', 'Source') |
+        $HasOverrides = $Properties |
             Where-Object { $PSBoundParameters.ContainsKey($_) }
 
         foreach($CallableEntry in $Callable) {
@@ -112,17 +159,12 @@ function Register-Nitpick {
                 $BaseCallable = if ($BaseNitpick) { $BaseNitpick.Callable } else { $CallableEntry }
 
                 $NitpickParams = @{}
-                foreach ($Property in 'Name', 'Namespace', 'Category', 'Source') {
+                foreach ($Property in $Properties) {
                     if ($PSBoundParameters.ContainsKey($Property)) {
                         $NitpickParams[$Property] = $PSBoundParameters[$Property]
-                    } elseif ($BaseNitpick -and $BaseNitpick.$Property) {
+                    } elseif ($BaseNitpick) {
                         $NitpickParams[$Property] = $BaseNitpick.$Property
                     }
-                }
-                if ($PSBoundParameters.ContainsKey('EditorEnabled')) {
-                    $NitpickParams.EditorEnabled = $EditorEnabled
-                } elseif ($BaseNitpick) {
-                    $NitpickParams.EditorEnabled = $BaseNitpick.EditorEnabled
                 }
 
                 $Nitpick = $BaseCallable | New-Nitpick @NitpickParams
@@ -134,6 +176,7 @@ function Register-Nitpick {
                 } else {
                     $Nitpick.Callable.Name
                 }
+
                 if ($Nitpick.Name -ne $ExpectedName) {
                     Write-Error "Rule name '$($Nitpick.Name)' must match callable name '$ExpectedName'."
                     continue
@@ -142,11 +185,13 @@ function Register-Nitpick {
 
             $Registry = Get-NitpickRegistry
             $IsIncluded = @($Nitpick) |
-                Where-NitpickIncluded -PropertyPath Id -Include $IncludeRule -Exclude $ExcludeRule -Wildcard
+                Where-NitpickIncluded `
+                    -PropertyPath Id `
+                    -Include $IncludeRule `
+                    -Exclude $ExcludeRule `
+                    -Wildcard
 
-            if (-not $IsIncluded) {
-                continue
-            }
+            if (-not $IsIncluded) { continue }
 
             $Existing = $Registry.Nitpicks[$Nitpick.Id]
             if ($Existing) {
@@ -154,7 +199,7 @@ function Register-Nitpick {
                     $Existing.Source -eq $Nitpick.Source -and
                     (Test-NitpickCallableIdentity -Left $Existing.Callable -Right $Nitpick.Callable)
 
-                if ($IsSame) {
+                if ($IsSame -and -not $HasOverrides) {
                     Write-Verbose "Nitpick '$($Nitpick.Id)' is already registered."
                     if ($PassThru) {
                         Write-Output $Existing
@@ -162,7 +207,7 @@ function Register-Nitpick {
                     continue
                 }
 
-                if (-not $Force) {
+                if (-not $IsSame -and -not $Force) {
                     Write-Error "A Nitpick with the ID '$($Nitpick.Id)' is already registered."
                     continue
                 }

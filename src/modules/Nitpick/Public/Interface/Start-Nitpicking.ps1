@@ -1,4 +1,5 @@
 using namespace System
+using namespace System.Collections
 using namespace System.Diagnostics
 using namespace System.IO
 using namespace System.Security
@@ -41,13 +42,29 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER Module
     Module names or literal paths to acquire as additive rule packages, alongside the
-    built-in package and any explicit registrations. Package manifests may declare
-    rule commands and supporting modules; supporting modules use the declared owner's
-    namespace even when acquired directly. Does not register acquired rules.
+    built-in package, packages declared by the configuration's Modules key, and any
+    explicit registrations. Relative paths resolve from the caller's current location.
+    Package manifests may declare rule commands and supporting modules; supporting
+    modules use the declared owner's namespace even when acquired directly. Acquiring
+    a package imports its code. Does not register acquired rules. Use IncludeRule and
+    ExcludeRule to control which acquired rules run.
 
-.PARAMETER ExcludeDefaults
-    Omits the built-in Nitpick package, including when Module is also omitted (in
-    which case no rules are discovered; registered rules may still apply).
+.PARAMETER ConfigFile
+    An explicit PSD1 project-configuration file containing compatibility policy,
+    rule packages (Modules), and/or rule settings (Rules). Configuration is validated
+    before target processing and applies uniformly to every target in this invocation.
+    Relative paths resolve from the caller's current PowerShell location; omitting
+    both ConfigFile and ConfigData supplies no project configuration. Packages it
+    declares are imported, so only use configuration files you trust. Cannot be
+    combined with ConfigData.
+
+.PARAMETER ConfigData
+    Project configuration as in-memory data, either the raw dictionary a
+    configuration file would contain or the output of New-NitpickConfiguration.
+    It is validated by New-NitpickConfiguration either way. There is no file to
+    resolve relative module paths from, so relative paths are rejected; build the
+    configuration with New-NitpickConfiguration -BaseDirectory to use them.
+    Cannot be combined with ConfigFile.
 
 .PARAMETER Path
     A file, directory, or wildcard path. Literal paths must exist. File targets are
@@ -66,6 +83,8 @@ using namespace System.Management.Automation.Language
 .PARAMETER ExcludeRule
     Excludes matching rule IDs. Unmatched exclusions are allowed. If no eligible
     rules remain after exclusions and editor-mode filtering, execution terminates.
+    Use 'Nitpick/*' to skip the built-in rules; they are still discovered, so
+    configured settings for them are still validated.
 
 .PARAMETER FixMode
     Specifies the mode for applying corrections.
@@ -111,6 +130,15 @@ using namespace System.Management.Automation.Language
     a specified path with preview mode for corrections.
 
     Start-Nitpicking -Module WPF -Path src/modules/WPF/Public/DSL -FixMode Preview
+
+.EXAMPLE
+    Run Start-Nitpicking with in-memory configuration instead of a file.
+
+    Start-Nitpicking -Script 'four' -IncludeRule Nitpick/AvoidLongLines -ConfigData @{
+        Rules = @{ 'Nitpick/AvoidLongLines' = @{ MaximumLength = 3 } }
+    }
+
+    Reports that line 1 exceeds the configured maximum of 3.
 #>
 function Start-Nitpicking {
     [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
@@ -129,6 +157,12 @@ function Start-Nitpicking {
 
         [string[]] $Module,
 
+        [ValidateNotNullOrEmpty()]
+        [string] $ConfigFile,
+
+        [ValidateNotNull()]
+        [IDictionary] $ConfigData,
+
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
 
@@ -144,7 +178,6 @@ function Start-Nitpicking {
         [ValidateSet('Off', 'Preview', 'Guided', 'Apply')]
         [string] $FixMode = 'Off',
 
-        [switch] $ExcludeDefaults,
         [switch] $EditorMode,
         [switch] $NoSummary
     )
@@ -163,12 +196,57 @@ function Start-Nitpicking {
             )
         }
 
+        if ($PSBoundParameters.ContainsKey('ConfigFile') -and $PSBoundParameters.ContainsKey('ConfigData')) {
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    [ArgumentException]::new('ConfigFile and ConfigData cannot be used together.'),
+                    'NitpickConflictingConfiguration',
+                    [ErrorCategory]::InvalidArgument,
+                    $null
+                )
+            )
+        }
+
+        $ProjectPolicy = @{}
+        $ProjectRuleSettings = @{}
+        $RuleModules = @()
+        $ProjectConfiguration = $null
+        $RuleSettingsSource = 'RuleSettings'
+        if ($PSBoundParameters.ContainsKey('ConfigFile')) {
+            $ProjectConfiguration = Read-NitpickConfiguration -LiteralPath $ConfigFile
+            $RuleSettingsSource = "configuration '$ConfigFile'"
+        } elseif ($PSBoundParameters.ContainsKey('ConfigData')) {
+            $ProjectConfiguration = New-NitpickConfiguration -Data $ConfigData
+            $RuleSettingsSource = 'configuration data'
+        }
+
+        if ($null -ne $ProjectConfiguration) {
+
+            if ($ProjectConfiguration.ContainsKey('Compatibility')) {
+                $ProjectPolicy = @{
+                    Compatibility = $ProjectConfiguration.Compatibility
+                }
+            }
+
+            if ($ProjectConfiguration.ContainsKey('Modules')) {
+                $RuleModules += $ProjectConfiguration.Modules
+            }
+
+            if ($ProjectConfiguration.ContainsKey('Rules')) {
+                $ProjectRuleSettings = $ProjectConfiguration.Rules
+            }
+        }
+        if ($Module) {
+            $RuleModules += $Module
+        }
+
         [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
-            -Module $Module `
+            -Module $RuleModules `
             -IncludeRule $IncludeRule `
             -ExcludeRule $ExcludeRule `
-            -ExcludeDefaults:$ExcludeDefaults `
-            -EditorMode:$EditorMode
+            -EditorMode:$EditorMode `
+            -RuleSettings $ProjectRuleSettings `
+            -RuleSettingsSource $RuleSettingsSource
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
@@ -306,6 +384,10 @@ function Start-Nitpicking {
                 $TargetFindings.Add($Diagnostic)
             }
 
+            $Context = New-NitpickInvocationContext `
+                -Target $Document `
+                -Context @{ Policy = $ProjectPolicy }
+
             $ApplicableRules = [List[NitpickRule]]::new()
             foreach ($Rule in $Rules) {
                 $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
@@ -326,7 +408,18 @@ function Start-Nitpicking {
 
                 if ($RuleIsSuppressed) { continue }
 
-                foreach ($Finding in $Rule.Invoke($Document, @{})) {
+                $RuleContext = Copy-NitpickPlainData -Value $Context -Path 'Context'
+                if ($ProjectRuleSettings.ContainsKey($Rule.Id)) {
+                    $RuleContext.RuleSettings = $ProjectRuleSettings[$Rule.Id]
+                }
+
+                $Outcome = $Rule.InvokeWithResult($Document, $RuleContext)
+                if ($Outcome.Status -eq 'Inapplicable') {
+                    Write-Verbose "Rule '$($Rule.Id)' was inapplicable during original analysis."
+                    continue
+                }
+
+                foreach ($Finding in $Outcome.Results) {
                     if ($Finding -is [NitpickFinding] -and (
                         Test-NitpickRuleSuppressed `
                             -RuleId $Finding.RuleId `
@@ -343,11 +436,22 @@ function Start-Nitpicking {
             $CorrectionResult = $null
             $FinalFindings = $TargetFindings.ToArray()
             if ($FixMode -ne 'Off') {
+                # The resolver rejects settings for rules it was not given, so pass
+                # only the settings for rules that apply to this target.
+                $ApplicableRuleSettings = @{}
+                foreach ($ApplicableRule in $ApplicableRules) {
+                    if ($ProjectRuleSettings.ContainsKey($ApplicableRule.Id)) {
+                        $ApplicableRuleSettings[$ApplicableRule.Id] = $ProjectRuleSettings[$ApplicableRule.Id]
+                    }
+                }
+
                 $CorrectionResult = Resolve-NitpickTargetCorrection `
                     -FixMode $FixMode `
                     -Document $Document `
                     -Finding $TargetFindings.ToArray() `
-                    -Rule $ApplicableRules.ToArray()
+                    -Rule $ApplicableRules.ToArray() `
+                    -RuleSettings $ApplicableRuleSettings `
+                    -Context $Context
 
                 $FinalFindings = $CorrectionResult.Report.EffectiveFindings
 

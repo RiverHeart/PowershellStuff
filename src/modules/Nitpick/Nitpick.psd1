@@ -77,6 +77,7 @@ FunctionsToExport = @(
     'Import-ScriptBlockAst'
     'New-Nitpick'
     'New-NitpickTemplate'
+    'New-NitpickConfiguration'
     'New-NitpickCorrection'
     'New-NitpickCorrectionResult'
     'New-NitpickFinding'
@@ -90,7 +91,10 @@ FunctionsToExport = @(
     'Test-ArrayShapeLostThroughControlFlow'
     'Test-AvoidParameterAttributeBool'
     'Test-AvoidAmbiguousPipelineContinuation'
+    'Test-AvoidLongLines'
+    'Test-AvoidLiveCollectionMutation'
     'Test-AvoidTrailingWhitespace'
+    'Test-AvoidUnsupportedTernarySyntax'
     'Measure-AvoidTrailingWhitespace'
     'Test-CollectionComparisonUsedAsAPredicate'
     'Test-EmptyCollectionMemberAccess'
@@ -98,6 +102,7 @@ FunctionsToExport = @(
     'Test-PossibleNullItemFromIndexedLookup'
     'Test-StringArgToSwitchParameter'
     'Test-UseIsNotOperator'
+    'Measure-AvoidLongLines'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -132,6 +137,9 @@ PrivateData = @{
             'Test-ArrayShapeLostThroughControlFlow'
             'Test-AvoidParameterAttributeBool'
             'Test-AvoidAmbiguousPipelineContinuation'
+            'Measure-AvoidLongLines'
+            'Test-AvoidLiveCollectionMutation'
+            'Test-AvoidUnsupportedTernarySyntax'
             'Test-CollectionComparisonUsedAsAPredicate'
             'Test-EmptyCollectionMemberAccess'
             'Test-MisleadingBooleanConversion'

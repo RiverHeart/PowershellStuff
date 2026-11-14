@@ -100,6 +100,33 @@ Describe 'Resolve-NitpickTargetCorrection application and report ownership' {
         }
     }
 
+    It 'forwards the canonical context to proposal resolution' {
+        $Fixture = New-TargetCorrectionFixture -NoReanalysis
+        $Context = @{ Caller = 'PolicyCoordinator'; Policy = @{} }
+        Mock Resolve-NitpickCorrectionProposal -ModuleName Nitpick `
+            -RemoveParameterValidation Document `
+            -ParameterFilter { $Context.Caller -eq 'PolicyCoordinator' } {
+                $Fixture.Proposal
+            }
+
+        $Result = InModuleScope Nitpick -Parameters @{
+            Fixture = $Fixture
+            Context = $Context
+        } {
+            param($Fixture, $Context)
+            Resolve-NitpickTargetCorrection `
+                -Document $Fixture.Document `
+                -Finding $Fixture.Findings `
+                -Rule $Fixture.Rules `
+                -FixMode Preview `
+                -Context $Context
+        }
+
+        $Result.Proposal | Should -Be $Fixture.Proposal
+        Should -Invoke Resolve-NitpickCorrectionProposal -ModuleName Nitpick -Times 1 -Exactly `
+            -ParameterFilter { $Context.Caller -eq 'PolicyCoordinator' }
+    }
+
     It 'uses AnalysisSource for findings rather than effective text when reanalysis is unavailable' {
         #===  ARRANGE  ===#
         $Fixture = New-TargetCorrectionFixture -NoReanalysis

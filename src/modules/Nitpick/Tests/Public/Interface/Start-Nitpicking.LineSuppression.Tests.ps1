@@ -275,7 +275,7 @@ Describe 'Line suppression analysis and corrections' {
         #=== Act ===#
         $Results = @(Start-Nitpicking `
             -Script '-not ($Value -is [int]) # nitpick disable-line owner/*' `
-            -ExcludeDefaults `
+            -ExcludeRule 'Nitpick/*' `
             -Output Object `
             -NoSummary `
             -ErrorAction Stop

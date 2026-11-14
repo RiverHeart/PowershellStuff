@@ -55,6 +55,269 @@ The resulting output starts by identifying the lines that were considered. The f
 
 Finally, the number of findings, their severity, the number of corrections applied, unresolved (in case there was no safe correction or if there were multiple ones to choose from), the number of files evaluated, and the time taken to do so is listed.
 
+## Project syntax policy
+
+Pass an explicit PSD1 configuration path to apply one policy to all file and
+fragment targets in an invocation. `nitpick.psd1` is a convention, not a
+required filename:
+
+```powershell
+# nitpick.psd1
+@{
+    Compatibility = @{
+        PowerShell = @{
+            MinimumVersion = '5.1'
+        }
+    }
+}
+```
+
+```powershell
+Start-Nitpicking -Path .\src -ConfigFile .\nitpick.psd1
+```
+
+Relative configuration paths resolve against the caller's current PowerShell
+location. Paths are literal, configuration is loaded once per invocation, and
+missing, unreadable, malformed, or unsupported configuration terminates before
+target processing. Omit the parameter to supply no policy; Nitpick does not
+automatically discover configuration files.
+
+`MinimumVersion` is the oldest supported PowerShell **syntax** version, not a
+list of runtimes or a guarantee about commands, .NET APIs, editions, or platforms.
+The configuration accepts two-component strings from the supported catalog:
+`5.1`, `6.0`, `6.1`, `6.2`, and `7.0` through `7.6`. Unknown keys and versions
+are errors.
+
+The detection-only `Nitpick/AvoidUnsupportedTernarySyntax` rule reports
+ternary expressions when the declared minimum is below `7.0`. It offers no
+correction. With no policy or a minimum of `7.0` or later the rule is
+inapplicable, rather than a clean compatibility certification. Checking a
+minimum below `7.0` requires an analysis host running PowerShell 7 or later;
+on Windows PowerShell 5.1, an applicable check terminates with
+`NitpickUnsupportedAnalysisHost`. Whole-target suppression bypasses that check;
+line and regional suppression do not.
+
+Initial and candidate analysis receive the same project policy. Correction
+producers should use it to avoid introducing incompatible syntax, and candidate
+analysis reports violations from selected, applicable, unsuppressed rules. A
+compatibility finding alone does **not** reject a correction: independent
+enforcement of syntax policy when accepting corrections is deferred.
+
+## Rule modules in configuration
+
+A configuration can declare the rule packages a project uses, so callers don't
+have to repeat `-Module` on every run:
+
+```powershell
+@{
+    Modules = @(
+        'WPF'                     # module name, resolved through PSModulePath
+        '.\tools\MyRules.psd1'    # path, resolved from this file's directory
+    )
+}
+```
+
+`Modules` accepts one string or an array of non-empty strings. Relative paths
+resolve from the configuration file's directory, regardless of the caller's
+location; bare names are module names and may not contain wildcards. Configured
+modules and `Start-Nitpicking -Module` are additive: built-in rules, configured
+packages, and requested packages are all discovered together, and configured
+rule settings are validated against that combined set. Use `-IncludeRule` and
+`-ExcludeRule` to choose what runs, for example `-ExcludeRule 'Nitpick/*'` to
+skip the built-in rules.
+
+> [!WARNING]
+> Declaring a module imports and runs its code. Only use configuration files
+> from sources you trust, just as you would with `-Module`.
+
+A file that looks like a PowerShell module manifest (it has `ModuleVersion`,
+`RootModule`, or `GUID`) is rejected, so a module's own `.psd1` is not mistaken
+for Nitpick configuration.
+
+## In-memory configuration
+
+Pass configuration as data with `Start-Nitpicking -ConfigData` instead of a
+file with `-ConfigFile`. The two parameters can't be combined. `-ConfigData`
+accepts either the hashtable a configuration file would contain or the output of
+`New-NitpickConfiguration`, and is validated the same way as a file:
+
+```powershell
+Start-Nitpicking -Path .\src -ConfigData @{
+    Rules = @{ 'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 } }
+}
+```
+
+`New-NitpickConfiguration` validates configuration without running anything,
+which is useful for tests and tooling. Pass the whole configuration with
+`-Data`, or each section with `-Compatibility`, `-Modules`, and `-Rules`. Its
+output can be passed to `-ConfigData` or back into `New-NitpickConfiguration`:
+
+```powershell
+$Data = ConvertFrom-PowerShellData -String "@{ Modules = 'WPF', '.\rules\Custom.psd1' }"
+$Configuration = New-NitpickConfiguration -Data $Data -BaseDirectory .\build
+Start-Nitpicking -Path .\src -ConfigData $Configuration
+```
+
+There is no file to resolve relative module paths from, so they require
+`New-NitpickConfiguration -BaseDirectory`; without it they are rejected rather
+than resolved from the current location.
+
+## Rule settings and line length
+
+Rule-specific settings live beside, but separately from, project compatibility
+policy in the same explicitly selected PSD1 file:
+
+```powershell
+@{
+    Compatibility = @{
+        PowerShell = @{ MinimumVersion = '5.1' }
+    }
+    Rules = @{
+        'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 }
+    }
+}
+```
+
+`Start-Nitpicking -ConfigFile .\nitpick.psd1` validates configured rule
+IDs and values before reading targets, including settings for known rules that
+are excluded from the run. Unknown rules, misspelled setting names, malformed
+schemas, and invalid or out-of-range values are errors. No second configuration
+file or automatic discovery is used.
+
+Rule authors declare integer settings through command `-Details` metadata or
+`New-Nitpick`/`Register-Nitpick -Settings`. A declaration requires `Type` and
+`Default`, and may specify `Minimum` and `Maximum`:
+
+```powershell
+Settings = @{
+    MaximumLength = @{
+        Type = 'Integer'
+        Default = 120
+        Minimum = 1
+    }
+}
+```
+
+Values may be any integral CLR type that fits in `Int32`; Boolean, null, strings,
+decimals, floating-point values, and out-of-range values are rejected. Each
+predicate and producer receives only that descriptor's validated effective
+settings in `Context.RuleSettings`, including defaults. The predicate and
+producer receive independent context copies.
+
+Direct descriptor callers can override settings without a PSD1:
+
+```powershell
+$Rule.Invoke($Document, @{
+    RuleSettings = @{ MaximumLength = 100 }
+})
+```
+
+The raw `Measure-AvoidLongLines` producer also accepts those settings through
+`-Context`; it validates them against its own schema. Without coordinated
+`RuleBehavior.OutputType`, it retains the existing standalone
+`DiagnosticRecord` output convention.
+
+Direct `Resolve-NitpickCorrectionProposal` callers with multiple rules instead
+pass `-RuleSettings` keyed by qualified rule ID. This keeps one rule's values
+from being exposed to another descriptor.
+
+`Nitpick/AvoidLongLines` is selected by default, even when no configuration file
+is supplied. It emits one Warning and no correction for each physical line
+longer than its `MaximumLength` (default 120). Measurement uses the complete
+physical snapshot line, including trailing whitespace, and counts UTF-16 code
+units: tabs count as one, and CRLF, LF, and CR terminators do not count. Comments,
+multiline strings, and here-strings are checked as written. A final unterminated
+line is checked; empty lines cannot exceed the positive minimum.
+
+When a submitted fragment intersects a long physical line, Nitpick measures the
+complete snapshot line but anchors the finding within the fragment's overlap.
+Thus source outside a fragment can contribute to the warning without producing
+an out-of-fragment location. The line rule and trailing-whitespace rule analyze
+the same original snapshot independently. For example, 118 content units plus
+three trailing spaces trigger both rules at a 120-unit limit; if whitespace
+trimming is selected and succeeds, candidate analysis no longer reports the
+line-length warning, while original finding counts retain both detections.
+
+## Descriptor invocation context
+
+Rules invoked through a descriptor's `Invoke` method receive a fresh, recursively
+isolated context when they declare a `Context` parameter. Caller dictionaries,
+nested values, and attached ETS members are not shared across invocations.
+Supported context data is string-keyed dictionaries, one-dimensional arrays,
+null, strings, Booleans, CLR numeric values, and `System.Version`. Unsupported
+objects, cycles, and invalid reserved metadata terminate with
+`NitpickInvalidContext`.
+
+Legacy `Caller`, `File`, and `RuleBehavior` values are preserved. Added metadata
+includes `Policy` (empty by default), `TargetKind`, nullable `TargetPath`, and
+`AnalysisHost.PowerShellVersion`. A descriptor also receives only its own
+validated `RuleSettings`, with declared defaults applied. Only a file-backed
+`AstDocument` establishes file identity; a ScriptBlockAst's file provenance does
+not.
+
+Direct context may declare
+`Policy.Compatibility.PowerShell.MinimumVersion` as a supported major/minor
+string or two-component `System.Version`. Supported releases are `5.1`, `6.0`,
+`6.1`, `6.2`, and `7.0` through `7.6`; the value normalizes to `System.Version`.
+`Start-Nitpicking` loads an explicit configuration and propagates its normalized
+policy to initial and candidate analysis. Direct
+`Resolve-NitpickCorrectionProposal` callers can pass the same policy with
+`-Context`; the resolver does not load configuration on their behalf.
+
+### Applicability and execution outcomes
+
+Rules may declare `Applicability` (a ScriptBlock receiving one `IDictionary`
+context argument) and `MinimumAnalysisHostVersion` (a positive, two-component
+`System.Version`). Command-backed rules declare them through `-Details`;
+`New-Nitpick` and `Register-Nitpick` accept explicit overrides. Omission preserves
+declarations; explicit `$null` clears them, including when a descriptor is
+reconstructed for an unrelated metadata override. Explicit registration overrides
+also update an already registered instance of the same callable.
+
+```powershell
+$Rule = New-Nitpick `
+  -Name ProjectCheck `
+  -Source Example `
+  -Callable {
+    param($ScriptBlockAst)
+    # Inspect the target here.
+  } `
+  -Applicability {
+      param([System.Collections.IDictionary] $Context)
+      $Context.Policy.Count -gt 0
+  } `
+  -MinimumAnalysisHostVersion ([version] '7.0')
+
+$Document = New-AstDocument -InputObject '# example'
+$Outcome = $Rule.InvokeWithResult($Document, @{})
+$Outcome.Status  # Inapplicable: no policy was supplied.
+$Outcome.Results.Count  # 0
+```
+
+For a compatibility rule, its predicate can read
+`$Context.Policy.Compatibility.PowerShell.MinimumVersion` and compare the
+normalized version with the syntax feature's introduction version. Put source
+inspection in the producer, not the predicate. Producers that offer corrections
+can inspect the same policy through their optional `IDictionary Context`
+parameter; descriptor invocations isolate each predicate and producer context.
+
+Each dispatch evaluates the predicate once with an isolated context. Exactly one
+actual Boolean is required; false returns `Inapplicable` without running the
+producer or checking host prerequisites. If true or absent, the dispatcher checks
+the actual host, then executes the producer with a separate context copy and
+returns `Executed`, even when no findings were produced. Existing `Invoke`
+overloads enforce the same gates but return only the producer's `object[]` results.
+`InvokeWithResult` also accepts an invocation-parameters dictionary.
+
+Discovery validates declaration types without executing predicates or rejecting
+rules whose host prerequisites are unmet. Invalid predicate output, predicate
+errors, and unmet host prerequisites terminate with
+`NitpickInvalidApplicabilityResult`, `NitpickApplicabilityFailed`, and
+`NitpickUnsupportedAnalysisHost`, respectively. Calling a raw producer directly
+bypasses these descriptor gates. The coordinator reports inapplicable rules on
+the verbose stream without changing selected-rule totals or ordinary finding
+output.
+
 ## Whole-target rule suppression
 
 Put a standalone directive in a file's leading comment/whitespace preamble:
@@ -255,7 +518,7 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | Criterion | PSScriptAnalyzer | Nitpick | Explanation |
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 10 Rules |  |
+| **Built-In Ruleset** | 75 Rules | 11 Rules |  |
 | **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |
@@ -268,6 +531,21 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 ## Built-in correctness rules
 
 Nitpick includes these rules for common PowerShell value-semantics mistakes:
+
+- **AvoidLiveCollectionMutation** reports mutations inside `foreach` over the
+  same collection, its live `.Keys`/`.Values` view, or `.GetEnumerator()`.
+  This includes dictionary index/property writes (even updates to existing
+  values), indexed writes to dictionary/list-typed parameters, and common
+  mutating methods such as `Add`, `Remove`, and `Clear`. Enumerate a snapshot
+  such as `foreach ($Key in @($Map.Keys))`, or defer changes until after the
+  loop. Ordinary array index writes and `+=` reassignment do not invalidate
+  the original array enumerator and are not reported.
+  Matching covers variables and static property chains, not aliases, dynamic
+  receivers, local type inference, or pipeline iteration. Unknown receiver
+  methods are potential hazards, not proof of failure; explicitly concurrent
+  parameter types are excluded. Nested deferred scriptblocks are not treated
+  as loop-body mutations. Reachability and receiver reassignment are not
+  analyzed. No automatic correction is offered.
 
 - **EmptyCollectionMemberAccess** reports direct `@($Items.Property)` captures
   on array expressions, explicit array casts, and array-typed parameters in the
@@ -407,15 +685,12 @@ ScriptAnalyzer diagnostic conversion still emits local names and suppression IDs
 External DiagnosticRecord-only scaffolds are not native producers and remain unchanged.
 
 **TODO:**
-  - Re-add `-FilePath` params to rules and verify ScriptAnalyzer still accepts them.
+  - Bare names in config can still match a local folder. The config reader keeps WPF as a name, but Resolve-NitpickModuleSource runs the existence check later. If the folder you run from contains a WPF folder, that folder is used instead of the installed module. -Module has always behaved this way. Fixing it for config would mean passing "this came from config" through to that later step.
   - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
   - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
   - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.
   - Add Nitpick rule for using `return` in `Begin` and `Process` blocks.
-  - Add rule `MisleadingBooleanConversion` - `[bool]'false'` evaluates to `$true`. Flag provable nonempty-string conversions, including `[bool]` parameters with string-literal defaults. Suggest parsing rather than casting when appropriate.
-  - Add rule `CollectionComparisonUsedAsAPredicate` - `if ($Values -eq $Expected)` filters a collection, then tests the returned values’ truthiness. Matching `0`, `$false`, or `''` can therefore produce a false condition. Recommend `-contains` when membership is intended—not for every collection comparison.
   - Add rule `ComparisonResultUsedAsAnExistenceTest` - `if ($Values -match $Pattern)` has the same filtering-versus-Boolean distinction. Deserves an explanation separate from an ordinary operator-style suggestion.
-  - Add rule `StringArgToSwitchParameter` - `Invoke-Thing -Force 'false'` does not mean `-Force:$false`; the string becomes another argument. Diagnose only when parameter metadata is known.
   - Add rule `SuccessStreamLeakage` - A known value-returning call such as `$ArrayList.Add($Item)` emits its return value from a function. Focus on calls whose return values are conventionally incidental; don’t flag every unassigned expression.
   - Add rule `ArrayMutationDuringEnumeration` - Removing entries from a collection while directly enumerating that same collection. Start with obvious same-variable cases and known collection types; suggest enumerating a snapshot when appropriate.
   - Add rule `InvalidHashtableAssignment` - `$Options += @{ Name = 'new' }` throws when `Name` already exists; it isn’t an overwrite/merge operation. Detect statically provable duplicate keys.

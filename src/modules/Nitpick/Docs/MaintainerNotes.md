@@ -274,8 +274,10 @@ the `Local` namespace; use `-Namespace` when a scriptblock has an explicit owner
 `Get-Nitpick` lists explicit registrations, not package rules acquired for the last
 invocation. `Find-Nitpick` acquires the built-in Nitpick package by default; specifying
 `-Module` replaces that default unless `-IncludeDefaults` is also passed. In contrast,
-`Start-Nitpicking -Module` adds packages alongside built-in rules unless `-ExcludeDefaults`
-is specified.
+`Start-Nitpicking` always acquires built-in rules alongside packages declared by the
+project configuration's `Modules` key and by `-Module`; both sources are additive for
+discovery. Use `-IncludeRule` or `-ExcludeRule` (for example `-ExcludeRule 'Nitpick/*'`)
+to control which discovered rules run.
 
 An explicitly registered rule takes precedence over discovery of the same callable,
 preserving its metadata and running it only once. Different callables with the same

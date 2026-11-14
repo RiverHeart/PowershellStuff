@@ -191,7 +191,7 @@ Describe 'Whole-target suppression coordination' {
 
         $Results = @(Start-Nitpicking `
             -Script "# nitpick disable-target Owner/UseIsNotOperator`n-not (`$Value -is [int])" `
-            -ExcludeDefaults `
+            -ExcludeRule 'Nitpick/*' `
             -Output Object `
             -NoSummary `
             -ErrorAction Stop

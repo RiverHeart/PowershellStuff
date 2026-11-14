@@ -324,7 +324,20 @@ class NitpickSummary {
 # MARK: NP_RULE
 #------------------
 
+class NitpickRuleInvocationResult {
+    [string] $Status
+    [object[]] $Results
+
+    NitpickRuleInvocationResult([string] $Status, [object[]] $Results) {
+        $this.Status = $Status
+        $this.Results = $Results
+    }
+}
+
 class NitpickRule {
+    # Opaque in-process marker for coordinator dispatch; not an authorization boundary.
+    static hidden [object] $CoordinatorDispatchToken = [object]::new()
+
     [string] $Name
     [string] $Namespace
     [string] $Id
@@ -340,6 +353,9 @@ class NitpickRule {
     [string] $Explanation
     [string[]] $IncludePath
     [string[]] $ExcludePath
+    [scriptblock] $Applicability
+    [version] $MinimumAnalysisHostVersion
+    [hashtable] $Settings
 
     NitpickRule([object] $TargetCallable, [hashtable] $Overrides) {
         if ($TargetCallable -is [string]) {
@@ -356,11 +372,12 @@ class NitpickRule {
         $DispatchSignature = Resolve-NitpickDispatchSignature `
             -Callable $TargetCallable `
             -ErrorAction Stop
+
         $this.DispatchType = $DispatchSignature.DispatchType
         $this.DispatchParameterName = $DispatchSignature.DispatchParameterName
-
         $this.Category = 'Other'
         $this.EditorEnabled = $true
+
         if ($TargetCallable -is [scriptblock]) {
             $this.CallableType = 'ScriptBlock'
             $this.Callable = $TargetCallable
@@ -371,6 +388,7 @@ class NitpickRule {
             } else {
                 $TargetCallable.Name
             }
+
             $this.CallableType = 'Function'
             $this.Callable = $TargetCallable
             $this.Source = $TargetCallable.ModuleName
@@ -384,12 +402,22 @@ class NitpickRule {
         $HasDetails = $TargetCallable |
             Get-CallableParameter -Name 'Details' -Type 'SwitchParameter'
 
+        $ExecutionMetadata = @{
+            Applicability = $null
+            MinimumAnalysisHostVersion = $null
+            Settings = $null
+        }
+
         if ($HasDetails) {
             $Details = & $TargetCallable -Details
             foreach ($Property in 'Name', 'Category', 'EditorEnabled', 'Source', 'Description', 'Severity', 'Explanation', 'IncludePath', 'ExcludePath') {
                 if ($null -ne $Details.$Property) {
                     $this.$Property = $Details.$Property
                 }
+            }
+
+            foreach ($Property in @($ExecutionMetadata.Keys)) {
+                $ExecutionMetadata[$Property] = $Details.$Property
             }
         }
 
@@ -409,6 +437,35 @@ class NitpickRule {
         Assert-NitpickIdentitySegment -Value $this.Name -SegmentType Name
         Assert-NitpickIdentitySegment -Value $this.Namespace -SegmentType Namespace
         $this.Id = '{0}/{1}' -f $this.Namespace, $this.Name
+
+        foreach ($Property in @($ExecutionMetadata.Keys)) {
+            if ($Overrides.ContainsKey($Property)) {
+                $ExecutionMetadata[$Property] = $Overrides[$Property]
+            }
+        }
+
+        if ($null -ne $ExecutionMetadata.Applicability -and
+            $ExecutionMetadata.Applicability -isnot [scriptblock]
+        ) {
+            throw [ArgumentException]::new("Rule '$($this.Id)' Applicability must be a ScriptBlock or null.")
+        }
+
+        $HostMinimum = $ExecutionMetadata.MinimumAnalysisHostVersion
+        if ($null -ne $HostMinimum -and (
+            $HostMinimum -isnot [version] -or $HostMinimum.Major -lt 1 -or
+            $HostMinimum.Minor -lt 0 -or $HostMinimum.Build -ne -1 -or
+            $HostMinimum.Revision -ne -1
+        )) {
+            throw [ArgumentException]::new(
+                "Rule '$($this.Id)' MinimumAnalysisHostVersion must be a positive major/minor System.Version or null."
+            )
+        }
+        $this.Applicability = $ExecutionMetadata.Applicability
+        $this.MinimumAnalysisHostVersion = $HostMinimum
+        $this.Settings = ConvertTo-NitpickRuleSettingsSchema `
+            -Settings $ExecutionMetadata.Settings `
+            -RuleId $this.Id `
+            -ErrorAction Stop
     }
 
     <#
@@ -452,6 +509,8 @@ class NitpickRule {
     .DESCRIPTION
         Assigns descriptor-owned identity to native findings and nested corrections.
         Non-native outputs, including explicit DiagnosticRecords, are returned unchanged.
+        Producers receive recursively isolated plain-data context, with normalized
+        policy, submitted-target identity, and actual analysis-host metadata.
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .OUTPUTS
@@ -485,7 +544,9 @@ class NitpickRule {
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .PARAMETER Context
-        The context dictionary to pass to the rule invocation.
+        Plain-data context to copy for the rule invocation. Nested mutation and ETS
+        additions do not affect caller input or subsequent invocations. Unsupported
+        values and invalid reserved metadata terminate with NitpickInvalidContext.
     .OUTPUTS
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
@@ -536,13 +597,8 @@ class NitpickRule {
         if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
             throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
         }
-        $Target = if ($this.DispatchType.Name -eq 'AstDocument') {
-            $Document
-        } else {
-            $Document.Ast
-        }
         $Parameters = @{ Context = $Context }
-        $Parameters[$this.DispatchParameterName] = $Target
+        $Parameters[$this.DispatchParameterName] = $Document
         return $this.Invoke($Parameters)
     }
 
@@ -550,11 +606,52 @@ class NitpickRule {
     .SYNOPSIS
         Invokes the rule against the specified parameters dictionary.
     .PARAMETER Parameters
-        The parameters dictionary to pass to the rule invocation.
+        The parameters dictionary to pass to the rule invocation. Context is
+        validated and recursively copied without mutating the supplied dictionary.
     .OUTPUTS
         [object[]] # NitpickFinding or DiagnosticRecord instances
     #>
     [object[]] Invoke(
+        [IDictionary] $Parameters
+    ) {
+        return $this.InvokeWithResult($Parameters).Results
+    }
+
+    <#
+    .SYNOPSIS
+        Dispatches a document or AST and returns execution status and producer results.
+    .DESCRIPTION
+        Applicability is evaluated once with an isolated context before host
+        prerequisites. The producer receives a different isolated copy.
+    .EXAMPLE
+        $Outcome = $Rule.InvokeWithResult($Document, @{})
+        $Outcome.Status
+        $Outcome.Results
+
+        Distinguishes Inapplicable from Executed, including an empty execution.
+    #>
+    [NitpickRuleInvocationResult] InvokeWithResult(
+        [object] $Document,
+        [IDictionary] $Context
+    ) {
+        $Parameters = @{ Context = $Context }
+        $Parameters[$this.DispatchParameterName] = $Document
+        return $this.InvokeWithResult($Parameters)
+    }
+
+    <#
+    .SYNOPSIS
+        Validates and dispatches rule parameters through the shared execution gates.
+    .DESCRIPTION
+        Returns Inapplicable only for one Boolean false predicate result.
+        Predicate failures, invalid output, and unmet host prerequisites terminate
+        with rule-specific error records. Existing Invoke methods unwrap Results.
+    .EXAMPLE
+        $Outcome = $Rule.InvokeWithResult(@{ ScriptBlockAst = { Get-Process }.Ast })
+
+        Uses the legacy AST parameter fallback and default invocation context.
+    #>
+    [NitpickRuleInvocationResult] InvokeWithResult(
         [IDictionary] $Parameters
     ) {
         $InvocationParameters = @{}
@@ -568,40 +665,76 @@ class NitpickRule {
             $InvocationParameters.Remove('ScriptBlockAst')
         }
 
+        $ContextTarget = $Target
+        $CoordinatorDispatch = $InvocationParameters['__NitpickCoordinatorDispatch']
+        if ($InvocationParameters.ContainsKey('__NitpickCoordinatorDispatch')) {
+            $InvocationParameters.Remove('__NitpickCoordinatorDispatch')
+
+            if (-not (Test-NitpickCoordinatorDispatch -Dispatch $CoordinatorDispatch)) {
+                throw [ArgumentException]::new(
+                    'Invalid coordinator-owned rule invocation context.'
+                )
+            }
+
+            $ContextTarget = $CoordinatorDispatch.Target
+        }
+
         if ($this.DispatchType.Name -eq 'AstDocument') {
             if ($Target -is [ScriptBlockAst]) {
                 $Target = New-AstDocument -InputObject $Target
             } elseif ($null -eq $Target -or $Target.GetType().Name -ne 'AstDocument') {
                 throw [ArgumentException]::new('Rule invocation requires an AstDocument.')
             }
-            $Ast = $Target.Ast
         } else {
             if ($null -ne $Target -and $Target.GetType().Name -eq 'AstDocument') {
                 $Target = $Target.Ast
             } elseif ($Target -isnot [ScriptBlockAst]) {
                 throw [ArgumentException]::new('Rule invocation requires a ScriptBlockAst.')
             }
-            $Ast = $Target
+        }
+
+        $Context = New-NitpickInvocationContext `
+            -Target $ContextTarget `
+            -Context $InvocationParameters.Context
+        $SettingsInput = if ($Context.ContainsKey('RuleSettings')) {
+            $Context.RuleSettings
+        } else {
+            @{}
+        }
+        $Context.RuleSettings = ConvertTo-NitpickEffectiveRuleSettings `
+            -Schema $this.Settings `
+            -Values $SettingsInput `
+            -RuleId $this.Id `
+            -ErrorAction Stop
+
+        if ($null -ne $this.Applicability) {
+            $IsApplicable = Test-NitpickRuleApplicability `
+                -Applicability $this.Applicability `
+                -Context (Copy-NitpickPlainData -Value $Context -Path 'Context') `
+                -RuleId $this.Id
+
+            if (-not $IsApplicable) {
+                return [NitpickRuleInvocationResult]::new('Inapplicable', @())
+            }
+        }
+
+        $HostVersion = $Context.AnalysisHost.PowerShellVersion
+
+        if ($null -ne $this.MinimumAnalysisHostVersion -and
+            $HostVersion -lt $this.MinimumAnalysisHostVersion) {
+            throw [ErrorRecord]::new(
+                [InvalidOperationException]::new(
+                    "Rule '$($this.Id)' requires analysis host PowerShell $($this.MinimumAnalysisHostVersion); actual host is $HostVersion."
+                ),
+                'NitpickUnsupportedAnalysisHost',
+                [ErrorCategory]::NotImplemented,
+                $this.Id
+            )
         }
 
         $InvocationParameters[$this.DispatchParameterName] = $Target
         if (Get-CallableParameter -Callable $this.Callable -Name Context) {
-            $Context = $InvocationParameters.Context
-            if ($null -eq $Context) {
-                $Context = @{}
-            }
-            if ($Context -isnot [IDictionary]) {
-                throw [ArgumentException]::new('Rule invocation Context must be a dictionary.')
-            }
-            if (-not $Context.Contains('Caller')) { $Context.Caller = 'Nitpick' }
-            if (-not $Context.Contains('File')) { $Context.File = $Ast.Extent.File }
-            if ($null -eq $Context.RuleBehavior) {
-                $Context.RuleBehavior = @{
-                    SearchNestedScriptBlocks = $true
-                    OutputType = 'NitpickFinding'
-                }
-            }
-            $InvocationParameters.Context = $Context
+            $InvocationParameters.Context = Copy-NitpickPlainData -Value $Context -Path 'Context'
         } else {
             $InvocationParameters.Remove('Context')
         }
@@ -611,12 +744,14 @@ class NitpickRule {
             if ($Finding -isnot [NitpickFinding]) {
                 continue
             }
+
             $Finding.RuleId = $this.Id
+
             foreach ($Correction in $Finding.Corrections) {
                 $Correction.RuleId = $this.Id
             }
         }
-        return $Results
+        return [NitpickRuleInvocationResult]::new('Executed', $Results)
     }
 }
 

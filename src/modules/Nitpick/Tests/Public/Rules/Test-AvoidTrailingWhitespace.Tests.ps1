@@ -3,11 +3,13 @@ using namespace System.Management.Automation.Language
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
+    $PreviousQuietWhatIf = $env:WHATIF__QUIET
     $env:WHATIF__QUIET = $true
 }
 
 AfterAll {
     Remove-Module Nitpick -Force -ErrorAction SilentlyContinue
+    $env:WHATIF__QUIET = $PreviousQuietWhatIf
 }
 
 Describe 'AvoidTrailingWhitespace' {

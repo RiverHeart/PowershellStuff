@@ -11,8 +11,22 @@ using namespace System.Management.Automation
     The rule's identity namespace. Defaults to Local for scriptblocks and commands
     without an implementing module, or to the implementing module's name.
 
+.PARAMETER Applicability
+    Optional ScriptBlock receiving one isolated IDictionary context argument.
+    Must emit exactly one Boolean. False skips execution; errors terminate.
+    Explicit null clears a declaration from Details.
+
+.PARAMETER MinimumAnalysisHostVersion
+    Optional positive major/minor System.Version required to analyze an applicable
+    target. Checked after applicability, not during discovery. Explicit null clears
+    a declaration from Details. This is separate from project syntax policy.
+
+.PARAMETER Settings
+    Optional integer settings schema. Each setting declares Type, Default, and
+    optional Minimum and Maximum values. Explicit null clears a declaration from Details.
+
 .EXAMPLE
-    Create scriptblock based Nitpick rule
+    Create rule from a scriptblock
 
     $NitpickParams = @{
         Name = 'MyNitpick'
@@ -22,12 +36,27 @@ using namespace System.Management.Automation
     $Nitpick = New-Nitpick @NitpickParams
 
 .EXAMPLE
-    Create function based Nitpick rule
+    Create rule from a function
 
     $NitpickParams = @{
         Callable = 'Get-Command'
     }
     $Nitpick = New-Nitpick @NitpickParams
+
+.EXAMPLE
+    Create a rule that requires policy and, only when applicable, a 7.0 host.
+
+    $NitpickParams = @{
+        Name = 'ProjectRule'
+        Source = 'Tests'
+        Callable = { param($ScriptBlockAst) }
+        Applicability = {
+            param([System.Collections.IDictionary] $Context)
+            $Context.Policy.Count -gt 0
+        }
+        MinimumAnalysisHostVersion = ([version] '7.0')
+    }
+    $Rule = New-Nitpick @NitpickParams
 #>
 function New-Nitpick {
     [CmdletBinding()]
@@ -47,6 +76,18 @@ function New-Nitpick {
 
         [bool] $EditorEnabled = $true,
 
+        [Parameter(HelpMessage='Optional scriptblock receiving one isolated IDictionary context argument. Must emit exactly one Boolean. False skips execution; errors terminate. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $Applicability,
+
+        [Parameter(HelpMessage='Optional minimum analysis host version. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $MinimumAnalysisHostVersion,
+
+        [Parameter(HelpMessage='Optional integer settings schema. Explicit null clears a declaration from Details.')]
+        [AllowNull()]
+        [object] $Settings,
+
         [Parameter(HelpMessage='The name of the nitpick. Mandatory only when using a scriptblock')]
         [ValidateNotNullOrEmpty()]
         [string] $Name,
@@ -60,9 +101,16 @@ function New-Nitpick {
         [string] $Source
     )
 
+    begin {
+        $Properties = @(
+            'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source',
+            'Applicability', 'MinimumAnalysisHostVersion', 'Settings'
+        )
+    }
+
     process {
         $Overrides = @{}
-        foreach ($Property in 'Name', 'Namespace', 'Category', 'EditorEnabled', 'Source') {
+        foreach ($Property in $Properties) {
             if ($PSBoundParameters.ContainsKey($Property)) {
                 $Overrides[$Property] = $PSBoundParameters[$Property]
             }

@@ -222,7 +222,7 @@ function Test-Nested {
         #=== Act ===#
         $Findings = @(Start-Nitpicking `
             -Script $Source `
-            -ExcludeDefaults `
+            -ExcludeRule 'Nitpick/*' `
             -Output Object `
             -NoSummary `
             -ErrorAction Stop

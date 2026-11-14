@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Collections.Generic
 using module AstEditor
 
@@ -62,6 +63,17 @@ using module AstEditor
 .PARAMETER Rule
     Selected Nitpick rules to rerun against valid rendered text. When omitted, the
     correction preview is returned without final reanalysis.
+
+.PARAMETER Context
+    Optional caller-supplied invocation context. The resolver validates and
+    normalizes it against the submitted document before correction selection; it
+    does not load project configuration.
+
+.PARAMETER RuleSettings
+    Optional map of per-rule settings keyed by qualified rule ID. This is the
+    unambiguous direct-call entry point when candidate analysis uses multiple rules.
+    Every ID must match a supplied Rule, so a misspelled ID fails instead of being
+    ignored.
 
 .PARAMETER Path
     Optional source path used to retain file identity during final rule analysis.
@@ -148,6 +160,12 @@ function Resolve-NitpickCorrectionProposal {
         [NitpickRule[]] $Rule,
 
         [AllowNull()]
+        [IDictionary] $Context,
+
+        [AllowNull()]
+        [IDictionary] $RuleSettings,
+
+        [AllowNull()]
         [string] $Path,
 
         [scriptblock] $CorrectionSelector
@@ -168,6 +186,38 @@ function Resolve-NitpickCorrectionProposal {
 
     if ($Document.Edits.Count -gt 0) {
         Write-Error "The provided AstDocument contains edits and cannot be used."
+    }
+
+    $CanonicalContext = New-NitpickInvocationContext `
+        -Target $Document `
+        -Context $Context
+
+    $HasRuleSettings = $PSBoundParameters.ContainsKey('RuleSettings')
+
+    if ($HasRuleSettings -and $CanonicalContext.ContainsKey('RuleSettings')) {
+        throw [ArgumentException]::new(
+            'Supply settings through either Context.RuleSettings for one rule or -RuleSettings keyed by rule ID, not both.'
+        )
+    }
+
+    if ($HasRuleSettings) {
+        $RuleSettings = ConvertTo-NitpickRuleSettingsMap `
+            -RuleSettings $RuleSettings `
+            -Rule $Rule `
+            -Source 'RuleSettings' `
+            -ErrorAction Stop
+    } elseif ($CanonicalContext.ContainsKey('RuleSettings')) {
+        if ($Rule.Count -ne 1) {
+            throw [ArgumentException]::new(
+                'Context.RuleSettings can be used only when exactly one rule is supplied; use -RuleSettings keyed by rule ID for multiple rules.'
+            )
+        }
+
+        $null = ConvertTo-NitpickEffectiveRuleSettings `
+            -Schema $Rule[0].Settings `
+            -Values $CanonicalContext.RuleSettings `
+            -RuleId $Rule[0].Id `
+            -ErrorAction Stop
     }
 
     $AcceptedCorrections = [List[NitpickCorrection]]::new()
@@ -439,7 +489,26 @@ function Resolve-NitpickCorrectionProposal {
 
             if ($RuleIsSuppressed) { continue }
 
-            foreach ($FinalFinding in $SelectedRule.Invoke($RenderedDocument, @{})) {
+            $RuleContext = Copy-NitpickPlainData -Value $CanonicalContext -Path 'Context'
+            if ($HasRuleSettings) {
+                $RuleContext.Remove('RuleSettings')
+                if ($RuleSettings.ContainsKey($SelectedRule.Id)) {
+                    $RuleContext.RuleSettings = $RuleSettings[$SelectedRule.Id]
+                }
+            }
+
+            $Outcome = Invoke-NitpickRuleWithCoordinatorContext `
+                -Rule $SelectedRule `
+                -Target $RenderedDocument `
+                -Context $RuleContext `
+                -ContextTarget $Document
+
+            if ($Outcome.Status -eq 'Inapplicable') {
+                Write-Verbose "Rule '$($SelectedRule.Id)' was inapplicable during candidate analysis."
+                continue
+            }
+
+            foreach ($FinalFinding in $Outcome.Results) {
                 if ($FinalFinding -is [NitpickFinding] -and (
                     Test-NitpickRuleSuppressed `
                         -RuleId $FinalFinding.RuleId `

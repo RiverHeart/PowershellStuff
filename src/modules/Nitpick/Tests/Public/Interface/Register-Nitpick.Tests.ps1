@@ -29,6 +29,91 @@ Describe 'Register-Nitpick' {
         }
     }
 
+    It 'preserves settings schemas through descriptor reconstruction and explicit clearing' {
+        $Original = New-Nitpick `
+            -Name SettingsRule `
+            -Source Tests `
+            -Settings @{
+                MaximumLength = @{ Type = 'Integer'; Default = 120; Minimum = 1 }
+            } `
+            -Callable { param($ScriptBlockAst) }
+
+        $Registered = $Original | Register-Nitpick -Category Quality -PassThru
+
+        $Registered.Settings.MaximumLength.Default | Should -Be 120
+        $Registered.Category | Should -BeExactly 'Quality'
+
+        $Cleared = $Registered | Register-Nitpick -Settings $null -PassThru
+        $Cleared.Settings.Count | Should -Be 0
+    }
+
+    It 'accepts a settings schema declared directly during registration' {
+        $Registered = Register-Nitpick `
+            -Name DirectSettings `
+            -Source Tests `
+            -Callable { param($ScriptBlockAst) } `
+            -Settings @{ Threshold = @{ Type = 'Integer'; Default = 7; Maximum = 10 } } `
+            -PassThru
+
+        $Registered.Settings.Threshold.Default | Should -Be 7
+        $Registered.Settings.Threshold.Maximum | Should -Be 10
+    }
+
+    It 'preserves execution declarations through unrelated descriptor overrides' {
+        $Predicate = { $false }
+        $Original = New-Nitpick -Name Declared -Source Tests -Callable {
+            param($ScriptBlockAst)
+        } -Applicability $Predicate -MinimumAnalysisHostVersion ([version] '999.0')
+        $Registered = $Original | Register-Nitpick -Category Quality -PassThru
+
+        $Registered.Category | Should -BeExactly 'Quality'
+        [object]::ReferenceEquals($Registered, $Original) | Should -BeFalse
+        [object]::ReferenceEquals($Registered.Applicability, $Predicate) | Should -BeTrue
+        $Registered.MinimumAnalysisHostVersion | Should -Be ([version] '999.0')
+        $Registered.InvokeWithResult({}.Ast, @{}).Status | Should -BeExactly 'Inapplicable'
+
+        $Cleared = $Registered | Register-Nitpick -Applicability $null -MinimumAnalysisHostVersion $null -PassThru
+        $Cleared.Applicability | Should -BeNullOrEmpty
+        $Cleared.MinimumAnalysisHostVersion | Should -BeNullOrEmpty
+        $Cleared.Category | Should -BeExactly 'Quality'
+        $Stored = Get-Nitpick | Where-Object { $_.Id -eq 'Local/Declared' }
+        [object]::ReferenceEquals($Stored, $Cleared) | Should -BeTrue
+        $Cleared.InvokeWithResult({}.Ast, @{}).Status | Should -BeExactly 'Executed'
+    }
+
+    It 'supports direct execution metadata overrides and null preservation during reconstruction' {
+        $Predicate = { $true }
+        $Registered = Register-Nitpick -Name DirectMetadata -Source Tests -Callable {
+            param($ScriptBlockAst)
+        } -Applicability $Predicate -MinimumAnalysisHostVersion ([version] '5.1') -PassThru
+        [object]::ReferenceEquals($Registered.Applicability, $Predicate) | Should -BeTrue
+        $Registered.MinimumAnalysisHostVersion | Should -Be ([version] '5.1')
+
+        $Producer = {
+            [CmdletBinding(DefaultParameterSetName='Rule')]
+            param(
+                [Parameter(Mandatory,ParameterSetName='Rule')]
+                $ScriptBlockAst,
+
+                [Parameter(Mandatory,ParameterSetName='Details')]
+                [switch] $Details
+            )
+            if ($Details) { return @{ Applicability = { $false }; MinimumAnalysisHostVersion = [version] '999.0' } }
+        }
+        $Cleared = New-Nitpick -Callable $Producer -Name Cleared -Source Tests `
+            -Applicability $null -MinimumAnalysisHostVersion $null
+        $Rebuilt = $Cleared | Register-Nitpick -Category Style -PassThru
+        $Rebuilt.Applicability | Should -BeNullOrEmpty
+        $Rebuilt.MinimumAnalysisHostVersion | Should -BeNullOrEmpty
+    }
+
+    It 'rejects malformed execution overrides instead of converting them' {
+        { Register-Nitpick -Callable { param($ScriptBlockAst) } -Name Bad -Source Tests -Applicability 'false' } |
+            Should -Throw '*Applicability*'
+        { Register-Nitpick -Callable { param($ScriptBlockAst) } -Name Bad -Source Tests -MinimumAnalysisHostVersion '7.0' } |
+            Should -Throw '*MinimumAnalysisHostVersion*'
+    }
+
     It 'registers a rule in the Nitpick registry' {
         Register-Nitpick -Callable {
             param ($ScriptBlockAst)
