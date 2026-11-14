@@ -566,8 +566,7 @@ Export-ModuleMember -Function Test-ContractRule
                     -Script {} `
                     -Module $Alpha.ManifestPath,$Beta.ManifestPath `
                     -IncludeRule 'NitpickContractAlpha/ContractRule','NitpickContractBeta/ContractRule' `
-                    -Output Object `
-                    -ExcludeDefaults
+                    -Output Object
             )
 
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }

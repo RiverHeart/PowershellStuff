@@ -550,7 +550,10 @@ registration. Existing file-target tests pass with only necessary selector migra
   detection. Its own `-ExcludeDefaults` switch keeps the opt-out built-ins-by-default
   contract end users expect, translating to an explicit `Find-Nitpick -IncludeDefaults`
   argument (`$true` unless `-ExcludeDefaults` is set) so the built-in package and any
-  requested packages are always acquired together in one call.
+  requested packages are always acquired together in one call. (Later superseded:
+  `-ExcludeDefaults` was removed when project configuration gained a `Modules` key.
+  `Start-Nitpicking` now always acquires built-ins alongside configured and requested
+  packages; use `-ExcludeRule 'Nitpick/*'` to skip built-in rules.)
 - [Register-Nitpick](../Public/Interface/Register-Nitpick.ps1) gained `-Namespace` and
   now keys the registry by `Id`. A piped `NitpickRule` (for example from `Find-Nitpick`)
   can still have its `-Category`/`-Source`/`-EditorEnabled`/`-Name`/`-Namespace`

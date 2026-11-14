@@ -103,6 +103,37 @@ analysis reports violations from selected, applicable, unsuppressed rules. A
 compatibility finding alone does **not** reject a correction: independent
 enforcement of syntax policy when accepting corrections is deferred.
 
+## Rule modules in configuration
+
+A configuration can declare the rule packages a project uses, so callers don't
+have to repeat `-Module` on every run:
+
+```powershell
+@{
+    Modules = @(
+        'WPF'                     # module name, resolved through PSModulePath
+        '.\tools\MyRules.psd1'    # path, resolved from this file's directory
+    )
+}
+```
+
+`Modules` accepts one string or an array of non-empty strings. Relative paths
+resolve from the configuration file's directory, regardless of the caller's
+location; bare names are module names and may not contain wildcards. Configured
+modules and `Start-Nitpicking -Module` are additive: built-in rules, configured
+packages, and requested packages are all discovered together, and configured
+rule settings are validated against that combined set. Use `-IncludeRule` and
+`-ExcludeRule` to choose what runs, for example `-ExcludeRule 'Nitpick/*'` to
+skip the built-in rules.
+
+> [!WARNING]
+> Declaring a module imports and runs its code. Only use configuration files
+> from sources you trust, just as you would with `-Module`.
+
+A file that looks like a PowerShell module manifest (it has `ModuleVersion`,
+`RootModule`, or `GUID`) is rejected, so a module's own `.psd1` is not mistaken
+for Nitpick configuration.
+
 ## Rule settings and line length
 
 Rule-specific settings live beside, but separately from, project compatibility
@@ -626,6 +657,7 @@ ScriptAnalyzer diagnostic conversion still emits local names and suppression IDs
 External DiagnosticRecord-only scaffolds are not native producers and remain unchanged.
 
 **TODO:**
+  - Bare names in config can still match a local folder. The config reader keeps WPF as a name, but Resolve-NitpickModuleSource runs the existence check later. If the folder you run from contains a WPF folder, that folder is used instead of the installed module. -Module has always behaved this way. Fixing it for config would mean passing "this came from config" through to that later step.
   - Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
   - Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.
   - Use the `Select-Object -First`/`-Last` + `StopUpstreamCommandsException` defect as a concrete test ground for PowerShell edition/version compatibility support in Nitpick: a rule (or rule category) that flags constructs known to behave differently, or outright break, across supported PowerShell versions/editions.

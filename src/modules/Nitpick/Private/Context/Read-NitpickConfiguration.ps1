@@ -8,13 +8,24 @@ using namespace System.Management.Automation
 
 .DESCRIPTION
     Reads one explicitly selected PSD1 file and returns a hashtable with optional
-    Compatibility policy and Rules settings keys.
+    Compatibility policy, Modules, and Rules settings keys.
 
-    Resolves filesystem paths against the caller's current location.
+    Resolves the configuration path against the caller's current location.
+
+    Modules lists rule packages to acquire, as one string or an array of strings.
+    A path-shaped entry (one containing a path separator or provider qualifier, or
+    ending in .psd1, .psm1, or .dll) that is relative resolves from the
+    configuration file's directory, so the configuration means the same thing
+    wherever the command is run. Other entries are module names and are returned
+    unchanged. Packages are not acquired here, so no module code runs.
 
     Rules is checked only for shape here, because which rule IDs exist depends on
     the packages loaded for a run. Resolve-NitpickEffectiveRuleSet checks the IDs
     and values against discovered rules.
+
+    A PSD1 file that looks like a PowerShell module manifest is rejected with a
+    specific message. The conventional configuration name, nitpick.psd1, matches
+    Nitpick's own manifest on case-insensitive file systems.
 
     Empty configuration normalizes to an empty dictionary. Missing, unreadable,
     invalid, or unknown configuration terminates with NitpickInvalidConfiguration.
@@ -32,6 +43,16 @@ using namespace System.Management.Automation
     $NitpickModule.NewBoundScriptBlock({
         $Policy = Read-NitpickConfiguration -LiteralPath '.\build\policy[legacy].psd1'
     }).Invoke()
+
+.EXAMPLE
+    Resolves a relative module path from the configuration file's directory.
+
+    $Path = Join-Path $env:TEMP 'nitpick-example.psd1'
+    Set-Content -LiteralPath $Path -Value "@{ Modules = 'WPF', '.\rules\Custom.psd1' }"
+    (Read-NitpickConfiguration -LiteralPath $Path).Modules
+
+    Returns 'WPF' unchanged and the absolute path of rules\Custom.psd1 under
+    $env:TEMP. Neither module needs to exist, because nothing is imported.
 
 .NOTES
     Private helper; examples run within Nitpick's module scope. Loading policy
@@ -79,10 +100,50 @@ function Read-NitpickConfiguration {
             throw [ArgumentException]::new('Configuration must be a string-keyed dictionary.')
         }
 
+        $ManifestKeys = @(
+            @('ModuleVersion', 'RootModule', 'GUID') | Where-Object { $Data.Contains($_) }
+        )
+        if ($ManifestKeys.Count -gt 0) {
+            throw [ArgumentException]::new(
+                "the file looks like a PowerShell module manifest (it contains '$($ManifestKeys[0])'), " +
+                'not a Nitpick configuration.'
+            )
+        }
+
         $Configuration = @{}
         foreach ($Key in $Data.psbase.Keys) {
-            if ($Key -isnot [string] -or $Key -notin 'Compatibility', 'Rules') {
+            if ($Key -isnot [string] -or $Key -notin 'Compatibility', 'Modules', 'Rules') {
                 throw [ArgumentException]::new("Unknown configuration key 'Configuration.$Key'.")
+            }
+        }
+
+        if ($Data.Contains('Modules')) {
+            $ConfigurationDirectory = Split-Path -Path $File.FullName -Parent
+            $Modules = foreach ($Entry in @($Data.Modules)) {
+                if ($Entry -isnot [string] -or [string]::IsNullOrWhiteSpace($Entry)) {
+                    throw [ArgumentException]::new(
+                        "'Configuration.Modules' must contain only non-empty module names or paths."
+                    )
+                }
+
+                $IsPath = Test-NitpickModulePathShape -Value $Entry -SyntaxOnly
+
+                if (-not $IsPath) {
+                    if ([WildcardPattern]::ContainsWildcardCharacters($Entry)) {
+                        throw [ArgumentException]::new(
+                            "'Configuration.Modules' entry '$Entry' must be an exact module name, not a wildcard pattern."
+                        )
+                    }
+                    $Entry
+                } elseif ($Entry.Contains('::') -or [IO.Path]::IsPathRooted($Entry)) {
+                    $Entry
+                } else {
+                    [IO.Path]::GetFullPath([IO.Path]::Combine($ConfigurationDirectory, $Entry))
+                }
+            }
+
+            if (@($Modules).Count -gt 0) {
+                $Configuration.Modules = [string[]] @($Modules)
             }
         }
 

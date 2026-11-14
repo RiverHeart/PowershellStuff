@@ -17,7 +17,8 @@ using namespace System.Management.Automation
     remain after exclusions and editor-mode filtering.
 
 .PARAMETER Module
-    Module names or literal paths to acquire as additive rule packages.
+    Module names or literal paths to acquire as rule packages, in addition to the
+    built-in package.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs. Supports wildcards. Every literal selector must match
@@ -25,9 +26,6 @@ using namespace System.Management.Automation
 
 .PARAMETER ExcludeRule
     Excludes matching rule IDs. Supports wildcards.
-
-.PARAMETER ExcludeDefaults
-    Omits the built-in Nitpick package, including when Module is also omitted.
 
 .PARAMETER EditorMode
     Keeps only rules whose EditorEnabled metadata is true.
@@ -50,7 +48,6 @@ function Resolve-NitpickEffectiveRuleSet {
         [string[]] $Module,
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
-        [switch] $ExcludeDefaults,
         [switch] $EditorMode,
         [AllowNull()]
         [IDictionary] $RuleSettings,
@@ -59,7 +56,11 @@ function Resolve-NitpickEffectiveRuleSet {
 
     $DiscoveredRules = [List[object]]::new()
 
-    Find-Nitpick -Module $Module -IncludeDefaults:(-not $ExcludeDefaults) -ErrorAction Stop |
+    $FindParam = @{ IncludeDefaults = $true }
+    if ($Module) {
+        $FindParam.Module = $Module
+    }
+    Find-Nitpick @FindParam -ErrorAction Stop |
         ForEach-Object { $DiscoveredRules.Add($_) }
 
     $RegisteredRules = Get-Nitpick

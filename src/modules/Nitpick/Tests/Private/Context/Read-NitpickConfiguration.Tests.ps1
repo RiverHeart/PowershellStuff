@@ -45,7 +45,7 @@ Describe 'Read-NitpickConfiguration' {
 
     It 'normalizes empty policy <Text>' -TestCases @(
         '@{}', '@{ Compatibility = @{} }', '@{ Compatibility = @{ PowerShell = @{} } }',
-        '@{ Rules = @{} }' |
+        '@{ Rules = @{} }', '@{ Modules = @() }' |
             ForEach-Object { @{ Text = $_ } }
     ) {
         param($Text)
@@ -96,6 +96,14 @@ Describe 'Read-NitpickConfiguration' {
         '@{ Rules = @{ UnknownRule = @{} } }',
         '@{ Rules = @{ "Nitpick/AvoidLongLines" = 1 } }',
         '@{ 1 = @{} }',
+        '@{ Modules = $null }',
+        '@{ Modules = "" }',
+        '@{ Modules = "   " }',
+        '@{ Modules = 1 }',
+        '@{ Modules = @{} }',
+        '@{ Modules = @("WPF", 2) }',
+        '@{ Modules = @("WPF", @("Nested")) }',
+        '@{ Modules = "Nitpick*" }',
         'throw "must not execute"',
         '@{ Compatibility =' |
             ForEach-Object { @{ Text = $_ } }
@@ -106,6 +114,80 @@ Describe 'Read-NitpickConfiguration' {
             $Path = Join-Path $TestDrive 'malformed.psd1'
             Set-Content -LiteralPath $Path -Value $Text
             { Read-NitpickConfiguration -Path $Path } |
+                Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
+        }
+    }
+
+    It 'explains that wildcard module names are not supported' {
+        InModuleScope Nitpick {
+            $Path = Join-Path $TestDrive 'wildcard.psd1'
+            Set-Content -LiteralPath $Path -Value '@{ Modules = "Nitpick*" }'
+            { Read-NitpickConfiguration -LiteralPath $Path } |
+                Should -Throw '*must be an exact module name, not a wildcard pattern*'
+        }
+    }
+
+    It 'returns a single module name as a one-element array' {
+        InModuleScope Nitpick {
+            $Path = Join-Path $TestDrive 'single.psd1'
+            Set-Content -LiteralPath $Path -Value '@{ Modules = "WPF" }'
+
+            $Configuration = Read-NitpickConfiguration -LiteralPath $Path
+
+            $Configuration.Modules | Should -BeOfType ([string])
+            , $Configuration.Modules | Should -BeOfType ([string[]])
+            $Configuration.Modules | Should -Be @('WPF')
+        }
+    }
+
+    It 'resolves relative module paths from the configuration directory, not the caller location' {
+        InModuleScope Nitpick {
+            $ConfigDirectory = New-Item -Path (Join-Path $TestDrive 'project\config') -ItemType Directory
+            $Elsewhere = New-Item -Path (Join-Path $TestDrive 'elsewhere') -ItemType Directory
+            # A same-named directory at the caller's location must not turn a name into a path.
+            $null = New-Item -Path (Join-Path $Elsewhere.FullName 'WPF') -ItemType Directory
+            $RootedPath = Join-Path $TestDrive 'Rooted\Rooted.psd1'
+            $Path = Join-Path $ConfigDirectory.FullName 'nitpick.psd1'
+            Set-Content -LiteralPath $Path -Value @"
+@{
+    Modules = @(
+        'WPF'
+        '.\rules\Custom.psd1'
+        '..\shared\Shared.psm1'
+        'Local.psm1'
+        '$RootedPath'
+        'FileSystem::C:\Provider\Rules'
+    )
+}
+"@
+
+            Push-Location -LiteralPath $Elsewhere.FullName
+            try {
+                $Modules = (Read-NitpickConfiguration -LiteralPath $Path).Modules
+            } finally {
+                Pop-Location
+            }
+
+            $Modules | Should -Be @(
+                'WPF'
+                (Join-Path $ConfigDirectory.FullName 'rules\Custom.psd1')
+                (Join-Path $TestDrive 'project\shared\Shared.psm1')
+                (Join-Path $ConfigDirectory.FullName 'Local.psm1')
+                $RootedPath
+                'FileSystem::C:\Provider\Rules'
+            )
+        }
+    }
+
+    It 'rejects a PowerShell module manifest with a specific message' {
+        InModuleScope Nitpick {
+            $ManifestPath = Join-Path (Get-Module Nitpick).ModuleBase 'Nitpick.psd1'
+            { Read-NitpickConfiguration -LiteralPath $ManifestPath } |
+                Should -Throw '*looks like a PowerShell module manifest*'
+
+            $Path = Join-Path $TestDrive 'guid.psd1'
+            Set-Content -LiteralPath $Path -Value "@{ GUID = '$([guid]::NewGuid())' }"
+            { Read-NitpickConfiguration -LiteralPath $Path } |
                 Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
         }
     }

@@ -41,20 +41,20 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER Module
     Module names or literal paths to acquire as additive rule packages, alongside the
-    built-in package and any explicit registrations. Package manifests may declare
-    rule commands and supporting modules; supporting modules use the declared owner's
-    namespace even when acquired directly. Does not register acquired rules.
+    built-in package, packages declared by the configuration's Modules key, and any
+    explicit registrations. Relative paths resolve from the caller's current location.
+    Package manifests may declare rule commands and supporting modules; supporting
+    modules use the declared owner's namespace even when acquired directly. Acquiring
+    a package imports its code. Does not register acquired rules. Use IncludeRule and
+    ExcludeRule to control which acquired rules run.
 
 .PARAMETER ConfigurationPath
-    An explicit PSD1 project-configuration file containing compatibility policy
-    and/or rule settings. Configuration is validated before target processing and
-    applies uniformly to every target in this invocation. Relative paths resolve
-    from the caller's current PowerShell location; omitting this parameter supplies
-    no project configuration.
-
-.PARAMETER ExcludeDefaults
-    Omits the built-in Nitpick package, including when Module is also omitted (in
-    which case no rules are discovered; registered rules may still apply).
+    An explicit PSD1 project-configuration file containing compatibility policy,
+    rule packages (Modules), and/or rule settings (Rules). Configuration is validated
+    before target processing and applies uniformly to every target in this invocation.
+    Relative paths resolve from the caller's current PowerShell location; omitting
+    this parameter supplies no project configuration. Packages it declares are
+    imported, so only use configuration files you trust.
 
 .PARAMETER Path
     A file, directory, or wildcard path. Literal paths must exist. File targets are
@@ -73,6 +73,8 @@ using namespace System.Management.Automation.Language
 .PARAMETER ExcludeRule
     Excludes matching rule IDs. Unmatched exclusions are allowed. If no eligible
     rules remain after exclusions and editor-mode filtering, execution terminates.
+    Use 'Nitpick/*' to skip the built-in rules; they are still discovered, so
+    configured settings for them are still validated.
 
 .PARAMETER FixMode
     Specifies the mode for applying corrections.
@@ -154,7 +156,6 @@ function Start-Nitpicking {
         [ValidateSet('Off', 'Preview', 'Guided', 'Apply')]
         [string] $FixMode = 'Off',
 
-        [switch] $ExcludeDefaults,
         [switch] $EditorMode,
         [switch] $NoSummary
     )
@@ -175,6 +176,7 @@ function Start-Nitpicking {
 
         $ProjectPolicy = @{}
         $ProjectRuleSettings = @{}
+        $RuleModules = @()
         if ($PSBoundParameters.ContainsKey('ConfigurationPath')) {
             $ProjectConfiguration = Read-NitpickConfiguration -LiteralPath $ConfigurationPath
 
@@ -184,16 +186,22 @@ function Start-Nitpicking {
                 }
             }
 
+            if ($ProjectConfiguration.ContainsKey('Modules')) {
+                $RuleModules += $ProjectConfiguration.Modules
+            }
+
             if ($ProjectConfiguration.ContainsKey('Rules')) {
                 $ProjectRuleSettings = $ProjectConfiguration.Rules
             }
         }
+        if ($Module) {
+            $RuleModules += $Module
+        }
 
         [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
-            -Module $Module `
+            -Module $RuleModules `
             -IncludeRule $IncludeRule `
             -ExcludeRule $ExcludeRule `
-            -ExcludeDefaults:$ExcludeDefaults `
             -EditorMode:$EditorMode `
             -RuleSettings $ProjectRuleSettings `
             -RuleSettingsSource "configuration '$ConfigurationPath'"
