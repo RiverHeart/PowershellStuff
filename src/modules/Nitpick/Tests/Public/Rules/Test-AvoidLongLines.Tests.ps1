@@ -180,19 +180,16 @@ Describe 'AvoidLongLines' {
     }
 
     It 'propagates project settings through original and candidate analysis' {
-        $ConfigurationPath = Join-Path $TestDrive 'line-settings.psd1'
-        Set-Content -LiteralPath $ConfigurationPath -Value @'
-@{
-    Rules = @{
-        'Nitpick/AvoidLongLines' = @{ MaximumLength = 3 }
-    }
-}
-'@
+        $ConfigData = @{
+            Rules = @{
+                'Nitpick/AvoidLongLines' = @{ MaximumLength = 3 }
+            }
+        }
 
         $Results = @(
             Start-Nitpicking `
                 -Script 'four' `
-                -ConfigurationPath $ConfigurationPath `
+                -ConfigData $ConfigData `
                 -IncludeRule Nitpick/AvoidLongLines `
                 -FixMode Preview `
                 -Output Object `

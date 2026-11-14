@@ -35,7 +35,7 @@ applies uniformly to the invocation's targets; a configuration does not contain
 file-path-specific compatibility overrides.
 
 Use a PSD1 data file loaded through `Import-PowerShellDataFile`, selected by
-`Start-Nitpicking -ConfigurationPath`. `nitpick.psd1` is the documented convention,
+`Start-Nitpicking -ConfigFile`. `nitpick.psd1` is the documented convention,
 not a mandatory explicit filename. Resolve relative paths against the caller's
 current PowerShell location and validate once before target processing.
 Omitting the path supplies no project policy; an explicit missing, unreadable,
@@ -632,7 +632,7 @@ the module.
 
 Implemented. The shared private `ConvertTo-NitpickPolicy` owns schema validation
 and the release catalog for both file loading and direct-context normalization.
-The reader is not exported and `Start-Nitpicking -ConfigurationPath` is not
+The reader is not exported and `Start-Nitpicking -ConfigFile` is not
 available until the coordinator phase. Each descriptor invocation receives a
 fresh context; file identity is retained even when a file-backed document is
 dispatched to an AST producer.
@@ -701,7 +701,7 @@ both hosts; an intentionally impossible host prerequisite errors only on dispatc
 
 Changes:
 
-- Add `Start-Nitpicking -ConfigurationPath`, load once in `begin`, construct
+- Add `Start-Nitpicking -ConfigFile`, load once in `begin`, construct
   canonical context per target, and consume descriptor outcomes.
 - Forward optional context through target correction and proposal resolution.
   Preserve original target identity for candidate analysis through a

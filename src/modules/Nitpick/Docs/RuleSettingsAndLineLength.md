@@ -4,7 +4,7 @@
 
 Implementation record for rule-specific project settings and the detection-only
 line-length rule. The feature extends the existing explicit
-`Start-Nitpicking -ConfigurationPath` entry point rather than adding a second
+`Start-Nitpicking -ConfigFile` entry point rather than adding a second
 configuration file or automatic discovery. Runtime behavior and user-facing
 configuration are documented in the [Nitpick README](../README.md).
 

@@ -205,8 +205,13 @@ Export-ModuleMember -Function Test-PathRule
 
             Push-Location -LiteralPath $Elsewhere.FullName
             try {
-                $Results = @(Start-Nitpicking -Script '$Value = 1' -ConfigurationPath $ConfigPath `
-                    -IncludeRule "$ModuleName/PathRule" -Output Object -ErrorAction Stop)
+                $Results = @(Start-Nitpicking `
+                    -Script '$Value = 1' `
+                    -ConfigFile $ConfigPath `
+                    -IncludeRule "$ModuleName/PathRule" `
+                    -Output Object `
+                    -ErrorAction Stop
+                )
             } finally {
                 Pop-Location
             }
@@ -223,31 +228,40 @@ Export-ModuleMember -Function Test-PathRule
 function Measure-OtherPathRule { param ($ScriptBlockAst) }
 Export-ModuleMember -Function Measure-OtherPathRule
 '@
-            Set-Content -LiteralPath $ConfigPath -Value "@{ Modules = @('$ManifestPath') }"
+            $ConfigData = @{ Modules = @($ManifestPath) }
             $BuiltInRuleCount = (Find-Nitpick).Count
 
-            $Results = @(Start-Nitpicking -Script {} -ConfigurationPath $ConfigPath `
-                -Module $OtherModulePath -Output Object -ErrorAction Stop)
+            $Results = @(Start-Nitpicking `
+                -Script {} `
+                -ConfigData $ConfigData `
+                -Module $OtherModulePath `
+                -Output Object `
+                -ErrorAction Stop
+            )
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
             $Summary.RuleCount | Should -Be ($BuiltInRuleCount + 2)
 
-            $Results = @(Start-Nitpicking -Script {} -ConfigurationPath $ConfigPath `
-                -Module $OtherModulePath -ExcludeRule 'Nitpick/*' -Output Object -ErrorAction Stop)
+            $Results = @(Start-Nitpicking `
+                -Script {} `
+                -ConfigData $ConfigData `
+                -Module $OtherModulePath `
+                -ExcludeRule 'Nitpick/*' `
+                -Output Object `
+                -ErrorAction Stop
+            )
             $Summary = $Results | Where-Object { $_.GetType().Name -eq 'NitpickSummary' }
             $Summary.RuleCount | Should -Be 2
         }
 
         It 'validates configured settings against rules from configured modules' {
-            Set-Content -LiteralPath $ConfigPath -Value @"
-@{
-    Modules = '$ManifestPath'
-    Rules = @{ '$ModuleName/PathRule' = @{ Bogus = 1 } }
-}
-"@
+            $ConfigData = @{
+                Modules = $ManifestPath
+                Rules = @{ "$ModuleName/PathRule" = @{ Bogus = 1 } }
+            }
             Mock New-AstDocument -ModuleName Nitpick { throw 'Analysis must not start.' }
 
             {
-                Start-Nitpicking -Script {} -ConfigurationPath $ConfigPath -ErrorAction Stop
+                Start-Nitpicking -Script {} -ConfigData $ConfigData -ErrorAction Stop
             } | Should -Throw "*unknown setting 'Bogus'*"
             Should -Invoke New-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
         }

@@ -7,7 +7,7 @@ AfterAll {
 }
 
 Describe 'Test-NitpickModulePathShape' {
-    It 'treats <Value> as path-shaped from syntax alone' -TestCases @(
+    It 'treats <Value> as path-shaped from syntax alone' -ForEach @(
         @{ Value = '.\Rules' }
         @{ Value = 'Rules/Custom' }
         @{ Value = 'FileSystem::C:\Rules' }

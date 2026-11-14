@@ -6,60 +6,10 @@ AfterAll {
     Remove-Module Nitpick -Force -ErrorAction SilentlyContinue
 }
 
+# Content validation is tested in memory in New-NitpickConfiguration.Tests.ps1.
+# These tests cover reading the file and passing its directory along.
 Describe 'Read-NitpickConfiguration' {
-    It 'normalizes supported release <Release>' -ForEach @(
-        '5.1',
-        '6.0', '6.1', '6.2',
-        '7.0', '7.1', '7.2', '7.3', '7.4', '7.5', '7.6' |
-        ForEach-Object { @{ Release = $_ } }
-    ) {
-        param($Release)
-        InModuleScope Nitpick -Parameters @{ Release = $Release } {
-            param($Release)
-            $Path = Join-Path $TestDrive 'nitpick.psd1'
-            Set-Content -LiteralPath $Path -Value "@{ Compatibility = @{ PowerShell = @{ MinimumVersion = '$Release' } } }"
-
-            $Policy = Read-NitpickConfiguration -Path $Path
-
-            $Policy.Compatibility.PowerShell.MinimumVersion | Should -BeOfType ([version])
-            $Policy.Compatibility.PowerShell.MinimumVersion.ToString() | Should -BeExactly $Release
-            $Policy.Compatibility.PowerShell.MinimumVersion.Build | Should -Be -1
-        }
-    }
-
-    It 'rejects invalid minimum <Expression>' -TestCases @(
-        "'5'", "'5.0'", "'7'", "'7.4.0'", "'7.4-preview.1'", "' 7.4'", "'7.4 '",
-        '7.4', '7', "'99.0'", "'6.3'", "'7.7'", "''", '$null', '$false', '@()', '@{}' |
-            ForEach-Object { @{ Expression = $_ } }
-    ) {
-        param($Expression)
-        InModuleScope Nitpick -Parameters @{ Expression = $Expression } {
-            param($Expression)
-            $Path = Join-Path $TestDrive 'invalid.psd1'
-            Set-Content -LiteralPath $Path -Value "@{ Compatibility = @{ PowerShell = @{ MinimumVersion = $Expression } } }"
-
-            { Read-NitpickConfiguration -Path $Path } |
-                Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
-        }
-    }
-
-    It 'normalizes empty policy <Text>' -TestCases @(
-        '@{}', '@{ Compatibility = @{} }', '@{ Compatibility = @{ PowerShell = @{} } }',
-        '@{ Rules = @{} }', '@{ Modules = @() }' |
-            ForEach-Object { @{ Text = $_ } }
-    ) {
-        param($Text)
-        InModuleScope Nitpick -Parameters @{ Text = $Text } {
-            param($Text)
-            $Path = Join-Path $TestDrive 'empty.psd1'
-            Set-Content -LiteralPath $Path -Value $Text
-            $Policy = Read-NitpickConfiguration -Path $Path
-            $Policy | Should -BeOfType ([hashtable])
-            $Policy.Count | Should -Be 0
-        }
-    }
-
-    It 'accepts rule settings separately from compatibility policy' {
+    It 'returns validated configuration from a file' {
         InModuleScope Nitpick {
             $Path = Join-Path $TestDrive 'settings.psd1'
             Set-Content -LiteralPath $Path -Value @'
@@ -78,37 +28,23 @@ Describe 'Read-NitpickConfiguration' {
         }
     }
 
-    It 'rejects malformed or unknown schema <Text>' -TestCases @(
-        '@{ Compatibility = $null }',
-        '@{ Compatibility = 1 }',
-        '@{ Compatibility = @() }',
-        '@{ Compatibility = @{ PowerShell = $null } }',
-        '@{ Compatibility = @{ PowerShell = "5.1" } }',
-        '@{ Compatibility = @{ PowerShell = @() } }',
-        '@{ Keys = @() }',
-        '@{ Compatibility = @{ Keys = @() } }',
-        '@{ Compatibility = @{ PowerShell = @{ Keys = @() } } }',
-        '@{ Caller = "spoofed" }',
-        '@{ Compatibility = @{ Typo = @{} } }',
-        '@{ Compatibility = @{ PowerShell = @{ MinVersion = "5.1" } } }',
-        '@{ Compatibility = @{ PowerShell = @{}; Typo = 1 } }',
-        '@{ Rules = $null }',
-        '@{ Rules = @{ UnknownRule = @{} } }',
-        '@{ Rules = @{ "Nitpick/AvoidLongLines" = 1 } }',
-        '@{ 1 = @{} }',
-        '@{ Modules = $null }',
-        '@{ Modules = "" }',
-        '@{ Modules = "   " }',
-        '@{ Modules = 1 }',
-        '@{ Modules = @{} }',
-        '@{ Modules = @("WPF", 2) }',
-        '@{ Modules = @("WPF", @("Nested")) }',
-        '@{ Modules = "Nitpick*" }',
-        'throw "must not execute"',
-        '@{ Compatibility =' |
-            ForEach-Object { @{ Text = $_ } }
+    It 'names the configuration path once in content errors' {
+        InModuleScope Nitpick {
+            $Path = Join-Path $TestDrive 'typo.psd1'
+            Set-Content -LiteralPath $Path -Value '@{ Typo = 1 }'
+
+            $Thrown = { Read-NitpickConfiguration -LiteralPath $Path } |
+                Should -Throw -ErrorId 'NitpickInvalidConfiguration*' -PassThru
+
+            $Thrown.Exception.Message |
+                Should -BeExactly "Invalid Nitpick configuration '$Path': Unknown configuration key 'Configuration.Typo'."
+            $Thrown.TargetObject | Should -BeExactly $Path
+        }
+    }
+
+    It 'rejects a file that is not data <Text>' -ForEach @(
+        'throw "must not execute"', '@{ Compatibility =' | ForEach-Object { @{ Text = $_ } }
     ) {
-        param($Text)
         InModuleScope Nitpick -Parameters @{ Text = $Text } {
             param($Text)
             $Path = Join-Path $TestDrive 'malformed.psd1'
@@ -118,48 +54,12 @@ Describe 'Read-NitpickConfiguration' {
         }
     }
 
-    It 'explains that wildcard module names are not supported' {
-        InModuleScope Nitpick {
-            $Path = Join-Path $TestDrive 'wildcard.psd1'
-            Set-Content -LiteralPath $Path -Value '@{ Modules = "Nitpick*" }'
-            { Read-NitpickConfiguration -LiteralPath $Path } |
-                Should -Throw '*must be an exact module name, not a wildcard pattern*'
-        }
-    }
-
-    It 'returns a single module name as a one-element array' {
-        InModuleScope Nitpick {
-            $Path = Join-Path $TestDrive 'single.psd1'
-            Set-Content -LiteralPath $Path -Value '@{ Modules = "WPF" }'
-
-            $Configuration = Read-NitpickConfiguration -LiteralPath $Path
-
-            $Configuration.Modules | Should -BeOfType ([string])
-            , $Configuration.Modules | Should -BeOfType ([string[]])
-            $Configuration.Modules | Should -Be @('WPF')
-        }
-    }
-
     It 'resolves relative module paths from the configuration directory, not the caller location' {
         InModuleScope Nitpick {
             $ConfigDirectory = New-Item -Path (Join-Path $TestDrive 'project\config') -ItemType Directory
             $Elsewhere = New-Item -Path (Join-Path $TestDrive 'elsewhere') -ItemType Directory
-            # A same-named directory at the caller's location must not turn a name into a path.
-            $null = New-Item -Path (Join-Path $Elsewhere.FullName 'WPF') -ItemType Directory
-            $RootedPath = Join-Path $TestDrive 'Rooted\Rooted.psd1'
             $Path = Join-Path $ConfigDirectory.FullName 'nitpick.psd1'
-            Set-Content -LiteralPath $Path -Value @"
-@{
-    Modules = @(
-        'WPF'
-        '.\rules\Custom.psd1'
-        '..\shared\Shared.psm1'
-        'Local.psm1'
-        '$RootedPath'
-        'FileSystem::C:\Provider\Rules'
-    )
-}
-"@
+            Set-Content -LiteralPath $Path -Value "@{ Modules = 'WPF', '.\rules\Custom.psd1' }"
 
             Push-Location -LiteralPath $Elsewhere.FullName
             try {
@@ -168,34 +68,22 @@ Describe 'Read-NitpickConfiguration' {
                 Pop-Location
             }
 
-            $Modules | Should -Be @(
-                'WPF'
-                (Join-Path $ConfigDirectory.FullName 'rules\Custom.psd1')
-                (Join-Path $TestDrive 'project\shared\Shared.psm1')
-                (Join-Path $ConfigDirectory.FullName 'Local.psm1')
-                $RootedPath
-                'FileSystem::C:\Provider\Rules'
-            )
+            $Modules | Should -Be @('WPF', (Join-Path $ConfigDirectory.FullName 'rules\Custom.psd1'))
         }
     }
 
-    It 'rejects a PowerShell module manifest with a specific message' {
+    It 'rejects Nitpick''s own module manifest with a specific message' {
         InModuleScope Nitpick {
             $ManifestPath = Join-Path (Get-Module Nitpick).ModuleBase 'Nitpick.psd1'
             { Read-NitpickConfiguration -LiteralPath $ManifestPath } |
                 Should -Throw '*looks like a PowerShell module manifest*'
-
-            $Path = Join-Path $TestDrive 'guid.psd1'
-            Set-Content -LiteralPath $Path -Value "@{ GUID = '$([guid]::NewGuid())' }"
-            { Read-NitpickConfiguration -LiteralPath $Path } |
-                Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
         }
     }
 
-    It 'accepts case-insensitive keys and a literal relative filename' {
+    It 'accepts a literal relative filename' {
         InModuleScope Nitpick {
             $Path = Join-Path $TestDrive 'policy[1].psd1'
-            Set-Content -LiteralPath $Path -Value '@{ compatibility = @{ powershell = @{ minimumversion = "5.1" } } }'
+            Set-Content -LiteralPath $Path -Value '@{ Compatibility = @{ PowerShell = @{ MinimumVersion = "5.1" } } }'
             Push-Location $TestDrive
             try {
                 $Policy = Read-NitpickConfiguration -LiteralPath '.\policy[1].psd1'

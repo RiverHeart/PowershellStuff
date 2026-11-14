@@ -32,14 +32,18 @@ Describe 'Start-Nitpicking project policy' {
             param([IDictionary] $Context)
             $Context.Policy.Compatibility.PowerShell.MinimumVersion -eq [version] '5.1'
         }
-        Register-Nitpick -Callable $Producer -Name PolicyProbe -Namespace Local -Source Tests `
+        Register-Nitpick `
+            -Callable $Producer `
+            -Name PolicyProbe `
+            -Namespace Local `
+            -Source Tests `
             -Applicability $Applicability
 
         $FirstPath = Join-Path $TestDrive 'first.ps1'
         $SecondPath = Join-Path $TestDrive 'second.ps1'
         [IO.File]::WriteAllText($FirstPath, '$Value = 1')
         [IO.File]::WriteAllText($SecondPath, '$Value = 2')
-        $ConfigurationPath = Join-Path $TestDrive 'policy[local].psd1'
+        $ConfigFile = Join-Path $TestDrive 'policy[local].psd1'
         Mock Read-NitpickConfiguration -ModuleName Nitpick {
             @{ Compatibility = @{ PowerShell = @{ MinimumVersion = [version] '5.1' } } }
         }
@@ -47,14 +51,14 @@ Describe 'Start-Nitpicking project policy' {
         $Results = @(
             @($FirstPath, $SecondPath) |
                 Start-Nitpicking `
-                    -ConfigurationPath $ConfigurationPath `
+                    -ConfigFile $ConfigFile `
                     -IncludeRule Local/PolicyProbe `
                     -Output Object `
                     -ErrorAction Stop
         )
 
         Should -Invoke Read-NitpickConfiguration -ModuleName Nitpick -Times 1 -Exactly `
-            -ParameterFilter { $LiteralPath -eq $ConfigurationPath }
+            -ParameterFilter { $LiteralPath -eq $ConfigFile }
         $Seen | Should -HaveCount 2
         foreach ($Entry in $Seen) {
             $Entry.Policy | Should -Be ([version] '5.1')
@@ -73,7 +77,12 @@ Describe 'Start-Nitpicking project policy' {
             param([ScriptBlockAst] $ScriptBlockAst)
             $State.ProducerCalls++
         }.GetNewClosure()
-        Register-Nitpick -Callable $Producer -Name PolicyProbe -Namespace Local -Source Tests `
+
+        Register-Nitpick `
+            -Callable $Producer `
+            -Name PolicyProbe `
+            -Namespace Local `
+            -Source Tests `
             -Applicability {
                 param([IDictionary] $Context)
                 $Context.Policy.Count -gt 0
@@ -93,25 +102,29 @@ Describe 'Start-Nitpicking project policy' {
 
     It 'applies explicit policy to fragments without assigning file identity' {
         $Seen = [List[object]]::new()
-        Register-Nitpick -Callable ({
-            param([ScriptBlockAst] $ScriptBlockAst, [IDictionary] $Context)
-            $Seen.Add([pscustomobject]@{
-                Policy = $Context.Policy.Compatibility.PowerShell.MinimumVersion
-                TargetKind = $Context.TargetKind
-                TargetPath = $Context.TargetPath
-            })
-        }.GetNewClosure()) -Name PolicyProbe -Namespace Local -Source Tests `
+        Register-Nitpick `
+            -Callable ({
+                param([ScriptBlockAst] $ScriptBlockAst, [IDictionary] $Context)
+                $Seen.Add([pscustomobject]@{
+                    Policy = $Context.Policy.Compatibility.PowerShell.MinimumVersion
+                    TargetKind = $Context.TargetKind
+                    TargetPath = $Context.TargetPath
+                })
+            }.GetNewClosure()) `
+            -Name PolicyProbe `
+            -Namespace Local `
+            -Source Tests `
             -Applicability {
                 param([IDictionary] $Context)
                 $Context.Policy.Count -gt 0
             }
-        Mock Read-NitpickConfiguration -ModuleName Nitpick {
-            @{ Compatibility = @{ PowerShell = @{ MinimumVersion = '5.1' } } }
-        }
 
         Start-Nitpicking -Script '$Value = 1' `
-            -ConfigurationPath (Join-Path $TestDrive 'policy.psd1') `
-            -IncludeRule Local/PolicyProbe -Output Object -NoSummary -ErrorAction Stop | Out-Null
+            -ConfigData @{ Compatibility = @{ PowerShell = @{ MinimumVersion = '5.1' } } } `
+            -IncludeRule Local/PolicyProbe `
+            -Output Object `
+            -NoSummary `
+            -ErrorAction Stop | Out-Null
 
         $Seen | Should -HaveCount 1
         $Seen[0].Policy | Should -Be ([version] '5.1')
@@ -130,13 +143,16 @@ Describe 'Start-Nitpicking project policy' {
                 $Context.Policy.Count -gt 0
             }
 
-        $ConfigurationPath = Join-Path $TestDrive 'policy.psd1'
-        Mock Read-NitpickConfiguration -ModuleName Nitpick {
-            @{ Compatibility = @{ PowerShell = @{ MinimumVersion = [version] '5.1' } } }
-        }
+        $ConfigData = New-NitpickConfiguration -Compatibility @{ PowerShell = @{ MinimumVersion = '5.1' } }
 
-        Start-Nitpicking -Script '$First = 1' -ConfigurationPath $ConfigurationPath `
-            -IncludeRule Local/PolicyProbe -Output Object -NoSummary -ErrorAction Stop | Out-Null
+        Start-Nitpicking `
+            -Script '$First = 1' `
+            -ConfigData $ConfigData `
+            -IncludeRule Local/PolicyProbe `
+            -Output Object `
+            -NoSummary `
+            -ErrorAction Stop | Out-Null
+
         $WithoutPolicy = @(
             Start-Nitpicking -Script '$Second = 2' -IncludeRule Local/PolicyProbe `
                 -Output Object -Verbose 4>&1
@@ -145,54 +161,72 @@ Describe 'Start-Nitpicking project policy' {
         $State.ProducerCalls | Should -Be 1
         ($WithoutPolicy -join "`n") |
             Should -Match "Rule 'Local/PolicyProbe' was inapplicable during original analysis"
-        Should -Invoke Read-NitpickConfiguration -ModuleName Nitpick -Times 1 -Exactly
+    }
+
+    It 'rejects ConfigFile and ConfigData together' {
+        {
+            Start-Nitpicking -Script '$Value = 1' -ConfigFile (Join-Path $TestDrive 'policy.psd1') `
+                -ConfigData @{}
+        } | Should -Throw -ErrorId 'NitpickConflictingConfiguration*'
+    }
+
+    It 'rejects invalid ConfigData without requiring ErrorAction Stop' {
+        {
+            Start-Nitpicking -Script '$Value = 1' -ConfigData @{ Typo = 1 }
+        } | Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
     }
 
     It 'fails with a configuration error without requiring ErrorAction Stop' {
         {
-            Start-Nitpicking -Script '$Value = 1' -ConfigurationPath (Join-Path $TestDrive 'missing.psd1') `
+            Start-Nitpicking -Script '$Value = 1' -ConfigFile (Join-Path $TestDrive 'missing.psd1') `
                 -IncludeRule Nitpick/UseIsNotOperator
         } | Should -Throw -ErrorId 'NitpickInvalidConfiguration*'
     }
 
     It 'validates configured rule settings before reading any target' {
-        $ConfigurationPath = Join-Path $TestDrive 'invalid-rule-settings.psd1'
-        Set-Content -LiteralPath $ConfigurationPath -Value @'
-@{
-    Rules = @{
-        'Nitpick/AvoidLongLines' = @{ MaximumLenght = 100 }
-    }
-}
-'@
+        $ConfigData = @{
+            Rules = @{
+                'Nitpick/AvoidLongLines' = @{ MaximumLenght = 100 }
+            }
+        }
         $MissingTarget = Join-Path $TestDrive 'not-read.ps1'
 
         $ErrorRecord = {
             Start-Nitpicking `
                 -Path $MissingTarget `
-                -ConfigurationPath $ConfigurationPath `
+                -ConfigData $ConfigData `
                 -IncludeRule Nitpick/AvoidLongLines
         } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*' -PassThru
 
-        $ErrorRecord.Exception.Message | Should -BeLike (
-            "Invalid settings for Nitpick rule 'Nitpick/AvoidLongLines' in configuration '*invalid-rule-settings.psd1': " +
+        $ErrorRecord.Exception.Message | Should -BeExactly (
+            "Invalid settings for Nitpick rule 'Nitpick/AvoidLongLines' in configuration data: " +
             "unknown setting 'MaximumLenght' (known settings: MaximumLength)."
         )
     }
 
-    It 'passes configured settings for non-applicable rules through fix mode' {
-        $ConfigurationPath = Join-Path $TestDrive 'excluded-rule-settings.psd1'
-        Set-Content -LiteralPath $ConfigurationPath -Value @'
-@{
-    Rules = @{
-        'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 }
+    It 'names the configuration file in rule settings errors' {
+        $ConfigFile = Join-Path $TestDrive 'invalid-rule-settings.psd1'
+        Set-Content -LiteralPath $ConfigFile -Value "@{ Rules = @{ 'Nitpick/AvoidLongLines' = @{ MaximumLenght = 100 } } }"
+
+        $ErrorRecord = {
+            Start-Nitpicking -Script '$Value = 1' -ConfigFile $ConfigFile -IncludeRule Nitpick/AvoidLongLines
+        } | Should -Throw -ErrorId 'NitpickInvalidRuleSettings*' -PassThru
+
+        $ErrorRecord.Exception.Message |
+            Should -BeLike "Invalid settings for Nitpick rule 'Nitpick/AvoidLongLines' in configuration '$ConfigFile':*"
     }
-}
-'@
+
+    It 'passes configured settings for non-applicable rules through fix mode' {
+        $ConfigData = @{
+            Rules = @{
+                'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 }
+            }
+        }
 
         {
             Start-Nitpicking `
                 -Script '$Value = 1' `
-                -ConfigurationPath $ConfigurationPath `
+                -ConfigData $ConfigData `
                 -ExcludeRule Nitpick/AvoidLongLines `
                 -FixMode Preview `
                 -Output Object `
@@ -202,24 +236,21 @@ Describe 'Start-Nitpicking project policy' {
     }
 
     It 'rejects settings for a rule unavailable to this invocation before reading targets' {
-        $ConfigurationPath = Join-Path $TestDrive 'unknown-rule-settings.psd1'
-        Set-Content -LiteralPath $ConfigurationPath -Value @'
-@{
-    Rules = @{
-        'MissingPackage/Rule' = @{ MaximumLength = 100 }
-    }
-}
-'@
+        $ConfigData = @{
+            Rules = @{
+                'MissingPackage/Rule' = @{ MaximumLength = 100 }
+            }
+        }
         $MissingTarget = Join-Path $TestDrive 'not-read.ps1'
 
         $ErrorRecord = {
             Start-Nitpicking `
                 -Path $MissingTarget `
-                -ConfigurationPath $ConfigurationPath `
+                -ConfigData $ConfigData `
                 -IncludeRule Nitpick/AvoidLongLines
         } | Should -Throw "*unknown Nitpick rule ID 'MissingPackage/Rule'*" -PassThru
 
-        $ErrorRecord.Exception.Message | Should -BeLike "Invalid rule settings in configuration '*unknown-rule-settings.psd1':*"
+        $ErrorRecord.Exception.Message | Should -BeLike 'Invalid rule settings in configuration data:*'
     }
 
     It 'does not save when candidate reanalysis exposes an unsupported rule' {
@@ -237,6 +268,7 @@ Describe 'Start-Nitpicking project policy' {
                 -ReplacementText '# suppression removed' `
                 -FilePathOrContext $Document.Path `
                 -Description 'Remove the test suppression.'
+
             New-NitpickFinding `
                 -RuleId 'Local/HeaderFix' `
                 -Message 'Remove the test suppression.' `
@@ -255,6 +287,7 @@ Describe 'Start-Nitpicking project policy' {
                 param([ScriptBlockAst] $ScriptBlockAst)
                 throw 'The host prerequisite should prevent producer execution.'
             }
+
         Register-Nitpick -Callable $HeaderRule, $HostRule
 
         {

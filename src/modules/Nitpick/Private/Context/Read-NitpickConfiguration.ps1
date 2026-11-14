@@ -7,28 +7,18 @@ using namespace System.Management.Automation
     Reads one explicitly selected PSD1 file as validated Nitpick project configuration.
 
 .DESCRIPTION
-    Reads one explicitly selected PSD1 file and returns a hashtable with optional
-    Compatibility policy, Modules, and Rules settings keys.
+    Resolves the configuration path against the caller's current location, reads
+    the file as data, and passes it to New-NitpickConfiguration with the file's
+    directory as the base directory. This function owns only the file handling;
+    New-NitpickConfiguration owns every check on the contents, so the same rules
+    apply to configuration built in memory.
 
-    Resolves the configuration path against the caller's current location.
+    Passing the file's directory means relative module paths resolve from the
+    configuration file, so the configuration means the same thing wherever the
+    command is run.
 
-    Modules lists rule packages to acquire, as one string or an array of strings.
-    A path-shaped entry (one containing a path separator or provider qualifier, or
-    ending in .psd1, .psm1, or .dll) that is relative resolves from the
-    configuration file's directory, so the configuration means the same thing
-    wherever the command is run. Other entries are module names and are returned
-    unchanged. Packages are not acquired here, so no module code runs.
-
-    Rules is checked only for shape here, because which rule IDs exist depends on
-    the packages loaded for a run. Resolve-NitpickEffectiveRuleSet checks the IDs
-    and values against discovered rules.
-
-    A PSD1 file that looks like a PowerShell module manifest is rejected with a
-    specific message. The conventional configuration name, nitpick.psd1, matches
-    Nitpick's own manifest on case-insensitive file systems.
-
-    Empty configuration normalizes to an empty dictionary. Missing, unreadable,
-    invalid, or unknown configuration terminates with NitpickInvalidConfiguration.
+    Missing, unreadable, invalid, or unknown configuration terminates with
+    NitpickInvalidConfiguration, and the message names the configuration path.
 
 .PARAMETER Path
     The explicit configuration path; nitpick.psd1 is a convention, not a requirement.
@@ -95,87 +85,18 @@ function Read-NitpickConfiguration {
         }
 
         $Data = Import-PowerShellDataFile -LiteralPath $Resolved.ProviderPath -ErrorAction Stop
-        $Data = Copy-NitpickPlainData -Value $Data -Path 'Configuration'
-        if ($Data -isnot [IDictionary]) {
-            throw [ArgumentException]::new('Configuration must be a string-keyed dictionary.')
-        }
-
-        $ManifestKeys = @(
-            @('ModuleVersion', 'RootModule', 'GUID') | Where-Object { $Data.Contains($_) }
-        )
-        if ($ManifestKeys.Count -gt 0) {
-            throw [ArgumentException]::new(
-                "the file looks like a PowerShell module manifest (it contains '$($ManifestKeys[0])'), " +
-                'not a Nitpick configuration.'
-            )
-        }
-
-        $Configuration = @{}
-        foreach ($Key in $Data.psbase.Keys) {
-            if ($Key -isnot [string] -or $Key -notin 'Compatibility', 'Modules', 'Rules') {
-                throw [ArgumentException]::new("Unknown configuration key 'Configuration.$Key'.")
-            }
-        }
-
-        if ($Data.Contains('Modules')) {
-            $ConfigurationDirectory = Split-Path -Path $File.FullName -Parent
-            $Modules = foreach ($Entry in @($Data.Modules)) {
-                if ($Entry -isnot [string] -or [string]::IsNullOrWhiteSpace($Entry)) {
-                    throw [ArgumentException]::new(
-                        "'Configuration.Modules' must contain only non-empty module names or paths."
-                    )
-                }
-
-                $IsPath = Test-NitpickModulePathShape -Value $Entry -SyntaxOnly
-
-                if (-not $IsPath) {
-                    if ([WildcardPattern]::ContainsWildcardCharacters($Entry)) {
-                        throw [ArgumentException]::new(
-                            "'Configuration.Modules' entry '$Entry' must be an exact module name, not a wildcard pattern."
-                        )
-                    }
-                    $Entry
-                } elseif ($Entry.Contains('::') -or [IO.Path]::IsPathRooted($Entry)) {
-                    $Entry
-                } else {
-                    [IO.Path]::GetFullPath([IO.Path]::Combine($ConfigurationDirectory, $Entry))
-                }
-            }
-
-            if (@($Modules).Count -gt 0) {
-                $Configuration.Modules = [string[]] @($Modules)
-            }
-        }
-
-        if ($Data.Contains('Compatibility')) {
-            $Policy = ConvertTo-NitpickPolicy -Policy @{ Compatibility = $Data.Compatibility }
-            if ($Policy.ContainsKey('Compatibility')) {
-                $Configuration.Compatibility = $Policy.Compatibility
-            }
-        }
-
-        if ($Data.Contains('Rules')) {
-            if ($null -eq $Data.Rules) {
-                throw [ArgumentException]::new("'Configuration.Rules' must be a dictionary keyed by qualified rule ID.")
-            }
-
-            # Only the map's shape is checked here; rule IDs and values are checked
-            # against discovered descriptors by Resolve-NitpickEffectiveRuleSet.
-            $RuleSettings = ConvertTo-NitpickRuleSettingsMap `
-                -RuleSettings $Data.Rules `
-                -Source 'Configuration.Rules' `
-                -ErrorAction Stop
-
-            if ($RuleSettings.Count -gt 0) {
-                $Configuration.Rules = $RuleSettings
-            }
-        }
-
-        return $Configuration
+        $ConfigurationDirectory = Split-Path -Path $File.FullName -Parent
+        $Configuration = New-NitpickConfiguration -Data $Data -BaseDirectory $ConfigurationDirectory
     } catch {
+        # New-NitpickConfiguration already says the configuration is invalid; add the path instead.
+        $Cause = $_.Exception
+        if ($_.FullyQualifiedErrorId -like 'NitpickInvalidConfiguration,*' -and $Cause.InnerException) {
+            $Cause = $Cause.InnerException
+        }
+
         $Exception = [ArgumentException]::new(
-            "Invalid Nitpick configuration '$DisplayPath': $($_.Exception.Message)",
-            $_.Exception
+            "Invalid Nitpick configuration '$DisplayPath': $($Cause.Message)",
+            $Cause
         )
 
         $PSCmdlet.ThrowTerminatingError([ErrorRecord]::new(
@@ -184,4 +105,6 @@ function Read-NitpickConfiguration {
             $DisplayPath
         ))
     }
+
+    Write-Output $Configuration
 }

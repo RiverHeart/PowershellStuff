@@ -16,12 +16,7 @@ BeforeAll {
     function New-TestSyntaxConfiguration {
         param([string] $Minimum)
 
-        $Path = Join-Path $TestDrive "syntax-$Minimum.psd1"
-        [IO.File]::WriteAllText(
-            $Path,
-            "@{ Compatibility = @{ PowerShell = @{ MinimumVersion = '$Minimum' } } }"
-        )
-        return $Path
+        return @{ Compatibility = @{ PowerShell = @{ MinimumVersion = $Minimum } } }
     }
 }
 
@@ -67,7 +62,7 @@ Describe 'Ternary syntax compatibility' {
             ErrorAction = 'Stop'
         }
         @(Start-Nitpicking @Parameters) | Should -HaveCount 0
-        $Parameters.ConfigurationPath = New-TestSyntaxConfiguration '7.0'
+        $Parameters.ConfigData = New-TestSyntaxConfiguration '7.0'
         @(Start-Nitpicking @Parameters) | Should -HaveCount 0
     }
 
@@ -78,7 +73,7 @@ Describe 'Ternary syntax compatibility' {
         ) {
         $Configuration = New-TestSyntaxConfiguration $Minimum
         @(Start-Nitpicking -Script '$Value = $true ? 1 : 2' `
-            -ConfigurationPath $Configuration `
+            -ConfigData $Configuration `
             -IncludeRule Nitpick/AvoidUnsupportedTernarySyntax `
             -Output Object -NoSummary -ErrorAction Stop) | Should -HaveCount 0
     }
@@ -127,7 +122,7 @@ Describe 'Ternary syntax compatibility' {
             -Source '$Value = $true ? 1 : 2' -Prefix "`$Other = 1`r`n"
         $Configuration = New-TestSyntaxConfiguration '5.1'
         $Findings = @(Start-Nitpicking -Script $Fixture.FragmentAst `
-            -ConfigurationPath $Configuration `
+            -ConfigData $Configuration `
             -IncludeRule Nitpick/AvoidUnsupportedTernarySyntax `
             -Output Object -NoSummary -ErrorAction Stop)
         $Findings | Should -HaveCount 1
@@ -140,7 +135,7 @@ Describe 'Ternary syntax compatibility' {
         -Skip:($PSVersionTable.PSVersion.Major -ge 7) {
         $Configuration = New-TestSyntaxConfiguration '5.1'
         $Parameters = @{
-            ConfigurationPath = $Configuration
+            ConfigData = $Configuration
             IncludeRule = 'Nitpick/AvoidUnsupportedTernarySyntax'
             Output = 'Object'
             NoSummary = $true
@@ -157,7 +152,7 @@ Describe 'Ternary syntax compatibility' {
         -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         $Configuration = New-TestSyntaxConfiguration '5.1'
         $Source = '$Value = $true ? 1 : 2 # nitpick disable-line Nitpick/AvoidUnsupportedTernarySyntax'
-        @(Start-Nitpicking -Script $Source -ConfigurationPath $Configuration `
+        @(Start-Nitpicking -Script $Source -ConfigData $Configuration `
             -IncludeRule Nitpick/AvoidUnsupportedTernarySyntax `
             -Output Object -NoSummary -ErrorAction Stop) | Should -HaveCount 0
     }
@@ -221,7 +216,7 @@ Describe 'Ternary syntax compatibility' {
         [IO.File]::WriteAllText($Path, '$Value = 1')
         $Configuration = New-TestSyntaxConfiguration '5.1'
         Register-Nitpick -Callable $FixRule
-        $Results = @(Start-Nitpicking -Path $Path -ConfigurationPath $Configuration `
+        $Results = @(Start-Nitpicking -Path $Path -ConfigData $Configuration `
             -IncludeRule Local/Fixture,Nitpick/AvoidUnsupportedTernarySyntax `
             -FixMode Apply -Confirm:$false -Output Object -NoSummary -ErrorAction Stop)
         [IO.File]::ReadAllText($Path) | Should -BeExactly '$Value = $true ? 1 : 2'

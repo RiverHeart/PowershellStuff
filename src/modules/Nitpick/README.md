@@ -73,7 +73,7 @@ required filename:
 ```
 
 ```powershell
-Start-Nitpicking -Path .\src -ConfigurationPath .\nitpick.psd1
+Start-Nitpicking -Path .\src -ConfigFile .\nitpick.psd1
 ```
 
 Relative configuration paths resolve against the caller's current PowerShell
@@ -134,6 +134,34 @@ A file that looks like a PowerShell module manifest (it has `ModuleVersion`,
 `RootModule`, or `GUID`) is rejected, so a module's own `.psd1` is not mistaken
 for Nitpick configuration.
 
+## In-memory configuration
+
+Pass configuration as data with `Start-Nitpicking -ConfigData` instead of a
+file with `-ConfigFile`. The two parameters can't be combined. `-ConfigData`
+accepts either the hashtable a configuration file would contain or the output of
+`New-NitpickConfiguration`, and is validated the same way as a file:
+
+```powershell
+Start-Nitpicking -Path .\src -ConfigData @{
+    Rules = @{ 'Nitpick/AvoidLongLines' = @{ MaximumLength = 100 } }
+}
+```
+
+`New-NitpickConfiguration` validates configuration without running anything,
+which is useful for tests and tooling. Pass the whole configuration with
+`-Data`, or each section with `-Compatibility`, `-Modules`, and `-Rules`. Its
+output can be passed to `-ConfigData` or back into `New-NitpickConfiguration`:
+
+```powershell
+$Data = ConvertFrom-PowerShellData -String "@{ Modules = 'WPF', '.\rules\Custom.psd1' }"
+$Configuration = New-NitpickConfiguration -Data $Data -BaseDirectory .\build
+Start-Nitpicking -Path .\src -ConfigData $Configuration
+```
+
+There is no file to resolve relative module paths from, so they require
+`New-NitpickConfiguration -BaseDirectory`; without it they are rejected rather
+than resolved from the current location.
+
 ## Rule settings and line length
 
 Rule-specific settings live beside, but separately from, project compatibility
@@ -150,7 +178,7 @@ policy in the same explicitly selected PSD1 file:
 }
 ```
 
-`Start-Nitpicking -ConfigurationPath .\nitpick.psd1` validates configured rule
+`Start-Nitpicking -ConfigFile .\nitpick.psd1` validates configured rule
 IDs and values before reading targets, including settings for known rules that
 are excluded from the run. Unknown rules, misspelled setting names, malformed
 schemas, and invalid or out-of-range values are errors. No second configuration

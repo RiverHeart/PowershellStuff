@@ -1,4 +1,5 @@
 using namespace System
+using namespace System.Collections
 using namespace System.Diagnostics
 using namespace System.IO
 using namespace System.Security
@@ -48,13 +49,22 @@ using namespace System.Management.Automation.Language
     a package imports its code. Does not register acquired rules. Use IncludeRule and
     ExcludeRule to control which acquired rules run.
 
-.PARAMETER ConfigurationPath
+.PARAMETER ConfigFile
     An explicit PSD1 project-configuration file containing compatibility policy,
     rule packages (Modules), and/or rule settings (Rules). Configuration is validated
     before target processing and applies uniformly to every target in this invocation.
     Relative paths resolve from the caller's current PowerShell location; omitting
-    this parameter supplies no project configuration. Packages it declares are
-    imported, so only use configuration files you trust.
+    both ConfigFile and ConfigData supplies no project configuration. Packages it
+    declares are imported, so only use configuration files you trust. Cannot be
+    combined with ConfigData.
+
+.PARAMETER ConfigData
+    Project configuration as in-memory data, either the raw dictionary a
+    configuration file would contain or the output of New-NitpickConfiguration.
+    It is validated by New-NitpickConfiguration either way. There is no file to
+    resolve relative module paths from, so relative paths are rejected; build the
+    configuration with New-NitpickConfiguration -BaseDirectory to use them.
+    Cannot be combined with ConfigFile.
 
 .PARAMETER Path
     A file, directory, or wildcard path. Literal paths must exist. File targets are
@@ -120,6 +130,15 @@ using namespace System.Management.Automation.Language
     a specified path with preview mode for corrections.
 
     Start-Nitpicking -Module WPF -Path src/modules/WPF/Public/DSL -FixMode Preview
+
+.EXAMPLE
+    Run Start-Nitpicking with in-memory configuration instead of a file.
+
+    Start-Nitpicking -Script 'four' -IncludeRule Nitpick/AvoidLongLines -ConfigData @{
+        Rules = @{ 'Nitpick/AvoidLongLines' = @{ MaximumLength = 3 } }
+    }
+
+    Reports that line 1 exceeds the configured maximum of 3.
 #>
 function Start-Nitpicking {
     [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
@@ -139,7 +158,10 @@ function Start-Nitpicking {
         [string[]] $Module,
 
         [ValidateNotNullOrEmpty()]
-        [string] $ConfigurationPath,
+        [string] $ConfigFile,
+
+        [ValidateNotNull()]
+        [IDictionary] $ConfigData,
 
         [string[]] $IncludeRule,
         [string[]] $ExcludeRule,
@@ -174,11 +196,31 @@ function Start-Nitpicking {
             )
         }
 
+        if ($PSBoundParameters.ContainsKey('ConfigFile') -and $PSBoundParameters.ContainsKey('ConfigData')) {
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    [ArgumentException]::new('ConfigFile and ConfigData cannot be used together.'),
+                    'NitpickConflictingConfiguration',
+                    [ErrorCategory]::InvalidArgument,
+                    $null
+                )
+            )
+        }
+
         $ProjectPolicy = @{}
         $ProjectRuleSettings = @{}
         $RuleModules = @()
-        if ($PSBoundParameters.ContainsKey('ConfigurationPath')) {
-            $ProjectConfiguration = Read-NitpickConfiguration -LiteralPath $ConfigurationPath
+        $ProjectConfiguration = $null
+        $RuleSettingsSource = 'RuleSettings'
+        if ($PSBoundParameters.ContainsKey('ConfigFile')) {
+            $ProjectConfiguration = Read-NitpickConfiguration -LiteralPath $ConfigFile
+            $RuleSettingsSource = "configuration '$ConfigFile'"
+        } elseif ($PSBoundParameters.ContainsKey('ConfigData')) {
+            $ProjectConfiguration = New-NitpickConfiguration -Data $ConfigData
+            $RuleSettingsSource = 'configuration data'
+        }
+
+        if ($null -ne $ProjectConfiguration) {
 
             if ($ProjectConfiguration.ContainsKey('Compatibility')) {
                 $ProjectPolicy = @{
@@ -204,7 +246,7 @@ function Start-Nitpicking {
             -ExcludeRule $ExcludeRule `
             -EditorMode:$EditorMode `
             -RuleSettings $ProjectRuleSettings `
-            -RuleSettingsSource "configuration '$ConfigurationPath'"
+            -RuleSettingsSource $RuleSettingsSource
 
         $Summary = [NitpickSummary]::new()
         $Summary.RuleCount = $Rules.Count
