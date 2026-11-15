@@ -146,8 +146,8 @@ function Start-Nitpicking {
     [OutputType([string])]
     [OutputType('NitpickFinding', 'NitpickSummary', 'NitpickCorrectionResult')]
     param(
-        [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
-        [string] $Path,
+        [Parameter(ParameterSetName='Path',ValueFromPipeline)]
+        [string] $Path = $PWD,
 
         [string] $Filter = '*.ps1',
 

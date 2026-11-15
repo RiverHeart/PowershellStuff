@@ -57,7 +57,7 @@ function Add-AstTextEdit {
     [CmdletBinding(DefaultParameterSetName = 'ByOffset')]
     [OutputType('AstTextEditResult')]
     param (
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory,Position=0)]
         [AstDocument] $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
