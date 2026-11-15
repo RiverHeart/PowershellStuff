@@ -527,17 +527,25 @@ Describe 'Start-Nitpicking' {
         $Results = @(
             Start-Nitpicking `
                 -Script $Script.Ast `
-                -IncludeRule Nitpick/AvoidParameterAttributeBool
+                -IncludeRule Nitpick/AvoidParameterAttributeBool 6>&1
         )
 
         $Results.Count | Should -Be 2
         $Results[0] | Should -BeOfType ([string])
-        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool$'
+        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool\r?\n\z'
         $Results[1] | Should -BeOfType ([string])
         $Results[1] | Should -Match '^1 finding \(1 information\) across 1 target in [\d,]+ ms$'
     }
 
-    It 'separates consecutive target findings with host-only blank lines' {
+    It 'returns only summary text without leading spacing when no findings exist' {
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule Nitpick/AvoidParameterAttributeBool 6>&1)
+
+        $Results | Should -HaveCount 1
+        $Results[0] | Should -BeOfType ([string])
+        $Results[0] | Should -Match '^0 findings'
+    }
+
+    It 'appends spacing to each target string without separate host output' {
         $Directory = New-Item -Path (Join-Path $TestDrive 'SeparatedFindings') -ItemType Directory
         foreach ($Name in 'First.ps1', 'Second.ps1') {
             [System.IO.File]::WriteAllText(
@@ -553,11 +561,11 @@ Describe 'Start-Nitpicking' {
                 -NoSummary 6>&1
         )
 
-        $Results.Count | Should -Be 3
-        $Results[0] | Should -BeOfType ([string])
-        $Results[1] | Should -BeOfType ([System.Management.Automation.InformationRecord])
-        "$($Results[1])" | Should -BeExactly ''
-        $Results[2] | Should -BeOfType ([string])
+        $Results.Count | Should -Be 2
+        foreach ($Result in $Results) {
+            $Result | Should -BeOfType ([string])
+            $Result | Should -Match '\S\r?\n\z'
+        }
     }
 
     It 'sorts text findings by source position within each target' {
@@ -588,9 +596,10 @@ Describe 'Start-Nitpicking' {
             -NoSummary
 
         $Lines = $RenderedOutput -split '\r?\n'
-        $Lines.Count | Should -Be 3
+        $Lines.Count | Should -Be 4
         $Lines[1] | Should -Match '^  1:1\s+information\s+First finding\s+Local/OutOfOrder$'
         $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+Local/OutOfOrder$'
+        $Lines[3] | Should -BeExactly ''
     }
 
     It 'previews corrections and summarizes detected findings for in-memory input' {
