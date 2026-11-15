@@ -1,3 +1,5 @@
+using namespace System
+using namespace System.IO
 using namespace System.Collections.Generic
 using namespace System.Collections.ObjectModel
 using namespace System.Management.Automation
@@ -200,7 +202,7 @@ function Task {
 
         [Parameter()]
         [AllowNull()]
-        [System.Management.Automation.Language.CommentHelpInfo] $Help,
+        [CommentHelpInfo] $Help,
 
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
@@ -216,7 +218,7 @@ function Task {
 
     $ScriptBlock = $Arguments[-1]
     if (-not ($ScriptBlock -is [scriptblock])) {
-        throw [System.ArgumentException]::new('The last argument must be a scriptblock.')
+        throw [ArgumentException]::new('The last argument must be a scriptblock.')
     }
 
     if ($Arguments.Length -gt 1) {
@@ -245,23 +247,24 @@ function Get-TaskHelp {
         [string[]] $Comments
     )
 
-    if ($Comments.Count -eq 0) {
-        return
-    }
+    if ($Comments.Count -eq 0) { return }
 
     $HelpSource = ($Comments -join [Environment]::NewLine) +
         "`nfunction __PleaseWorkTaskHelp {}`n"
+
     $HelpTokens = $null
     $HelpErrors = $null
-    $HelpAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $HelpAst = [Parser]::ParseInput(
         $HelpSource,
         [ref] $HelpTokens,
         [ref] $HelpErrors
     )
+
     $FunctionAst = $HelpAst.Find({
-            param ($AstNode)
-            $AstNode -is [System.Management.Automation.Language.FunctionDefinitionAst]
-        }, $false)
+        param ($AstNode)
+        $AstNode -is [FunctionDefinitionAst]
+    }, $false)
+
     return $FunctionAst.GetHelpContent()
 }
 
@@ -279,27 +282,29 @@ function Get-TaskDeclaration {
     $SourceText = $ScriptBlock.Ast.Extent.Text
     $Tokens = $null
     $ParseErrors = $null
-    $ParsedAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $ParsedAst = [Parser]::ParseInput(
         $SourceText,
         [ref] $Tokens,
         [ref] $ParseErrors
     )
+
     $CommentTokens = @($Tokens | Where-Object {
-            $_.Kind -eq [System.Management.Automation.Language.TokenKind]::Comment
+            $_.Kind -eq [TokenKind]::Comment
         })
 
     $TaskNames = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($Statement in $ParsedAst.EndBlock.Statements) {
         # Only top-level, single-command pipelines can be task declarations.
-        if (-not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
+        if (-not ($Statement -is [PipelineAst]) -or
             $Statement.PipelineElements.Count -ne 1 -or
-            -not ($Statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])
+            -not ($Statement.PipelineElements[0] -is [CommandAst])
         ) {
             continue
         }
 
         $CommandAst = $Statement.PipelineElements[0]
         $CommandToken = $CommandAst.GetCommandName()
+
         # The trailing colon distinguishes task declarations from ordinary commands.
         if ([string]::IsNullOrEmpty($CommandToken) -or
             -not $CommandToken.EndsWith(':')
@@ -317,7 +322,7 @@ function Get-TaskDeclaration {
 
         $CommandElements = $CommandAst.CommandElements
         if ($CommandElements.Count -lt 2 -or
-            -not ($CommandElements[-1] -is [System.Management.Automation.Language.ScriptBlockExpressionAst])
+            -not ($CommandElements[-1] -is [ScriptBlockExpressionAst])
         ) {
             throw "Task '$TaskName' must end with a scriptblock body."
         }
@@ -325,9 +330,8 @@ function Get-TaskDeclaration {
         if ($CommandElements.Count -gt 2) {
             $Dependencies = [List[string]]::new()
             foreach ($DependencyAst in $CommandElements[1..($CommandElements.Count - 2)]) {
-                if (
-                    -not ($DependencyAst -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
-                    $DependencyAst.StringConstantType -ne [System.Management.Automation.Language.StringConstantType]::BareWord
+                if (-not ($DependencyAst -is [StringConstantExpressionAst]) -or
+                    $DependencyAst.StringConstantType -ne [StringConstantType]::BareWord
                 ) {
                     throw "Dependencies for task '$TaskName' must be bare task names."
                 }
@@ -340,16 +344,17 @@ function Get-TaskDeclaration {
 
         $Comments = [List[string]]::new()
         $CommentBoundary = $CommandAst.Extent.StartOffset
-        foreach ($CommentToken in ($CommentTokens |
-                Where-Object { $_.Extent.EndOffset -le $CommentBoundary } |
-                Sort-Object { $_.Extent.StartOffset } -Descending)) {
+        foreach (
+            $CommentToken in ($CommentTokens |
+            Where-Object { $_.Extent.EndOffset -le $CommentBoundary } |
+            Sort-Object { $_.Extent.StartOffset } -Descending)
+        ) {
             $Gap = $SourceText.Substring(
                 $CommentToken.Extent.EndOffset,
                 $CommentBoundary - $CommentToken.Extent.EndOffset
             )
-            if (-not [string]::IsNullOrWhiteSpace($Gap)) {
-                break
-            }
+
+            if (-not [string]::IsNullOrWhiteSpace($Gap)) { break }
 
             $Comments.Insert(0, $CommentToken.Text)
             $CommentBoundary = $CommentToken.Extent.StartOffset
@@ -386,7 +391,7 @@ function Resolve-TaskFilePath {
         throw 'TaskFile discovery requires a FileSystem location.'
     }
 
-    $Directory = [System.IO.DirectoryInfo]::new($PWD.ProviderPath)
+    $Directory = [DirectoryInfo]::new($PWD.ProviderPath)
     while ($null -ne $Directory) {
         $Candidate = Join-Path $Directory.FullName 'TaskFile.ps1'
         if (Test-Path -LiteralPath $Candidate -PathType Leaf) {
@@ -412,7 +417,7 @@ function Get-TaskFileDeclaration {
     )
 
     $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
-    $TaskFileScript = [scriptblock]::Create([System.IO.File]::ReadAllText($ResolvedPath))
+    $TaskFileScript = [scriptblock]::Create([File]::ReadAllText($ResolvedPath))
     return Get-TaskDeclaration -ScriptBlock $TaskFileScript
 }
 
@@ -430,7 +435,7 @@ function Read-TaskFile {
     )
 
     $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
-    $TaskFileScript = [scriptblock]::Create([System.IO.File]::ReadAllText($ResolvedPath))
+    $TaskFileScript = [scriptblock]::Create([File]::ReadAllText($ResolvedPath))
     $Declarations = @(Get-TaskDeclaration -ScriptBlock $TaskFileScript)
 
     if ($Declarations.Count -eq 0) {
@@ -463,13 +468,16 @@ function Read-TaskFile {
                         -Arguments $Arguments
                 }.GetNewClosure()
 
-                Set-Item -LiteralPath "Function:$($Declaration.CommandToken)" -Value $TaskCommand
+                Set-Item `
+                    -LiteralPath "Function:$($Declaration.CommandToken)" `
+                    -Value $TaskCommand
             }
 
             $BoundScriptBlock = $ExecutionContext.SessionState.Module.NewBoundScriptBlock($ScriptBlock)
             $ErrorActionPreference = 'Stop'
             $null = @(. $BoundScriptBlock)
         }
+
     $Tasks = @(& $TaskFileModule { $script:RegisteredTasks })
     $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
 
@@ -482,7 +490,10 @@ function Read-TaskFile {
     }
 
     return [pscustomobject] @{
-        DefaultTask = if ($env:PLEASE_DEFAULT_TASK) { $env:PLEASE_DEFAULT_TASK } else { $Tasks[0].Name }
+        DefaultTask =
+            if ($env:PLEASE_DEFAULT_TASK) { $env:PLEASE_DEFAULT_TASK }
+            else { $Tasks[0].Name }
+
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
         Module = $TaskFileModule
@@ -550,22 +561,22 @@ function Invoke-PleaseWorkTask {
         [object[]] $Arguments,
 
         [Parameter(Mandatory)]
-        [System.Collections.IDictionary] $Context,
+        [IDictionary] $Context,
 
         [Parameter(Mandatory)]
         [ref] $Result
     )
 
-    $Variables = [List[System.Management.Automation.PSVariable]]::new()
+    $Variables = [List[PSVariable]]::new()
     $Variables.Add(
-        [System.Management.Automation.PSVariable]::new('ErrorActionPreference', 'Stop')
+        [PSVariable]::new('ErrorActionPreference', 'Stop')
     )
     foreach ($VariableName in $Context.Keys) {
         if ($VariableName -eq 'ErrorActionPreference') {
             continue
         }
         $Variables.Add(
-            [System.Management.Automation.PSVariable]::new(
+            [PSVariable]::new(
                 [string] $VariableName,
                 $Context[$VariableName]
             )
@@ -583,7 +594,7 @@ function Invoke-PleaseWorkTask {
         $TaskException = $_.Exception
         if ($null -ne $TaskException.InnerException) {
             $TaskException = $TaskException.InnerException
-            if ($TaskException -is [System.Management.Automation.RuntimeException] -and
+            if ($TaskException -is [RuntimeException] -and
                 $null -ne $TaskException.ErrorRecord
             ) {
                 $TaskError = $TaskException.ErrorRecord
@@ -600,6 +611,7 @@ function Invoke-PleaseWorkTask {
             FinishedAt = $FinishedAt
             Duration = $FinishedAt - $StartedAt
         }
+
         throw $TaskException
     }
 
@@ -675,6 +687,7 @@ function Invoke-PleaseWork {
     $TaskFilePath = Resolve-TaskFilePath -Path $TaskFile
     $TaskFileRoot = Split-Path -Parent $TaskFilePath
     $TaskSet = Read-TaskFile -Path $TaskFilePath
+
     if ($List) {
         foreach ($TaskName in $TaskSet.TaskNames) {
             $Description = $TaskSet.Tasks[$TaskName].Help.Description
@@ -689,6 +702,7 @@ function Invoke-PleaseWork {
                 Description = $Description
             }
         }
+
         return
     }
 
@@ -706,12 +720,15 @@ function Invoke-PleaseWork {
         TaskFilePath = $TaskFilePath
         TaskFileRoot = $TaskFileRoot
     }
+
     $OriginalLocation = Get-Location
+
     try {
         foreach ($TaskName in $TaskOrder) {
             Set-Location -LiteralPath $TaskFileRoot
             $TaskResult = $null
             $TaskOutput = [List[object]]::new()
+
             try {
                 Invoke-PleaseWorkTask `
                     -Name $TaskName `
@@ -787,16 +804,20 @@ function Resolve-ParamBlock {
     }
 
     $Parameters = [RuntimeDefinedParameterDictionary]::new()
+
     foreach($ParameterAst in $ParameterAsts) {
         $Attributes = [List`1[System.Attribute]]::new()
+
         foreach($AttributeAst in $ParameterAst.Attributes) {
             if ($AttributeAst.GetType().Name -eq 'TypeConstraintAst') {
                 # This is available already from ParameterAst
                 continue
             }
+
             $TypeName = $AttributeAst.TypeName
             $AttributeType = $TypeName.GetReflectionAttributeType()
             $AttributeObj = $AttributeType::new()
+
             foreach($NamedArg in $AttributeAst.NamedArguments) {
                 $AttributeObj.psobject.properties |
                     Where-Object { $_.Name -eq $NamedArg.ArgumentName } |
@@ -808,12 +829,20 @@ function Resolve-ParamBlock {
                         }
                     }
             }
+
             $Attributes.Add($AttributeObj)
         }
-        $Parameter = [RuntimeDefinedParameter]::new($ParameterAst.Name.VariablePath, $ParameterAst.StaticType, $Attributes)
+
+        $Parameter = [RuntimeDefinedParameter]::new(
+            $ParameterAst.Name.VariablePath,
+            $ParameterAst.StaticType,
+            $Attributes
+        )
+
         if ($ParameterAst.DefaultValue) {
             $Parameter.Value = $Parameter.DefaultValue
         }
+
         $Parameters.Add($Parameter.Name, $Parameter)
     }
 
