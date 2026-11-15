@@ -11,6 +11,8 @@ using namespace System.Text
     sorted as given, and, when CorrectionResult is provided, the correction section
     from Format-NitpickCorrection. Returns nothing when there are no findings and no
     correction activity to report. Spacing between targets is left to the caller.
+    Finding rows align position, severity, and rule label before the unpadded message,
+    so long messages do not introduce excess spacing in other rows.
 
     ANSI OSC 8 hyperlinks are used by default when supported but can be explicitly
     enabled or disabled using `$env:FORCE_HYPERLINK` and `$env:NO_HYPERLINK`
@@ -117,15 +119,14 @@ function Format-NitpickText {
     if ($Rows.Count -gt 0) {
         $PositionWidth = ($Rows.Position | Measure-Object -Property Length -Maximum).Maximum
         $SeverityWidth = ($Rows.Severity | Measure-Object -Property Length -Maximum).Maximum
-        $MessageWidth = ($Rows.Message | Measure-Object -Property Length -Maximum).Maximum
     }
 
     foreach ($Row in $Rows) {
         $Builder.AppendLine(('  {0}  {1}  {2}  {3}' -f `
             $Row.Position.PadRight($PositionWidth),
             $Row.Severity.PadRight($SeverityWidth),
-            $Row.Message.PadRight($MessageWidth),
-            $Row.RuleLabel
+            $Row.RuleLabel,
+            $Row.Message
         )) | Out-Null
     }
 
