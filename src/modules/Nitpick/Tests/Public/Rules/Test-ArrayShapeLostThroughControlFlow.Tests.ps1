@@ -29,29 +29,24 @@ BeforeAll {
 
 Describe 'Test-ArrayShapeLostThroughControlFlow' {
     It 'reports <Label> once per assigned if' -ForEach @(
-        @{ Label = 'an empty array'; Source = '$Items = if ($Flag) { @() }'; Empty = $true }
-        @{ Label = 'typed array intent'; Source = '[array] $Items = if ($Flag) { @() }'; Empty = $true }
-        @{ Label = 'typed object array intent'; Source = '[object[]] $Items = if ($Flag) { @() }'; Empty = $true }
-        @{ Label = 'a singleton'; Source = '$Items = if ($Flag) { @(42) }'; Empty = $false }
-        @{ Label = 'a null item'; Source = '$Items = if ($Flag) { @($null) }'; Empty = $false }
-        @{ Label = 'multiple branches'; Source = '$Items = if ($Flag) { @(42) } elseif ($Other) { @($null) } else { @() }'; Empty = $true }
-        @{ Label = 'nested branch output'; Source = '$Items = if ($Flag) { if ($Other) { @() } }'; Empty = $true }
-        @{ Label = 'parenthesized output'; Source = '$Items = if ($Flag) { (@()) }'; Empty = $true }
-        @{ Label = 'comma-separated output'; Source = '$Items = if ($Flag) { 1, 2 }'; Empty = $false }
-        @{ Label = 'unknown cardinality'; Source = '$Items = if ($Flag) { @(Get-Item .) }'; Empty = $false }
-        @{ Label = 'nonfinal output'; Source = '$Items = if ($Flag) { @(); Write-Output 42 }'; Empty = $true }
+        @{ Label = 'an empty array'; Source = '$Items = if ($Flag) { @() }' }
+        @{ Label = 'typed array intent'; Source = '[array] $Items = if ($Flag) { @() }' }
+        @{ Label = 'typed object array intent'; Source = '[object[]] $Items = if ($Flag) { @() }' }
+        @{ Label = 'a singleton'; Source = '$Items = if ($Flag) { @(42) }' }
+        @{ Label = 'a null item'; Source = '$Items = if ($Flag) { @($null) }' }
+        @{ Label = 'multiple branches'; Source = '$Items = if ($Flag) { @(42) } elseif ($Other) { @($null) } else { @() }' }
+        @{ Label = 'nested branch output'; Source = '$Items = if ($Flag) { if ($Other) { @() } }' }
+        @{ Label = 'parenthesized output'; Source = '$Items = if ($Flag) { (@()) }' }
+        @{ Label = 'comma-separated output'; Source = '$Items = if ($Flag) { 1, 2 }' }
+        @{ Label = 'unknown cardinality'; Source = '$Items = if ($Flag) { @(Get-Item .) }' }
+        @{ Label = 'nonfinal output'; Source = '$Items = if ($Flag) { @(); Write-Output 42 }' }
     ) {
         $Findings = @(Invoke-ArrayShapeRule -Source $Source)
         $Findings | Should -HaveCount 1
         $Findings[0].RuleId | Should -Be 'Nitpick/ArrayShapeLostThroughControlFlow'
         $Findings[0].Severity | Should -Be 'Warning'
-        $Findings[0].Message | Should -BeLike '*Initialize the destination collection separately*'
+        $Findings[0].Message | Should -BeExactly 'Arrays emitted by this if lose their shape before assignment.'
         $Findings[0].Corrections | Should -BeNullOrEmpty
-        if ($Empty) {
-            $Findings[0].Message | Should -BeLike '*empty @() emits no items*'
-        } else {
-            $Findings[0].Message | Should -Not -BeLike '*empty @() emits no items*'
-        }
     }
 
     It 'does not report <Label>' -ForEach @(
@@ -86,6 +81,11 @@ Describe 'Test-ArrayShapeLostThroughControlFlow' {
         $Details.Name | Should -Be 'ArrayShapeLostThroughControlFlow'
         $Details.Category | Should -Be 'Correctness'
         $Details.Severity | Should -Be 'Warning'
+        $Details.Explanation | Should -BeLike '*the result may be null, a scalar, or an array*'
+        $Details.Explanation | Should -BeLike '*empty @() emits no items*'
+        $Details.Explanation | Should -Match 'typing the destination as \[array\] does not fix absent output'
+        $Details.Explanation | Should -BeLike '*Initialize the destination collection separately*'
+        $Details.Explanation | Should -BeLike '*Preserve explicit null items*'
         @(Find-Nitpick -IncludeRule Nitpick/ArrayShapeLostThroughControlFlow) | Should -HaveCount 1
     }
 

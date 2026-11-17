@@ -49,7 +49,7 @@ function Test-ArrayShapeLostThroughControlFlow {
         Category = 'Correctness'
         Description = 'Detects explicit array output losing its shape through an if assignment.'
         Severity = 'Warning'
-        Explanation = 'Branch output enumerates arrays. Initialize the destination collection separately and add emitted items to it when its shape must remain stable. Preserve explicit null items unless filtering them is intentional.'
+        Explanation = 'Arrays emitted by this if are enumerated before assignment; the result may be null, a scalar, or an array rather than retaining the emitted array shape. An empty @() emits no items, not an empty array object; typing the destination as [array] does not fix absent output. Initialize the destination collection separately and add emitted items to it when its shape must remain stable. Preserve explicit null items unless filtering them is intentional.'
     }
 
     if ($Details) { return $Metadata }
@@ -81,7 +81,6 @@ function Test-ArrayShapeLostThroughControlFlow {
         }
 
         $HasArrayOutput = $false
-        $HasEmptyArrayOutput = $false
         $Arrays = $Assignment.Right.FindAll({
             param($Node)
             $Node -is [ArrayExpressionAst] -or $Node -is [ArrayLiteralAst]
@@ -123,20 +122,11 @@ function Test-ArrayShapeLostThroughControlFlow {
 
             if ($Current -ne $Assignment.Right) { continue }
             $HasArrayOutput = $true
-            if ($Array -is [ArrayExpressionAst] -and
-                $Array.SubExpression.Statements.Count -eq 0
-            ) {
-                $HasEmptyArrayOutput = $true
-            }
         }
 
         if (-not $HasArrayOutput) { continue }
 
-        $Message = 'Arrays emitted by this if are enumerated before assignment; the result may be null, a scalar, or an array rather than retaining the emitted array shape.'
-        if ($HasEmptyArrayOutput) {
-            $Message += ' An empty @() emits no items, not an empty array object; typing the destination as [array] does not fix absent output.'
-        }
-        $Message += ' Initialize the destination collection separately and add the emitted items when stable collection shape is intended.'
+        $Message = 'Arrays emitted by this if lose their shape before assignment.'
         $FilePath = if ($Assignment.Extent.File) { $Assignment.Extent.File } else { '<ScriptBlock>' }
 
         New-NitpickFinding `
