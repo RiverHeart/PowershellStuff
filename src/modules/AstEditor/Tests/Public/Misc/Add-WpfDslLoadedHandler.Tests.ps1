@@ -19,7 +19,10 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -HandlerBody "Write-Verbose 'Loaded handler from AstOverlayLab.'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -HandlerBody "Write-Verbose 'Loaded handler from AstOverlayLab.'"
+
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeTrue
@@ -58,7 +61,11 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'forced AstOverlayLab insertion'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -OnExistingHandler InsertAfterExisting `
+            -HandlerBody "Write-Verbose 'forced AstOverlayLab insertion'"
+
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeTrue
@@ -81,7 +88,10 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler AppendToExistingBody -HandlerBody "Write-Verbose 'appended AstOverlayLab code'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -OnExistingHandler AppendToExistingBody `
+            -HandlerBody "Write-Verbose 'appended AstOverlayLab code'"
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeTrue
@@ -104,7 +114,10 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -Force -HandlerBody "Write-Verbose 'forced compatibility AstOverlayLab insertion'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -Force `
+            -HandlerBody "Write-Verbose 'forced compatibility AstOverlayLab insertion'"
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeTrue
@@ -126,7 +139,10 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'idempotent AstOverlayLab insertion'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -OnExistingHandler InsertAfterExisting `
+            -HandlerBody "Write-Verbose 'idempotent AstOverlayLab insertion'"
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeFalse
@@ -146,7 +162,10 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'commented AstOverlayLab insertion'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -OnExistingHandler InsertAfterExisting `
+            -HandlerBody "Write-Verbose 'commented AstOverlayLab insertion'"
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeTrue
@@ -171,7 +190,11 @@ Window Main {
 "@
 
         $Document = New-AstDocument -InputObject $Source
-        $Changed = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -AllowDuplicateHandlerBody -HandlerBody "Write-Verbose 'duplicate AstOverlayLab insertion'"
+        $Changed = Add-WpfDslLoadedHandler `
+            -Document $Document `
+            -OnExistingHandler InsertAfterExisting `
+            -AllowDuplicateHandlerBody `
+            -HandlerBody "Write-Verbose 'duplicate AstOverlayLab insertion'"
         $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
         $Changed | Should -BeTrue
@@ -195,7 +218,9 @@ Window Main {
 "@
 
             $Document = New-AstDocument -InputObject $Source
-            $Plan = New-WpfDslLoadedHandlerRewritePlan -Document $Document -HandlerBody "Write-Verbose 'plan AstOverlayLab insertion'"
+            $Plan = New-WpfDslLoadedHandlerRewritePlan `
+                -Document $Document `
+                -HandlerBody "Write-Verbose 'plan AstOverlayLab insertion'"
             $Changed = Invoke-WpfDslLoadedHandlerRewritePlan -Document $Document -Plan $Plan
             $Validation = Resolve-AstDocument -Document $Document -PassThruText
 
@@ -218,7 +243,9 @@ Window Main {
 "@
 
             $Document = New-AstDocument -InputObject $Source
-            $Plan = New-WpfDslLoadedHandlerRewritePlan -Document $Document -HandlerBody "Write-Verbose 'already planned'"
+            $Plan = New-WpfDslLoadedHandlerRewritePlan `
+                -Document $Document `
+                -HandlerBody "Write-Verbose 'already planned'"
             $Changed = Invoke-WpfDslLoadedHandlerRewritePlan -Document $Document -Plan $Plan
             $Validation = Resolve-AstDocument -Document $Document -PassThruText
 

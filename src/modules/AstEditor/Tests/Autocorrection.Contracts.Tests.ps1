@@ -68,10 +68,33 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'renders insertions, replacements, deletions, and adjacent ranges from one snapshot' {
         $Document = New-AstDocument -InputObject 'abcdefghij'
 
-        $null = Add-AstTextEdit -Document $Document -StartOffset 0 -EndOffset 0 -ReplacementText '>' -Reason 'Insert at start'
-        $null = Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 3 -ReplacementText 'BC' -Reason 'Replace [1, 3)'
-        $null = Add-AstTextEdit -Document $Document -StartOffset 3 -EndOffset 5 -ReplacementText '' -Reason 'Delete [3, 5)'
-        $null = Add-AstTextEdit -Document $Document -StartOffset 5 -EndOffset 7 -ReplacementText 'FGHIJ' -Reason 'Replace [5, 7) with longer text'
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 0 `
+            -EndOffset 0 `
+            -ReplacementText '>' `
+            -Reason 'Insert at start'
+
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 3 `
+            -ReplacementText 'BC' `
+            -Reason 'Replace [1, 3)'
+
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 3 `
+            -EndOffset 5 `
+            -ReplacementText '' `
+            -Reason 'Delete [3, 5)'
+
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 5 `
+            -EndOffset 7 `
+            -ReplacementText 'FGHIJ' `
+            -Reason 'Replace [5, 7) with longer text'
 
         $Result = Resolve-AstDocument -Document $Document -PassThruText
 
@@ -81,8 +104,19 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'atomically queues a detached edit batch' {
         $Document = New-AstDocument -InputObject 'abcdefghij'
         $Edits = @(
-            New-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 3 -ReplacementText 'BC' -Reason 'First edit'
-            New-AstTextEdit -Document $Document -StartOffset 5 -EndOffset 7 -ReplacementText 'FG' -Reason 'Second edit'
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset 1 `
+                -EndOffset 3 `
+                -ReplacementText 'BC' `
+                -Reason 'First edit'
+
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset 5 `
+                -EndOffset 7 `
+                -ReplacementText 'FG' `
+                -Reason 'Second edit'
         )
 
         $Queued = @(Add-AstTextEdit -Document $Document -TextEdit $Edits)
@@ -120,8 +154,19 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
     It 'rejects a conflicting detached batch without queueing any member' {
         $Document = New-AstDocument -InputObject 'abcdef'
         $Edits = @(
-            New-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 4 -ReplacementText 'first' -Reason 'First edit'
-            New-AstTextEdit -Document $Document -StartOffset 3 -EndOffset 5 -ReplacementText 'second' -Reason 'Second edit'
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset 1 `
+                -EndOffset 4 `
+                -ReplacementText 'first' `
+                -Reason 'First edit'
+
+            New-AstTextEdit `
+                -Document $Document `
+                -StartOffset 3 `
+                -EndOffset 5 `
+                -ReplacementText 'second' `
+                -Reason 'Second edit'
         )
 
         { Add-AstTextEdit -Document $Document -TextEdit $Edits } |
@@ -257,10 +302,21 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
 
     It 'returns structured details for both edits in a conflict' {
         $Document = New-AstDocument -InputObject 'abcdef'
-        $null = Add-AstTextEdit -Document $Document -StartOffset 1 -EndOffset 4 -ReplacementText 'first' -Reason 'First correction'
+        $null = Add-AstTextEdit `
+            -Document $Document `
+            -StartOffset 1 `
+            -EndOffset 4 `
+            -ReplacementText 'first' `
+            -Reason 'First correction'
 
         try {
-            Add-AstTextEdit -Document $Document -StartOffset 3 -EndOffset 5 -ReplacementText 'second' -Reason 'Second correction'
+            Add-AstTextEdit `
+                -Document $Document `
+                -StartOffset 3 `
+                -EndOffset 5 `
+                -ReplacementText 'second' `
+                -Reason 'Second correction'
+
             throw 'Expected Add-AstTextEdit to reject the overlapping edit.'
         } catch {
             $_.Exception.Data['ExistingEdit'].Reason | Should -Be 'First correction'

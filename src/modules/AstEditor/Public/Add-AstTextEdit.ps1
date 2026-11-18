@@ -163,7 +163,14 @@ function Add-AstTextEdit {
                     $Edit.StartOffset -lt $ExistingEdit.EndOffset
 
                 if ($Overlaps -or $HasSharedInsertionOffset) {
-                    $Message = "Edit conflict detected between '$($ExistingEdit.Reason)' at offsets [$($ExistingEdit.StartOffset), $($ExistingEdit.EndOffset)) and '$($Edit.Reason)' at offsets [$($Edit.StartOffset), $($Edit.EndOffset))."
+                    $Message = Get-LocalizedString -Key 'EditConflict' -Args @(
+                        $ExistingEdit.Reason,
+                        $ExistingEdit.StartOffset,
+                        $ExistingEdit.EndOffset,
+                        $Edit.Reason,
+                        $Edit.StartOffset,
+                        $Edit.EndOffset
+                    )
                     $Exception = [InvalidOperationException]::new($Message)
                     $Exception.Data['FailureKind'] = 'Conflict'
                     $Exception.Data['ExistingEdit'] = @{

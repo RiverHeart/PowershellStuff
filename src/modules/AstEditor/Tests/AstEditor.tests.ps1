@@ -29,9 +29,21 @@ function Greet {
                 $Node.GetCommandName() -eq 'Write-Host'
             }, $true)
 
-        $Overlay.PrependLine($WriteHostCall, 'Write-Output "....testing, mic check..."', 'Insert greeting before Write-Host')
-        $Overlay.Replace($WriteHostCall, 'Write-Output "Hello, $Name!"', 'Replace Write-Host with Write-Output')
-        $Overlay.AppendLine($WriteHostCall, 'Write-Output "Welcome to the AstOverlayLab!"', 'Insert additional greeting after Write-Host')
+        $Overlay.PrependLine(
+            $WriteHostCall,
+            'Write-Output "....testing, mic check..."',
+            'Insert greeting before Write-Host'
+        )
+        $Overlay.Replace(
+            $WriteHostCall,
+            'Write-Output "Hello, $Name!"',
+            'Replace Write-Host with Write-Output'
+        )
+        $Overlay.AppendLine(
+            $WriteHostCall,
+            'Write-Output "Welcome to the AstOverlayLab!"',
+            'Insert additional greeting after Write-Host'
+        )
 
         $Validation = Resolve-AstDocument -Document $Overlay -PassThruText
         $Validation.ParseErrorCount | Should -Be 0

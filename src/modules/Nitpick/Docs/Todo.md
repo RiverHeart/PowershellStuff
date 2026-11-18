@@ -1,6 +1,7 @@
 # Todo
 
 - [ ] In VSCode, I've noticed that automatic linking fails when the file name is longer than the terminal width and is wrapped onto a new line. Investigate if there's anything to be done about this or make a limitation note.
+- [ ] When displaying findings, descriptions that are long can wrap, especially on small terminals. Investigate using `[Console]::WindowWidth` to calculate a gutter area so we can perform manual wrapping that keeps the gutter clean.
 - [ ] Bare names in config can still match a local folder. The config reader keeps WPF as a name, but Resolve-NitpickModuleSource runs the existence check later. If the folder you run from contains a WPF folder, that folder is used instead of the installed module. -Module has always behaved this way. Fixing it for config would mean passing "this came from config" through to that later step.
 - [ ] Add a Nitpick (editor only?) that converts fully qualified types to shorthand and adds `using namespace` for it.
 - [ ] Add Nitpick rules for the zero-element member-access and `ForEach-Object <MemberName>` / `-WhatIf` pitfalls above.

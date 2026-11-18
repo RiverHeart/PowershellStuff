@@ -83,9 +83,11 @@ function New-AstScriptExtent {
         ($StartOffset -lt $Document.Ast.Extent.StartOffset -or
         $EndOffset -gt $Document.Ast.Extent.EndOffset)
     ) {
-        $Exception = [System.InvalidOperationException]::new(
-            "Extent at offsets [$StartOffset, $EndOffset) falls outside the submitted fragment [$($Document.Ast.Extent.StartOffset), $($Document.Ast.Extent.EndOffset))."
-        )
+        $Exception = [System.InvalidOperationException]::new((
+            Get-LocalizedString `
+                -Key 'OutsideFragment' `
+                -Args $StartOffset, $EndOffset, $Document.Ast.Extent.StartOffset, $Document.Ast.Extent.EndOffset
+        ))
         $Exception.Data['FailureKind'] = 'OutsideTarget'
         throw $Exception
     }

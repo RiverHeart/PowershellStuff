@@ -23,12 +23,18 @@
     Adds a Loaded handler only when it does not already exist, then saves the result.
 
 .EXAMPLE
-    Add-WpfDslLoadedHandler -Document $doc -HandlerBody "Write-Verbose 'Window loaded'" -OnExistingHandler InsertAfterExisting
+    Add-WpfDslLoadedHandler `
+        -Document $doc `
+        -HandlerBody "Write-Verbose 'Window loaded'" `
+        -OnExistingHandler InsertAfterExisting
 
     Inserts a second Loaded handler directly beneath the existing Loaded handler.
 
 .EXAMPLE
-    Add-WpfDslLoadedHandler -Document $doc -HandlerBody "Write-Verbose 'Window loaded'" -OnExistingHandler AppendToExistingBody
+    Add-WpfDslLoadedHandler `
+        -Document $doc `
+        -HandlerBody "Write-Verbose 'Window loaded'" `
+        -OnExistingHandler AppendToExistingBody
 
     Appends new statements inside the existing Loaded handler block.
 #>
@@ -52,7 +58,13 @@ function Add-WpfDslLoadedHandler {
         [switch] $Force
     )
 
-    $Plan = New-WpfDslLoadedHandlerRewritePlan -Document $Document -HandlerBody $HandlerBody -OnExistingHandler $OnExistingHandler -AllowDuplicateHandlerBody:$AllowDuplicateHandlerBody -Force:$Force
+    $Plan = New-WpfDslLoadedHandlerRewritePlan `
+        -Document $Document `
+        -HandlerBody $HandlerBody `
+        -OnExistingHandler $OnExistingHandler `
+        -AllowDuplicateHandlerBody:$AllowDuplicateHandlerBody `
+        -Force:$Force
+
     if ($Plan.Action -eq 'None') {
         return $false
     }

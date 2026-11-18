@@ -29,7 +29,7 @@ function New-WpfDslLoadedHandlerRewritePlan {
     $WindowCommand = Find-AstNode -Ast $Document.Ast -Recurse -Query {
         param($Node)
 
-        if (-not ($Node -is [CommandAst])) {
+        if ($Node -isnot [CommandAst]) {
             return $false
         }
 
@@ -56,7 +56,7 @@ function New-WpfDslLoadedHandlerRewritePlan {
     $LoadedWhenCommands = Find-AstNode -Ast $WindowScriptBlockAst -Recurse -All -Query {
         param($Node)
 
-        if (-not ($Node -is [CommandAst])) {
+        if ($Node -isnot [CommandAst]) {
             return $false
         }
 
@@ -69,7 +69,7 @@ function New-WpfDslLoadedHandlerRewritePlan {
         }
 
         $Literal = $Node.CommandElements[1]
-        if (-not ($Literal -is [StringConstantExpressionAst])) {
+        if ($Literal -isnot [StringConstantExpressionAst]) {
             return $false
         }
 
@@ -89,7 +89,10 @@ function New-WpfDslLoadedHandlerRewritePlan {
             continue
         }
 
-        if (Test-ScriptBlockStatementTextEquivalent -Left $LoadedHandlerScriptBlockExpression.ScriptBlock -Right $HandlerBodyScriptBlock.Ast) {
+        if (Test-ScriptBlockStatementTextEquivalent `
+            -Left $LoadedHandlerScriptBlockExpression.ScriptBlock `
+            -Right $HandlerBodyScriptBlock.Ast
+        ) {
             $ExistingLoadedHandler = $LoadedWhenCommand
             $HandlerBodyAlreadyPresent = $true
             break
