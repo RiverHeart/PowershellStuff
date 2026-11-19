@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
 
     <#
@@ -20,7 +19,6 @@ BeforeAll {
         $ParseErrors | Should -BeNullOrEmpty
         Test-PossibleNullItemFromIndexedLookup -ScriptBlockAst $Ast -Context @{
             RuleBehavior = @{
-                OutputType = 'NitpickFinding'
                 SearchNestedScriptBlocks = $Recurse
             }
         }
@@ -105,20 +103,6 @@ Describe 'Test-PossibleNullItemFromIndexedLookup' {
         $Proposal.AcceptedCorrections | Should -BeNullOrEmpty
     }
 
-    It 'returns ScriptAnalyzer diagnostics exactly once per nested capture' {
-        $Source = '$Items = @($Map[0]); function Invoke-Example { $Items = @($Map[1]) }'
-        $Diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') `
-            -IncludeRule Test-PossibleNullItemFromIndexedLookup -Settings @{})
-        $Diagnostics | Should -HaveCount 2
-        foreach ($Diagnostic in $Diagnostics) {
-            $Diagnostic.GetType().Name | Should -Be 'DiagnosticRecord'
-            $Diagnostic.RuleName | Should -Be 'PossibleNullItemFromIndexedLookup'
-            $Diagnostic.RuleSuppressionID | Should -Be 'PossibleNullItemFromIndexedLookup'
-            $Diagnostic.Severity.ToString() | Should -Be 'Information'
-            $Diagnostic.SuggestedCorrections | Should -BeNullOrEmpty
-        }
-    }
 }
 
 Describe 'Indexed lookup null semantics' {

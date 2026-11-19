@@ -28,6 +28,12 @@ _Avoid_: Display name, suppression ID (as if these were separate from Local Name
 A rule's fully qualified identity: `Namespace/Local Name` (for example `WPF/AvoidBlockingUI`). Used for selection, the registry key, and conflict/attribution across native findings.
 _Avoid_: Qualified name, full name
 
+**Adapter**:
+An optional integration boundary that translates Nitpick's native findings and
+corrections into another host's external diagnostics without changing producers
+or native identity.
+_Avoid_: Rule wrapper, converter function (for the boundary as a whole)
+
 ### Analysis input
 
 **Target**:

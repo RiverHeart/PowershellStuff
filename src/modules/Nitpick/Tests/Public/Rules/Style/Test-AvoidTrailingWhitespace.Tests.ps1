@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\..\Nitpick.psd1" -Force
     $PreviousQuietWhatIf = $env:WHATIF__QUIET
     $env:WHATIF__QUIET = $true
@@ -75,27 +74,27 @@ Describe 'AvoidTrailingWhitespace' {
         }
     }
 
-    It 'supports standalone diagnostic invocation without a Context document' {
+    It 'supports standalone document invocation without coordinator context' {
         #=== Arrange ===#
         $Ast = [Parser]::ParseInput('$Value = 1  ', [ref] $null, [ref] $null)
 
         #=== Act ===#
-        $Findings = @(Test-AvoidTrailingWhitespace -ScriptBlockAst $Ast)
+        $Findings = @(Measure-AvoidTrailingWhitespace -InputObject (New-AstDocument -InputObject $Ast))
 
         #=== Assert ===#
         $Findings | Should -HaveCount 1
-        $Findings[0].GetType().Name | Should -Be 'DiagnosticRecord'
-        $Findings[0].Extent.StartColumnNumber | Should -Be 11
-        $Findings[0].SuggestedCorrections | Should -HaveCount 1
+        $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
+        $Findings[0].ViolationExtent.StartColumnNumber | Should -Be 11
+        $Findings[0].Corrections | Should -HaveCount 1
     }
 
-    It 'discovers the document implementation without registering its ScriptAnalyzer adapter' {
+    It 'discovers the document implementation' {
         $Rule = @(Find-Nitpick -IncludeRule 'Nitpick/AvoidTrailingWhitespace')
 
         $Rule | Should -HaveCount 1
         $Rule[0].DispatchType.Name | Should -BeExactly 'AstDocument'
         $Rule[0].Callable.Name | Should -BeExactly 'Measure-AvoidTrailingWhitespace'
-        (Test-AvoidTrailingWhitespace -Details).Name | Should -BeExactly 'AvoidTrailingWhitespace'
+        (Measure-AvoidTrailingWhitespace -Details).Name | Should -BeExactly 'AvoidTrailingWhitespace'
     }
 
     It 'reports but does not automatically correct malformed snapshots' {
@@ -112,7 +111,7 @@ Describe 'AvoidTrailingWhitespace' {
         $Findings[0].Corrections | Should -BeNullOrEmpty
     }
 
-    It 'analyzes nested scopes once in native mode and only its scope for standalone calls' {
+    It 'analyzes nested scopes according to coordinator and standalone traversal' {
         #=== Arrange ===#
         $Source = '$Outer = 1  ' + "`n& {`n" + '$Inner = 2  ' + "`n}"
 
@@ -122,9 +121,11 @@ Describe 'AvoidTrailingWhitespace' {
 
         #=== Assert ===#
         @($Rule.Invoke($Root)) | Should -HaveCount 2
-        @(Test-AvoidTrailingWhitespace -ScriptBlockAst $Root) | Should -HaveCount 1
+        @(Measure-AvoidTrailingWhitespace -InputObject (New-AstDocument -InputObject $Root)) |
+            Should -HaveCount 1
         $Nested = $Root.Find({ param($Node) $Node -is [ScriptBlockExpressionAst] }, $true).ScriptBlock
-        @(Test-AvoidTrailingWhitespace -ScriptBlockAst $Nested) | Should -HaveCount 1
+        @(Measure-AvoidTrailingWhitespace -InputObject (New-AstDocument -InputObject $Nested)) |
+            Should -HaveCount 1
     }
 
     It 'edits only the submitted fragment and retains source provenance' {

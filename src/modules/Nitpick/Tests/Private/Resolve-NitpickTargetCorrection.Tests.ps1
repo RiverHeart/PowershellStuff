@@ -63,8 +63,7 @@ BeforeAll {
                 -Severity Information `
                 -ScriptPath $Document.Path `
                 -Explanation 'Overlaps the UseIsNotOperator fix.' `
-                -Corrections $ConflictCorrection `
-                -OutputAs NitpickFinding
+                -Corrections $ConflictCorrection
         }
 
         $Rules = if ($NoReanalysis) { @() } else { @($Rule) }

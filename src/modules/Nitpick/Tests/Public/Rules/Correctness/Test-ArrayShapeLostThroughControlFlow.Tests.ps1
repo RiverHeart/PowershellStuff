@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
 
     <#
@@ -20,7 +19,6 @@ BeforeAll {
         $ParseErrors | Should -BeNullOrEmpty
         Test-ArrayShapeLostThroughControlFlow -ScriptBlockAst $Ast -Context @{
             RuleBehavior = @{
-                OutputType = 'NitpickFinding'
                 SearchNestedScriptBlocks = $Recurse
             }
         }
@@ -114,24 +112,6 @@ Describe 'Test-ArrayShapeLostThroughControlFlow' {
             Should -HaveCount 0
     }
 
-    It 'returns ScriptAnalyzer diagnostics without duplicated nested findings' {
-        $Source = @'
-$Items = if ($Flag) { @() }
-function Invoke-Example {
-    $Items = if ($Flag) { @($null) } else { @(42) }
-}
-'@
-        $Diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') `
-            -IncludeRule Test-ArrayShapeLostThroughControlFlow -Settings @{})
-        $Diagnostics | Should -HaveCount 2
-        foreach ($Diagnostic in $Diagnostics) {
-            $Diagnostic.GetType().Name | Should -Be 'DiagnosticRecord'
-            $Diagnostic.RuleName | Should -Be 'ArrayShapeLostThroughControlFlow'
-            $Diagnostic.RuleSuppressionID | Should -Be 'ArrayShapeLostThroughControlFlow'
-            $Diagnostic.SuggestedCorrections | Should -BeNullOrEmpty
-        }
-    }
 }
 
 Describe 'Array output shape reproductions' {

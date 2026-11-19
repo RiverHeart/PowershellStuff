@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') -Force -ErrorAction Stop
 
     function Invoke-ContinuationRule {
@@ -16,7 +15,6 @@ BeforeAll {
         $ParseErrors | Should -BeNullOrEmpty
         Test-AvoidAmbiguousPipelineContinuation -ScriptBlockAst $Ast -Context @{
             RuleBehavior = @{
-                OutputType = 'NitpickFinding'
                 SearchNestedScriptBlocks = $Recurse
             }
         }
@@ -83,13 +81,11 @@ Describe 'Test-AvoidAmbiguousPipelineContinuation' {
             }
         }.Ast
         $Body = $Ast.Find({ param($Node) $Node -is [FunctionDefinitionAst] }, $false).Body
-        $Result = @(Test-AvoidAmbiguousPipelineContinuation -ScriptBlockAst $Body -Context @{
-            RuleBehavior = @{ OutputType = 'NitpickFinding' }
-        })
+        $Result = @(Test-AvoidAmbiguousPipelineContinuation -ScriptBlockAst $Body)
         $Result | Should -HaveCount 1
     }
 
-    It 'defaults to ScriptAnalyzer diagnostics pointing at the separate command' {
+    It 'defaults to native findings pointing at the separate command' {
         $Ast = {
             Get-ChildItem |
                 Where-Object { $_.Name }
@@ -97,10 +93,10 @@ Describe 'Test-AvoidAmbiguousPipelineContinuation' {
         }.Ast
         $Result = @(Test-AvoidAmbiguousPipelineContinuation -ScriptBlockAst $Ast)
         $Result | Should -HaveCount 1
-        $Result[0].GetType().Name | Should -Be 'DiagnosticRecord'
-        $Result[0].Extent.Text | Should -Be 'ForEach-Object'
-        $Result[0].RuleSuppressionID | Should -Be 'AvoidAmbiguousPipelineContinuation'
-        $Result[0].SuggestedCorrections | Should -BeNullOrEmpty
+        $Result[0].GetType().Name | Should -Be 'NitpickFinding'
+        $Result[0].ViolationExtent.Text | Should -Be 'ForEach-Object'
+        $Result[0].RuleId | Should -Be 'Nitpick/AvoidAmbiguousPipelineContinuation'
+        $Result[0].Corrections | Should -BeNullOrEmpty
     }
 
     It 'is discoverable and assigns coordinated identity' {
@@ -123,28 +119,4 @@ Describe 'Test-AvoidAmbiguousPipelineContinuation' {
         $Details.Severity | Should -Be 'Warning'
     }
 
-    It 'reports nested ScriptAnalyzer violations exactly once without suggesting a fix' {
-        $Source = @'
-function Invoke-Example {
-    Get-ChildItem |
-        Where-Object { $_.Name }
-        ForEach-Object { $_.FullName }
-    & {
-        Get-ChildItem |
-            Where-Object { $_.Name }
-            ForEach-Object { $_.FullName }
-    }
-}
-'@
-        $Results = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') `
-            -IncludeRule Test-AvoidAmbiguousPipelineContinuation -Settings @{})
-        $Results | Should -HaveCount 2
-        @($Results | ForEach-Object { $_.Extent.StartOffset } | Sort-Object -Unique) |
-            Should -HaveCount 2
-        foreach ($Result in $Results) {
-            $Result.RuleName | Should -Be 'AvoidAmbiguousPipelineContinuation'
-            $Result.SuggestedCorrections | Should -BeNullOrEmpty
-        }
-    }
 }

@@ -4,44 +4,6 @@ using module AstEditor
 
 <#
 .SYNOPSIS
-    PSScriptAnalyzer adapter for the native trailing-whitespace rule.
-
-.DESCRIPTION
-    Converts the ScriptBlockAst supplied by PSScriptAnalyzer to an AstDocument
-    and delegates to Measure-AvoidTrailingWhitespace.
-
-.EXAMPLE
-    Test-AvoidTrailingWhitespace -ScriptBlockAst {
-        param(
-            [string] $Foo
-        )
-    }.Ast
-#>
-function Test-AvoidTrailingWhitespace {
-    [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType([object[]], [hashtable])]
-    param(
-        [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
-        [ValidateNotNullOrEmpty()]
-        [ScriptBlockAst] $ScriptBlockAst,
-
-        [Parameter(ParameterSetName='ScriptBlockAst')]
-        [IDictionary] $Context,
-
-        [Parameter(Mandatory,ParameterSetName='Details')]
-        [switch] $Details
-    )
-
-    if ($Details) {
-        return Measure-AvoidTrailingWhitespace -Details
-    }
-
-    $Document = New-AstDocument -InputObject $ScriptBlockAst
-    Measure-AvoidTrailingWhitespace -InputObject $Document -Context $Context
-}
-
-<#
-.SYNOPSIS
     Finds and corrects trailing whitespace in an AstDocument.
 
 .DESCRIPTION
@@ -54,9 +16,8 @@ function Test-AvoidTrailingWhitespace {
     The complete source snapshot and parsed metadata to analyze.
 
 .PARAMETER Context
-    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
-    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
-    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal.
+    Without this setting, traversal is scope-local.
 
 .EXAMPLE
     $Document = New-AstDocument -InputObject '$Value = 1  '
@@ -89,7 +50,6 @@ function Measure-AvoidTrailingWhitespace {
             Explanation = 'Trailing whitespace is unnecessary and should be removed.'
         }
         $Behavior = $Context.RuleBehavior
-        $OutputAs = if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' } else { $Behavior.OutputType }
 
         # Pattern to match trailing whitespace at the end of lines
         # while preserving line endings and a final unterminated line.
@@ -173,7 +133,6 @@ function Measure-AvoidTrailingWhitespace {
                     -Corrections $Corrections `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `
-                    -OutputAs $OutputAs
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

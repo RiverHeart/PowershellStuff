@@ -371,8 +371,7 @@ function Start-Nitpicking {
                     -ViolationExtent $ParseError.Extent `
                     -Severity Error `
                     -ScriptPath $TargetPath `
-                    -Explanation 'The PowerShell parser could not parse this source.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'The PowerShell parser could not parse this source.'
 
                 $TargetFindings.Add($ParserFinding)
             }

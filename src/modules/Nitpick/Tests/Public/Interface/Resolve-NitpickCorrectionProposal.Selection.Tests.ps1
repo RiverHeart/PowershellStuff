@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '../../../../AstEditor/AstEditor.psd1') -Force
     Import-Module (Join-Path $PSScriptRoot '../../../Nitpick.psd1') -Force
 
@@ -19,8 +18,7 @@ BeforeAll {
             -Severity Information `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Exercises correction selection and attribution.' `
-            -Corrections $Correction `
-            -OutputAs NitpickFinding
+            -Corrections $Correction
     }
 }
 

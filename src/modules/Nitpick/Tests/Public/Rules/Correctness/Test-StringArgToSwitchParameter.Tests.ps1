@@ -12,7 +12,7 @@ BeforeAll {
         $ParseErrors | Should -BeNullOrEmpty
 
         Test-StringArgToSwitchParameter -ScriptBlockAst $Ast -Context @{
-            RuleBehavior = @{ OutputType = 'NitpickFinding' }
+            RuleBehavior = @{ SearchNestedScriptBlocks = $false }
         }
     }
 

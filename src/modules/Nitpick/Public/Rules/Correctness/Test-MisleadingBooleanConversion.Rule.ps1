@@ -44,10 +44,6 @@ function Test-MisleadingBooleanConversion {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $BooleanDefaults = @{}
     $ScriptBlockAst.FindAll({
         param($Node)
@@ -90,6 +86,5 @@ function Test-MisleadingBooleanConversion {
             -Severity $Metadata.Severity `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
-            -OutputAs $OutputAs
     }
 }

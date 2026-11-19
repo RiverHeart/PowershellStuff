@@ -18,6 +18,10 @@
       "ConfigPath": "src/modules/Nitpick/pester.json"
     },
     {
+      "Name": "Nitpick.ScriptAnalyzer",
+      "ConfigPath": "src/modules/Nitpick.ScriptAnalyzer/pester.json"
+    },
+    {
       "Name": "PleaseWork",
       "ConfigPath": "src/modules/PleaseWork/pester.json"
     },

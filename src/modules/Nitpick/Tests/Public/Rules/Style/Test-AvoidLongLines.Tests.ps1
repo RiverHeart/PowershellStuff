@@ -3,7 +3,6 @@ using namespace System.Management.Automation.Language
 using module AstEditor
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\..\Nitpick.psd1" -Force
 }
 
@@ -86,15 +85,15 @@ Describe 'AvoidLongLines' {
         $Findings.ViolationExtent.StartLineNumber | Should -Be @(1, 3, 6)
     }
 
-    It 'preserves standalone diagnostic output conventions' {
+    It 'returns native findings for standalone document analysis' {
         $Ast = [Parser]::ParseInput(('x' * 121), [ref] $null, [ref] $null)
 
-        $Findings = @(Test-AvoidLongLines -ScriptBlockAst $Ast)
+        $Findings = @(Measure-AvoidLongLines -InputObject (New-AstDocument -InputObject $Ast))
 
         $Findings | Should -HaveCount 1
-        $Findings[0].GetType().Name | Should -BeExactly 'DiagnosticRecord'
-        $Findings[0].Extent.StartColumnNumber | Should -Be 1
-        $Findings[0].SuggestedCorrections | Should -BeNullOrEmpty
+        $Findings[0].GetType().Name | Should -BeExactly 'NitpickFinding'
+        $Findings[0].ViolationExtent.StartColumnNumber | Should -Be 1
+        $Findings[0].Corrections | Should -BeNullOrEmpty
     }
 
     It 'anchors a partial physical line finding inside the submitted fragment' {

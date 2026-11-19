@@ -79,7 +79,7 @@ Describe 'Built-in producer identity migration' {
             $Source, [ref] $null, [ref] $null
         )
         $Command = Get-Command -Name "Nitpick\Test-$Name"
-        $Context = @{ RuleBehavior = @{ OutputType = 'NitpickFinding'; SearchNestedScriptBlocks = $true } }
+        $Context = @{ RuleBehavior = @{ SearchNestedScriptBlocks = $true } }
         $Findings = @(& $Command -ScriptBlockAst $Ast -Context $Context)
 
         $Findings | Should -HaveCount 1

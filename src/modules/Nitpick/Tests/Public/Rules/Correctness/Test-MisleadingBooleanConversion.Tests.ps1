@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') -Force -ErrorAction Stop
 
     function Invoke-MisleadingBooleanConversionRule {
@@ -13,7 +12,7 @@ BeforeAll {
         $ParseErrors | Should -BeNullOrEmpty
 
         Test-MisleadingBooleanConversion -ScriptBlockAst $Ast -Context @{
-            RuleBehavior = @{ OutputType = 'NitpickFinding' }
+            RuleBehavior = @{ SearchNestedScriptBlocks = $false }
         }
     }
 }

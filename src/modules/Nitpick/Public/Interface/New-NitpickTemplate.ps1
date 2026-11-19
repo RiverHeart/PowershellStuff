@@ -48,67 +48,70 @@ using namespace System.Management.Automation.Language
     }.Ast
 #>
 function __Name__ {
-    [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
+        [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
         [ScriptBlockAst] $ScriptBlockAst,
 
-        [ValidateNotNullOrEmpty()]
-        [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
-        [string] $FilePath
+        [Parameter(ParameterSetName='ScriptBlockAst')]
+        [System.Collections.IDictionary] $Context,
+
+        [Parameter(Mandatory,ParameterSetName='Details')]
+        [switch] $Details
     )
 
     process {
         try {
+            $Command = $PSCmdlet.MyInvocation.MyCommand
+            $RuleName = $Command.Noun
+            $Metadata = [pscustomobject]@{
+                Name = $RuleName
+                CommandName = $Command.Name
+                Category = '__Category__'
+                Description = 'Describe the rule.'
+                Severity = 'Information'
+                Explanation = 'Explain why the rule reports a finding.'
+            }
+            if ($Details) {
+                Write-Output $Metadata
+                return
+            }
+
+            $ShouldRecurse = $Context.RuleBehavior.SearchNestedScriptBlocks -eq $true
             $MatchingNodes = $ScriptBlockAst.FindAll({
                 param($Ast)
 
                 # Implement your matching logic here
 
-                # Matching nothing in case this rule is auto-detected by ScriptAnalyzer
                 return $false
-            }, $false <# Do not enter nested script blocks; ScriptAnalyzer analyzes those scopes separately. #>)
+            }, $ShouldRecurse)
 
             $MatchingNodes | ForEach-Object {
                 $BadNode = $_
 
-                $FilePath = if ($BadNode.Extent.FileName) {
-                    $BadNode.Extent.FileName
+                $ScriptPath = if ($BadNode.Extent.File) {
+                    $BadNode.Extent.File
                 } else {
-                    Get-PSCallStack | Where-Object { $_.ScriptName } | Select-Object -Last 1 -ExpandProperty ScriptName
-                }
-                if (-not $FilePath) { $FilePath = '<ScriptBlock>' }
-
-                #$CorrectionExtent = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]::new(
-                #    $BadNode.Extent.StartLineNumber,
-                #    $BadNode.Extent.EndLineNumber,
-                #    $BadNode.Extent.StartColumnNumber,
-                #    $BadNodeEndColumnNumber,
-                #    $ReplacementText,
-                #    $FilePath,  # File Path or Context
-                #    $Description  # Hover Text Description
-                #)
-                #$SuggestedCorrections = [System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]]::new()
-                #$SuggestedCorrections.Add($CorrectionExtent)
-
-                $DiagnosticRecord = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord]@{
-                    Message = "Placeholder message for __Name__"
-                    Extent = $BadNode.Extent
-                    RuleName = $PSCmdlet.MyInvocation.MyCommand.Name
-                    Severity = 'Information'
-                    RuleSuppressionID = '__Name__'
-                    #SuggestedCorrections = $SuggestedCorrections
+                    '<ScriptBlock>'
                 }
 
-                Write-Output $DiagnosticRecord
+                New-NitpickFinding `
+                    -RuleId "Nitpick/$RuleName" `
+                    -Message 'Describe the finding.' `
+                    -ViolationExtent $BadNode.Extent `
+                    -Severity $Metadata.Severity `
+                    -ScriptPath $ScriptPath `
+                    -Explanation $Metadata.Explanation `
+                    -Corrections @()
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 }
-'@ -replace '__Name__', $Name
+'@ -replace '__Name__', $Name -replace '__Category__', $Category
 
     $RuleTemplate | Out-File -FilePath $OutPath -Force
 }

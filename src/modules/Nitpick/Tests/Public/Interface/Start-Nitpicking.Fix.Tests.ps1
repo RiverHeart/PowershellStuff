@@ -1,5 +1,4 @@
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
     . "$PSScriptRoot\..\..\Support\CorrectionFixtures.ps1"
 

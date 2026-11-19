@@ -45,10 +45,6 @@ function Test-StringArgToSwitchParameter {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $LocalSwitches = @{}
     $Functions = $ScriptBlockAst.FindAll({
         param($Node)
@@ -140,7 +136,6 @@ function Test-StringArgToSwitchParameter {
                 -Severity $Metadata.Severity `
                 -ScriptPath $FilePath `
                 -Explanation $Metadata.Explanation `
-                -OutputAs $OutputAs
         }
     }
 }

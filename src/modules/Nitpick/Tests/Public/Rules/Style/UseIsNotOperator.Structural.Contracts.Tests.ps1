@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '../../../../../AstEditor/AstEditor.psd1') -Force
     Import-Module (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') -Force
 
@@ -253,12 +252,12 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         @($Rule.Invoke($Document.Ast)) | Should -HaveCount 0
     }
 
-    It 'returns a direct ScriptAnalyzer diagnostic without suggestions' {
+    It 'returns a direct native finding with an atomic correction' {
         $Findings = @(Test-UseIsNotOperator -ScriptBlockAst { -not ($Value -is [int]) }.Ast)
         $Findings | Should -HaveCount 1
-        $Findings[0].GetType().FullName |
-            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
-        $Findings[0].SuggestedCorrections | Should -BeNullOrEmpty
+        $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
+        $Findings[0].Corrections | Should -HaveCount 1
+        $Findings[0].Corrections[0].TextEdits | Should -HaveCount 2
     }
 
     It 'corrects subexpressions in interpolated strings without changing literal text: <Label>' -ForEach @(
@@ -288,20 +287,4 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         $Result.CandidateFindings | Should -HaveCount 0
     }
 
-    It 'retains diagnostics but exposes no partial ScriptAnalyzer fix' {
-        $Results = @(Invoke-ScriptAnalyzer `
-            -ScriptDefinition '-not (''literal -is'' -is [string])' `
-            -CustomRulePath (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') `
-            -IncludeRule Test-UseIsNotOperator `
-            -Settings @{})
-
-        $Results | Should -HaveCount 1
-        $Results[0].RuleName | Should -Be 'UseIsNotOperator'
-        @($Results[0].SuggestedCorrections) | Should -HaveCount 0
-
-        $Rule = New-Nitpick -Callable Test-UseIsNotOperator
-
-        $Finding = @($Rule.Invoke({ -not ($Value -is [int]) }.Ast))[0]
-        @($Finding.ToDiagnosticRecord().SuggestedCorrections) | Should -HaveCount 0
-    }
 }

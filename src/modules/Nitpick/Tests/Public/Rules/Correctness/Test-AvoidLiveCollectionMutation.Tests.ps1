@@ -1,7 +1,6 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
 
     <#
@@ -19,7 +18,6 @@ BeforeAll {
         $Errors | Should -BeNullOrEmpty
         Test-AvoidLiveCollectionMutation -ScriptBlockAst $Ast -Context @{
             RuleBehavior = @{
-                OutputType = 'NitpickFinding'
                 SearchNestedScriptBlocks = $Recurse
             }
         }
@@ -106,17 +104,6 @@ Describe 'Test-AvoidLiveCollectionMutation' {
             Should -HaveCount 0
     }
 
-    It 'reports nested ScriptAnalyzer findings once each' {
-        $Source = 'foreach ($Key in $Map.Keys) { $Map[$Key] = 2 }; function Invoke-Example { foreach ($Item in $Items) { $Items.Clear() } }'
-        $Diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') `
-            -IncludeRule Test-AvoidLiveCollectionMutation -Settings @{})
-        $Diagnostics | Should -HaveCount 2
-        foreach ($Diagnostic in $Diagnostics) {
-            $Diagnostic.RuleName | Should -Be 'AvoidLiveCollectionMutation'
-            $Diagnostic.SuggestedCorrections | Should -BeNullOrEmpty
-        }
-    }
 }
 
 Describe 'Live collection enumeration semantics' {

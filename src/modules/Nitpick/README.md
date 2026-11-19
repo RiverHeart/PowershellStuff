@@ -8,6 +8,7 @@ Nitpick is a Powershell based linter that seeks to replace ScriptAnalyzer (if fo
   * [Analysis](#analysis)
   * [Remediation](#remediation)
 * [Why Not Use PSScriptAnalyzer?](#why-not-use-psscriptanalyzer)
+* [PSScriptAnalyzer Integration](#psscriptanalyzer-integration)
 * [Feature Comparison](#feature-comparison)
 * [Dependencies](#dependencies)
 
@@ -72,6 +73,23 @@ When those findings show up, you have to choose between suppressing them, living
 Attributes weren't designed for the role they play in suppressing rules. They are awkward to place, finicky to use, verbose, don't regularly occur near the code they apply to, and stick out like a sore thumb because they aren't comments so syntax highlighting gives them the same weight as everything else.
 
 Integrating findings into task runners requires additional handling; and although object-oriented output is great for automation, they do not make good use of terminal real estate when rendered into tables. Some limitations matter especially when developing custom rules and working with test files containing intentionally invalid examples.
+
+## PSScriptAnalyzer Integration
+
+Nitpick does not require PSScriptAnalyzer for normal use, tests, or debugging.
+The optional `Nitpick.ScriptAnalyzer` module adapts Nitpick's built-in rules to
+PSScriptAnalyzer's custom-rule contract:
+
+```powershell
+Invoke-ScriptAnalyzer `
+    -Path .\Example.ps1 `
+    -CustomRulePath .\Nitpick.ScriptAnalyzer.psd1
+```
+
+Use the adapter manifest for `-CustomRulePath`; `Nitpick.psd1` is intentionally
+not a PSScriptAnalyzer custom-rule source. The adapter preserves single-edit
+suggested corrections and omits multi-edit corrections rather than splitting an
+atomic Nitpick fix.
 
 ## Feature Comparison
 

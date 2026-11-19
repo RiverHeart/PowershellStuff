@@ -1,5 +1,4 @@
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module -Name (Join-Path $PSScriptRoot '..\Nitpick.psd1') -Force -ErrorAction Stop
 
     function New-ContractRulePackage {
@@ -29,7 +28,7 @@ function Test-ContractRule {
     New-NitpickFinding -RuleId 'Local/ContractRule' -Message (Get-ContractMessage) `
         -Severity Information -ViolationExtent $ScriptBlockAst.Extent `
         -ScriptPath '<ScriptBlock>' `
-        -Explanation 'Rule package contract.' -OutputAs NitpickFinding
+        -Explanation 'Rule package contract.'
 }
 function Test-HiddenContractRule { param ($ScriptBlockAst) }
 function Test-InvalidContractRule { param ($FilePath) }
@@ -156,21 +155,6 @@ Describe 'Nitpick rule package contracts' -Tag 'RulePackageContract' {
             Should -Invoke Save-AstDocument -ModuleName Nitpick -Times 0 -Exactly -Scope It
 
             @(Get-Nitpick) | Should -HaveCount 0
-        }
-
-        It 'retains local diagnostic names and suppression IDs at the external boundary' {
-            $Finding = New-NitpickFinding `
-                -RuleId 'Local/ContractRule' `
-                -Message 'Contract finding.' `
-                -Severity Information `
-                -ViolationExtent {}.Ast.Extent `
-                -ScriptPath '<ScriptBlock>' `
-                -Explanation 'External identity contract.' `
-                -OutputAs NitpickFinding
-
-            $Diagnostic = $Finding.ToDiagnosticRecord()
-            $Diagnostic.RuleName | Should -Be ContractRule
-            $Diagnostic.RuleSuppressionID | Should -Be ContractRule
         }
 
         It 'retains supporting module scope and private helpers without exporting global commands' {
@@ -649,9 +633,6 @@ Export-ModuleMember -Function Test-ContractRule
             $Findings | Should -HaveCount 1
             $Findings[0].RuleId | Should -Be 'NitpickContractPackage/ContractRule'
 
-            $Diagnostic = $Findings[0].ToDiagnosticRecord()
-            $Diagnostic.RuleName | Should -Be ContractRule
-            $Diagnostic.RuleSuppressionID | Should -Be ContractRule
         }
 
         It 'distinguishes equal local names from two declaring packages in text and object output' {

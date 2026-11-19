@@ -39,9 +39,8 @@ using namespace System.Management.Automation.Language
     proof of an execution bug.
 
 .PARAMETER Context
-    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
-    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
-    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal.
+    Without this setting, traversal is scope-local.
 
 .EXAMPLE
     Test-AvoidAmbiguousPipelineContinuation -ScriptBlockAst {
@@ -52,7 +51,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-AvoidAmbiguousPipelineContinuation {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory, ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -84,10 +83,6 @@ function Test-AvoidAmbiguousPipelineContinuation {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
 
     $Pipelines = $ScriptBlockAst.FindAll({
         param($Node)
@@ -149,6 +144,5 @@ function Test-AvoidAmbiguousPipelineContinuation {
             -Severity $Metadata.Severity `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
-            -OutputAs $OutputAs
     }
 }

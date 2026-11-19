@@ -4,10 +4,10 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    PSScriptAnalyzer rule to detect instances of the '-not (<expression> -is <type>)' pattern.
+    Detects instances of the '-not (<expression> -is <type>)' pattern.
 
 .DESCRIPTION
-    PSScriptAnalyzer rule to detect instances of the '-not (<expression> -is <type>)' pattern.
+    Detects the pattern and suggests the equivalent '-isnot' operator.
 
     The rule suggests using the '-isnot' operator instead of the '-not (<expression> -is <type>)'
     pattern.
@@ -20,9 +20,8 @@ using namespace System.Management.Automation.Language
     Coordinated execution replaces that identity with the executing descriptor's ID.
 
 .PARAMETER Context
-    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
-    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
-    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal.
+    Without this setting, traversal is scope-local.
 
 .EXAMPLE
     Test-UseIsNotOperator -ScriptBlockAst {
@@ -40,7 +39,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-UseIsNotOperator {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory, ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -69,7 +68,6 @@ function Test-UseIsNotOperator {
         # Rule Behavior
         $Behavior = $Context.RuleBehavior
         $ShouldRecurse = if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false } else { $Behavior.SearchNestedScriptBlocks }
-        $OutputAs = if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' } else { $Behavior.OutputType }
     }
 
     process {
@@ -188,7 +186,6 @@ function Test-UseIsNotOperator {
                     -Corrections $Corrections `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `
-                    -OutputAs $OutputAs
             }
         } catch {
             $PSCmdlet.ThrowTerminatingError($_)

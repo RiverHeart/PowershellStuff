@@ -46,8 +46,7 @@ using namespace System.Text
         -Severity 'Warning' `
         -ScriptPath '<ScriptBlock>' `
         -Explanation 'Why this rule applies.' `
-        -Corrections @() `
-        -OutputAs 'NitpickFinding'
+        -Corrections @()
 
     Format-NitpickText -Ast $Ast -Finding $Finding
 #>

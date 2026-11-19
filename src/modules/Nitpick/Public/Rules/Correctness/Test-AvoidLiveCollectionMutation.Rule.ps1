@@ -18,7 +18,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-AvoidLiveCollectionMutation {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -48,10 +48,6 @@ function Test-AvoidLiveCollectionMutation {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $Unwrap = {
         param($Node)
         while ($true) {
@@ -178,7 +174,6 @@ function Test-AvoidLiveCollectionMutation {
                 -Severity $Metadata.Severity `
                 -ScriptPath $FilePath `
                 -Explanation $Metadata.Explanation `
-                -OutputAs $OutputAs
         }
     }
 }

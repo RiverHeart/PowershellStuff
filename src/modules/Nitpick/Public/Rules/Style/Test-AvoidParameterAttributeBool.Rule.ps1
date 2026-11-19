@@ -3,10 +3,10 @@ using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
-    PSScriptAnalyzer rule to detect instances of the `[Parameter(<Attribute>=<Bool>)]` pattern.
+    Detects instances of the `[Parameter(<Attribute>=<Bool>)]` pattern.
 
 .DESCRIPTION
-    PSScriptAnalyzer rule to detect instances of the `[Parameter(<Attribute>=<Bool>)]` pattern.
+    Detects explicit Boolean values in Parameter attributes.
 
     The rule suggests using the `[Parameter(<Attribute>)]` when the parameter is required,
     and omitting the attribute when the parameter is optional.
@@ -14,9 +14,8 @@ using namespace System.Management.Automation.Language
     Coordinated execution replaces that identity with the executing descriptor's ID.
 
 .PARAMETER Context
-    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal
-    and RuleBehavior.OutputType selects NitpickFinding or DiagnosticRecord output.
-    Without these settings, traversal is scope-local and output is DiagnosticRecord.
+    Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls traversal.
+    Without this setting, traversal is scope-local.
 
 .EXAMPLE
     Test-AvoidParameterAttributeBool -ScriptBlockAst {
@@ -62,7 +61,6 @@ function Test-AvoidParameterAttributeBool {
         }
         $Behavior = $Context.RuleBehavior
         $ShouldRecurse = if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false } else { $Behavior.SearchNestedScriptBlocks }
-        $OutputAs = if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' } else { $Behavior.OutputType }
     }
 
     process {
@@ -141,7 +139,6 @@ function Test-AvoidParameterAttributeBool {
                     -Corrections $Correction `
                     -ScriptPath $FilePath `
                     -Explanation $Metadata.Explanation `
-                    -OutputAs $OutputAs
 
                 Write-Output $Finding
             }

@@ -4,37 +4,6 @@ using module AstEditor
 
 <#
 .SYNOPSIS
-    PSScriptAnalyzer adapter for the native line-length rule.
-
-.DESCRIPTION
-    Converts the supplied ScriptBlockAst to an AstDocument and delegates to
-    Measure-AvoidLongLines.
-#>
-function Test-AvoidLongLines {
-    [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType([object[]], [hashtable])]
-    param(
-        [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
-        [ValidateNotNullOrEmpty()]
-        [ScriptBlockAst] $ScriptBlockAst,
-
-        [Parameter(ParameterSetName='ScriptBlockAst')]
-        [IDictionary] $Context,
-
-        [Parameter(Mandatory,ParameterSetName='Details')]
-        [switch] $Details
-    )
-
-    if ($Details) {
-        return Measure-AvoidLongLines -Details
-    }
-
-    $Document = New-AstDocument -InputObject $ScriptBlockAst
-    Measure-AvoidLongLines -InputObject $Document -Context $Context
-}
-
-<#
-.SYNOPSIS
     Finds physical source lines that exceed the configured length.
 
 .DESCRIPTION
@@ -48,8 +17,7 @@ function Test-AvoidLongLines {
 
 .PARAMETER Context
     Optional invocation context. RuleSettings.MaximumLength overrides the
-    default of 120. RuleBehavior.OutputType selects NitpickFinding or
-    DiagnosticRecord output.
+    default of 120.
 #>
 function Measure-AvoidLongLines {
     [CmdletBinding(DefaultParameterSetName='Document')]
@@ -89,13 +57,6 @@ function Measure-AvoidLongLines {
 
     process {
         if ($Details) { return $Metadata }
-
-        $RuleBehavior = $Context.RuleBehavior
-        $OutputAs = if ($null -eq $RuleBehavior.OutputType) {
-            'DiagnosticRecord'
-        } else {
-            $RuleBehavior.OutputType
-        }
 
         $SettingsInput = if ($null -ne $Context -and $Context.Contains('RuleSettings')) {
             $Context.RuleSettings
@@ -147,8 +108,7 @@ function Measure-AvoidLongLines {
                 -LineBreakEnd $LineBreakEnd `
                 -FragmentStart $FragmentStart `
                 -FragmentEnd $FragmentEnd `
-                -MaximumLength $MaximumLength `
-                -OutputAs $OutputAs
+                -MaximumLength $MaximumLength
 
             $Offset = $LineBreakEnd
             $LineStart = $LineBreakEnd
@@ -165,8 +125,7 @@ function Measure-AvoidLongLines {
                 -LineBreakEnd $Text.Length `
                 -FragmentStart $FragmentStart `
                 -FragmentEnd $FragmentEnd `
-                -MaximumLength $MaximumLength `
-                -OutputAs $OutputAs
+                -MaximumLength $MaximumLength
         }
     }
 }
@@ -202,10 +161,7 @@ function New-AvoidLongLinesFinding {
         [int] $FragmentEnd,
 
         [Parameter(Mandatory)]
-        [int] $MaximumLength,
-
-        [Parameter(Mandatory)]
-        [string] $OutputAs
+        [int] $MaximumLength
     )
 
     $LineLength = $LineEnd - $LineStart
@@ -239,6 +195,5 @@ function New-AvoidLongLinesFinding {
         -Severity Warning `
         -Corrections @() `
         -ScriptPath $FilePath `
-        -Explanation 'The physical source line exceeds the configured maximum length.' `
-        -OutputAs $OutputAs
+        -Explanation 'The physical source line exceeds the configured maximum length.'
 }

@@ -148,7 +148,7 @@ Describe 'Nitpick plain-data context' {
             $Copy = New-NitpickInvocationContext -Target {}.Ast -Context $Context
             $Copy.Caller | Should -BeExactly 'Nitpick'
             $Copy.RuleBehavior.SearchNestedScriptBlocks | Should -BeTrue
-            $Copy.RuleBehavior.OutputType | Should -BeExactly 'NitpickFinding'
+            $Copy.RuleBehavior.ContainsKey('OutputType') | Should -BeFalse
             $Copy.Policy.Count | Should -Be 0
             $Copy.TargetKind | Should -BeExactly 'Fragment'
             $Copy.ContainsKey('TargetPath') | Should -BeTrue
@@ -172,12 +172,12 @@ Describe 'Nitpick plain-data context' {
             $Copy = New-NitpickInvocationContext -Target {}.Ast -Context @{
                 Caller = $null
                 File = 'legacy'
-                RuleBehavior = @{ OutputType = 'DiagnosticRecord' }
+                RuleBehavior = @{ SearchNestedScriptBlocks = $false }
             }
             $Copy.Caller | Should -BeNullOrEmpty
             $Copy.File | Should -BeExactly 'legacy'
             $Copy.RuleBehavior.Count | Should -Be 1
-            $Copy.RuleBehavior.OutputType | Should -BeExactly 'DiagnosticRecord'
+            $Copy.RuleBehavior.SearchNestedScriptBlocks | Should -BeFalse
         }
     }
 

@@ -18,7 +18,7 @@ BeforeAll {
         $NewFinding = {
             New-NitpickFinding -RuleId 'Local/Placeholder' -Message 'Placeholder' `
                 -ViolationExtent ([scriptblock]::Create('$Placeholder = 1').Ast.Extent) `
-                -Severity Information -ScriptPath $Path -Explanation 'Placeholder.' -OutputAs NitpickFinding
+                -Severity Information -ScriptPath $Path -Explanation 'Placeholder.'
         }
 
         $Proposal = $null

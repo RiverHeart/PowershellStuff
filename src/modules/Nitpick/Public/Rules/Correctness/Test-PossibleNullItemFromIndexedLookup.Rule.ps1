@@ -16,8 +16,7 @@ using namespace System.Management.Automation.Language
     Findings are diagnostic-only. Use native suppression for intentional capture.
 
 .PARAMETER Context
-    RuleBehavior.SearchNestedScriptBlocks controls traversal; OutputType selects
-    NitpickFinding or DiagnosticRecord. Defaults are scope-local diagnostics.
+    RuleBehavior.SearchNestedScriptBlocks controls traversal. The default is scope-local.
 
 .EXAMPLE
     Test-PossibleNullItemFromIndexedLookup -ScriptBlockAst {
@@ -26,7 +25,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-PossibleNullItemFromIndexedLookup {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -57,10 +56,6 @@ function Test-PossibleNullItemFromIndexedLookup {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $Arrays = $ScriptBlockAst.FindAll({
         param($Node)
         $Node -is [ArrayExpressionAst]
@@ -101,7 +96,6 @@ function Test-PossibleNullItemFromIndexedLookup {
             -ViolationExtent $Array.Extent `
             -Severity $Metadata.Severity `
             -ScriptPath $FilePath `
-            -Explanation $Metadata.Explanation `
-            -OutputAs $OutputAs
+            -Explanation $Metadata.Explanation
     }
 }

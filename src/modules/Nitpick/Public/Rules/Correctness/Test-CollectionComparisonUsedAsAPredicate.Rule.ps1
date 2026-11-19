@@ -44,10 +44,6 @@ function Test-CollectionComparisonUsedAsAPredicate {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $Conditions = [System.Collections.Generic.List[Ast]]::new()
     $ControlStatements = $ScriptBlockAst.FindAll({
         param($Node)
@@ -130,7 +126,6 @@ function Test-CollectionComparisonUsedAsAPredicate {
                 -Severity $Metadata.Severity `
                 -ScriptPath $FilePath `
                 -Explanation $Metadata.Explanation `
-                -OutputAs $OutputAs
         }
     }
 }

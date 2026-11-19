@@ -17,8 +17,7 @@ using namespace System.Management.Automation.Language
     access, and explicit null property values must not be silently removed.
 
 .PARAMETER Context
-    RuleBehavior.SearchNestedScriptBlocks controls traversal; OutputType selects
-    NitpickFinding or DiagnosticRecord. Defaults are scope-local diagnostics.
+    RuleBehavior.SearchNestedScriptBlocks controls traversal. The default is scope-local.
 
 .EXAMPLE
     Test-EmptyCollectionMemberAccess -ScriptBlockAst {
@@ -28,7 +27,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-EmptyCollectionMemberAccess {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -58,10 +57,6 @@ function Test-EmptyCollectionMemberAccess {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $Arrays = $ScriptBlockAst.FindAll({
         param($Node)
         $Node -is [ArrayExpressionAst]
@@ -140,6 +135,5 @@ function Test-EmptyCollectionMemberAccess {
             -Severity $Metadata.Severity `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
-            -OutputAs $OutputAs
     }
 }

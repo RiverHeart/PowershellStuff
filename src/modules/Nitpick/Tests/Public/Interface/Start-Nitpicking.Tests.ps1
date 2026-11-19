@@ -451,8 +451,7 @@ Describe 'Start-Nitpicking' {
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity Information `
                 -ScriptPath $ScriptBlockAst.Extent.File `
-                -Explanation 'Verifies scoped dispatch.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Verifies scoped dispatch.'
         }
 
         $ExcludedDirectory = New-Item -Path (Join-Path $TestDrive 'excluded') -ItemType Directory
@@ -583,8 +582,7 @@ Describe 'Start-Nitpicking' {
                     -ViolationExtent $Variable.Extent `
                     -Severity Information `
                     -ScriptPath '<ScriptBlock>' `
-                    -Explanation 'Returns findings out of order.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'Returns findings out of order.'
             }
         }
         Register-Nitpick -Callable $Rule -Name OutOfOrder -Source Tests
@@ -648,8 +646,7 @@ Describe 'Start-Nitpicking' {
                     -Severity Information `
                     -Corrections $Correction `
                     -ScriptPath '<ScriptBlock>' `
-                    -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'Verifies conflict reporting through Start-Nitpicking.'
             }
         }
         Register-Nitpick -Callable $Rule -Name ConflictingRule -Source Tests
@@ -695,8 +692,7 @@ Describe 'Start-Nitpicking' {
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity $RuleSeverity `
                 -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Threshold test finding' `
-                -OutputAs NitpickFinding
+                -Explanation 'Threshold test finding'
         }.GetNewClosure()
 
         Register-Nitpick -Callable $Rule -Name $RuleName -Source Tests

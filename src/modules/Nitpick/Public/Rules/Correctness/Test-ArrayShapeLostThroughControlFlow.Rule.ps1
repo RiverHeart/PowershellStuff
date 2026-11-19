@@ -17,8 +17,7 @@ using namespace System.Management.Automation.Language
     collection substitution, wrapping, and null filtering require author intent.
 
 .PARAMETER Context
-    RuleBehavior.SearchNestedScriptBlocks controls traversal; OutputType selects
-    NitpickFinding or DiagnosticRecord. Defaults are scope-local diagnostics.
+    RuleBehavior.SearchNestedScriptBlocks controls traversal. The default is scope-local.
 
 .EXAMPLE
     Test-ArrayShapeLostThroughControlFlow -ScriptBlockAst {
@@ -27,7 +26,7 @@ using namespace System.Management.Automation.Language
 #>
 function Test-ArrayShapeLostThroughControlFlow {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -58,10 +57,6 @@ function Test-ArrayShapeLostThroughControlFlow {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $Assignments = $ScriptBlockAst.FindAll({
         param($Node)
         $Node -is [AssignmentStatementAst] -and
@@ -136,6 +131,5 @@ function Test-ArrayShapeLostThroughControlFlow {
             -Severity $Metadata.Severity `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
-            -OutputAs $OutputAs
     }
 }
