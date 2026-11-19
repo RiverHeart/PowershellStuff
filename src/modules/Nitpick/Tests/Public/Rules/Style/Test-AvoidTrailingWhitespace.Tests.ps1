@@ -2,7 +2,7 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
+    Import-Module "$PSScriptRoot\..\..\..\..\Nitpick.psd1" -Force
     $PreviousQuietWhatIf = $env:WHATIF__QUIET
     $env:WHATIF__QUIET = $true
 }

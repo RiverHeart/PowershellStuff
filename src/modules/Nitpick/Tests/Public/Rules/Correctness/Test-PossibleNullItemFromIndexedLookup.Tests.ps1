@@ -2,7 +2,7 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
 
     <#
     .SYNOPSIS
@@ -108,7 +108,7 @@ Describe 'Test-PossibleNullItemFromIndexedLookup' {
     It 'returns ScriptAnalyzer diagnostics exactly once per nested capture' {
         $Source = '$Items = @($Map[0]); function Invoke-Example { $Items = @($Map[1]) }'
         $Diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\Nitpick.psd1') `
+            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') `
             -IncludeRule Test-PossibleNullItemFromIndexedLookup -Settings @{})
         $Diagnostics | Should -HaveCount 2
         foreach ($Diagnostic in $Diagnostics) {

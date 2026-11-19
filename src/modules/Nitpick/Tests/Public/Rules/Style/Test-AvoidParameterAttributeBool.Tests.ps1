@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    $RulesPath = Join-Path $PSScriptRoot '../../../Nitpick.psm1'
+    $RulesPath = Join-Path $PSScriptRoot '../../../../Nitpick.psm1'
     Import-Module $RulesPath -Force
 }
 

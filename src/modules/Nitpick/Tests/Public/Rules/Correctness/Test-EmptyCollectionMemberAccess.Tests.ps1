@@ -2,7 +2,7 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
 
     <#
     .SYNOPSIS
@@ -105,7 +105,7 @@ Describe 'Test-EmptyCollectionMemberAccess' {
     It 'reports nested ScriptAnalyzer findings once each' {
         $Source = 'param([object[]] $Items) @($Items.Name); function Invoke-Example { param([array] $Items) @($Items.Name) }'
         $Diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\Nitpick.psd1') `
+            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') `
             -IncludeRule Test-EmptyCollectionMemberAccess -Settings @{})
         $Diagnostics | Should -HaveCount 2
         foreach ($Diagnostic in $Diagnostics) {

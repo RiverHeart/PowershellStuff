@@ -2,8 +2,8 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
-    Import-Module (Join-Path $PSScriptRoot '../../../../AstEditor/AstEditor.psd1') -Force
-    Import-Module (Join-Path $PSScriptRoot '../../../Nitpick.psd1') -Force
+    Import-Module (Join-Path $PSScriptRoot '../../../../../AstEditor/AstEditor.psd1') -Force
+    Import-Module (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') -Force
 
     # This predicate specifies the bounded syntax, not a production fix provider.
     function Get-IsNotContractMatch {
@@ -291,7 +291,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
     It 'retains diagnostics but exposes no partial ScriptAnalyzer fix' {
         $Results = @(Invoke-ScriptAnalyzer `
             -ScriptDefinition '-not (''literal -is'' -is [string])' `
-            -CustomRulePath (Join-Path $PSScriptRoot '../../../Nitpick.psd1') `
+            -CustomRulePath (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') `
             -IncludeRule Test-UseIsNotOperator `
             -Settings @{})
 

@@ -1,7 +1,7 @@
 using namespace System.Management.Automation.Language
 
 BeforeAll {
-    Import-Module (Join-Path $PSScriptRoot '../../../Nitpick.psd1') -Force -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') -Force -ErrorAction Stop
 
     function Invoke-StringArgToSwitchParameterRule {
         param([string] $Source)

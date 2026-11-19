@@ -2,7 +2,7 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') -Force -ErrorAction Stop
 
     <#
     .SYNOPSIS
@@ -122,7 +122,7 @@ function Invoke-Example {
 }
 '@
         $Diagnostics = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\Nitpick.psd1') `
+            -CustomRulePath (Join-Path $PSScriptRoot '..\..\..\..\Nitpick.psd1') `
             -IncludeRule Test-ArrayShapeLostThroughControlFlow -Settings @{})
         $Diagnostics | Should -HaveCount 2
         foreach ($Diagnostic in $Diagnostics) {

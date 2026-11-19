@@ -2,7 +2,7 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    Import-Module (Join-Path $PSScriptRoot '../../../Nitpick.psd1') -Force -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') -Force -ErrorAction Stop
 
     function Invoke-ContinuationRule {
         param(
@@ -137,7 +137,7 @@ function Invoke-Example {
 }
 '@
         $Results = @(Invoke-ScriptAnalyzer -ScriptDefinition $Source `
-            -CustomRulePath (Join-Path $PSScriptRoot '../../../Nitpick.psd1') `
+            -CustomRulePath (Join-Path $PSScriptRoot '../../../../Nitpick.psd1') `
             -IncludeRule Test-AvoidAmbiguousPipelineContinuation -Settings @{})
         $Results | Should -HaveCount 2
         @($Results | ForEach-Object { $_.Extent.StartOffset } | Sort-Object -Unique) |

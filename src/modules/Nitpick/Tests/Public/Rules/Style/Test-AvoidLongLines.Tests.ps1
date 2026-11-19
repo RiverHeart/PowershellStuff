@@ -4,7 +4,7 @@ using module AstEditor
 
 BeforeAll {
     Import-Module PSScriptAnalyzer -ErrorAction Stop
-    Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
+    Import-Module "$PSScriptRoot\..\..\..\..\Nitpick.psd1" -Force
 }
 
 AfterAll {
