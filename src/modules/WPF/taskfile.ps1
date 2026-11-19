@@ -3,7 +3,13 @@ $PleaseConfig = @{
 }
 
 test: {
-    & "$GitRoot/tools/Invoke-Test.ps1" -Suite WPF
+    param([string] $Path)
+
+    if ($Path) {
+        & "$GitRoot/tools/Invoke-Test.ps1" -Suite WPF -Path $Path
+    } else {
+        & "$GitRoot/tools/Invoke-Test.ps1" -Suite WPF
+    }
 }
 
 lint: {

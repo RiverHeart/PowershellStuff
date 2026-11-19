@@ -1,5 +1,11 @@
 test: {
-    & "$GitRoot/tools/Invoke-Test.ps1" -Suite Nitpick
+    param([string] $Path)
+
+    if ($Path) {
+        & "$GitRoot/tools/Invoke-Test.ps1" -Suite Nitpick -Path $Path
+    } else {
+        & "$GitRoot/tools/Invoke-Test.ps1" -Suite Nitpick
+    }
 }
 
 lint: {
