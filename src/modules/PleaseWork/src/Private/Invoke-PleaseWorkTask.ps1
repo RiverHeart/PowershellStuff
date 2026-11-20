@@ -21,9 +21,27 @@ function Invoke-PleaseWorkTask {
         [AllowNull()]
         [scriptblock] $Invoker,
 
+        [AllowNull()]
+        [pscustomobject] $Snapshot,
+
+        [Parameter()]
+        [System.Management.Automation.PSCmdlet] $StreamCaller = $PSCmdlet,
+
         [Parameter(Mandatory)]
         [ref] $Result
     )
+
+    if ($null -ne $Snapshot) {
+        Invoke-PleaseWorkIsolatedTask `
+            -Name $Name `
+            -Snapshot $Snapshot `
+            -Arguments $Arguments `
+            -Context $Context `
+            -Result $Result `
+            -StreamCaller $StreamCaller `
+            -WorkingDirectory $Context.TaskFileRoot
+        return
+    }
 
     # Standard TaskFiles bind task bodies to a dynamic module. This wrapper runs there so context
     # variables remain invocation-local while the call operator preserves normal parameter binding.

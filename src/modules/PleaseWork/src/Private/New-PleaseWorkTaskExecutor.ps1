@@ -16,16 +16,30 @@ function New-PleaseWorkTaskExecutor {
         [System.Collections.IDictionary] $Variables = @{},
 
         [Parameter()]
+        [System.Management.Automation.Runspaces.InitialSessionState] $InitialSessionState,
+
+        [Parameter()]
         [string] $WorkingDirectory
     )
 
     $Runspace = $null
     $PowerShell = $null
+    $OriginalPSModulePath = $env:PSModulePath
     try {
         # The parameterless factory provides the session state in which module auto-loading works
         # consistently for both Windows PowerShell 5.1 and PowerShell 7.
-        $Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
-        $Runspace.Open()
+        $Runspace = if ($null -eq $InitialSessionState) {
+            [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+        } else {
+            [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace(
+                $InitialSessionState
+            )
+        }
+        try {
+            $Runspace.Open()
+        } finally {
+            $env:PSModulePath = $OriginalPSModulePath
+        }
 
         foreach ($Variable in $Variables.GetEnumerator()) {
             $Runspace.SessionStateProxy.SetVariable([string] $Variable.Key, $Variable.Value)
@@ -41,6 +55,7 @@ function New-PleaseWorkTaskExecutor {
     } catch {
         if ($null -ne $PowerShell) { $PowerShell.Dispose() }
         if ($null -ne $Runspace) { $Runspace.Dispose() }
+        $env:PSModulePath = $OriginalPSModulePath
         throw
     }
 

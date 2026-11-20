@@ -151,7 +151,7 @@ function Get-TaskDeclaration {
             }
             Comments = $Comments.ToArray()
             Description = Get-TaskDescription -Comments $Comments.ToArray()
-            Help = $TaskBodyAst.GetHelpContent()
+            Help = Get-PleaseWorkTaskHelp -ScriptBlockAst $TaskBodyAst
         }
     }
 }

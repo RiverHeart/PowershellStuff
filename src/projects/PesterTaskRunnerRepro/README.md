@@ -20,12 +20,11 @@ Import-Module Pester -MinimumVersion '5.0.0' -ErrorAction Stop
 Invoke-Pester -Path $TestPaths -Output Detailed
 ```
 
-Then run it in Please Work's normal task scope and dedicated runspace:
+Then run it in Please Work:
 
 ```powershell
 Import-Module .\src\modules\PleaseWork\PleaseWork.psd1 -Force
 pw test -TaskFile .\src\projects\PesterTaskRunnerRepro\TaskFile.ps1
-pw test -TaskFile .\src\projects\PesterTaskRunnerRepro\TaskFile.ps1 -Runspace
 ```
 
 Record the PowerShell and Pester versions when comparing another setup.
@@ -63,23 +62,24 @@ The significant sequence for each form is:
 | Invocation | Result |
 | --- | --- |
 | `Invoke-Pester`, focused test directly | Passes |
-| `pw test` in the normal task scope | Fails |
-| `pw test -Runspace` | Passes |
+| `pw test` with Please Work's isolated task execution | Passes |
 
 This was reproduced with PowerShell 7.6.10 and Pester 5.7.1. The existing baseline
 also records the same direct/task/runspace split on Windows PowerShell
 5.1.19041.6456 with Pester 5.7.1.
 
-Piping the `New-Module` result to `Import-Module` does not change this split.
+Before per-task isolation was introduced, piping the `New-Module` result to
+`Import-Module` did not change the direct-versus-task split.
 Retaining the `PSModuleInfo` instances in script-scoped variables and removing
-those exact instances in `AfterAll` also does not change it. In the normal task
-scope, that form leaves zero modules registered but one retained command visible
+those exact instances in `AfterAll` also did not change it. In the normal task
+scope, that form left zero modules registered but one retained command visible
 through `Get-Command -All`, causing the reference container to fail teardown.
 Creating the dynamic module inside a child scope with
 `$script:foo = & { New-Module ... } | Import-Module -PassThru` preserves the same
-result.
+result. Both forms now pass through normal Please Work execution because Pester
+runs in a disposable task runspace instead of the TaskFile module scope.
 
-In the failing task-scoped run, the final module query is empty, but
+In the historical failing task-scoped run, the final module query is empty, but
 `Get-Command Test-ReproRule` still returns the command imported from the first
 module. Its source is `RulePackageRules` and its definition is the first
 module's function body.
@@ -89,16 +89,16 @@ module's function body.
 The evidence distinguishes module removal from command-table cleanup:
 
 - `Get-Module -All` no longer reports either temporary module.
-- The command remains discoverable only in the normal Please Work task scope.
+- The command remained discoverable only in the old normal Please Work task scope.
 - A breakpoint probe run in the normal task scope observed no modules and no
   commands immediately after cleanup, while the Pester assertion in its own
   nested scope still resolved the command.
-- The dedicated Please Work runspace removes the mismatch.
+- A dedicated runspace removed the mismatch.
 - Importing the first temporary module with `Import-Module -Global` made the
   controlled reproduction pass under the normal task scope.
 
-Normal Please Work execution binds TaskFile script blocks to a dynamic module and
-invokes task bodies there. Pester's `InModuleScope` also binds the supplied
+Historical Please Work execution bound TaskFile scriptblocks to a dynamic module
+and invoked task bodies there. Pester's `InModuleScope` also binds the supplied
 scriptblock to the target module's session state.
 
 The precise formulation supported by this reproduction is:
@@ -153,11 +153,11 @@ test-runner use.
 
 ## Mitigations
 
-For stateful test suites, prefer an isolated process or Please Work's dedicated
-runspace:
+For stateful test suites, Please Work's per-task runspace now provides the
+required process-local isolation:
 
 ```powershell
-pw test -TaskFile .\src\projects\PesterTaskRunnerRepro\TaskFile.ps1 -Runspace
+pw test -TaskFile .\src\projects\PesterTaskRunnerRepro\TaskFile.ps1
 ```
 
 When a test intentionally needs to import modules that another module scope will

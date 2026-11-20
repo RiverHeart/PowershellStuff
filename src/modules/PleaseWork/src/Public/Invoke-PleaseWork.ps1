@@ -30,10 +30,7 @@ function Invoke-PleaseWork {
         [string] $TaskFile,
 
         [Parameter(ParameterSetName='Run')]
-        [switch] $PassThru,
-
-        [Parameter()]
-        [switch] $Runspace
+        [switch] $PassThru
     )
 
     dynamicparam {
@@ -89,46 +86,26 @@ function Invoke-PleaseWork {
             }
         }
 
-        if ($Runspace) {
-            $InvocationParameters = @{}
-            foreach ($ParameterName in $PSBoundParameters.Keys) {
-                if ($ParameterName -ne 'Runspace') {
-                    $InvocationParameters[$ParameterName] = $PSBoundParameters[$ParameterName]
-                }
-            }
-            $InvocationParameters.TaskFile = $TaskFilePath
-
-            Invoke-PleaseWorkInRunspace `
-                -ModulePath $MyInvocation.MyCommand.Module.Path `
-                -InvocationParameters $InvocationParameters `
-                -WorkingDirectory $PWD.ProviderPath
-            return
-        }
-
-        # The runspace bootstrap registers tasks directly and places its prepared set in this
-        # module's private state. Standard invocation retains the dynamic-module loader.
-        $TaskSet = if ($null -ne $script:PreparedTaskSet) {
-            $script:PreparedTaskSet
-        } else {
-            Read-TaskFile -Path $TaskFilePath
-        }
-
-        # Support a native 'help' task that displays the available tasks and their descriptions.
-        $UseNativeHelp = $Name -ieq 'help' -and -not $TaskSet.Tasks.ContainsKey('help')
-
-        # If the user requested a task list or help, build a list of tasks and their descriptions.
+        $TaskDeclarations = @(Get-TaskFileDeclaration -Path $TaskFilePath)
+        $UseNativeHelp = $Name -ieq 'help' -and
+            -not @($TaskDeclarations | Where-Object Name -ieq 'help')
         if ($List -or $UseNativeHelp) {
-            $TaskList = foreach ($TaskName in $TaskSet.TaskNames) {
-                $Description = $TaskSet.Tasks[$TaskName].Description
+            $DefaultTaskName = if ($env:PLEASE_DEFAULT_TASK) {
+                $env:PLEASE_DEFAULT_TASK
+            } else {
+                $TaskDeclarations[0].Name
+            }
+            $TaskList = foreach ($Declaration in $TaskDeclarations) {
+                $Description = $Declaration.Description
                 if (-not [string]::IsNullOrWhiteSpace($Description)) {
                     $Description = $Description.Trim()
                 }
 
                 [pscustomobject] @{
-                    Name = $TaskName
-                    Dependencies = [string[]] $TaskSet.Tasks[$TaskName].Dependencies
-                    PathSpecs = [string[]] $TaskSet.Tasks[$TaskName].PathSpecs
-                    Default = $TaskName -eq $TaskSet.DefaultTask
+                    Name = $Declaration.Name
+                    Dependencies = [string[]] $Declaration.Dependencies
+                    PathSpecs = [string[]] $Declaration.PathSpecs
+                    Default = $Declaration.Name -eq $DefaultTaskName
                     Description = $Description
                 }
             }
@@ -137,16 +114,22 @@ function Invoke-PleaseWork {
         if ($List) { return $TaskList }
 
         if ($UseNativeHelp -and -not [string]::IsNullOrWhiteSpace($HelpTaskName)) {
-            if (-not $TaskSet.Tasks.ContainsKey($HelpTaskName)) {
+            $HelpDeclaration = $TaskDeclarations |
+                Where-Object Name -ieq $HelpTaskName |
+                Select-Object -First 1
+            if ($null -eq $HelpDeclaration) {
                 throw "Task '$HelpTaskName' is not defined."
             }
-            return $TaskSet.Tasks[$HelpTaskName].Help
+            return $HelpDeclaration.Help
         }
 
         if ($UseNativeHelp) {
             $TaskList | Format-PleaseWorkTaskHelp
             return
         }
+
+        $TaskSnapshot = New-PleaseWorkTaskSnapshot -Path $TaskFilePath
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $TaskSnapshot
 
         if ([string]::IsNullOrEmpty($Name)) {
             $Name = $TaskSet.DefaultTask
@@ -206,12 +189,15 @@ function Invoke-PleaseWork {
                         -Arguments $(if ($TaskName -ieq $Name) { $TaskArguments } else { $null }) `
                         -Context $CurrentTaskContext `
                         -Invoker $TaskSet.Invoker `
+                        -Snapshot $TaskSet.Snapshot `
+                        -StreamCaller $PSCmdlet `
                         -Result ([ref] $TaskResult) |
                         ForEach-Object { $TaskOutput.Add($_) }
                 } catch {
                     $TaskResult | Add-Member `
                         -NotePropertyName Output `
-                        -NotePropertyValue $TaskOutput.ToArray()
+                        -NotePropertyValue $TaskOutput.ToArray() `
+                        -Force
 
                     if ($PassThru) {
                         $TaskResult
@@ -223,7 +209,8 @@ function Invoke-PleaseWork {
 
                 $TaskResult | Add-Member `
                     -NotePropertyName Output `
-                    -NotePropertyValue $TaskOutput.ToArray()
+                    -NotePropertyValue $TaskOutput.ToArray() `
+                    -Force
 
                 Write-Verbose (
                     "Completed task '$TaskName' in $($TaskResult.Duration). " +

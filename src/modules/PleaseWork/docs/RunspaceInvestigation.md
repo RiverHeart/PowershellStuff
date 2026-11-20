@@ -142,7 +142,7 @@ PleaseWork should keep task semantics separate from pipeline transport:
 7. Record `HadErrors` as diagnostic information rather than using it as the success predicate.
 
 `Invoke-PleaseWorkTask` already owns task-level error and native exit-code handling.
-`Invoke-PleaseWorkInRunspace` owns the outer pipeline and runspace lifecycle. This separation is
+`Invoke-PleaseWorkIsolatedTask` owns the task pipeline and runspace lifecycle. This separation is
 appropriate. The outer layer can preserve richer terminating-error metadata by forwarding the
 reason's `ErrorRecord`, when available, rather than reducing it to an exception message.
 

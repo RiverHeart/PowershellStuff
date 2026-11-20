@@ -58,6 +58,25 @@ please build -Configuration Release -Force
 
 Task parameter names and aliases must not conflict with PleaseWork parameters, common parameters, or their abbreviations. Task arguments are passed only to the requested task, not its dependencies.
 
+## Task isolation
+
+PleaseWork loads each TaskFile once in a disposable definition runspace. It
+captures top-level PowerShell data values, helper functions, aliases, and
+file-backed modules as a Task Snapshot, then creates a fresh runspace for every
+task in the plan. A task therefore starts from the same definition state but
+cannot observe session-state changes made by a dependency.
+
+Dependencies define execution order and do not transfer in-memory state.
+Files, environment variables, Git state, native processes, and other
+process/system effects remain visible because runspace isolation is not a
+sandbox. Structured task output still crosses the boundary normally.
+
+TaskFile setup should define values, helpers, and configuration without external
+side effects. Live variable values that cannot be copied safely and dynamic
+modules without a file source produce an explicit error. Caller-only functions,
+aliases, variables, and modules are not inherited; import dependencies from the
+TaskFile or make them available through normal module auto-loading.
+
 `help` is reserved as a predictable task name to get taskfile help. However, if you really, really, really want to define `help` yourself there is an override.
 
 ```powershell

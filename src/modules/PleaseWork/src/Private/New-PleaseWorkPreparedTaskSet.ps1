@@ -14,8 +14,11 @@ function New-PleaseWorkPreparedTaskSet {
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Config,
 
-        [Parameter(Mandatory)]
-        [scriptblock] $Invoker
+        [AllowNull()]
+        [scriptblock] $Invoker,
+
+        [AllowNull()]
+        [pscustomobject] $Snapshot
     )
 
     $HelpTask = @($Tasks | Where-Object { $_.Name -ieq 'help' })
@@ -44,5 +47,6 @@ function New-PleaseWorkPreparedTaskSet {
         Config = $Config
         Module = $null
         Invoker = $Invoker
+        Snapshot = $Snapshot
     }
 }
