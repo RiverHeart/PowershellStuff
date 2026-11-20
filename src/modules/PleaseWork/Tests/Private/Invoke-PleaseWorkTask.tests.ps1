@@ -2,100 +2,106 @@ Import-Module "$PSScriptRoot/../../PleaseWork.psd1" -Force
 
 InModuleScope PleaseWork {
     Describe 'Invoke-PleaseWorkTask' {
-        It 'injects task context and records a successful result without mixing it into output' {
-            $Context = @{
-                TaskFilePath = 'C:\project\TaskFile.ps1'
-                TaskFileRoot = 'C:\project'
-            }
+        BeforeAll {
+            $ModulePath = Join-Path $TestDrive 'SnapshotDependency.psm1'
+            @'
+function Get-SnapshotModuleValue {
+    'module-value'
+}
+Export-ModuleMember -Function Get-SnapshotModuleValue
+'@ | Set-Content -LiteralPath $ModulePath
+            $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
+            @"
+`$SnapshotState = @{ Count = 0 }
+function Get-SnapshotState {
+    `$SnapshotState.Count
+}
+Import-Module '$ModulePath'
+
+build: {
+    param ([string] `$Configuration)
+
+    `$SnapshotState.Count++
+    [pscustomobject] @{
+        Configuration = `$Configuration
+        Count = Get-SnapshotState
+        ModuleValue = Get-SnapshotModuleValue
+    }
+}
+"@ | Set-Content -LiteralPath $TaskFile
+            $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        }
+
+        It 'recreates TaskFile state and definitions in a fresh runspace' {
             $Result = $null
 
-            $Output = @(Invoke-PleaseWorkTask `
-                -Name inspect `
-                -ScriptBlock { "$TaskFilePath|$TaskFileRoot"; 'task output' } `
-                -Context $Context `
-                -Result ([ref] $Result))
-
-            $Output | Should -Be @(
-                'C:\project\TaskFile.ps1|C:\project'
-                'task output'
+            $Output = @(
+                Invoke-PleaseWorkTask `
+                    -Name build `
+                    -Snapshot $Snapshot `
+                    -Arguments @{ Configuration = 'Release' } `
+                    -Context @{ TaskFilePath = $TaskFile } `
+                    -Result ([ref] $Result) `
+                    -WorkingDirectory $TestDrive
             )
-            $Result.TaskName | Should -Be 'inspect'
+
+            $Output.Configuration | Should -Be 'Release'
+            $Output.Count | Should -Be 1
+            $Output.ModuleValue | Should -Be 'module-value'
             $Result.Succeeded | Should -BeTrue
-            $Result.ExitCode | Should -Be 0
-            $Result.Error | Should -BeNullOrEmpty
-            $Result.StartedAt | Should -BeOfType ([datetime])
-            $Result.FinishedAt | Should -BeOfType ([datetime])
-            $Result.Duration | Should -BeOfType ([timespan])
+            $Result.Output | Should -Be $Output
         }
 
-        It 'binds named arguments and validates them in an isolated task module scope' {
-            $TaskModule = New-Module {
-                $script:Task = {
-                    param (
-                        [Parameter(Mandatory)]
-                        [ValidateSet('Debug', 'Release')]
-                        [string] $Configuration,
+        It 'does not carry task session-state changes into the next task runspace' {
+            $FirstResult = $null
+            $SecondResult = $null
 
-                        [switch] $Force
-                    )
-
-                    "$GitRoot|$Configuration|$Force"
-                }
-            }
-            $TaskScriptBlock = & $TaskModule { $script:Task }
-            $Result = $null
-
-            $Output = Invoke-PleaseWorkTask `
+            $FirstOutput = Invoke-PleaseWorkTask `
                 -Name build `
-                -ScriptBlock $TaskScriptBlock `
-                -Arguments @{ Configuration = 'Release'; Force = $true } `
-                -Context @{ GitRoot = 'C:\repo' } `
-                -Result ([ref] $Result)
-
-            $Output | Should -Be 'C:\repo|Release|True'
-            $Result.Succeeded | Should -BeTrue
-            & $TaskModule {
-                Get-Variable -Name GitRoot -Scope Script -ErrorAction SilentlyContinue
-            } | Should -BeNullOrEmpty
-
-            { Invoke-PleaseWorkTask `
+                -Snapshot $Snapshot `
+                -Arguments @{ Configuration = 'Debug' } `
+                -Context @{} `
+                -Result ([ref] $FirstResult) `
+                -WorkingDirectory $TestDrive
+            $SecondOutput = Invoke-PleaseWorkTask `
                 -Name build `
-                -ScriptBlock $TaskScriptBlock `
-                -Arguments @{ Configuration = 'Invalid' } `
-                -Context @{ GitRoot = 'C:\repo' } `
-                -Result ([ref] $Result) } |
-                Should -Throw '*Cannot validate argument on parameter*Configuration*'
+                -Snapshot $Snapshot `
+                -Arguments @{ Configuration = 'Debug' } `
+                -Context @{} `
+                -Result ([ref] $SecondResult) `
+                -WorkingDirectory $TestDrive
+
+            $FirstOutput.Count | Should -Be 1
+            $SecondOutput.Count | Should -Be 1
+            $Snapshot.Variables |
+                Where-Object Name -eq SnapshotState |
+                ForEach-Object { $_.Value.Count } |
+                Should -Be 0
         }
 
-        It 'resets stale native status before invoking a task with no native commands' {
-            $global:LASTEXITCODE = 23
+        It 'returns output from before a task failure and preserves the task error' {
+            $FailureTaskFile = Join-Path $TestDrive 'FailureTaskFile.ps1'
+            @'
+build: {
+    'before failure'
+    throw 'task failed'
+}
+'@ | Set-Content -LiteralPath $FailureTaskFile
+            $FailureSnapshot = New-PleaseWorkTaskSnapshot -Path $FailureTaskFile
             $Result = $null
 
-            Invoke-PleaseWorkTask `
-                -Name powershellOnly `
-                -ScriptBlock { Write-Output 'done' } `
-                -Context @{} `
-                -Result ([ref] $Result)
+            {
+                Invoke-PleaseWorkTask `
+                    -Name build `
+                    -Snapshot $FailureSnapshot `
+                    -Context @{} `
+                    -Result ([ref] $Result) `
+                    -WorkingDirectory $TestDrive
+            } | Should -Throw '*task failed*'
 
-            $Result.Succeeded | Should -BeTrue
-            $Result.ExitCode | Should -Be 0
-            $LASTEXITCODE | Should -Be 0
-        }
-
-        It 'records a terminating error before rethrowing it' {
-            $Result = $null
-
-            { Invoke-PleaseWorkTask `
-                -Name broken `
-                -ScriptBlock { throw 'broken task' } `
-                -Context @{} `
-                -Result ([ref] $Result) } | Should -Throw 'broken task'
-
-            $Result.TaskName | Should -Be 'broken'
             $Result.Succeeded | Should -BeFalse
-            $Result.ExitCode | Should -Be 0
-            $Result.Error.Exception.Message | Should -Match 'broken task'
+            $Result.Error.Exception.Message | Should -Match 'task failed'
+            $Result.Output | Should -Be @('before failure')
         }
     }
 }
-

@@ -645,7 +645,8 @@ build: {
 }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $TaskSet = Read-TaskFile -Path $TaskFile
+        $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $Snapshot
 
         $TaskSet.TaskNames | Should -Be @('build')
     }
@@ -654,7 +655,7 @@ build: {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         'build: test' | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } |
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
             Should -Throw "Task 'build' must end with a scriptblock body."
     }
 
@@ -662,7 +663,7 @@ build: {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         "build: 'test' { 'build' }" | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } |
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
             Should -Throw "Dependencies for task 'build' must be bare task names."
     }
 
@@ -674,7 +675,8 @@ FOO: { 'first' }
 foo: { 'second' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } | Should -Throw "Task 'foo' is declared more than once."
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
+            Should -Throw "Task 'foo' is declared more than once."
         Get-Variable -Name PleaseWorkDuplicateTaskFileLoaded -Scope Global -ErrorAction SilentlyContinue |
             Should -BeNullOrEmpty
     }
@@ -683,7 +685,8 @@ foo: { 'second' }
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         ': { ''body'' }' | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } | Should -Throw 'Task names cannot be empty.'
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
+            Should -Throw 'Task names cannot be empty.'
     }
 
     It 'allows non-task top-level statements' {
@@ -697,7 +700,8 @@ Write-Output 'loading'
 build: { Get-Message }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $TaskSet = Read-TaskFile -Path $TaskFile
+        $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $Snapshot
         $TaskSet.TaskNames | Should -Be @('build')
 
         @(please build -TaskFile $TaskFile) | Should -Be @('build')
@@ -813,7 +817,8 @@ inspect: {
 build: { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $TaskSet = Read-TaskFile -Path $TaskFile
+        $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $Snapshot
 
         $TaskSet.DefaultTask | Should -Be 'build'
         $TaskSet.TaskNames | Should -Be @('build')
@@ -829,7 +834,8 @@ build: { $global:PleaseWorkLog.Add('build') }
 
         try {
             $ErrorActionPreference = 'Continue'
-            { Read-TaskFile -Path $TaskFile } | Should -Throw 'setup failed'
+            { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
+                Should -Throw 'setup failed'
         } finally {
             $ErrorActionPreference = $OriginalErrorActionPreference
         }

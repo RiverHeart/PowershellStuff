@@ -185,10 +185,9 @@ function Invoke-PleaseWork {
                     # Dependencies run without the requested task's arguments.
                     Invoke-PleaseWorkTask `
                         -Name $TaskName `
-                        -ScriptBlock $Task.ScriptBlock `
                         -Arguments $(if ($TaskName -ieq $Name) { $TaskArguments } else { $null }) `
                         -Context $CurrentTaskContext `
-                        -Invoker $TaskSet.Invoker `
+                        -WorkingDirectory $TaskFileRoot `
                         -Snapshot $TaskSet.Snapshot `
                         -StreamCaller $PSCmdlet `
                         -Result ([ref] $TaskResult) |

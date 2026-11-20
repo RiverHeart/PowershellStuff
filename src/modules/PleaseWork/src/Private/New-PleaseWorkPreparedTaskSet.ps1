@@ -14,10 +14,8 @@ function New-PleaseWorkPreparedTaskSet {
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Config,
 
-        [AllowNull()]
-        [scriptblock] $Invoker,
-
-        [AllowNull()]
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
         [pscustomobject] $Snapshot
     )
 
@@ -45,8 +43,6 @@ function New-PleaseWorkPreparedTaskSet {
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
         Config = $Config
-        Module = $null
-        Invoker = $Invoker
         Snapshot = $Snapshot
     }
 }

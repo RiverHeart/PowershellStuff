@@ -53,6 +53,16 @@ function New-PleaseWorkTaskSnapshot {
             throw "TaskFile '$TaskFilePath' does not declare any tasks."
         }
 
+        $DeclarationNames = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase
+        )
+
+        foreach ($Declaration in $Declarations) {
+            if (-not $DeclarationNames.Add($Declaration.Name)) {
+                throw "Task '$($Declaration.Name)' is declared more than once."
+            }
+        }
+
         $script:PleaseWorkSnapshotDeclarations = @{}
         $script:PleaseWorkSnapshotTasks = `
             [System.Collections.Generic.List[hashtable]]::new()
@@ -296,19 +306,48 @@ function New-PleaseWorkTaskSnapshot {
         try {
             $Output = @($PowerShell.Invoke())
         } catch {
-            $InvocationError = @($PowerShell.Streams.Error) |
-                Select-Object -Last 1
-            if ($null -ne $InvocationError) {
-                throw $InvocationError
-            }
-            throw
+            $InvocationError = $_
         }
+
         if ($PowerShell.InvocationStateInfo.State -eq 'Failed') {
-            throw $PowerShell.InvocationStateInfo.Reason
+            if ($null -eq $InvocationError) {
+                $InvocationError = @($PowerShell.Streams.Error) |
+                    Select-Object -Last 1
+            }
+
+            if ($null -eq $InvocationError) {
+                $InvocationError = $PowerShell.InvocationStateInfo.Reason
+            }
         }
+
+        if ($null -ne $InvocationError) {
+            $ResolvedError = $InvocationError
+            for ($Depth = 0; $Depth -lt 8; $Depth++) {
+                $InnerError = $null
+                if ($ResolvedError -is [System.Management.Automation.ErrorRecord]) {
+                    $InnerError = $ResolvedError.Exception
+                } elseif ($null -ne $ResolvedError.InnerException) {
+                    $InnerError = $ResolvedError.InnerException
+                } elseif (
+                    $null -ne $ResolvedError.PSObject.Properties['ErrorRecord'].Value
+                ) {
+                    $InnerError = $ResolvedError.PSObject.Properties['ErrorRecord'].Value
+                }
+
+                if ($null -eq $InnerError -or
+                    [object]::ReferenceEquals($InnerError, $ResolvedError)
+                ) {
+                    break
+                }
+                $ResolvedError = $InnerError
+            }
+            throw $ResolvedError
+        }
+
         if ($Output.Count -ne 1) {
             throw "TaskFile snapshot produced $($Output.Count) result objects."
         }
+
         $RawSnapshot = $Output[0]
         $Variables = @(
             foreach ($Variable in $RawSnapshot.Variables) {

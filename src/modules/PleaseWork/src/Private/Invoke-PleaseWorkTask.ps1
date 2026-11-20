@@ -1,6 +1,38 @@
+using namespace System.Management.Automation
+
 <#
 .SYNOPSIS
-    Invokes one task with explicit context and records its result.
+    Invokes one task in a disposable runspace created from a Task Snapshot.
+
+.DESCRIPTION
+    Recreates task and helper definitions in a fresh runspace, executes the task,
+    records its result, replays task streams, and disposes all task session state.
+
+.PARAMETER Name
+    The task name.
+
+.PARAMETER Snapshot
+    The Task Snapshot that contains the task definition and setup state.
+
+.PARAMETER Arguments
+    Arguments for the requested task.
+
+.PARAMETER Context
+    PleaseWork context injected into the task.
+
+.PARAMETER Result
+    Receives the task result.
+
+.PARAMETER WorkingDirectory
+    Working directory for the task.
+
+.EXAMPLE
+    Invoke-PleaseWorkTask -Name build -Snapshot $Snapshot -Context @{} -Result ([ref] $Result)
+
+    Runs one task and records it in $Result.
+
+.NOTES
+    Examples run in the PleaseWork module's scope.
 #>
 function Invoke-PleaseWorkTask {
     [CmdletBinding()]
@@ -10,7 +42,8 @@ function Invoke-PleaseWorkTask {
         [string] $Name,
 
         [Parameter(Mandatory)]
-        [scriptblock] $ScriptBlock,
+        [ValidateNotNull()]
+        [pscustomobject] $Snapshot,
 
         [AllowNull()]
         [object] $Arguments,
@@ -18,95 +51,170 @@ function Invoke-PleaseWorkTask {
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Context,
 
-        [AllowNull()]
-        [scriptblock] $Invoker,
-
-        [AllowNull()]
-        [pscustomobject] $Snapshot,
+        [Parameter(Mandatory)]
+        [ref] $Result,
 
         [Parameter()]
         [System.Management.Automation.PSCmdlet] $StreamCaller = $PSCmdlet,
 
-        [Parameter(Mandatory)]
-        [ref] $Result
+        [Parameter()]
+        [string] $WorkingDirectory
     )
 
-    if ($null -ne $Snapshot) {
-        Invoke-PleaseWorkIsolatedTask `
-            -Name $Name `
-            -Snapshot $Snapshot `
-            -Arguments $Arguments `
-            -Context $Context `
-            -Result $Result `
-            -StreamCaller $StreamCaller `
-            -WorkingDirectory $Context.TaskFileRoot
-        return
+    $TaskDefinition = @($Snapshot.Tasks | Where-Object Name -eq $Name)[0]
+    if ($null -eq $TaskDefinition) {
+        throw "Task '$Name' is not present in the Task Snapshot."
     }
 
-    # Standard TaskFiles bind task bodies to a dynamic module. This wrapper runs there so context
-    # variables remain invocation-local while the call operator preserves normal parameter binding.
-    $TaskInvoker = {
-        param ($TaskScriptBlock, $TaskContext, $TaskArguments)
+    $InvocationScript = {
+        param (
+            [string] $TaskScript,
+            [System.Collections.IDictionary] $TaskContext,
+            [System.Collections.IDictionary] $TaskConfig,
+            [AllowNull()]
+            [object] $TaskArguments
+        )
 
+        $global:LASTEXITCODE = 0
         $ErrorActionPreference = 'Stop'
-        foreach ($VariableName in $TaskContext.Keys) {
-            if ($VariableName -eq 'ErrorActionPreference') {
-                continue
-            }
+        $private:PleaseWorkModule = Get-Module PleaseWork | Select-Object -First 1
+        & $private:PleaseWorkModule {
+            param ($Config)
+            $script:PleaseWorkConfig = $Config
+        } $TaskConfig
+        $private:TaskScriptBlock = [scriptblock]::Create($TaskScript)
+        $private:InvocationContext = $TaskContext
+        $private:InvocationArguments = $TaskArguments
+
+        Remove-Variable `
+            -Name TaskScript, TaskContext, TaskArguments, TaskConfig, PleaseWorkModule `
+            -Scope Local
+
+        foreach ($VariableName in $private:InvocationContext.Keys) {
             Set-Variable `
                 -Name ([string] $VariableName) `
-                -Value $TaskContext[$VariableName] `
+                -Value $private:InvocationContext[$VariableName] `
                 -Scope Local
         }
 
-        if ($TaskArguments -is [System.Collections.IDictionary]) {
-            & $TaskScriptBlock @TaskArguments
-        } elseif ($null -ne $TaskArguments) {
-            [object[]] $PositionalArguments = @($TaskArguments)
-            & $TaskScriptBlock @PositionalArguments
-        } else {
-            & $TaskScriptBlock
+        try {
+            if ($private:InvocationArguments -is [System.Collections.IDictionary]) {
+                & $private:TaskScriptBlock @private:InvocationArguments
+            } elseif ($null -ne $private:InvocationArguments) {
+                [object[]] $private:PositionalArguments = @($private:InvocationArguments)
+                & $private:TaskScriptBlock @private:PositionalArguments
+            } else {
+                & $private:TaskScriptBlock
+            }
+        } finally {
+            $global:PleaseWorkTaskExitCode = $global:LASTEXITCODE
         }
     }
 
-    $StartedAt = [datetime]::UtcNow
-    $global:LASTEXITCODE = 0
-    try {
-        # Direct-runspace TaskFiles supply an invoker created in their own script scope. Standard
-        # TaskFiles instead enter the dynamic module associated with the task scriptblock.
-        if ($null -ne $Invoker) {
-            & $Invoker $ScriptBlock $Context $Arguments
-        } elseif ($null -ne $ScriptBlock.Module) {
-            & $ScriptBlock.Module $TaskInvoker $ScriptBlock $Context $Arguments
-        } else {
-            & $TaskInvoker $ScriptBlock $Context $Arguments
-        }
-    } catch {
-        $TaskError = $_
+    $InitialSessionState = New-PleaseWorkInitialSessionState -Snapshot $Snapshot
+    $IsolatedConfig = Copy-PleaseWorkSnapshotValue `
+        -InputObject $Snapshot.Config `
+        -Name PleaseConfig
 
+    $IsolatedContext = Copy-PleaseWorkSnapshotValue `
+        -InputObject $Context `
+        -Name TaskContext
+
+    $Executor = $null
+    $Runspace = $null
+    $StartedAt = [datetime]::UtcNow
+    $TaskError = $null
+    $Output = @()
+    try {
+        $Executor = New-PleaseWorkTaskExecutor `
+            -ScriptBlock $InvocationScript `
+            -Parameters @{
+                TaskScript = $TaskDefinition.ScriptBlockText
+                TaskContext = $IsolatedContext
+                TaskConfig = $IsolatedConfig
+                TaskArguments = $Arguments
+            } `
+            -InitialSessionState $InitialSessionState `
+            -WorkingDirectory $WorkingDirectory
+
+        $Runspace = $Executor.Runspace
+
+        $InvocationOutput = [PSDataCollection[psobject]]::new()
+        try {
+            $Executor.Invoke($null, $InvocationOutput)
+        } catch {
+            $TaskError = @($Executor.Streams.Error) | Select-Object -Last 1
+
+            if ($null -eq $TaskError) {
+                $TaskError = $Executor.InvocationStateInfo.Reason
+            }
+
+            if ($null -eq $TaskError) {
+                $TaskError = $_.Exception.InnerException
+            }
+
+            if ($null -eq $TaskError) {
+                $TaskError = $_
+            }
+
+            while ($null -ne $TaskError) {
+                $ErrorException = if ($TaskError -is [ErrorRecord]) {
+                    $TaskError.Exception
+                } else {
+                    $TaskError
+                }
+
+                $InnerError = $ErrorException.PSObject.Properties['ErrorRecord'].Value
+                if ($null -eq $InnerError -or $InnerError -eq $TaskError) {
+                    break
+                }
+                $TaskError = $InnerError
+            }
+            if ($TaskError -is [System.Exception]) {
+                $TaskError = [ErrorRecord]::new(
+                    $TaskError,
+                    'PleaseWorkIsolatedTaskFailed',
+                    [ErrorCategory]::OperationStopped,
+                    $Name
+                )
+            }
+        }
+        $Output = @($InvocationOutput)
+
+        Write-PleaseWorkTaskExecutorStream -Executor $Executor -Caller $StreamCaller
+    } finally {
         $FinishedAt = [datetime]::UtcNow
+        $ExitCode = 0
+        if ($null -ne $Runspace) {
+            $ExitCodeValue = $Runspace.SessionStateProxy.GetVariable(
+                'PleaseWorkTaskExitCode'
+            )
+
+            if ($null -ne $ExitCodeValue) {
+                $ExitCode = [int] $ExitCodeValue
+            }
+
+            $Runspace.Dispose()
+        }
+
+        if ($null -ne $Executor) { $Executor.Dispose() }
+
         $Result.Value = [pscustomobject] @{
             TaskName = $Name
-            Succeeded = $false
-            ExitCode = [int] $global:LASTEXITCODE
+            Succeeded = $null -eq $TaskError -and $ExitCode -eq 0
+            ExitCode = $ExitCode
             Error = $TaskError
             StartedAt = $StartedAt
             FinishedAt = $FinishedAt
             Duration = $FinishedAt - $StartedAt
+            Output = $Output
         }
-        throw  # Re-throw the error to propagate it to the caller.
+        $global:LASTEXITCODE = $ExitCode
     }
 
-    $FinishedAt = [datetime]::UtcNow
-    # Task-local LASTEXITCODE assignments do not affect the native status tracked by the runspace.
-    $ExitCode = [int] $global:LASTEXITCODE
-    $Result.Value = [pscustomobject] @{
-        TaskName = $Name
-        Succeeded = $ExitCode -eq 0
-        ExitCode = $ExitCode
-        Error = $null
-        StartedAt = $StartedAt
-        FinishedAt = $FinishedAt
-        Duration = $FinishedAt - $StartedAt
+    Write-Output -InputObject $Output
+
+    if ($null -ne $TaskError) {
+        throw $TaskError
     }
 }
