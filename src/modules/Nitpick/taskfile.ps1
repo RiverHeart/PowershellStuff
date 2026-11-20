@@ -1,10 +1,23 @@
 test: {
     param([string] $Path)
 
+    $PowerShellPath = (Get-Process -Id $PID).Path
+    $Arguments = @(
+        '-NoProfile'
+        '-File'
+        "$GitRoot/tools/Invoke-Test.ps1"
+        '-Suite'
+        'Nitpick'
+        '-ExitOnError'
+    )
+
     if ($Path) {
-        & "$GitRoot/tools/Invoke-Test.ps1" -Suite Nitpick -Path $Path
-    } else {
-        & "$GitRoot/tools/Invoke-Test.ps1" -Suite Nitpick
+        $Arguments += @('-Path', $Path)
+    }
+
+    & $PowerShellPath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Nitpick tests failed with exit code $LASTEXITCODE."
     }
 }
 
