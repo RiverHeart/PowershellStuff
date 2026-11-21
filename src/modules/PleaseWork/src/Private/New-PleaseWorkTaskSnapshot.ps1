@@ -1,4 +1,7 @@
+using namespace System.Collections
 using namespace System.Collections.Generic
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Runspaces
 
 <#
 .SYNOPSIS
@@ -42,6 +45,7 @@ function New-PleaseWorkTaskSnapshot {
             -Force `
             -PassThru `
             -ErrorAction Stop
+
         $Declarations = @(
             & $PleaseWorkModule {
                 param ($Path)
@@ -49,6 +53,7 @@ function New-PleaseWorkTaskSnapshot {
                 Get-TaskFileDeclaration -Path $Path
             } $TaskFilePath
         )
+
         if ($Declarations.Count -eq 0) {
             throw "TaskFile '$TaskFilePath' does not declare any tasks."
         }
@@ -64,8 +69,9 @@ function New-PleaseWorkTaskSnapshot {
         }
 
         $script:PleaseWorkSnapshotDeclarations = @{}
-        $script:PleaseWorkSnapshotTasks = `
+        $script:PleaseWorkSnapshotTasks =
             [System.Collections.Generic.List[hashtable]]::new()
+
         $TaskCommand = {
             [CmdletBinding()]
             param (
@@ -95,16 +101,20 @@ function New-PleaseWorkTaskSnapshot {
         foreach ($Function in Get-ChildItem -LiteralPath 'Function:') {
             $BaselineFunctions[$Function.Name] = [string] $Function.ScriptBlock
         }
+
         $BaselineAliases = @{}
         foreach ($Alias in Get-ChildItem -LiteralPath 'Alias:') {
             $BaselineAliases[$Alias.Name] = $Alias.Definition
         }
+
         $BaselineModules = @(
             Get-Module |
                 Where-Object { -not [string]::IsNullOrWhiteSpace($_.Path) } |
                 ForEach-Object { $_.Path }
         )
+
         $BaselineModuleReferences = @(Get-Module)
+
         $BaselineVariables = @{}
         foreach ($Variable in Get-Variable -Scope Script) {
             $BaselineVariables[$Variable.Name] = $Variable.Value
@@ -131,6 +141,7 @@ function New-PleaseWorkTaskSnapshot {
                     )
                 }
         )
+
         if ($UnsupportedModules.Count -gt 0) {
             $UnsupportedModuleNames = $UnsupportedModules.Name -join ', '
             throw (
@@ -139,9 +150,11 @@ function New-PleaseWorkTaskSnapshot {
             )
         }
 
-        $ExcludedVariableNames = [System.Collections.Generic.HashSet[string]]::new(
-            [System.StringComparer]::OrdinalIgnoreCase
-        )
+        $ExcludedVariableNames =
+            [System.Collections.Generic.HashSet[string]]::new(
+                [System.StringComparer]::OrdinalIgnoreCase
+            )
+
         $ExcludedVariableNames.UnionWith([string[]] @(
             'PleaseWorkModule',
             'ImportedModulePath',
@@ -181,6 +194,7 @@ function New-PleaseWorkTaskSnapshot {
                     if ($ExcludedVariableNames.Contains($_.Name)) {
                         return $false
                     }
+
                     if (-not $BaselineVariables.ContainsKey($_.Name)) {
                         return $true
                     }
@@ -196,6 +210,7 @@ function New-PleaseWorkTaskSnapshot {
                     }
                 }
         )
+
         $SnapshotFunctions = @(
             Get-ChildItem -LiteralPath 'Function:' |
                 Where-Object {
@@ -216,6 +231,7 @@ function New-PleaseWorkTaskSnapshot {
                     -not $script:PleaseWorkSnapshotDeclarations.ContainsKey($_.Name)
                 }
         )
+
         $SnapshotAliases = @(
             Get-ChildItem -LiteralPath 'Alias:' |
                 Where-Object {
@@ -233,6 +249,7 @@ function New-PleaseWorkTaskSnapshot {
                     }
                 }
         )
+
         $SnapshotModules = @(
             Get-Module |
                 Where-Object {
@@ -247,6 +264,7 @@ function New-PleaseWorkTaskSnapshot {
                     }
                 }
         )
+
         $SnapshotTasks = @(
             $script:PleaseWorkSnapshotTasks |
                 ForEach-Object {
@@ -265,6 +283,7 @@ function New-PleaseWorkTaskSnapshot {
             -Name PleaseConfig `
             -Scope Script `
             -ErrorAction SilentlyContinue
+
         $SnapshotConfig = if ($null -eq $ConfigVariable) {
             @{}
         } elseif ($ConfigVariable.Value -is [System.Collections.IDictionary]) {
@@ -288,13 +307,15 @@ function New-PleaseWorkTaskSnapshot {
     $Runspace = $null
     $PowerShell = $null
     $OriginalPSModulePath = $env:PSModulePath
+
     try {
-        $Runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+        $Runspace = [RunspaceFactory]::CreateRunspace()
         try {
             $Runspace.Open()
         } finally {
             $env:PSModulePath = $OriginalPSModulePath
         }
+
         $PowerShell = [powershell]::Create()
         $PowerShell.Runspace = $Runspace
         $null = $PowerShell.AddScript($DefinitionScript.ToString())
@@ -324,14 +345,14 @@ function New-PleaseWorkTaskSnapshot {
             $ResolvedError = $InvocationError
             for ($Depth = 0; $Depth -lt 8; $Depth++) {
                 $InnerError = $null
-                if ($ResolvedError -is [System.Management.Automation.ErrorRecord]) {
+                $ErrorRecordProperty = $ResolvedError.PSObject.Properties['ErrorRecord']
+
+                if ($ResolvedError -is [ErrorRecord]) {
                     $InnerError = $ResolvedError.Exception
                 } elseif ($null -ne $ResolvedError.InnerException) {
                     $InnerError = $ResolvedError.InnerException
-                } elseif (
-                    $null -ne $ResolvedError.PSObject.Properties['ErrorRecord'].Value
-                ) {
-                    $InnerError = $ResolvedError.PSObject.Properties['ErrorRecord'].Value
+                } elseif ($null -ne $ErrorRecordProperty) {
+                    $InnerError = $ErrorRecordProperty.Value
                 }
 
                 if ($null -eq $InnerError -or
@@ -339,13 +360,22 @@ function New-PleaseWorkTaskSnapshot {
                 ) {
                     break
                 }
+
                 $ResolvedError = $InnerError
             }
+
             throw $ResolvedError
         }
 
         if ($Output.Count -ne 1) {
-            throw "TaskFile snapshot produced $($Output.Count) result objects."
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    "TaskFile snapshot produced $($Output.Count) result objects.",
+                    "InvalidSnapshotOutput",
+                    [ErrorCategory]::InvalidData,
+                    $null
+                )
+            )
         }
 
         $RawSnapshot = $Output[0]
@@ -354,15 +384,18 @@ function New-PleaseWorkTaskSnapshot {
                 $VariableValue = Copy-PleaseWorkSnapshotValue `
                     -InputObject $Variable.Value `
                     -Name $Variable.Name
+
                 [pscustomobject] @{
                     Name = [string] $Variable.Name
                     Value = $VariableValue
                 }
             }
         )
+
         $SnapshotConfig = Copy-PleaseWorkSnapshotValue `
             -InputObject $RawSnapshot.Config `
             -Name PleaseConfig
+
         $Snapshot = [pscustomobject] @{
             TaskFilePath = $ResolvedPath
             RunnerModulePath = $RawSnapshot.RunnerModulePath
@@ -373,7 +406,8 @@ function New-PleaseWorkTaskSnapshot {
             Modules = @($RawSnapshot.Modules)
             Tasks = @($RawSnapshot.Tasks)
         }
-        Write-Output -NoEnumerate $Snapshot
+
+        Write-Output $Snapshot -NoEnumerate
     } finally {
         if ($null -ne $PowerShell) { $PowerShell.Dispose() }
         if ($null -ne $Runspace) { $Runspace.Dispose() }

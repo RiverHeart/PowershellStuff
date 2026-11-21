@@ -1,5 +1,7 @@
 using namespace System.Collections.Generic
 using namespace System.Collections.ObjectModel
+using namespace System.Management.Automation.Language
+using namespace System.Reflection
 
 <#
 .SYNOPSIS
@@ -24,16 +26,17 @@ using namespace System.Collections.ObjectModel
 function Get-PleaseWorkTaskHelp {
     [CmdletBinding()]
     [OutputType([System.Management.Automation.Language.CommentHelpInfo])]
-    param (
+    param(
         [Parameter(Mandatory)]
-        [System.Management.Automation.Language.ScriptBlockAst] $ScriptBlockAst
+        [ScriptBlockAst] $ScriptBlockAst
     )
 
     $Help = $ScriptBlockAst.GetHelpContent()
     if ($null -ne $Help) {
-        Write-Output -NoEnumerate $Help
+        Write-Output $Help -NoEnumerate
         return
     }
+
     if (-not $ScriptBlockAst.Extent.Text.Contains('<#')) {
         return
     }
@@ -42,18 +45,20 @@ function Get-PleaseWorkTaskHelp {
     $Definition = [scriptblock]::Create(
         "function $HelpFunctionName $($ScriptBlockAst.Extent.Text)"
     )
+
     $HelpModule = New-Module -ScriptBlock $Definition
     $CommandHelp = & $HelpModule {
         param ($Name)
         Get-Help -Name $Name -Full
     } $HelpFunctionName
+
     if ($null -eq $CommandHelp -or
         [string]::IsNullOrWhiteSpace([string] $CommandHelp.Synopsis)
     ) {
         return
     }
 
-    $CommentHelp = [System.Management.Automation.Language.CommentHelpInfo]::new()
+    $CommentHelp = [CommentHelpInfo]::new()
     $Synopsis = [string] $CommandHelp.Synopsis
     $Description = @(
         $CommandHelp.Description |
@@ -61,6 +66,7 @@ function Get-PleaseWorkTaskHelp {
                 if ($null -ne $_.Text) { $_.Text } else { $_ }
             }
     ) -join [Environment]::NewLine
+
     $Notes = @(
         $CommandHelp.alertSet |
             ForEach-Object {
@@ -76,8 +82,9 @@ function Get-PleaseWorkTaskHelp {
     }
 
     $Parameters = [Dictionary[string, string]]::new(
-        [System.StringComparer]::OrdinalIgnoreCase
+        [StringComparer]::OrdinalIgnoreCase
     )
+
     foreach ($Parameter in @($CommandHelp.parameters.parameter)) {
         $ParameterDescription = @(
             $Parameter.description |
@@ -85,11 +92,12 @@ function Get-PleaseWorkTaskHelp {
                     if ($null -ne $_.Text) { $_.Text } else { $_ }
                 }
         ) -join [Environment]::NewLine
+
         $Parameters[[string] $Parameter.name] = $ParameterDescription
     }
 
     $Links = [List[string]]::new()
-    foreach ($Link in @($CommandHelp.relatedLinks.navigationLink)) {
+    foreach ($Link in $CommandHelp.relatedLinks.navigationLink) {
         if ($null -ne $Link.linkText) {
             $Links.Add([string] $Link.linkText)
         }
@@ -103,17 +111,18 @@ function Get-PleaseWorkTaskHelp {
         Parameters = $Parameters
         Links = $Links.AsReadOnly()
     }
+
     foreach ($PropertyName in $HelpProperties.Keys) {
-        $Property = [System.Management.Automation.Language.CommentHelpInfo].GetProperty(
+        $Property = [CommentHelpInfo].GetProperty(
             $PropertyName,
-            [System.Reflection.BindingFlags] (
-                [System.Reflection.BindingFlags]::Public -bor
-                [System.Reflection.BindingFlags]::NonPublic -bor
-                [System.Reflection.BindingFlags]::Instance
+            [BindingFlags] (
+                [BindingFlags]::Public -bor
+                [BindingFlags]::NonPublic -bor
+                [BindingFlags]::Instance
             )
         )
         $Property.SetValue($CommentHelp, $HelpProperties[$PropertyName])
     }
 
-    Write-Output -NoEnumerate $CommentHelp
+    Write-Output $CommentHelp -NoEnumerate
 }

@@ -1,16 +1,19 @@
+using namespace System.Collections.Generic
+
 <#
 .SYNOPSIS
     Formats task names and descriptions for native help output.
 #>
 function Format-PleaseWorkTaskHelp {
     [CmdletBinding()]
-    param (
+    [OutputType([string])]
+    param(
         [Parameter(Mandatory,ValueFromPipeline)]
         [psobject[]] $TaskInfo
     )
 
     begin {
-        $Tasks = [System.Collections.Generic.List[psobject]]::new()
+        $Tasks = [List[psobject]]::new()
     }
 
     process {
@@ -21,13 +24,14 @@ function Format-PleaseWorkTaskHelp {
 
     end {
         $NameWidth = ($Tasks.Name | Measure-Object -Property Length -Maximum).Maximum
-        'Available tasks:'
+        Write-Output 'Available tasks:'
         foreach ($Task in $Tasks) {
             $HelpLine = '  {0}' -f $Task.Name.PadRight($NameWidth)
             if (-not [string]::IsNullOrWhiteSpace($Task.Description)) {
                 $HelpLine += '  {0}' -f ($Task.Description -replace '\s+', ' ')
             }
-            $HelpLine.TrimEnd()
+
+            Write-Output $HelpLine.TrimEnd()
         }
     }
 }

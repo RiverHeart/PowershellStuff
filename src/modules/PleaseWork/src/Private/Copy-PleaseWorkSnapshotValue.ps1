@@ -1,3 +1,6 @@
+using namespace System.Collections
+using namespace System.Collections.Specialized
+
 <#
 .SYNOPSIS
     Copies one supported value for use in a Task Snapshot.
@@ -23,7 +26,7 @@
 function Copy-PleaseWorkSnapshotValue {
     [CmdletBinding()]
     [OutputType([object])]
-    param (
+    param(
         [AllowNull()]
         [object] $InputObject,
 
@@ -50,12 +53,12 @@ function Copy-PleaseWorkSnapshotValue {
         return $InputObject
     }
 
-    if ($InputObject -is [System.Collections.IDictionary]) {
+    if ($InputObject -is [IDictionary]) {
         $Copy = if (
-            $InputObject -is [System.Collections.Specialized.OrderedDictionary]
+            $InputObject -is [OrderedDictionary]
         ) {
-            [System.Collections.Specialized.OrderedDictionary]::new()
-        } elseif ($InputObject -is [System.Collections.Hashtable]) {
+            [OrderedDictionary]::new()
+        } elseif ($InputObject -is [Hashtable]) {
             $InputObject.Clone()
         } else {
             throw (
@@ -67,44 +70,53 @@ function Copy-PleaseWorkSnapshotValue {
             $CopiedKey = Copy-PleaseWorkSnapshotValue `
                 -InputObject $Entry.Key `
                 -Name ('{0} key' -f $Name)
+
             $EntryName = '{0}[{1}]' -f $Name, $Entry.Key
+
             $CopiedValue = Copy-PleaseWorkSnapshotValue `
                 -InputObject $Entry.Value `
                 -Name $EntryName
-            $Copy[[object] $CopiedKey] = $CopiedValue
+
+                $Copy[[object] $CopiedKey] = $CopiedValue
         }
         return ,$Copy
     }
 
-    if ($InputObject -is [System.Array]) {
-        $Copy = [System.Array]::CreateInstance(
+    if ($InputObject -is [Array]) {
+        $Copy = [Array]::CreateInstance(
             $InputObject.GetType().GetElementType(),
             $InputObject.Count
         )
+
         for ($Index = 0; $Index -lt $InputObject.Count; $Index++) {
             $CopiedValue = Copy-PleaseWorkSnapshotValue `
                 -InputObject $InputObject[$Index] `
                 -Name ('{0}[{1}]' -f $Name, $Index)
+
             $Copy.SetValue($CopiedValue, $Index)
         }
+
         return ,$Copy
     }
 
-    if ($InputObject -is [System.Collections.IList]) {
+    if ($InputObject -is [IList]) {
         try {
-            $Copy = [System.Activator]::CreateInstance($InputObject.GetType())
+            $Copy = [Activator]::CreateInstance($InputObject.GetType())
         } catch {
             throw (
                 "Task Snapshot value '$Name' has unsupported list type " +
                 "'$($InputObject.GetType().FullName)'."
             )
         }
+
         for ($Index = 0; $Index -lt $InputObject.Count; $Index++) {
             $CopiedValue = Copy-PleaseWorkSnapshotValue `
                 -InputObject $InputObject[$Index] `
                 -Name ('{0}[{1}]' -f $Name, $Index)
+
             $null = $Copy.Add($CopiedValue)
         }
+
         return ,$Copy
     }
 
@@ -112,6 +124,7 @@ function Copy-PleaseWorkSnapshotValue {
         $InputObject.PSObject.Properties |
             Where-Object { $_.MemberType -eq 'Property' -or $_.MemberType -eq 'NoteProperty' }
     )
+
     if ($InputObject -is [pscustomobject] -and $Properties.Count -gt 0) {
         $Copy = [ordered] @{}
         foreach ($Property in $Properties) {
@@ -120,6 +133,7 @@ function Copy-PleaseWorkSnapshotValue {
                 -InputObject $Property.Value `
                 -Name $PropertyName
         }
+
         return ,([pscustomobject] $Copy)
     }
 

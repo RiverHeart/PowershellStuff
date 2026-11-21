@@ -40,10 +40,10 @@ function New-PleaseWorkSnapshotTaskSet {
         })
     }
 
-    Write-Output -NoEnumerate (
+    Write-Output (
         New-PleaseWorkPreparedTaskSet `
             -Tasks $Tasks `
             -Config $Snapshot.Config `
             -Snapshot $Snapshot
-    )
+    ) -NoEnumerate
 }

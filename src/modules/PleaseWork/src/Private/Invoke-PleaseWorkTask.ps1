@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Management.Automation
 
 <#
@@ -49,13 +50,13 @@ function Invoke-PleaseWorkTask {
         [object] $Arguments,
 
         [Parameter(Mandatory)]
-        [System.Collections.IDictionary] $Context,
+        [IDictionary] $Context,
 
         [Parameter(Mandatory)]
         [ref] $Result,
 
         [Parameter()]
-        [System.Management.Automation.PSCmdlet] $StreamCaller = $PSCmdlet,
+        [PSCmdlet] $StreamCaller = $PSCmdlet,
 
         [Parameter()]
         [string] $WorkingDirectory
@@ -170,7 +171,7 @@ function Invoke-PleaseWorkTask {
                 }
                 $TaskError = $InnerError
             }
-            if ($TaskError -is [System.Exception]) {
+            if ($TaskError -is [Exception]) {
                 $TaskError = [ErrorRecord]::new(
                     $TaskError,
                     'PleaseWorkIsolatedTaskFailed',

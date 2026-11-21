@@ -6,6 +6,7 @@ using namespace System.Collections.Generic
 #>
 function Resolve-TaskOrder {
     [CmdletBinding()]
+    [OutputType([string[]])]
     param (
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -33,8 +34,15 @@ function Resolve-TaskOrder {
             & $AddTask $Dependency
             try {
                 $Dag.AddEdge($Dependency, $TaskName)
-            } catch [System.InvalidOperationException] {
-                throw "Task dependency cycle detected for '$Name'."
+            } catch [InvalidOperationException] {
+                $PSCmdlet.ThrowTerminatingError(
+                    [ErrorRecord]::new(
+                        "Task dependency cycle detected for '$Name'.",
+                        "TaskDependencyCycle",
+                        [ErrorCategory]::InvalidOperation,
+                        $null
+                    )
+                )
             }
         }
     }

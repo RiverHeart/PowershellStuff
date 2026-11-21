@@ -1,3 +1,5 @@
+using namespace System.Management.Automation
+
 <#
 .SYNOPSIS
     Replays buffered executor streams through the calling cmdlet.
@@ -16,12 +18,13 @@
 #>
 function Write-PleaseWorkTaskExecutorStream {
     [CmdletBinding()]
+    [OutputType([void])]
     param (
         [Parameter(Mandatory)]
         [powershell] $Executor,
 
         [Parameter(Mandatory)]
-        [System.Management.Automation.PSCmdlet] $Caller
+        [PSCmdlet] $Caller
     )
 
     foreach ($InformationRecord in $Executor.Streams.Information) {

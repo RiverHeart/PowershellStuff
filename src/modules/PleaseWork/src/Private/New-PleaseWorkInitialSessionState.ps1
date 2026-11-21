@@ -1,3 +1,5 @@
+using namespace System.Management.Automation.Runspaces
+
 <#
 .SYNOPSIS
     Recreates a Task Snapshot as a PowerShell initial session state.
@@ -19,22 +21,22 @@
 #>
 function New-PleaseWorkInitialSessionState {
     [CmdletBinding()]
-    [OutputType([System.Management.Automation.Runspaces.InitialSessionState])]
+    [OutputType([InitialSessionState])]
     param (
         [Parameter(Mandatory)]
         [ValidateNotNull()]
         [pscustomobject] $Snapshot
     )
 
-    $InitialSessionState =
-        [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault2()
+    $InitialSessionState = [InitialSessionState]::CreateDefault2()
 
     foreach ($Variable in $Snapshot.Variables) {
         $Value = Copy-PleaseWorkSnapshotValue `
             -InputObject $Variable.Value `
             -Name $Variable.Name
+
         $InitialSessionState.Variables.Add(
-            [System.Management.Automation.Runspaces.SessionStateVariableEntry]::new(
+            [SessionStateVariableEntry]::new(
                 $Variable.Name,
                 $Value,
                 "TaskFile variable '$($Variable.Name)'."
@@ -44,7 +46,7 @@ function New-PleaseWorkInitialSessionState {
 
     foreach ($Function in $Snapshot.Functions) {
         $InitialSessionState.Commands.Add(
-            [System.Management.Automation.Runspaces.SessionStateFunctionEntry]::new(
+            [SessionStateFunctionEntry]::new(
                 $Function.Name,
                 $Function.Definition,
                 $Function.Options,
@@ -55,7 +57,7 @@ function New-PleaseWorkInitialSessionState {
 
     foreach ($Alias in $Snapshot.Aliases) {
         $InitialSessionState.Commands.Add(
-            [System.Management.Automation.Runspaces.SessionStateAliasEntry]::new(
+            [SessionStateAliasEntry]::new(
                 $Alias.Name,
                 $Alias.Definition,
                 "TaskFile alias '$($Alias.Name)'.",
@@ -69,6 +71,7 @@ function New-PleaseWorkInitialSessionState {
         $Snapshot.Modules.Path |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
+
     if ($ModulePaths.Count -gt 0) {
         $InitialSessionState.ImportPSModule($ModulePaths)
     }

@@ -1,3 +1,7 @@
+using namespace System.ComponentModel
+using namespace System.IO
+using namespace System.Management.Automation
+
 <#
 .SYNOPSIS
     Invokes a native command and fails when its exit code is not accepted.
@@ -37,15 +41,18 @@ function Invoke-PleaseWorkNativeCommand {
     # Normalize the edition specific PSModulePath so a call to powershell or
     # pwsh can find modules in the expected user module path.
     $OriginalPSModulePath = $env:PSModulePath
+
     try {
-        $CommandName = [IO.Path]::GetFileNameWithoutExtension($FilePath)
+        $CommandName = [Path]::GetFileNameWithoutExtension($FilePath)
         $NormalizePowerShellModulePath = -not (
             $null -ne $script:PleaseWorkConfig -and
             $script:PleaseWorkConfig.Contains('NormalizePowerShellModulePath') -and
             $script:PleaseWorkConfig['NormalizePowerShellModulePath'] -eq $false
         )
 
-        if ($NormalizePowerShellModulePath -and $CommandName -in @('powershell', 'pwsh')) {
+        if ($NormalizePowerShellModulePath -and
+            $CommandName -in @('powershell', 'pwsh')
+        ) {
             $UserModulePath = if ($CommandName -eq 'pwsh' -and ($IsLinux -or $IsMacOS)) {
                 Join-Path $HOME '.local/share/powershell/Modules'
             } else {
@@ -54,14 +61,18 @@ function Invoke-PleaseWorkNativeCommand {
                 } else {
                     'PowerShell'
                 }
+
                 Join-Path `
                     ([Environment]::GetFolderPath('MyDocuments')) `
                     "$UserModuleDirectoryName\Modules"
             }
-            $ModulePaths = @($env:PSModulePath -split [IO.Path]::PathSeparator)
 
-            if ((Test-Path -LiteralPath $UserModulePath) -and $UserModulePath -notin $ModulePaths) {
-                $env:PSModulePath = $UserModulePath + [IO.Path]::PathSeparator + $env:PSModulePath
+            $ModulePaths = @($env:PSModulePath -split [Path]::PathSeparator)
+
+            if ((Test-Path -LiteralPath $UserModulePath) -and
+                $UserModulePath -notin $ModulePaths
+            ) {
+                $env:PSModulePath = $UserModulePath + [Path]::PathSeparator + $env:PSModulePath
             }
         }
 
@@ -72,14 +83,15 @@ function Invoke-PleaseWorkNativeCommand {
     }
 
     if ($SuccessExitCode -notcontains $ExitCode) {
-        $Exception = [System.ComponentModel.Win32Exception]::new(
+        $Exception = [Win32Exception]::new(
             $ExitCode,
             "Native command '$FilePath' exited with code $ExitCode."
         )
-        $ErrorRecord = [System.Management.Automation.ErrorRecord]::new(
+
+        $ErrorRecord = [ErrorRecord]::new(
             $Exception,
             'PleaseWork.NativeCommandFailed',
-            [System.Management.Automation.ErrorCategory]::NotSpecified,
+            [ErrorCategory]::NotSpecified,
             $FilePath
         )
         $PSCmdlet.ThrowTerminatingError($ErrorRecord)

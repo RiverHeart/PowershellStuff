@@ -1,3 +1,6 @@
+using namespace System.Collections
+using namespace System.Management.Automation.Runspaces
+
 <#
 .SYNOPSIS
     Creates a PowerShell pipeline in a new PleaseWork runspace.
@@ -10,13 +13,13 @@ function New-PleaseWorkTaskExecutor {
         [scriptblock] $ScriptBlock,
 
         [Parameter()]
-        [System.Collections.IDictionary] $Parameters = @{},
+        [IDictionary] $Parameters = @{},
 
         [Parameter()]
-        [System.Collections.IDictionary] $Variables = @{},
+        [IDictionary] $Variables = @{},
 
         [Parameter()]
-        [System.Management.Automation.Runspaces.InitialSessionState] $InitialSessionState,
+        [InitialSessionState] $InitialSessionState,
 
         [Parameter()]
         [string] $WorkingDirectory
@@ -29,12 +32,13 @@ function New-PleaseWorkTaskExecutor {
         # The parameterless factory provides the session state in which module auto-loading works
         # consistently for both Windows PowerShell 5.1 and PowerShell 7.
         $Runspace = if ($null -eq $InitialSessionState) {
-            [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+            [RunspaceFactory]::CreateRunspace()
         } else {
-            [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace(
+            [RunspaceFactory]::CreateRunspace(
                 $InitialSessionState
             )
         }
+
         try {
             $Runspace.Open()
         } finally {
@@ -44,6 +48,7 @@ function New-PleaseWorkTaskExecutor {
         foreach ($Variable in $Variables.GetEnumerator()) {
             $Runspace.SessionStateProxy.SetVariable([string] $Variable.Key, $Variable.Value)
         }
+
         if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
             $null = $Runspace.SessionStateProxy.Path.SetLocation($WorkingDirectory)
         }
@@ -56,6 +61,7 @@ function New-PleaseWorkTaskExecutor {
         if ($null -ne $PowerShell) { $PowerShell.Dispose() }
         if ($null -ne $Runspace) { $Runspace.Dispose() }
         $env:PSModulePath = $OriginalPSModulePath
+
         throw
     }
 

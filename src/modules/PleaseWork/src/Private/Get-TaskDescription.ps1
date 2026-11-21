@@ -4,7 +4,8 @@
 #>
 function Get-TaskDescription {
     [CmdletBinding()]
-    param (
+    [OutputType([string])]
+    param(
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [string[]] $Comments
