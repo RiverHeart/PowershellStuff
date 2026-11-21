@@ -199,6 +199,7 @@ FunctionsToExport = @(
     'ConvertTo-KeyGesture'
     'Convert-WPFObjectToXaml'
     'Find-WPFChildNode'
+    'Get-WPFApplication'
     'Get-WPFChromeAdapter'
     'Get-WPFContextId'
     'Get-WPFDarkModePreference'
