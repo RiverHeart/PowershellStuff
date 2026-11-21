@@ -27,9 +27,7 @@ function Resolve-ParamBlock {
         [scriptblock] $ParamBlock,
 
         [Parameter(Mandatory,ParameterSetName='ByParameterAst',Position=0)]
-        [System.Collections.ObjectModel.ReadOnlyCollection[
-            System.Management.Automation.Language.ParameterAst
-        ]] $ParameterAsts,
+        [ReadOnlyCollection[ParameterAst]] $ParameterAsts,
 
         [string] $DefaultParameterSetName
     )
@@ -38,11 +36,9 @@ function Resolve-ParamBlock {
         $ParameterAsts = $ParamBlock.Ast.ParamBlock.Parameters
     }
 
-    $Parameters =
-        [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
+    $Parameters = [RuntimeDefinedParameterDictionary]::new()
     foreach ($ParameterAst in $ParameterAsts) {
-        $Attributes =
-            [System.Collections.Generic.List`1[System.Attribute]]::new()
+        $Attributes = [List`1[System.Attribute]]::new()
 
         foreach ($AttributeAst in $ParameterAst.Attributes) {
             if ($AttributeAst.GetType().Name -eq 'TypeConstraintAst') {
@@ -61,10 +57,7 @@ function Resolve-ParamBlock {
                 }
             )
 
-            $AttributeObj = [System.Activator]::CreateInstance(
-                $AttributeType,
-                $PositionalArguments
-            )
+            $AttributeObj = [Activator]::CreateInstance($AttributeType, $PositionalArguments)
 
             foreach ($NamedArg in $AttributeAst.NamedArguments) {
                 $AttributeObj.psobject.properties |
@@ -83,23 +76,19 @@ function Resolve-ParamBlock {
 
         # A dynamic parameter without ParameterAttribute is not available in a named parameter set.
         if (-not [string]::IsNullOrEmpty($DefaultParameterSetName) -and
-            -not ($Attributes | Where-Object {
-                $_ -is [System.Management.Automation.ParameterAttribute]
-            })
+            -not ($Attributes | Where-Object { $_ -is [ParameterAttribute] })
         ) {
-            $ParameterAttribute =
-                [System.Management.Automation.ParameterAttribute]::new()
+            $ParameterAttribute = [ParameterAttribute]::new()
             $ParameterAttribute.ParameterSetName = $DefaultParameterSetName
             $Attributes.Add($ParameterAttribute)
         }
 
         # Leave defaults unset here so the task evaluates its own defaults in its execution scope.
-        $Parameter =
-            [System.Management.Automation.RuntimeDefinedParameter]::new(
-                $ParameterAst.Name.VariablePath,
-                $ParameterAst.StaticType,
-                $Attributes
-            )
+        $Parameter = [RuntimeDefinedParameter]::new(
+            $ParameterAst.Name.VariablePath,
+            $ParameterAst.StaticType,
+            $Attributes
+        )
 
         $Parameters.Add($Parameter.Name, $Parameter)
     }

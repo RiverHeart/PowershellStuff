@@ -533,6 +533,16 @@ Nitpick includes these rules for common PowerShell value-semantics mistakes:
   Destination/expression `[array]` or `[object]` casts do not exempt the capture:
   typing does not specify whether null items are intended. No automatic fix is
   offered; use native suppression when null capture is intentional.
+- **PossibleTypeResolutionFailure** reports shortened type names in code
+  evaluated outside its original parse context when their resolution depends
+  on an outer `using namespace` statement. It recognizes dynamic parameter
+  blocks, namespace-dependent `OutputType` metadata on helpers called from
+  `dynamicparam`, plus direct and simply assigned scriptblocks used with
+  `.ToString()`, `AddScript()`, or
+  `[scriptblock]::Create()`, and constant strings passed directly to the latter
+  two APIs. Reparsed script text does not retain the original file's using
+  context. Dynamic script construction, interprocedural assignment tracking,
+  and automatic correction are outside the MVP's scope.
 - **CollectionComparisonUsedAsAPredicate** reports equality comparisons against
   array expressions or explicitly collection-typed parameters when used as
   `if`, `while`, `do`, or `for` conditions. Collection comparisons filter and
