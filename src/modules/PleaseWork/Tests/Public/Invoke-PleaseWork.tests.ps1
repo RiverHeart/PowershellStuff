@@ -4,10 +4,13 @@ InModuleScope PleaseWork {
 Describe 'Invoke-PleaseWork' {
     BeforeEach {
         $global:PleaseWorkLog = [System.Collections.Generic.List[string]]::new()
+        $OriginalWhatIfQuiet = $env:WHATIF__QUIET
+        $env:WHATIF__QUIET = $true
     }
 
     AfterEach {
         Remove-Variable -Name PleaseWorkLog -Scope Global -ErrorAction SilentlyContinue
+        $env:WHATIF__QUIET = $OriginalWhatIfQuiet
     }
 
     It 'runs the first declared task by default' {
@@ -241,7 +244,7 @@ test: {
 }
 build: test { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
-        $Output = [List[object]]::new()
+        $Output = [System.Collections.Generic.List[object]]::new()
 
         {
             please build -TaskFile $TaskFile |
@@ -259,7 +262,7 @@ test: {
 }
 build: test { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
-        $Output = [List[object]]::new()
+        $Output = [System.Collections.Generic.List[object]]::new()
 
         {
             please build -TaskFile $TaskFile |
@@ -411,7 +414,7 @@ native: {
 }
 build: native { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
-        $Output = [List[object]]::new()
+        $Output = [System.Collections.Generic.List[object]]::new()
         $env:PleaseWorkTestPowerShellPath = $PowerShellPath
         try {
             {

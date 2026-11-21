@@ -149,7 +149,7 @@ function Invoke-PleaseWork {
 
         $TaskOrder = Resolve-TaskOrder -Name $Name -Tasks $TaskSet.Tasks
         $TaskPlan = $TaskOrder -join ', '
-        if (-not $PSCmdlet.ShouldProcess($Name, "Run task plan: $TaskPlan")) {
+        if (-not (Should-Process $Name "Run task plan: $TaskPlan")) {
             return
         }
 

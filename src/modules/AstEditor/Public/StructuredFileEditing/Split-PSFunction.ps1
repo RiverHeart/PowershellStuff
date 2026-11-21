@@ -74,6 +74,7 @@ function Split-PSFunction {
             -Document $Document `
             -Name $FunctionName `
             -ExcludeHelp:$ExcludeHelp
+
         $DestinationPath = Join-Path $ResolvedOutputDirectory "$($Plan.Name).ps1"
         if (-not $DestinationNames.Add($DestinationPath)) {
             throw "More than one extracted function maps to '$DestinationPath'."
@@ -101,11 +102,13 @@ function Split-PSFunction {
         }
 
         $Action = "Extract $($Files.Count) function(s) to '$ResolvedOutputDirectory'"
-        if ($PSCmdlet.ShouldProcess($Document.Path, $Action)) {
+        if (Should-Process $Document.Path $Action) {
             [Directory]::CreateDirectory($ResolvedOutputDirectory) | Out-Null
+
             foreach ($File in $Files) {
                 [File]::WriteAllText($File.Path, $File.Text)
             }
+
             [File]::WriteAllText($Document.Path, $Validation.RenderedText)
             $Applied = $true
         }

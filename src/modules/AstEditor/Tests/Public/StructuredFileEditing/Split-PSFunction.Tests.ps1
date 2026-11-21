@@ -2,10 +2,13 @@ using namespace System.Management.Automation.Language
 
 BeforeAll {
     Import-Module "$PSScriptRoot/../../../AstEditor.psd1" -Force
+    $OriginalWhatIfQuiet = $env:WHATIF__QUIET
+    $env:WHATIF__QUIET = $true
 }
 
 AfterAll {
     Remove-Module -Name AstEditor -Force -ErrorAction SilentlyContinue
+    $env:WHATIF__QUIET = $OriginalWhatIfQuiet
 }
 
 Describe 'Split-PSFunction' {
