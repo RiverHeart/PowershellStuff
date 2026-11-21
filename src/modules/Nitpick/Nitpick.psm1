@@ -135,30 +135,6 @@ class NitpickCorrection {
         }
     }
 
-    <#
-    .SYNOPSIS
-        Converts the NitpickCorrection instance to a CorrectionExtent object.
-    .OUTPUTS
-        [object] # Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent
-    #>
-    [object] ToCorrectionExtent() {
-        if ($this.TextEdits.Count -gt 1) {
-            throw 'A multi-edit correction cannot be converted to a single PSScriptAnalyzer CorrectionExtent.'
-        }
-
-        # Using `New-Object` to avoid type resolution issues at parse time
-        $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent' -ArgumentList (
-            $this.StartLineNumber,
-            $this.EndLineNumber,
-            $this.StartColumnNumber,
-            $this.EndColumnNumber,
-            $this.ReplacementText,
-            $this.FilePathOrContext,
-            $this.Description
-        )
-        return $Result
-    }
-
 }
 
 # MARK: NP_FINDING
@@ -198,34 +174,6 @@ class NitpickFinding {
             $LocationPath + ':' +
             $this.ViolationExtent.StartLineNumber + ':' +
             $this.ViolationExtent.StartColumnNumber
-    }
-
-    [object] ToDiagnosticRecord() {
-        Assert-NitpickRuleId -Value $this.RuleId
-        $LocalName = $this.RuleId.Split('/')[1]
-
-        # Using `New-Object` to avoid type resolution issues at parse time
-        $CorrectionExtents = New-Object 'System.Collections.ObjectModel.Collection[Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent]'
-
-        foreach ($Correction in $this.Corrections) {
-            # ScriptAnalyzer cannot enforce all-or-nothing application of a
-            # multi-edit fix, so only single-edit corrections are exported.
-            if ($Correction.TextEdits.Count -gt 1) {
-                continue
-            }
-            $CorrectionExtents.Add($Correction.ToCorrectionExtent())
-        }
-
-        $Result = New-Object 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord' -ArgumentList (
-            $this.Message,
-            $this.ViolationExtent,
-            $LocalName,
-            $this.Severity,
-            $this.ViolationExtent.File,
-            $LocalName,
-            $CorrectionExtents.PSObject.BaseObject
-        )
-        return $Result
     }
 
     [string] ToString() {
@@ -508,13 +456,13 @@ class NitpickRule {
         Invokes the rule against the specified ScriptBlockAst.
     .DESCRIPTION
         Assigns descriptor-owned identity to native findings and nested corrections.
-        Non-native outputs, including explicit DiagnosticRecords, are returned unchanged.
+        Non-finding results are returned unchanged and receive no identity.
         Producers receive recursively isolated plain-data context, with normalized
         policy, submitted-target identity, and actual analysis-host metadata.
     .PARAMETER Ast
         The ScriptBlockAst to check against the rule.
     .OUTPUTS
-        [object[]] # NitpickFinding or DiagnosticRecord instances
+        [object[]]
     #>
     [object[]] Invoke([ScriptBlockAst] $Ast) {
         $Target = if ($this.DispatchType.Name -eq 'AstDocument') {
@@ -529,7 +477,6 @@ class NitpickRule {
                 File = $Ast.Extent.File
                 RuleBehavior = @{
                     SearchNestedScriptBlocks = $true
-                    OutputType = 'NitpickFinding'
                 }
             }
         }
@@ -548,7 +495,7 @@ class NitpickRule {
         additions do not affect caller input or subsequent invocations. Unsupported
         values and invalid reserved metadata terminate with NitpickInvalidContext.
     .OUTPUTS
-        [object[]] # NitpickFinding or DiagnosticRecord instances
+        [object[]]
     #>
     [object[]] Invoke(
         [ScriptBlockAst] $Ast,
@@ -573,7 +520,7 @@ class NitpickRule {
         The document to dispatch to document rules or whose AST is dispatched to
         root-AST rules.
     .OUTPUTS
-        [object[]] # NitpickFinding or DiagnosticRecord instances
+        [object[]]
     #>
     [object[]] Invoke([object] $Document) {
         if ($null -eq $Document -or $Document.GetType().Name -ne 'AstDocument') {
@@ -585,7 +532,6 @@ class NitpickRule {
             File = $Document.Ast.Extent.File
             RuleBehavior = @{
                 SearchNestedScriptBlocks = $true
-                OutputType = 'NitpickFinding'
             }
         })
     }
@@ -609,7 +555,7 @@ class NitpickRule {
         The parameters dictionary to pass to the rule invocation. Context is
         validated and recursively copied without mutating the supplied dictionary.
     .OUTPUTS
-        [object[]] # NitpickFinding or DiagnosticRecord instances
+        [object[]]
     #>
     [object[]] Invoke(
         [IDictionary] $Parameters

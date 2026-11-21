@@ -1,7 +1,6 @@
 using module AstEditor
 
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module -Name "$PSScriptRoot/../../Nitpick.psd1" -Force
 }
 
@@ -261,7 +260,7 @@ Describe 'NitpickRule' {
             Should -Throw -ErrorId '*NitpickUnsupportedAnalysisHost*'
     }
 
-    It 'preserves native attribution and non-native output through outcomes' {
+    It 'preserves native attribution through outcomes' {
         $Ast = { -not ($Value -is [string]) }.Ast
         $Rule = New-Nitpick `
             -Callable Test-UseIsNotOperator `
@@ -274,8 +273,6 @@ Describe 'NitpickRule' {
         $Outcome.Results[0].RuleId | Should -BeExactly 'OutcomeOwner/UseIsNotOperator'
         $Outcome.Results[0].Corrections[0].RuleId | Should -BeExactly 'OutcomeOwner/UseIsNotOperator'
 
-        $Outcome = $Rule.InvokeWithResult($Ast, @{ RuleBehavior = @{ OutputType = 'DiagnosticRecord' } })
-        $Outcome.Results[0].GetType().Name | Should -BeExactly 'DiagnosticRecord'
     }
 
     It 'isolates predicate and producer mutation from each other, caller input, and defaults' {
@@ -286,7 +283,7 @@ Describe 'NitpickRule' {
             $State.Predicates++
             $Context.Policy.Compatibility.PowerShell.MinimumVersion = [version] '7.4'
             $Context.Extra.Values[0] = 9
-            $Context.RuleBehavior.OutputType = 'DiagnosticRecord'
+            $Context.RuleBehavior.SearchNestedScriptBlocks = $false
             $Context |
                 Add-Member -NotePropertyName Caller -NotePropertyValue 'shadow' -Force
             $Context.AnalysisHost.PowerShellVersion |
@@ -303,7 +300,7 @@ Describe 'NitpickRule' {
             $Snapshot = [pscustomobject]@{
                 Minimum = $Context.Policy.Compatibility.PowerShell.MinimumVersion
                 Extra = $Context.Extra.Values[0]
-                OutputType = $Context.RuleBehavior.OutputType
+                SearchNestedScriptBlocks = $Context.RuleBehavior.SearchNestedScriptBlocks
                 Caller = $Context.Caller
                 HostMarker = $Context.AnalysisHost.PowerShellVersion.psobject.Properties['Marker']
             }
@@ -330,7 +327,7 @@ Describe 'NitpickRule' {
             $Value = $Outcome.Results[0]
             $Value.Minimum | Should -Be ([version] '5.1')
             $Value.Extra | Should -Be 1
-            $Value.OutputType | Should -BeExactly 'NitpickFinding'
+            $Value.SearchNestedScriptBlocks | Should -BeTrue
             $Value.Caller | Should -BeExactly 'Nitpick'
             $Value.HostMarker | Should -BeNullOrEmpty
         }
@@ -563,42 +560,19 @@ Describe 'NitpickRule' {
         }
     }
 
-    It 'returns NitpickFinding objects when requested' {
+    It 'returns NitpickFinding objects from built-in rules' {
         InModuleScope Nitpick {
             #=== Arrange ===#
             $Rule = New-Nitpick -Callable Test-UseIsNotOperator
 
-            $Context = @{
-                RuleBehavior = @{ OutputType = 'NitpickFinding' }
-            }
-
             #=== Act ===#
             $Findings = $Rule.Invoke({
                 -not ($Value -is [string])
-            }.Ast, $Context)
+            }.Ast, @{})
 
             #=== Assert ===#
             $Findings.Count | Should -Be 1
             $Findings[0].GetType().Name | Should -Be 'NitpickFinding'
-        }
-    }
-
-    It 'returns DiagnosticRecord objects when requested' {
-        InModuleScope Nitpick {
-            #=== Arrange ===#
-            $Rule = New-Nitpick -Callable Test-UseIsNotOperator
-            $Context = @{
-                RuleBehavior = @{ OutputType = 'DiagnosticRecord' }
-            }
-
-            #=== Act ===#
-            $Findings = $Rule.Invoke({
-                -not ($Value -is [string])
-            }.Ast, $Context)
-
-            #=== Assert ===#
-            $Findings.Count | Should -Be 1
-            $Findings[0].GetType().Name | Should -Be 'DiagnosticRecord'
         }
     }
 
@@ -654,7 +628,6 @@ Describe 'NitpickRule' {
                 Caller = 'TestHost'
                 RuleBehavior = @{
                     SearchNestedScriptBlocks = $false
-                    OutputType = 'NitpickFinding'
                 }
             }
             $Rule = New-Nitpick -Callable Test-UseIsNotOperator

@@ -121,7 +121,10 @@ function Save-AstDocument {
 
         $Result.WasWritten = $true
         $Result.WriteStatus = 'Written'
-    } catch [IOException], [UnauthorizedAccessException], [InvalidOperationException], [InvalidDataException], [NotSupportedException] {
+    } catch
+        [IOException], [UnauthorizedAccessException], [InvalidOperationException],
+        [InvalidDataException], [NotSupportedException]
+    {
         if ($Result.WriteStatus -eq 'NotAttempted') {
             $Result.WriteStatus = 'FailedWrite'
         }

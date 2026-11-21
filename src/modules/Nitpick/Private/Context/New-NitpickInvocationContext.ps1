@@ -27,7 +27,7 @@ using namespace System.Management.Automation.Language
     $Context = New-NitpickInvocationContext -Target $Document -Context @{
         Caller = 'Build'
         Policy = $Policy
-        RuleBehavior = @{ OutputType = 'DiagnosticRecord' }
+        RuleBehavior = @{ SearchNestedScriptBlocks = $true }
     }
 
     Constructs a file-target context using an existing source file and policy
@@ -116,7 +116,6 @@ function New-NitpickInvocationContext {
         if ($null -eq $Copy.RuleBehavior) {
             $Copy.RuleBehavior = @{
                 SearchNestedScriptBlocks = $true
-                OutputType = 'NitpickFinding'
             }
         }
 

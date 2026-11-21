@@ -92,5 +92,8 @@
         # relying on the ambient variable `$WhatIfPreference` for downstream cmdlets
         # which do.
         'PSShouldProcess'
+
+        # Enforcing singular nouns for cmdlet names is not always practical and can be overly restrictive.
+        'PSUseSingularNouns'
     )
 }

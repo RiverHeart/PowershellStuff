@@ -32,7 +32,7 @@ using namespace System.Collections.Generic
 
         $Finding = Test-AvoidParameterAttributeBool `
             -ScriptBlockAst $SourceAst `
-            -Context @{ RuleBehavior = @{ OutputType = 'NitpickFinding' } }
+            -Context @{ RuleBehavior = @{ SearchNestedScriptBlocks = $true } }
 
         $Proposal = Resolve-NitpickCorrectionProposal `
             -Script $Source `

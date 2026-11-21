@@ -87,7 +87,8 @@ function Get-AstExtractedFunction {
         }
 
         $CommentText = ($CommentGroup | ForEach-Object { $_.Text }) -join $Document.NewLineSequence
-        if ($CommentText -match '(?im)^\s*#?\s*\.(SYNOPSIS|DESCRIPTION|PARAMETER|EXAMPLE|INPUTS|OUTPUTS|NOTES|LINK)\b') {
+        $CommentPattern = '(?im)^\s*#?\s*\.(SYNOPSIS|DESCRIPTION|PARAMETER|EXAMPLE|INPUTS|OUTPUTS|NOTES|LINK)\b'
+        if ($CommentText -match $CommentPattern) {
             $StartOffset = $CommentGroup[0].Extent.StartOffset
             $IncludedHelp = $true
         }

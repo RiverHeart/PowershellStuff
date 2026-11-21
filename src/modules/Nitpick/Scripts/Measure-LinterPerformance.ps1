@@ -25,7 +25,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $WorkingDirectory = (Resolve-Path -LiteralPath $WorkingDirectory).Path
 $Manifest = Join-Path $WorkingDirectory 'src\modules\Nitpick\Nitpick.psd1'
-$ImportTimes = foreach ($Module in @($Manifest, 'PSScriptAnalyzer')) {
+$AdapterManifest = Join-Path $WorkingDirectory `
+    'src\modules\Nitpick.ScriptAnalyzer\Nitpick.ScriptAnalyzer.psd1'
+$ImportTimes = foreach ($Module in @($Manifest, 'PSScriptAnalyzer', $AdapterManifest)) {
     $Watch = [System.Diagnostics.Stopwatch]::StartNew()
     Import-Module $Module -ErrorAction Stop
     $Watch.Stop()
@@ -49,7 +51,7 @@ function Invoke-Engine {
         Start-Nitpicking @Parameters
     } else {
         $Parameters = @{
-            CustomRulePath = $Manifest
+            CustomRulePath = $AdapterManifest
             IncludeRule = "Test-$Rule"
             Settings = @{}
         }

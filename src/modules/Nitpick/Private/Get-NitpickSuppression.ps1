@@ -118,8 +118,7 @@ function Get-NitpickSuppression {
                 -ViolationExtent $Token.Extent `
                 -Severity Warning `
                 -ScriptPath $(if ($Token.Extent.File) { $Token.Extent.File } else { '<ScriptBlock>' }) `
-                -Explanation 'Malformed or unsupported suppression directives are ignored as a whole.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Malformed or unsupported suppression directives are ignored as a whole.'
             ))
         } elseif ($Action -eq 'disable-target') {
             $Selectors.AddRange($DirectiveSelectors)

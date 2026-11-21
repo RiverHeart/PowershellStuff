@@ -64,7 +64,7 @@ function New-AstTextEdit {
     [CmdletBinding(DefaultParameterSetName = 'ByExtent')]
     [OutputType('AstTextEdit')]
     param (
-        [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
+        [Parameter(Mandatory, ParameterSetName = 'ByOffset',ValueFromPipeline)]
         [AstDocument] $Document,
 
         [Parameter(Mandatory, ParameterSetName = 'ByOffset')]
@@ -104,68 +104,70 @@ function New-AstTextEdit {
         [string] $ExpectedText
     )
 
-    if ($PSCmdlet.ParameterSetName -eq 'ByExplicitRange') {
+    process {
+        if ($PSCmdlet.ParameterSetName -eq 'ByExplicitRange') {
+            return [AstTextEdit]::new(@{
+                StartLineNumber = $StartLineNumber
+                EndLineNumber = $EndLineNumber
+                StartColumnNumber = $StartColumnNumber
+                EndColumnNumber = $EndColumnNumber
+                StartOffset = $StartOffset
+                EndOffset = $EndOffset
+                ExpectedText = $ExpectedText
+                ReplacementText = $ReplacementText
+                Reason = $Reason
+            })
+        }
+
+        if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
+            return [AstTextEdit]::new(@{
+                StartLineNumber = $Extent.StartLineNumber
+                EndLineNumber = $Extent.EndLineNumber
+                StartColumnNumber = $Extent.StartColumnNumber
+                EndColumnNumber = $Extent.EndColumnNumber
+                StartOffset = $Extent.StartOffset
+                EndOffset = $Extent.EndOffset
+                ExpectedText = $Extent.Text
+                ReplacementText = $ReplacementText
+                Reason = $Reason
+            })
+        }
+
+        if ($StartOffset -lt 0) {
+            throw 'StartOffset must be non-negative.'
+        }
+        if ($EndOffset -lt $StartOffset) {
+            throw 'EndOffset must be greater than or equal to StartOffset.'
+        }
+        if ($EndOffset -gt $Document.OriginalText.Length) {
+            throw "EndOffset $EndOffset exceeds document length $($Document.OriginalText.Length)."
+        }
+
+        $ActualText = $Document.OriginalText.Substring($StartOffset, $EndOffset - $StartOffset)
+        if ($PSBoundParameters.ContainsKey('ExpectedText') -and $ActualText -cne $ExpectedText) {
+            throw "Expected source text mismatch at offsets [$StartOffset, $EndOffset)."
+        }
+
+        $Positions = foreach ($Offset in $StartOffset, $EndOffset) {
+            $SourcePrefix = $Document.OriginalText.Substring(0, $Offset)
+            $LineStartOffset = $SourcePrefix.LastIndexOf("`n")
+
+            [pscustomobject] @{
+                LineNumber = ([regex]::Matches($SourcePrefix, "`n")).Count + 1
+                ColumnNumber = $Offset - $LineStartOffset
+            }
+        }
+
         return [AstTextEdit]::new(@{
-            StartLineNumber = $StartLineNumber
-            EndLineNumber = $EndLineNumber
-            StartColumnNumber = $StartColumnNumber
-            EndColumnNumber = $EndColumnNumber
+            StartLineNumber = $Positions[0].LineNumber
+            EndLineNumber = $Positions[1].LineNumber
+            StartColumnNumber = $Positions[0].ColumnNumber
+            EndColumnNumber = $Positions[1].ColumnNumber
             StartOffset = $StartOffset
             EndOffset = $EndOffset
-            ExpectedText = $ExpectedText
+            ExpectedText = $ActualText
             ReplacementText = $ReplacementText
             Reason = $Reason
         })
     }
-
-    if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
-        return [AstTextEdit]::new(@{
-            StartLineNumber = $Extent.StartLineNumber
-            EndLineNumber = $Extent.EndLineNumber
-            StartColumnNumber = $Extent.StartColumnNumber
-            EndColumnNumber = $Extent.EndColumnNumber
-            StartOffset = $Extent.StartOffset
-            EndOffset = $Extent.EndOffset
-            ExpectedText = $Extent.Text
-            ReplacementText = $ReplacementText
-            Reason = $Reason
-        })
-    }
-
-    if ($StartOffset -lt 0) {
-        throw 'StartOffset must be non-negative.'
-    }
-    if ($EndOffset -lt $StartOffset) {
-        throw 'EndOffset must be greater than or equal to StartOffset.'
-    }
-    if ($EndOffset -gt $Document.OriginalText.Length) {
-        throw "EndOffset $EndOffset exceeds document length $($Document.OriginalText.Length)."
-    }
-
-    $ActualText = $Document.OriginalText.Substring($StartOffset, $EndOffset - $StartOffset)
-    if ($PSBoundParameters.ContainsKey('ExpectedText') -and $ActualText -cne $ExpectedText) {
-        throw "Expected source text mismatch at offsets [$StartOffset, $EndOffset)."
-    }
-
-    $Positions = foreach ($Offset in $StartOffset, $EndOffset) {
-        $SourcePrefix = $Document.OriginalText.Substring(0, $Offset)
-        $LineStartOffset = $SourcePrefix.LastIndexOf("`n")
-
-        [pscustomobject] @{
-            LineNumber = ([regex]::Matches($SourcePrefix, "`n")).Count + 1
-            ColumnNumber = $Offset - $LineStartOffset
-        }
-    }
-
-    return [AstTextEdit]::new(@{
-        StartLineNumber = $Positions[0].LineNumber
-        EndLineNumber = $Positions[1].LineNumber
-        StartColumnNumber = $Positions[0].ColumnNumber
-        EndColumnNumber = $Positions[1].ColumnNumber
-        StartOffset = $StartOffset
-        EndOffset = $EndOffset
-        ExpectedText = $ActualText
-        ReplacementText = $ReplacementText
-        Reason = $Reason
-    })
 }

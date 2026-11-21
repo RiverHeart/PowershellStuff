@@ -16,6 +16,6 @@ We decided a `NitpickCorrection` is one complete fix for a finding, containing t
 
 - The per-target transactional application pipeline (atomic queueing, single-pass render, batch validation, transactional save) is retained unchanged at the AstEditor layer.
 
-- Diagnostic conversion to PSScriptAnalyzer can faithfully export only single-edit corrections; multi-edit corrections are dropped at that boundary because PSSA cannot enforce all-or-nothing application. This is a known, accepted interop cost, consistent with [ADR 0001](./0001-defer-scriptanalyzer-adapter.md).
+- Diagnostic conversion to PSScriptAnalyzer can faithfully export only single-edit corrections; multi-edit corrections are dropped at that boundary because PSSA cannot enforce all-or-nothing application. This is a known, accepted interop cost, owned by the separate adapter described in [ADR 0007](./0007-separate-scriptanalyzer-adapter.md).
 
 - Multiple corrections on one finding become the structural slot for future alternative fixes (editor-surfaced), without committing to that feature now.

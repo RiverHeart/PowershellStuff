@@ -3,7 +3,6 @@ using namespace System.Management.Automation.Language
 $ErrorActionPreference = 'Stop'
 
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module -Name "$PSScriptRoot/../Nitpick.psd1" -Force
 }
 
@@ -39,15 +38,14 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -EndColumnNumber 5 `
             -ReplacementText "first`nsecond" `
             -FilePathOrContext 'Example.ps1' `
-            -Description 'Replace a multiline range.' `
-            -OutputAs CorrectionExtent
+            -Description 'Replace a multiline range.'
 
         $Correction.StartLineNumber | Should -Be 2
         $Correction.EndLineNumber | Should -Be 3
         $Correction.StartColumnNumber | Should -Be 4
         $Correction.EndColumnNumber | Should -Be 5
-        $Correction.Text | Should -Be "first`nsecond"
-        $Correction.File | Should -Be 'Example.ps1'
+        $Correction.ReplacementText | Should -Be "first`nsecond"
+        $Correction.FilePathOrContext | Should -Be 'Example.ps1'
     }
 
     It 'keeps file-backed and in-memory correction provenance explicit' {
@@ -165,8 +163,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -Severity Information `
                 -Corrections $CoupledCorrection `
                 -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Exercises all-or-nothing correction edits.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Exercises all-or-nothing correction edits.'
             New-NitpickFinding `
                 -RuleId 'Local/ReplaceAssignments' `
                 -Message 'Replace the third assignment.' `
@@ -174,8 +171,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -Severity Information `
                 -Corrections $IndependentCorrection `
                 -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Exercises all-or-nothing correction edits.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Exercises all-or-nothing correction edits.'
         )
 
         $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Findings
@@ -216,8 +212,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -Severity Information `
                 -Corrections $Corrections[0] `
                 -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Exercises independent corrections.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Exercises independent corrections.'
             New-NitpickFinding `
                 -RuleId 'Local/ReplaceAssignments' `
                 -Message 'Replace the second assignment.' `
@@ -225,8 +220,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -Severity Information `
                 -Corrections $Corrections[1] `
                 -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Exercises independent corrections.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Exercises independent corrections.'
         )
 
         $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Findings
@@ -270,8 +264,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Severity Information `
             -Corrections $Corrections[0] `
             -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Exercises target-level conflict rejection.' `
-            -OutputAs NitpickFinding
+            -Explanation 'Exercises target-level conflict rejection.'
         # Overlapping fixes must come from separate findings to reach the
         # conflict policy; alternatives on one finding are skipped earlier.
         $CompetingFinding = New-NitpickFinding `
@@ -281,8 +274,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Severity Information `
             -Corrections $Corrections[1] `
             -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Exercises target-level conflict rejection.' `
-            -OutputAs NitpickFinding
+            -Explanation 'Exercises target-level conflict rejection.'
 
         $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding @($Finding, $CompetingFinding)
 
@@ -338,8 +330,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Severity Information `
             -Corrections $Correction `
             -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Exercises in-memory correction preview.' `
-            -OutputAs NitpickFinding
+            -Explanation 'Exercises in-memory correction preview.'
 
         $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
@@ -378,8 +369,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                     -Severity Information `
                     -Corrections $Correction `
                     -ScriptPath '<ScriptBlock>' `
-                    -Explanation 'Exercises final reanalysis.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'Exercises final reanalysis.'
             }
 
         $InitialFindings = @($Rule.Invoke($Ast))
@@ -417,8 +407,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
             -Severity Information `
             -Corrections $Correction `
             -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Exercises rejected candidate text.' `
-            -OutputAs NitpickFinding
+            -Explanation 'Exercises rejected candidate text.'
 
         $Result = Resolve-NitpickCorrectionProposal -Script $Source -Finding $Finding
 
@@ -463,7 +452,6 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 Severity = $Severity
                 ScriptPath = '<ScriptBlock>'
                 Explanation = 'Verifies final analysis severity counts.'
-                OutputAs = 'NitpickFinding'
             }
             if ($Corrections.Count -gt 0) {
                 $FindingParameters.Corrections = $Corrections
@@ -538,8 +526,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                         -Severity Information `
                         -Corrections $Correction `
                         -ScriptPath $Assignment.Extent.File `
-                        -Explanation 'Verifies target preview failure isolation.' `
-                        -OutputAs NitpickFinding
+                        -Explanation 'Verifies target preview failure isolation.'
                 }
                 return
             }
@@ -564,8 +551,7 @@ Describe 'Nitpick autocorrection contracts' -Tag 'AutocorrectionContract' {
                 -Severity Information `
                 -Corrections $Corrections `
                 -ScriptPath $Assignment.Extent.File `
-                -Explanation 'Verifies target preview failure isolation.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Verifies target preview failure isolation.'
         }
 
         Register-Nitpick -Callable $Rule -Name PerTargetRule -Source Tests

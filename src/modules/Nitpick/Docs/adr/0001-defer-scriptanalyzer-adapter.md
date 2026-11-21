@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: superseded by ADR-0007
 ---
 
 # Defer PSScriptAnalyzer Compatibility to a Future Adapter
+
+Superseded by [0007-separate-scriptanalyzer-adapter](./0007-separate-scriptanalyzer-adapter.md).
 
 Every native Nitpick rule function today accepts `$Context.RuleBehavior` and conditionally
 emits either `NitpickFinding` or `DiagnosticRecord` output, so the same function also works

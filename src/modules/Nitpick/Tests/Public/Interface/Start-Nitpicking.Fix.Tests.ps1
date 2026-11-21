@@ -1,5 +1,4 @@
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
     . "$PSScriptRoot\..\..\Support\CorrectionFixtures.ps1"
 
@@ -163,7 +162,8 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Output | Should -Match '1 \| - \$Value = 1'
         $Output | Should -Match '\| \+ \$Value = 2'
         [regex]::Matches($Output, '\|   \^{10}').Count | Should -Be 2
-        $Lines[-1] | Should -BeExactly '  1 proposed correction.'
+        $Lines[-2] | Should -BeExactly '  1 proposed correction.'
+        $Lines[-1] | Should -BeExactly ''
         $Output | Should -Not -MatchExactly '\(preview\)|No files changed'
         $Output | Should -Not -Match 'applied|committed'
         [System.IO.File]::ReadAllText($Path) | Should -Be '$Value = 1'
@@ -184,25 +184,36 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Output | Should -Not -Match '2 proposed'
     }
 
-    It 'separates consecutive target blocks with host-only blank lines' {
+    It 'appends spacing to correction strings without separate host output' {
         $Directory = New-Item -Path (Join-Path $TestDrive 'Separated') -ItemType Directory
         foreach ($Name in 'First.ps1', 'Second.ps1') {
             [System.IO.File]::WriteAllText((Join-Path $Directory $Name), '-not ($Value -is [int])')
         }
 
-        $Output = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -FixMode Preview `
-            -Output Text -NoSummary -ErrorAction Stop 6>$null)
         $Combined = @(Start-Nitpicking -Path $Directory.FullName -IncludeRule Nitpick/UseIsNotOperator -FixMode Preview `
             -Output Text -NoSummary -ErrorAction Stop 6>&1)
 
-        $Output | Where-Object { $_ -eq '' } | Should -BeNullOrEmpty
-        $SecondPath = [regex]::Escape((Join-Path $Directory.FullName 'Second.ps1'))
-        $SecondIndex = @(0..($Combined.Count - 1) | Where-Object {
-            "$($Combined[$_])" -match "^$SecondPath(\r?\n|$)"
-        })[0]
-        $SecondIndex | Should -BeGreaterThan 0
-        "$($Combined[$SecondIndex - 1])" | Should -BeExactly ''
-        $Combined[$SecondIndex - 1] | Should -BeOfType ([System.Management.Automation.InformationRecord])
+        $Combined | Should -HaveCount 2
+        foreach ($Block in $Combined) {
+            $Block | Should -BeOfType ([string])
+            $Block | Should -Match '  1 proposed correction\.\r?\n\z'
+        }
+    }
+
+    It 'appends spacing to read-failure text without separate host output' {
+        $Path = Join-Path $TestDrive 'Unreadable.ps1'
+        [System.IO.File]::WriteAllBytes($Path, [byte[]](0x23, 0x20, 0xE9))
+        $Errors = @()
+
+        $Results = @(Start-Nitpicking -Path $Path -IncludeRule Local/TransactionRule -FixMode Preview `
+            -Output Text -NoSummary -ErrorAction SilentlyContinue -ErrorVariable Errors 6>&1)
+
+        $Errors | Should -Not -BeNullOrEmpty
+        $Results | Should -HaveCount 1
+        $Results[0] | Should -BeOfType ([string])
+        $Results[0] | Should -BeExactly (
+            $Path + "`n  Corrections not attempted: the target could not be read." + [Environment]::NewLine
+        )
     }
 
     It 'omits the correction block when there are no edits but retains findings' {
@@ -284,7 +295,7 @@ Describe 'Start-Nitpicking transactional fixes' {
         $Output = @(Start-Nitpicking -Script $Source -IncludeRule Nitpick/AvoidParameterAttributeBool `
             -FixMode $FixMode -Output Text -NoSummary -ErrorAction Stop) -join "`n"
 
-        ($Output -split '\r?\n')[-1] | Should -BeExactly $Trailer
+        ($Output -split '\r?\n')[-2] | Should -BeExactly $Trailer
         $Output | Should -Match '\+.*param\(\[Parameter\(Mandatory\)\] \$MyParam\)'
         $Source.ToString() | Should -BeExactly $OriginalText
         if ($FixMode -eq 'Preview') {
@@ -413,7 +424,7 @@ Describe 'Start-Nitpicking transactional fixes' {
             $Text = (Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Guided `
                 -Output Text -NoSummary -Confirm:$false -ErrorAction Stop 6>$null) -join "`n"
 
-            $Text | Should -Match '\n  1 correction applied\.$'
+            $Text | Should -Match '\n  1 correction applied\.\r?\n\z'
             $Text | Should -Not -Match 'skipped'
         }
 

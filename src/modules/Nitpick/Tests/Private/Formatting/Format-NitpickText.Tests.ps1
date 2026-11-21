@@ -91,7 +91,7 @@ Describe 'Format-NitpickText' {
 
         $Lines = $Text -split '\r?\n'
         $Lines[0] | Should -BeExactly $PSCommandPath
-        $Lines[1] | Should -Match '^  1:1  warning  Test message  '
+        $Lines[1] | Should -BeExactly '  1:1  warning  Local/TestRule  Test message'
         $Lines[2..($Lines.Count - 1)] | Should -BeExactly @(
             '', '  1:1  Reason', '    1 - old', '      + new', '', '  1 proposed correction.'
         )

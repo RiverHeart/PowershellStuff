@@ -360,8 +360,9 @@ Describe 'Show-AstDiff' {
                 $Document = New-AstDocument -InputObject 'one'
                 $Document.ReplaceRange(0, 3, 'ONE', 'Change')
                 $Esc = [char]27
-                $Expected = if ($ExpectColor) {
-                    @(
+                $Expected = @()
+                if ($ExpectColor) {
+                    $Expected += @(
                         "${Esc}[1m[0] Change${Esc}[0m",
                         "${Esc}[31m  1 | - one${Esc}[0m",
                         '    |   ^^^',
@@ -369,7 +370,7 @@ Describe 'Show-AstDiff' {
                         '    |   ^^^'
                     )
                 } else {
-                    @(
+                    $Expected += @(
                         '[0] Change',
                         '  1 | - one',
                         '    |   ^^^',
@@ -377,7 +378,10 @@ Describe 'Show-AstDiff' {
                         '    |   ^^^'
                     )
                 }
-                Show-AstDiff -Document $Document -Annotate -NoColor:$DisableColor |
+                Show-AstDiff `
+                    -Document $Document `
+                    -Annotate `
+                    -NoColor:$DisableColor |
                     Should -BeExactly ($Expected -join [Environment]::NewLine)
             } finally {
                 $env:NO_COLOR = $OriginalNoColor
@@ -507,14 +511,15 @@ Describe 'Show-AstDiff' {
             $Document = New-AstDocument -InputObject 'one'
             $Document.ReplaceRange(0, 3, 'ONE', 'Change')
             $Esc = [char]27
-            $Expected = if ($ExpectColor) {
-                @(
+            $Expected = @()
+            if ($ExpectColor) {
+                $Expected += @(
                     "${Esc}[1m[0] Change${Esc}[0m",
                     "${Esc}[31m  1 | - one${Esc}[0m",
                     "${Esc}[32m    | + ONE${Esc}[0m"
                 )
             } else {
-                @('[0] Change', '  1 | - one', '    | + ONE')
+                $Expected += @('[0] Change', '  1 | - one', '    | + ONE')
             }
 
             Show-AstDiff -Document $Document -NoColor:$DisableColor |
@@ -728,8 +733,8 @@ function Greet {
         $Source = "one`ntwo`nthree`nfour`nfive`n"
         $Document = New-AstDocument -InputObject $Source
         $null = Add-AstTextEdit -Document $Document -TextEdit @(
-            New-AstTextEdit -Document $Document -StartOffset 4 -EndOffset 7 -ReplacementText 'TWO' -Reason 'Change two'
-            New-AstTextEdit -Document $Document -StartOffset 19 -EndOffset 23 -ReplacementText 'FIVE' -Reason 'Change five'
+            $Document | New-AstTextEdit -StartOffset 4 -EndOffset 7 -ReplacementText 'TWO' -Reason 'Change two'
+            $Document | New-AstTextEdit -StartOffset 19 -EndOffset 23 -ReplacementText 'FIVE' -Reason 'Change five'
         )
 
         Show-AstDiff -Document $Document -NoColor -Context $Context |

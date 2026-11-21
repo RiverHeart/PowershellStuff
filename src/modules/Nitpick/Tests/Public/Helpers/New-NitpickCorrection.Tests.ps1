@@ -1,5 +1,4 @@
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module -Name "$PSScriptRoot/../../../../AstEditor/AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 }
@@ -122,26 +121,6 @@ Describe 'New-NitpickCorrection' {
         $Correction.ReplacementText | Should -BeNullOrEmpty
     }
 
-    It 'cannot convert a multi-edit correction to a CorrectionExtent' {
-        $Source = "`$First = 1`n`$Second = 2"
-        $Ast = [scriptblock]::Create($Source).Ast
-        $Statements = $Ast.EndBlock.Statements
-        $Edits = @(
-            New-AstTextEdit -Extent $Statements[0].Extent `
-                -ReplacementText '$First = 10' -Reason 'Replace the coupled assignments.'
-            New-AstTextEdit -Extent $Statements[1].Extent `
-                -ReplacementText '$Second = 20' -Reason 'Replace the coupled assignments.'
-        )
-
-        {
-            New-NitpickCorrection `
-                -TextEdit $Edits `
-                -FilePathOrContext '<ScriptBlock>' `
-                -Description 'Replace the coupled assignments.' `
-                -OutputAs CorrectionExtent
-        } | Should -Throw '*multi-edit correction cannot be converted*'
-    }
-
     It 'accepts explicit standalone identity with <Construction> construction' -ForEach @(
         @{ Construction = 'Extent' }
         @{ Construction = 'TextEdit' }
@@ -233,16 +212,6 @@ Describe 'New-NitpickCorrection' {
         }
     }
 
-    It 'converts an explicitly attributed correction to a CorrectionExtent' {
-        $Correction = New-NitpickCorrection -RuleId 'Example/TestRule' -ViolationExtent $Extent `
-            -ReplacementText '$Replacement' -FilePathOrContext '<ScriptBlock>' `
-            -Description 'Replace the value.' -OutputAs CorrectionExtent
-
-        $Correction.GetType().FullName |
-            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent'
-        $Correction.Text | Should -BeExactly '$Replacement'
-    }
-
     It 'supports insertion and multiline offset ranges' {
         $Insertion = New-NitpickCorrection `
             -StartLineNumber 1 -EndLineNumber 1 `
@@ -284,17 +253,4 @@ Describe 'New-NitpickCorrection' {
         } | Should -Throw '*ExpectedText length must match*'
     }
 
-    It 'converts a correction to a ScriptAnalyzer CorrectionExtent' {
-        $Correction = New-NitpickCorrection `
-            -ViolationExtent $Extent `
-            -ReplacementText '$Replacement' `
-            -FilePathOrContext '<ScriptBlock>' `
-            -Description 'Replace the value.' `
-            -OutputAs CorrectionExtent
-
-        $Correction.GetType().FullName |
-            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.CorrectionExtent'
-        $Correction.Text | Should -Be '$Replacement'
-        $Correction.Description | Should -Be 'Replace the value.'
-    }
 }

@@ -30,9 +30,21 @@ if (-not $WriteHostCall) {
 
 # --- 3. Queue the edit ---
 
-$Overlay.PrependLine($WriteHostCall, 'Write-Output "....testing, mic check..."', 'Insert greeting before Write-Host')
-$Overlay.Replace($WriteHostCall, 'Write-Output "Hello, $Name!"', 'Replace Write-Host with Write-Output')
-$Overlay.AppendLine($WriteHostCall, 'Write-Output "Welcome to AstEditor!"', 'Insert additional greeting after Write-Host')
+$Overlay.PrependLine(
+    $WriteHostCall,
+    'Write-Output "....testing, mic check..."',
+    'Insert greeting before Write-Host'
+)
+$Overlay.Replace(
+    $WriteHostCall,
+    'Write-Output "Hello, $Name!"',
+    'Replace Write-Host with Write-Output'
+)
+$Overlay.AppendLine(
+    $WriteHostCall,
+    'Write-Output "Welcome to AstEditor!"',
+    'Insert additional greeting after Write-Host'
+)
 
 # --- 4. Render and validate ---
 

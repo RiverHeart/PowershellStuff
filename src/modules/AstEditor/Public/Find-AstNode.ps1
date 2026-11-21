@@ -54,7 +54,7 @@ function Find-AstNode {
         [scriptblock] $ScriptBlock,
 
         [Parameter(Mandatory,ParameterSetName='ByAst',Position=0)]
-        [System.Management.Automation.Language.Ast] $Ast,
+        [Ast] $Ast,
 
         [Parameter(Mandatory,ParameterSetName='ByDocument',Position=0)]
         [AstDocument] $Document,
@@ -161,14 +161,14 @@ function Find-AstNode {
             $EndOffset = $Range[1]
         } else {
             Write-Error `
-                -Message 'Range must be an IScriptExtent or an array of two Int32 offsets.' `
+                -Message (Get-LocalizedString -Key 'InvalidRange') `
                 -Category InvalidArgument
             return
         }
 
         if ($StartOffset -lt 0 -or $EndOffset -lt $StartOffset) {
             Write-Error `
-                -Message 'Range offsets must be non-negative and the end must not precede the start.' `
+                -Message (Get-LocalizedString -Key 'InvalidRangeOffsets') `
                 -Category InvalidArgument
             return
         }
@@ -181,7 +181,7 @@ function Find-AstNode {
     } elseif ($PSCmdlet.ParameterSetName -eq 'ByFilePath') {
         $ResolvedFilePath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($FilePath)
         $null = $tokens = $errors = $null
-        $Ast = [System.Management.Automation.Language.Parser]::ParseFile($ResolvedFilePath, [ref] $tokens, [ref] $errors)
+        $Ast = [Parser]::ParseFile($ResolvedFilePath, [ref] $tokens, [ref] $errors)
     }
 
     $HasContainsCursor = $PSBoundParameters.ContainsKey('ContainsCursor')
@@ -207,23 +207,22 @@ function Find-AstNode {
         }
 
         if (-not $HasCursorOffset) {
-            Write-Error 'CursorOffset is required when ContainsCursor is specified and could not be resolved from TabExpansion2 context.'
+            Write-Error (Get-LocalizedString -Key 'CursorOffsetRequired')
             return
         }
 
         if (-not $Ast) {
-            Write-Error 'Ast is required and could not be resolved from TabExpansion2 context.'
+            Write-Error (Get-LocalizedString -Key 'AstRequired')
             return
         }
     }
 
     if ($HasCursorOffset -and -not $HasContainsCursor) {
-        Write-Error 'ContainsCursor is required when CursorOffset is specified.'
+        Write-Error (Get-LocalizedString -Key 'ContainsCursorRequired')
         return
     }
 
     $HasCallerQuery = $PSBoundParameters.ContainsKey('Query')
-    $TypeNames = if ($Type) { $Type } else { @() }
 
     if ($HasCallerQuery) {
         $OriginalQuery = $Query
@@ -250,9 +249,9 @@ function Find-AstNode {
     $Query = {
         param($AstNode)
 
-        if ($TypeNames.Count -gt 0) {
+        if ($Type.Count -gt 0) {
             $IsExpectedType = $false
-            foreach ($T in $TypeNames) {
+            foreach ($T in $Type) {
                 if ($AstNode.GetType().Name -eq $T) {
                     $IsExpectedType = $true
                     break
@@ -291,10 +290,17 @@ function Find-AstNode {
             Write-Debug ("Query for AST node type '{0}' emitted {1} value(s): {2}" -f
                 $AstNode.GetType().Name,
                 $QueryOutput.Count,
-                $QueryOutputTypes)
+                $QueryOutputTypes
+            )
 
             if ($QueryOutput.Count -gt 1) {
-                throw "Find-AstNode query emitted $($QueryOutput.Count) values for '$($AstNode.GetType().Name)': $QueryOutputTypes. The query must emit at most one value."
+                throw [InvalidOperationException]::new((
+                    Get-LocalizedString -Key 'QueryEmittedMultipleValues' -Args @(
+                        $AstNode.GetType().Name,
+                        $QueryOutput.Count,
+                        $QueryOutputTypes
+                    )
+                ))
             }
 
             if ($QueryOutput.Count -eq 0) {

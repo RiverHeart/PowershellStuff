@@ -15,16 +15,14 @@ using namespace System.Management.Automation.Language
 
 .PARAMETER Context
     Optional invocation data. RuleBehavior.SearchNestedScriptBlocks controls
-    traversal and RuleBehavior.OutputType selects NitpickFinding or
-    DiagnosticRecord output. Standalone defaults are scope-local traversal and
-    DiagnosticRecord output.
+    traversal. Standalone invocation defaults to scope-local traversal.
 
 .EXAMPLE
     Test-AvoidUnsupportedTernarySyntax -Details
 #>
 function Test-AvoidUnsupportedTernarySyntax {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
-    [OutputType('NitpickFinding', 'DiagnosticRecord', 'PSCustomObject')]
+    [OutputType('NitpickFinding', 'PSCustomObject')]
     param(
         [Parameter(Mandatory,ParameterSetName='ScriptBlockAst')]
         [ValidateNotNullOrEmpty()]
@@ -61,10 +59,6 @@ function Test-AvoidUnsupportedTernarySyntax {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
-    $OutputAs =
-        if ($null -eq $Behavior.OutputType) { 'DiagnosticRecord' }
-        else { $Behavior.OutputType }
-
     $Candidates = $ScriptBlockAst.FindAll({
         param($Node)
 
@@ -85,6 +79,5 @@ function Test-AvoidUnsupportedTernarySyntax {
             -Severity $Metadata.Severity `
             -ScriptPath $FilePath `
             -Explanation $Metadata.Explanation `
-            -OutputAs $OutputAs
     }
 }

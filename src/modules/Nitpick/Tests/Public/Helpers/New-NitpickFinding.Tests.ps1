@@ -1,5 +1,4 @@
 BeforeAll {
-    Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
     Import-Module -Name "$PSScriptRoot/../../../../AstEditor/AstEditor.psd1" -Force
     Import-Module -Name "$PSScriptRoot/../../../Nitpick.psd1" -Force
 }
@@ -26,8 +25,7 @@ Describe 'New-NitpickFinding' {
             -Severity Warning `
             -ScriptPath '<ScriptBlock>' `
             -Explanation 'Test explanation.' `
-            -Corrections $Correction `
-            -OutputAs NitpickFinding
+            -Corrections $Correction
 
         $Finding.GetType().Name | Should -Be 'NitpickFinding'
         $Finding.RuleId | Should -Be 'Example/Test-Rule'
@@ -36,27 +34,7 @@ Describe 'New-NitpickFinding' {
         $Finding.Corrections[0] | Should -Be $Correction
     }
 
-    It 'converts a finding to a ScriptAnalyzer DiagnosticRecord' {
-        $Finding = New-NitpickFinding `
-            -RuleId 'Example/Test-Rule' `
-            -Message 'A problem was found.' `
-            -ViolationExtent $Extent `
-            -Severity Information `
-            -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Test explanation.' `
-            -Corrections $Correction `
-            -OutputAs DiagnosticRecord
-
-        $Finding.GetType().FullName |
-            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
-        $Finding.Message | Should -Be 'A problem was found.'
-        $Finding.RuleName | Should -Be 'Test-Rule'
-        $Finding.Severity.ToString() | Should -Be 'Information'
-        $Finding.RuleSuppressionID | Should -Be 'Test-Rule'
-        $Finding.SuggestedCorrections.Count | Should -Be 1
-    }
-
-    It 'defaults to a native finding even when ScriptAnalyzer is loaded' {
+    It 'returns a native finding' {
         $Finding = New-NitpickFinding `
             -RuleId 'Example/Test-Rule' `
             -Message 'A problem was found.' `
@@ -80,23 +58,6 @@ Describe 'New-NitpickFinding' {
         $Finding.ToString() | Should -Match 'Warning Example/TestRule:'
         [object]::ReferenceEquals($Finding.Corrections[0], $Correction) | Should -BeTrue
         $Correction.RuleId | Should -BeNullOrEmpty
-    }
-
-    It 'converts explicit identity to local diagnostic compatibility fields using <OutputAs>' -ForEach @(
-        @{ OutputAs = 'NitpickFinding' }
-        @{ OutputAs = 'DiagnosticRecord' }
-    ) {
-        $Finding = New-NitpickFinding -RuleId 'Example/TestRule' `
-            -Message 'A problem was found.' -ViolationExtent $Extent -Severity Warning `
-            -ScriptPath '<ScriptBlock>' -Explanation 'Test explanation.' `
-            -Corrections $Correction -OutputAs $OutputAs
-        $Diagnostic = if ($OutputAs -eq 'NitpickFinding') { $Finding.ToDiagnosticRecord() } else { $Finding }
-
-        $Diagnostic.GetType().FullName |
-            Should -Be 'Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord'
-        $Diagnostic.RuleName | Should -BeExactly 'TestRule'
-        $Diagnostic.RuleSuppressionID | Should -BeExactly 'TestRule'
-        $Diagnostic.SuggestedCorrections | Should -HaveCount 1
     }
 
     It 'rejects malformed standalone identity <RuleId>' -ForEach @(
@@ -160,83 +121,4 @@ Describe 'New-NitpickFinding' {
         }
     }
 
-    It 'omits multi-edit corrections while preserving single-edit suggestions' -ForEach @(
-        @{ OutputAs = 'NitpickFinding' }
-        @{ OutputAs = 'DiagnosticRecord' }
-    ) {
-        $MultiEditCorrection = New-NitpickCorrection `
-            -TextEdit @(
-                New-AstTextEdit -Extent $Extent `
-                    -ReplacementText '$First' -Reason 'Coordinated fix.'
-                New-AstTextEdit -Extent $Extent `
-                    -ReplacementText '$Second' -Reason 'Coordinated fix.'
-            ) `
-            -FilePathOrContext '<ScriptBlock>' `
-            -Description 'Coordinated fix.'
-        $Finding = New-NitpickFinding `
-            -RuleId 'Example/Test-Rule' `
-            -Message 'A problem was found.' `
-            -ViolationExtent $Extent `
-            -Severity Information `
-            -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Test explanation.' `
-            -Corrections (@($Correction) + $MultiEditCorrection) `
-            -OutputAs $OutputAs
-
-        $Diagnostic = if ($OutputAs -eq 'NitpickFinding') {
-            $Finding.Corrections | Should -HaveCount 2
-            $Finding.ToDiagnosticRecord()
-        } else {
-            $Finding
-        }
-
-        $Diagnostic.SuggestedCorrections | Should -HaveCount 1
-        $Diagnostic.SuggestedCorrections[0].Text | Should -BeExactly '$Replacement'
-    }
-
-    It 'derives diagnostic identity from the current qualified ID' {
-        $Finding = New-NitpickFinding `
-            -RuleId 'Example/Test-Rule' `
-            -Message 'A problem was found.' `
-            -ViolationExtent $Extent `
-            -Severity Warning `
-            -ScriptPath '<ScriptBlock>' `
-            -Explanation 'Test explanation.' `
-            -Corrections $Correction `
-            -OutputAs NitpickFinding
-        $Finding.RuleId = 'NewOwner/RenamedRule'
-
-        $DiagnosticRecord = $Finding.ToDiagnosticRecord()
-
-        $DiagnosticRecord.RuleName | Should -BeExactly RenamedRule
-        $DiagnosticRecord.RuleSuppressionID | Should -BeExactly RenamedRule
-        $DiagnosticRecord.SuggestedCorrections.Count | Should -Be 1
-    }
-
-    It 'rejects invalid identity assigned before diagnostic conversion' {
-        $Finding = New-NitpickFinding -RuleId 'Example/TestRule' -Message 'Test' `
-            -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' -Explanation 'Test'
-        $Finding.RuleId = 'Unqualified'
-        { $Finding.ToDiagnosticRecord() } | Should -Throw '*Namespace/Name*'
-    }
-
-    It 'normalizes native and external identity consistently in performance parity keys' {
-        $Finding = New-NitpickFinding -RuleId 'Nitpick/TestRule' -Message 'Test' `
-            -ViolationExtent $Extent -Severity Warning -ScriptPath '<ScriptBlock>' -Explanation 'Test'
-        $ScriptAst = [System.Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $PSScriptRoot '..\..\..\Scripts\Measure-LinterPerformance.ps1'),
-            [ref] $null, [ref] $null
-        )
-        $KeyFunction = $ScriptAst.Find({
-            param ($Node)
-            $Node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-                $Node.Name -eq 'Get-FindingKey'
-        }, $false).Body.GetScriptBlock()
-
-        $NativeKey = & $KeyFunction -Finding $Finding
-        $ExternalKey = & $KeyFunction -Finding $Finding.ToDiagnosticRecord()
-
-        $NativeKey | Should -BeExactly $ExternalKey
-        $NativeKey | Should -Match '\|Nitpick/TestRule\|'
-    }
 }

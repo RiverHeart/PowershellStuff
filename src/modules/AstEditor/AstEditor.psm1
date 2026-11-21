@@ -528,6 +528,29 @@ foreach ($Path in $Paths) {
         }
 }
 
+# MARK: LOCALIZATION
+
+# Import the default localized data for 'en-US'
+Import-LocalizedData `
+    -BindingVariable Script:Strings `
+    -UICulture 'en-US' `
+    -BaseDirectory "$ModuleRoot/Languages"
+
+# Attempt to import localized data for the current UI culture if it is not 'en-US'
+if ($PSUICulture -ne 'en-US') {
+    Import-LocalizedData `
+        -BindingVariable LocalizedData `
+        -BaseDirectory "$ModuleRoot/Languages" `
+        -ErrorAction SilentlyContinue
+}
+
+# Override default strings with localized data if available
+if ($LocalizedData) {
+    foreach ($Key in $LocalizedData.Keys) {
+        $Script:Strings[$Key] = $LocalizedData[$Key]
+    }
+}
+
 # MARK: EXPORTS
 #
 # Prevent `Should-Process` from triggering invalid verb warning because

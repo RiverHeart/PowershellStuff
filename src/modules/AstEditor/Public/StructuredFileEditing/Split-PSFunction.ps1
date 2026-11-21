@@ -100,7 +100,8 @@ function Split-PSFunction {
             }
         }
 
-        if ($PSCmdlet.ShouldProcess($Document.Path, "Extract $($Files.Count) function(s) to '$ResolvedOutputDirectory'")) {
+        $Action = "Extract $($Files.Count) function(s) to '$ResolvedOutputDirectory'"
+        if ($PSCmdlet.ShouldProcess($Document.Path, $Action)) {
             [Directory]::CreateDirectory($ResolvedOutputDirectory) | Out-Null
             foreach ($File in $Files) {
                 [File]::WriteAllText($File.Path, $File.Text)

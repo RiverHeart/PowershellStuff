@@ -451,8 +451,7 @@ Describe 'Start-Nitpicking' {
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity Information `
                 -ScriptPath $ScriptBlockAst.Extent.File `
-                -Explanation 'Verifies scoped dispatch.' `
-                -OutputAs NitpickFinding
+                -Explanation 'Verifies scoped dispatch.'
         }
 
         $ExcludedDirectory = New-Item -Path (Join-Path $TestDrive 'excluded') -ItemType Directory
@@ -527,17 +526,25 @@ Describe 'Start-Nitpicking' {
         $Results = @(
             Start-Nitpicking `
                 -Script $Script.Ast `
-                -IncludeRule Nitpick/AvoidParameterAttributeBool
+                -IncludeRule Nitpick/AvoidParameterAttributeBool 6>&1
         )
 
         $Results.Count | Should -Be 2
         $Results[0] | Should -BeOfType ([string])
-        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Avoid assigning Boolean values to Parameter attribute arguments  Nitpick/AvoidParameterAttributeBool$'
+        $Results[0] | Should -Match '^<ScriptBlock>\r?\n  \d+:\d+  information  Nitpick/AvoidParameterAttributeBool  Avoid assigning Boolean values to Parameter attribute arguments\r?\n\z'
         $Results[1] | Should -BeOfType ([string])
         $Results[1] | Should -Match '^1 finding \(1 information\) across 1 target in [\d,]+ ms$'
     }
 
-    It 'separates consecutive target findings with host-only blank lines' {
+    It 'returns only summary text without leading spacing when no findings exist' {
+        $Results = @(Start-Nitpicking -Script {} -IncludeRule Nitpick/AvoidParameterAttributeBool 6>&1)
+
+        $Results | Should -HaveCount 1
+        $Results[0] | Should -BeOfType ([string])
+        $Results[0] | Should -Match '^0 findings'
+    }
+
+    It 'appends spacing to each target string without separate host output' {
         $Directory = New-Item -Path (Join-Path $TestDrive 'SeparatedFindings') -ItemType Directory
         foreach ($Name in 'First.ps1', 'Second.ps1') {
             [System.IO.File]::WriteAllText(
@@ -553,11 +560,11 @@ Describe 'Start-Nitpicking' {
                 -NoSummary 6>&1
         )
 
-        $Results.Count | Should -Be 3
-        $Results[0] | Should -BeOfType ([string])
-        $Results[1] | Should -BeOfType ([System.Management.Automation.InformationRecord])
-        "$($Results[1])" | Should -BeExactly ''
-        $Results[2] | Should -BeOfType ([string])
+        $Results.Count | Should -Be 2
+        foreach ($Result in $Results) {
+            $Result | Should -BeOfType ([string])
+            $Result | Should -Match '\S\r?\n\z'
+        }
     }
 
     It 'sorts text findings by source position within each target' {
@@ -575,8 +582,7 @@ Describe 'Start-Nitpicking' {
                     -ViolationExtent $Variable.Extent `
                     -Severity Information `
                     -ScriptPath '<ScriptBlock>' `
-                    -Explanation 'Returns findings out of order.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'Returns findings out of order.'
             }
         }
         Register-Nitpick -Callable $Rule -Name OutOfOrder -Source Tests
@@ -588,9 +594,10 @@ Describe 'Start-Nitpicking' {
             -NoSummary
 
         $Lines = $RenderedOutput -split '\r?\n'
-        $Lines.Count | Should -Be 3
-        $Lines[1] | Should -Match '^  1:1\s+information\s+First finding\s+Local/OutOfOrder$'
-        $Lines[2] | Should -Match '^  2:1\s+information\s+Second finding\s+Local/OutOfOrder$'
+        $Lines.Count | Should -Be 4
+        $Lines[1] | Should -Match '^  1:1\s+information\s+Local/OutOfOrder\s+First finding$'
+        $Lines[2] | Should -Match '^  2:1\s+information\s+Local/OutOfOrder\s+Second finding$'
+        $Lines[3] | Should -BeExactly ''
     }
 
     It 'previews corrections and summarizes detected findings for in-memory input' {
@@ -639,8 +646,7 @@ Describe 'Start-Nitpicking' {
                     -Severity Information `
                     -Corrections $Correction `
                     -ScriptPath '<ScriptBlock>' `
-                    -Explanation 'Verifies conflict reporting through Start-Nitpicking.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'Verifies conflict reporting through Start-Nitpicking.'
             }
         }
         Register-Nitpick -Callable $Rule -Name ConflictingRule -Source Tests
@@ -686,8 +692,7 @@ Describe 'Start-Nitpicking' {
                 -ViolationExtent $ScriptBlockAst.Extent `
                 -Severity $RuleSeverity `
                 -ScriptPath '<ScriptBlock>' `
-                -Explanation 'Threshold test finding' `
-                -OutputAs NitpickFinding
+                -Explanation 'Threshold test finding'
         }.GetNewClosure()
 
         Register-Nitpick -Callable $Rule -Name $RuleName -Source Tests

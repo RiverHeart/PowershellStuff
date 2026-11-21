@@ -84,6 +84,8 @@ function New-AstDocument {
         }
 
         $TypeName = if ($null -eq $InputObject) { '<null>' } else { $InputObject.GetType().FullName }
-        throw [ArgumentException]::new("Unsupported InputObject type '$TypeName'. Expected String, ScriptBlock, or Ast.")
+        throw [ArgumentException]::new(
+            "Unsupported InputObject type '$TypeName'. Expected String, ScriptBlock, or Ast."
+        )
     }
 }

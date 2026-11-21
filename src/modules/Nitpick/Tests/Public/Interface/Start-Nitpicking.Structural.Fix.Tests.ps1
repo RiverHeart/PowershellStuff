@@ -1,5 +1,4 @@
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\Nitpick.psd1" -Force
     $PreviousQuietWhatIf = $env:WHATIF__QUIET
     $env:WHATIF__QUIET = $true

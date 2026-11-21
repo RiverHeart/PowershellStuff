@@ -18,10 +18,10 @@ The same task may work in the VS Code PowerShell extension because the extension
 loaded PSScriptAnalyzer. In that environment, PowerShell does not exercise the failing auto-load
 path.
 
-## Affected invocation
+## Historical affected invocation
 
-PleaseWork binds TaskFile task bodies to a dynamic module so that TaskFile variables and functions
-remain available after the TaskFile has been read. A module-bound task is invoked through the
+PleaseWork formerly bound TaskFile task bodies to a dynamic module so that TaskFile variables and
+functions remained available after the TaskFile had been read. A module-bound task was invoked through the
 following branch:
 
 ```powershell
@@ -124,21 +124,17 @@ $PSModule.OnRemove = {
 ...code below...
 ```
 
-## Dedicated runspace experiment
+## Per-task runspace resolution
 
-PleaseWork has an opt-in `-Runspace` prototype that imports the module, dot-sources the TaskFile,
-registers its tasks, and invokes the complete task plan in a fresh runspace. The runspace itself is
-the TaskFile's durable script scope, so task bodies are not bound to the dynamic module created by
-`Read-TaskFile`.
+PleaseWork now loads TaskFile setup once, captures a Task Snapshot, and recreates
+each task in its own fresh runspace. Task bodies are no longer bound to the
+dynamic module created by the historical `Read-TaskFile` path. The
+PSScriptAnalyzer cold auto-load case therefore runs in an ordinary task runspace
+script scope without requiring an entrypoint import.
 
-This direct-loading design preserves dynamic task parameters, task output and errors, injected task
-context, and persistent TaskFile `$script:` state. It also fixes the cold PSScriptAnalyzer auto-load
-failure. In a clean `pwsh -NoProfile` process, `please lint -Runspace` reaches normal script analysis
-without pre-importing PSScriptAnalyzer. The lint task may still throw `PSScriptAnalyzer found
-issues.` when findings exist; that is its intended behavior.
-
-Wrapping the old dynamic-module execution in a runspace did not fix the defect. The relevant change
-was making TaskFile registration and task invocation occur in the runspace's script scope.
+Wrapping the old dynamic-module execution in a runspace did not fix the defect.
+The relevant change was separating TaskFile definition, task-body reconstruction,
+and task execution from the module-bound session state.
 
 ### Output across the runspace boundary
 
@@ -150,11 +146,11 @@ analyzer's custom formatting metadata does not render reliably outside its origi
 
 PleaseWork also replays information, warning, verbose, debug, and progress records through the
 caller's corresponding PowerShell streams. This keeps `Write-Host` status messages visible and
-allows normal redirection and stream variables to work. The current synchronous prototype replays
-these records after the child pipeline completes; live, cross-stream ordering would require an
+allows normal redirection and stream variables to work. The synchronous executor replays
+these records after the task pipeline completes; live, cross-stream ordering would require an
 asynchronous stream pump.
 
-## Workaround for standard execution
+## Historical workaround
 
 Import PSScriptAnalyzer before PleaseWork enters the module-bound task invocation. For example, an
 entrypoint script can use:
@@ -166,9 +162,9 @@ Import-Module PleaseWork -Force
 please lint
 ```
 
-Pre-importing PSScriptAnalyzer in a clean process removes the `Get-Command` error from the standard
-dynamic-module execution path. The lint task then runs and reports normal analyzer findings. The
-experimental `-Runspace` path does not require this workaround.
+Pre-importing PSScriptAnalyzer in a clean process removed the `Get-Command` error from the old
+dynamic-module execution path. The current per-task runspace model does not require this
+workaround.
 
 If the dependency must be loaded from the task body, importing it into global session state also
 works:

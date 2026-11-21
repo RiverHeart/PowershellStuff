@@ -3,7 +3,6 @@ using namespace System.Management.Automation.Language
 using module AstEditor
 
 BeforeAll {
-    Import-Module PSScriptAnalyzer -ErrorAction Stop
     Import-Module "$PSScriptRoot\..\..\..\..\..\Nitpick.psd1" -Force -ErrorAction Stop
     . "$PSScriptRoot\..\..\..\..\Support\CorrectionFixtures.ps1"
 
@@ -103,16 +102,16 @@ Describe 'Ternary syntax compatibility' {
         }
     }
 
-    It 'respects nested traversal and standalone diagnostic output' `
+    It 'respects nested traversal in native standalone output' `
         -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         $Source = '$Outer = $true ? 1 : 2; & { $Inner = $false ? 3 : 4 }'
         $Document = New-AstDocument -InputObject $Source
         $Local = @(Test-AvoidUnsupportedTernarySyntax -ScriptBlockAst $Document.Ast)
         $Nested = @(Test-AvoidUnsupportedTernarySyntax -ScriptBlockAst $Document.Ast -Context @{
-            RuleBehavior = @{ SearchNestedScriptBlocks = $true; OutputType = 'NitpickFinding' }
+            RuleBehavior = @{ SearchNestedScriptBlocks = $true }
         })
         $Local | Should -HaveCount 1
-        $Local[0].GetType().Name | Should -BeExactly 'DiagnosticRecord'
+        $Local[0].GetType().Name | Should -BeExactly 'NitpickFinding'
         $Nested | Should -HaveCount 2
     }
 

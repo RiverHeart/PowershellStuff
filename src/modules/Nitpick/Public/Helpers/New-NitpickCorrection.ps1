@@ -1,12 +1,12 @@
 
 <#
 .SYNOPSIS
-    Creates a native Nitpick correction or a PSScriptAnalyzer correction extent.
+    Creates a native Nitpick correction.
 
 .DESCRIPTION
     Creates an immutable description of a text correction. Line and column positions are
-    one-based to preserve PSScriptAnalyzer CorrectionExtent compatibility. Native offsets
-    are zero-based and end-exclusive. A correction is one complete fix for a finding: it
+    one-based. Native offsets are zero-based and end-exclusive. A correction is one complete
+    fix for a finding: it
     contains the AstEditor text edits that together realize it, applied all-or-nothing.
     A correction does not mutate a file; application belongs to a target-level correction
     coordinator.
@@ -14,8 +14,8 @@
     Extent-based corrections capture offsets and expected source text automatically.
     Direct offset construction is retained for compatibility but is deprecated; new callers
     should create validated AstEditor edits and pass them through TextEdit. Corrections created only
-    from line and column positions remain suitable for PSScriptAnalyzer interoperability
-    but are not natively applicable until a later coordinator resolves them against source.
+    from line and column positions are not natively applicable until a later coordinator
+    resolves them against source.
 
 .PARAMETER ViolationExtent
     The source extent to describe. Its one-based line and column coordinates are copied to
@@ -66,10 +66,6 @@
 
 .PARAMETER Description
     A human-readable explanation of the proposed correction.
-
-.PARAMETER OutputAs
-    Returns a native NitpickCorrection by default, or a PSScriptAnalyzer CorrectionExtent
-    when CorrectionExtent is selected.
 
 .EXAMPLE
     $Extent = { $Value = 1 }.Ast.EndBlock.Statements[0].Extent
@@ -122,17 +118,6 @@
     Creates one correction containing two edits. The edits are one fix: a coordinator
     accepts or skips them together, and they are applied all-or-nothing.
 
-.EXAMPLE
-    New-NitpickCorrection `
-        -StartLineNumber 1 -EndLineNumber 1 `
-        -StartColumnNumber 1 -EndColumnNumber 11 `
-        -ReplacementText '$Value = 2' `
-        -FilePathOrContext 'Example.ps1' `
-        -Description 'Replace the assignment.' `
-        -OutputAs CorrectionExtent
-
-    Creates a line-and-column-only PSScriptAnalyzer CorrectionExtent. Without native offsets,
-    this form cannot be applied by the Nitpick correction coordinator.
 #>
 function New-NitpickCorrection {
     [CmdletBinding(DefaultParameterSetName = 'ByExtent')]
@@ -194,13 +179,6 @@ function New-NitpickCorrection {
         [ValidateSet('Safe', 'Review', 'Unsafe')]
         [string] $Applicability = 'Safe',
 
-        [Parameter(ParameterSetName='ByLineAndColumn', HelpMessage = "Specifies the output format for the correction extent.")]
-        [Parameter(ParameterSetName='ByExtent', HelpMessage = "Specifies the output format for the correction extent.")]
-        [Parameter(ParameterSetName = 'ByOffset', HelpMessage = "Specifies the output format for the correction extent.")]
-        [Parameter(ParameterSetName = 'ByTextEdit', HelpMessage = "Specifies the output format for the correction extent.")]
-        [ValidateSet('NitpickCorrection', 'CorrectionExtent')]
-        [string] $OutputAs = 'NitpickCorrection',
-
         [ValidateNotNullOrEmpty()]
         [string] $RuleId
     )
@@ -239,11 +217,5 @@ function New-NitpickCorrection {
     if ($PSBoundParameters.ContainsKey('RuleId')) {
         $CorrectionParams.RuleId = $RuleId
     }
-    $Correction = [NitpickCorrection]::new($CorrectionParams)
-
-    if ($OutputAs -eq 'CorrectionExtent') {
-        $Correction = $Correction.ToCorrectionExtent()
-    }
-
-    return $Correction
+    Write-Output ([NitpickCorrection]::new($CorrectionParams))
 }

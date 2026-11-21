@@ -31,6 +31,8 @@ using namespace System.Management.Automation.Language
     Standalone disable/enable comments change regional state from the next physical
     line. The last matching directive wins without stacking or lexical-scope resets;
     enable cannot override whole-target, invocation-level, or line exclusions.
+    Text output emits one string per reported target with a trailing newline for
+    spacing. Separators remain in the pipeline, including when output is buffered.
 
 .PARAMETER IncludeRule
     Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
@@ -146,8 +148,8 @@ function Start-Nitpicking {
     [OutputType([string])]
     [OutputType('NitpickFinding', 'NitpickSummary', 'NitpickCorrectionResult')]
     param(
-        [Parameter(Mandatory,ParameterSetName='Path',ValueFromPipeline)]
-        [string] $Path,
+        [Parameter(ParameterSetName='Path',ValueFromPipeline)]
+        [string] $Path = $PWD,
 
         [string] $Filter = '*.ps1',
 
@@ -322,8 +324,6 @@ function Start-Nitpicking {
 
         # MARK: NITPICK
 
-        # Text blocks are separated with host-only blank lines to keep the pipeline clean.
-        $HasWrittenTextBlock = $false
         foreach ($Target in $ResolvedTargets) {
             $Document = $null
             $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
@@ -353,10 +353,8 @@ function Start-Nitpicking {
                     if ($Output -eq 'Object') {
                         Write-Output $ReadFailure
                     } else {
-                        if ($HasWrittenTextBlock) { Write-Host '' }
-                        Write-Output ("{0}`n  Corrections not attempted: the target could not be read." -f
-                            $ReadFailure.Path)
-                        $HasWrittenTextBlock = $true
+                        Write-Output ("{0}`n  Corrections not attempted: the target could not be read.{1}" -f
+                            $ReadFailure.Path, [Environment]::NewLine)
                     }
                 }
 
@@ -373,8 +371,7 @@ function Start-Nitpicking {
                     -ViolationExtent $ParseError.Extent `
                     -Severity Error `
                     -ScriptPath $TargetPath `
-                    -Explanation 'The PowerShell parser could not parse this source.' `
-                    -OutputAs NitpickFinding
+                    -Explanation 'The PowerShell parser could not parse this source.'
 
                 $TargetFindings.Add($ParserFinding)
             }
@@ -521,10 +518,7 @@ function Start-Nitpicking {
                     -IsFragment:$Document.IsFragment
 
                 if ($TargetText) {
-                    if ($HasWrittenTextBlock) { Write-Host '' }
-
-                    Write-Output $TargetText
-                    $HasWrittenTextBlock = $true
+                    Write-Output ($TargetText + [Environment]::NewLine)
                 }
             }
 
@@ -539,7 +533,6 @@ function Start-Nitpicking {
             if ($Output -eq 'Object') {
                 Write-Output $Summary
             } else {
-                Write-Host ""  # Line buffer. Host based to avoid polluting output.
                 Write-Output $Summary.ToString()
             }
         }

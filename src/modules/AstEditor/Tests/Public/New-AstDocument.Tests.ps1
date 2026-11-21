@@ -140,6 +140,7 @@ Describe 'New-AstDocument' {
             param($Node)
             $Node -is [ScriptBlockExpressionAst]
         }, $true).ScriptBlock
+
         $OriginalAssignment = $Nested.Find({
             param($Node)
             $Node -is [AssignmentStatementAst]
@@ -152,11 +153,22 @@ Describe 'New-AstDocument' {
                 $Node -is [AssignmentStatementAst]
             }, $true)
 
-            foreach ($Pair in @(
-                @{ Actual = $Overlay.Ast.Extent.StartScriptPosition; Original = $Nested.Extent.StartScriptPosition }
-                @{ Actual = $Assignment.Extent.StartScriptPosition; Original = $OriginalAssignment.Extent.StartScriptPosition }
-                @{ Actual = $Overlay.Ast.Extent.EndScriptPosition; Original = $Nested.Extent.EndScriptPosition }
-            )) {
+            $Pairs = @(
+                @{
+                    Actual = $Overlay.Ast.Extent.StartScriptPosition
+                    Original = $Nested.Extent.StartScriptPosition
+                }
+                @{
+                    Actual = $Assignment.Extent.StartScriptPosition
+                    Original = $OriginalAssignment.Extent.StartScriptPosition
+                }
+                @{
+                    Actual = $Overlay.Ast.Extent.EndScriptPosition
+                    Original = $Nested.Extent.EndScriptPosition
+                }
+            )
+
+            foreach ($Pair in $Pairs) {
                 $Pair.Actual.File | Should -Be $Path
                 $Pair.Actual.Offset | Should -Be $Pair.Original.Offset
                 $Pair.Actual.LineNumber | Should -Be $Pair.Original.LineNumber
