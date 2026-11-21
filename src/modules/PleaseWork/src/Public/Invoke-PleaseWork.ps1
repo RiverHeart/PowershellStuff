@@ -37,7 +37,8 @@ function Invoke-PleaseWork {
     dynamicparam {
         # Build task parameters from declaration ASTs so PowerShell can bind them normally without
         # executing TaskFile setup code while it is still discovering this command's parameters.
-        $TaskParameters = [RuntimeDefinedParameterDictionary]::new()
+        $TaskParameters =
+            [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
 
         if (-not $PSBoundParameters.ContainsKey('List')) {
             # Unbound parameter variables can fall through to an outer scope during dynamicparam.

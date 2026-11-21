@@ -19,13 +19,17 @@ using namespace System.Management.Automation.Language
 #>
 function Resolve-ParamBlock {
     [CmdletBinding(DefaultParameterSetName='ByScriptblock')]
-    [OutputType([RuntimeDefinedParameterDictionary])]
+    [OutputType(
+        [System.Management.Automation.RuntimeDefinedParameterDictionary]
+    )]
     param(
         [Parameter(Mandatory,ParameterSetName='ByScriptblock',Position=0)]
         [scriptblock] $ParamBlock,
 
         [Parameter(Mandatory,ParameterSetName='ByParameterAst',Position=0)]
-        [ReadOnlyCollection[ParameterAst]] $ParameterAsts,
+        [System.Collections.ObjectModel.ReadOnlyCollection[
+            System.Management.Automation.Language.ParameterAst
+        ]] $ParameterAsts,
 
         [string] $DefaultParameterSetName
     )
@@ -34,9 +38,11 @@ function Resolve-ParamBlock {
         $ParameterAsts = $ParamBlock.Ast.ParamBlock.Parameters
     }
 
-    $Parameters = [RuntimeDefinedParameterDictionary]::new()
+    $Parameters =
+        [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
     foreach ($ParameterAst in $ParameterAsts) {
-        $Attributes = [List`1[System.Attribute]]::new()
+        $Attributes =
+            [System.Collections.Generic.List`1[System.Attribute]]::new()
 
         foreach ($AttributeAst in $ParameterAst.Attributes) {
             if ($AttributeAst.GetType().Name -eq 'TypeConstraintAst') {
@@ -55,7 +61,10 @@ function Resolve-ParamBlock {
                 }
             )
 
-            $AttributeObj = [Activator]::CreateInstance($AttributeType, $PositionalArguments)
+            $AttributeObj = [System.Activator]::CreateInstance(
+                $AttributeType,
+                $PositionalArguments
+            )
 
             foreach ($NamedArg in $AttributeAst.NamedArguments) {
                 $AttributeObj.psobject.properties |
@@ -74,19 +83,23 @@ function Resolve-ParamBlock {
 
         # A dynamic parameter without ParameterAttribute is not available in a named parameter set.
         if (-not [string]::IsNullOrEmpty($DefaultParameterSetName) -and
-            -not ($Attributes | Where-Object { $_ -is [ParameterAttribute] })
+            -not ($Attributes | Where-Object {
+                $_ -is [System.Management.Automation.ParameterAttribute]
+            })
         ) {
-            $ParameterAttribute = [ParameterAttribute]::new()
+            $ParameterAttribute =
+                [System.Management.Automation.ParameterAttribute]::new()
             $ParameterAttribute.ParameterSetName = $DefaultParameterSetName
             $Attributes.Add($ParameterAttribute)
         }
 
         # Leave defaults unset here so the task evaluates its own defaults in its execution scope.
-        $Parameter = [RuntimeDefinedParameter]::new(
-            $ParameterAst.Name.VariablePath,
-            $ParameterAst.StaticType,
-            $Attributes
-        )
+        $Parameter =
+            [System.Management.Automation.RuntimeDefinedParameter]::new(
+                $ParameterAst.Name.VariablePath,
+                $ParameterAst.StaticType,
+                $Attributes
+            )
 
         $Parameters.Add($Parameter.Name, $Parameter)
     }
