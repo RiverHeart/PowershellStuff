@@ -26,6 +26,8 @@ using namespace System.Management.Automation.Language
     scope-local.
 
 .EXAMPLE
+    Basic usage
+
     Test-UseDeclaredVarsMoreThanAssignments -ScriptBlockAst {
         $Unused = 'value'
     }.Ast

@@ -19,18 +19,24 @@ using namespace System.Management.Automation.Language
     stable proposal facts, application outcomes, and effective reporting. PowerShell
     parser errors are reported as Error findings. Rule selection must succeed before
     any targets are read.
+
     Native findings and corrections carry the executing rule's qualified RuleId.
+
     Parser findings use Nitpick/PowerShellParseError without introducing a selectable rule.
+
     Leading standalone '# nitpick disable-target Namespace/Rule' comments skip matching
     rules for that target, including correction reanalysis. Selectors support wildcards.
+
     For a directly submitted braced ScriptBlock, place directives at the start of
     its body, on their own lines before code. Nested blocks do not start new targets.
     disable-line comments (standalone or trailing) and standalone disable-next-line
     comments suppress native findings starting on that physical line or the next
     physical line, including their corrections. Candidate analysis rereads directives.
+
     Standalone disable/enable comments change regional state from the next physical
     line. The last matching directive wins without stacking or lexical-scope resets;
     enable cannot override whole-target, invocation-level, or line exclusions.
+
     Text output emits one string per reported target with a trailing newline for
     spacing. Separators remain in the pipeline, including when output is buffered.
 

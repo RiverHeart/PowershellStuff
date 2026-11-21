@@ -97,6 +97,7 @@ function Test-Outer {
         @(Find-Nitpick -IncludeRule Nitpick/UseDeclaredVarsMoreThanAssignments) |
             Should -HaveCount 1
 
+        # nitpick disable-next-line Nitpick/AvoidLongLines
         $Source = '$Unused = 1 # nitpick disable-line Nitpick/UseDeclaredVarsMoreThanAssignments -- Reserved for a future step.'
         @(Start-Nitpicking -Script $Source `
             -IncludeRule Nitpick/UseDeclaredVarsMoreThanAssignments `
