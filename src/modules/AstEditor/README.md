@@ -2,6 +2,9 @@
 
 PowerShell module for editing source through immutable ASTs and validated text overlays.
 
+Preview annotations: [caret annotations for edit ranges](Docs/CaretAnnotations.md)
+(opt-in rendering with Nitpick integration).
+
 This project demonstrates a practical approach to AST manipulation in PowerShell:
 
 - Keep native AST immutable
@@ -16,10 +19,20 @@ This project demonstrates a practical approach to AST manipulation in PowerShell
 - `AstEditor.psm1`: module loader
 - `Classes/`: internal document and text-edit classes
 - `Private/`: internal rewrite planning and emission helpers
+- `Private/AstDiffing/`: diff grouping, rendering, and shared offset-to-line lookup helpers
 - `Public/`: exported editing commands
 - `Run-SimpleExample.ps1`: minimal demo showing prepend/replace/append line edits
 - `Run-ImageViewerMutation.ps1`: end-to-end demo against the WPF ImageViewer DSL script
 - `Tests/AstEditor.tests.ps1`: Pester coverage for document parsing, line helpers, diff output, and WPF transform behavior
+
+`Show-AstDiff` handles edit selection and validation, then calls `Get-AstDiffHunk`
+and `Format-AstDiff`. A block groups contiguous changed lines into one
+original/replacement pair; a hunk groups blocks connected by displayed context.
+Grouping and rendering receive line records (`Start`, `ContentEnd`, and `End`)
+from `Get-AstTextLine`. They share `Get-AstLineIndexFromOffset`, which binary-searches
+the records directly without a separate array of start offsets.
+Formatting scriptblocks remain local to the renderer rather than adding more
+module-level helpers.
 
 ## Import
 
@@ -32,21 +45,122 @@ $document = New-AstDocument -InputObject 'function Get-Greeting {}'
 Resolve-AstDocument -Document $document
 ```
 
-`AstDocument` and `AstTextEdit` are internal implementation types. Consumers should instantiate
-documents through `New-AstDocument` and pass the returned objects to the other exported commands.
+`AstDocument` remains an internal implementation type. Consumers create documents through
+`New-AstDocument` and detached edits through `New-AstTextEdit` or structural edit commands.
+
+Document constructors share initialization and parsing. ScriptBlock and AST inputs parse
+their complete parse-time snapshot from `Extent.StartScriptPosition.GetFullScript()`,
+not just the submitted node's text. `Ast` is the submitted node relocated in that parse;
+`Root` groups the complete snapshot's typed `Ast`, `Tokens`, and `ParseErrors`.
+Type, exact offsets, and parent depth identify the node
+(a root and a nested scriptblock can have identical type and offsets). Missing or
+ambiguous matches, or extent text inconsistent with the snapshot, throw. If
+`GetFullScript()` is null, extent text is parsed as standalone input instead.
+
+`OriginalText` and all extents and edits use snapshot coordinates. `IsFragment` means
+`Ast` is not `Root.Ast`, regardless of how much text it covers. `Tokens` contains only
+tokens fully inside the fragment, descending into expandable-string nested tokens
+when the fragment is inside interpolation. `Root.Tokens` retains the parser's original
+token structure.
+`Root.ParseErrors` contains every snapshot error. `ParseErrors` omits only errors
+positioned strictly before the fragment start; errors after its end may still have
+been caused by it and are retained. For strings and root ASTs, fragment and root views
+coincide. A fragment's parent nodes provide context, not additional editing targets.
+
+ScriptBlock and AST inputs remain in-memory documents (`Path = '<memory>'`,
+`IsFileBacked = false`), even when their extents identify a file. Parser file names
+are provenance, not save targets; only `-Path` captures a transactional file snapshot.
+The source is not reread from disk, so later disk changes can make navigation stale.
+Use AST and token extents directly for source paths and one-based line/column positions;
+no coordinate translation is needed.
+
+`Resolve-AstDocument -PassThruText` returns the complete rendered snapshot as
+`RenderedText` and the submitted fragment's slice as `RenderedFragmentText`; they are
+equal for non-fragments. Validation reparses the entire snapshot with the source file
+name and never filters parse errors. If a syntactically valid replacement no longer
+has the submitted fragment's type, depth, and adjusted offsets, validation reports
+`FragmentNotFound` rather than selecting a different node. Replacing a whole fragment
+with another kind of construct (or deleting it) therefore fails validation.
 
 ## Core Model
 
-- `AstTextEdit`: internal representation of a single replacement/insertion operation
-- `AstDocument`: internal immutable parse data plus a queued list of `AstTextEdit` edits
+- `AstTextEdit`: class-based detached edit contract with source coordinates, expected text, replacement text, and reason
+- `AstDocument`: internal immutable parse data plus a queued edit list
 - `New-AstDocument`: factory for parsing input and creating an `AstDocument`
+- `New-AstScriptExtent`: describes arbitrary snapshot ranges as offset-aware `IScriptExtent` objects, including whitespace without an AST node
+- `New-AstTextEdit`: creates a detached edit from an extent or document-bound offset range
+- `New-AstCollectionEdit`: creates the same detached edit contract for a structural collection removal
+- `Add-AstTextEdit`: atomically validates and queues one or more detached edits
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
-- `Show-AstDiff`: displays all or selected queued edits by index
-- `Save-AstDocument`: writes rendered output after parse validation
+- `Show-AstDiff`: displays all or selected queued edits as whole-line hunks; edits on the same or adjacent lines are grouped, identical reasons within a hunk share a label, `-Label` chooses edit indexes (`Index`, default) or the first edit's `line:column` (`Position`), and `-Context` adds surrounding unchanged lines (default `0`)
+- `Save-AstDocument`: validates and transactionally saves output with a structured write result
 - `Set-AstFunction`: queues replacement of one structurally selected function
 - `Edit-PSFunction`: previews or explicitly applies a function replacement to a file
 - `Extract-AstFunction`: queues removal of one function and returns its source text
 - `Split-PSFunction`: previews or applies extraction of top-level functions into individual files
+
+Use `Show-AstDiff -Document $document -Annotate` to add caret rows under removed
+and added edit spans. Multiple spans on one line share a row; insertions annotate
+only the added side, deletions only the removed side, and replacements both.
+Reason headers remain unchanged. Multiline spans annotate their first line only.
+Carets describe queued edit ranges, not minimal textual differences. Prefix tabs are
+preserved; highlighted widths count UTF-16 units rather than terminal display cells,
+so highlighted tabs and wide/combining characters may not align visually.
+
+## Generic Text Edits
+
+`Find-AstNode -Document $document` searches the submitted AST without reparsing or
+changing node identity. `-Ast`, `-ScriptBlock`, and `-FilePath` inputs remain available.
+`-Range` accepts an `IScriptExtent` or two Int32 offsets (`@(start, end)`) and returns
+only nodes fully contained in that zero-based, end-exclusive range. It is not an
+overlap query and should not be used to distinguish whitespace from token content.
+
+For a range with no AST node, create an extent from the document's original snapshot:
+
+```powershell
+$document = New-AstDocument -InputObject '$Value = 1  '
+$extent = New-AstScriptExtent -Document $document -StartOffset 10 -EndOffset 12
+$edit = New-AstTextEdit -Extent $extent -ReplacementText '' -Reason 'Remove trailing whitespace.'
+```
+
+The extent retains exact text, source-file provenance, and complete snapshot positions.
+Offsets are zero-based and end-exclusive; line and column numbers are one-based UTF-16
+positions. CRLF, LF, and CR terminators are preserved, and endpoint positions expose
+the complete snapshot through `GetFullScript()`. Fragment documents reject ranges
+outside the submitted target with `Exception.Data['FailureKind'] = 'OutsideTarget'`;
+empty ranges at either endpoint are allowed. Match indexes from `document.Ast.Extent.Text`
+must be added to `document.Ast.Extent.StartOffset` before calling this helper.
+Creating an extent does not queue an edit or decide whether a change is semantically safe.
+
+Offset ranges are zero-based and end-exclusive. Construct edits without side effects, then submit
+the selected target batch to `Add-AstTextEdit`:
+
+```powershell
+$document = New-AstDocument -InputObject '$Value = 1'
+$edit = New-AstTextEdit `
+	-Document $document `
+	-StartOffset 9 `
+	-EndOffset 10 `
+	-ReplacementText '2' `
+	-ExpectedText '1' `
+	-Reason 'Update the value'
+Add-AstTextEdit -Document $document -TextEdit $edit
+
+$result = Resolve-AstDocument -Document $document -PassThruText
+$result.RenderedText
+```
+
+Use `New-AstTextEdit -Extent` when an `IScriptExtent` identifies the complete edit range.
+`New-AstCollectionEdit` returns the same contract for token-aware collection removal. Batch
+queueing validates expected text, ranges, overlaps, and same-offset insertions before queueing any
+member. Fragment documents also reject edits outside `Ast.Extent` with
+`Exception.Data['FailureKind'] = 'OutsideTarget'`, leaving the complete batch unqueued.
+Direct document methods enforce the same boundary. Zero-length insertions may occur at
+either endpoint, but rendering must still locate the fragment at its adjusted offsets;
+for example, inserting whitespace before its opening brace fails relocation validation.
+Conflict exceptions expose the existing and incoming edits through `ExistingEdit` and
+`IncomingEdit` entries in `Exception.Data`. The offset and extent parameter sets on
+`Add-AstTextEdit` remain convenience surfaces for one edit.
 
 ## Function Editing
 
@@ -92,8 +206,38 @@ include nested definitions; ambiguous matches are rejected with source locations
 comment-based help immediately above the target is replaced with the function by default. Use
 `-ExcludeHelp` to preserve it.
 
-The current MVP replaces complete function definitions. It does not yet perform semantic renames,
-body-only edits, concurrent file-change detection, atomic writes, or encoding preservation.
+The current MVP replaces complete function definitions. It does not yet perform semantic renames
+or body-only edits.
+
+## Transactional Saves
+
+`New-AstDocument -Path` records a SHA-256 fingerprint of the original bytes, the encoding/BOM,
+and a path-bearing AST. `Save-AstDocument` preserves that encoding and existing newline
+characters, validates rendered syntax, and stages output in the destination directory before
+atomic replacement. It checks source and destination fingerprints after confirmation and
+immediately before commit. It does not fall back to truncating the original if replacement fails.
+
+Supported file encodings are valid BOM-less UTF-8 and BOM-marked UTF-8, UTF-16 LE/BE, and
+UTF-32 LE/BE. Legacy code-page encodings are not inferred. In-memory documents require
+`-OutPath` and default to UTF-8 without a BOM.
+
+```powershell
+$result = Save-AstDocument -Document $document -Confirm:$false
+if ($result.ErrorRecord) {
+    throw $result.ErrorRecord
+}
+$result.WasWritten
+$result.WriteStatus
+```
+
+Expected validation and I/O failures return structured `AstEditor.WriteResult` objects with
+`ErrorRecord` and `WasWritten = $false`. Check these fields before reporting success.
+`-WhatIf` and declined confirmations also return non-written results. Temporary files owned
+by the transaction are cleaned up on failure. Fingerprints protect the last pre-commit check,
+not an OS-level compare-and-swap against a writer racing the replacement itself.
+
+`Edit-PSFunction -Apply` uses this save contract. `Split-PSFunction` still has a separate
+multi-file write workflow; it is not a transactional multi-file commit.
 
 ## Function Extraction
 
@@ -152,5 +296,10 @@ Output is written to:
 
 ## Notes
 
-AstEditor intentionally avoids mutating PowerShell AST objects in-place.
-It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+- AstEditor intentionally avoids mutating PowerShell AST objects in-place.
+- It treats AST as a query surface and source of stable spans, while all changes are represented in an overlay plan.
+
+## Todo
+
+- AstEditor conflict exceptions carry field snapshots, not edit instances (Data['ExistingEdit'] is a hashtable). That forced the field-matching `$FindOwner` logic in the resolver to map conflicts back to owning corrections — workable, but brittle if AstTextEdit fields ever change. If AstEditor could attach the actual instances (or a correlation token), the resolver's attribution would collapse to a dictionary lookup.
+  - `$FindOwner` lives in `Resolve-NitpickCorrectionProposal` around line 230.

@@ -70,6 +70,7 @@ Copyright = '2025'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
+    'Add-ToCollection'
     'Convert-PSObjectToHashtable'
     'ConvertFrom-Json'
     'ConvertFrom-StringTable'
@@ -82,12 +83,13 @@ FunctionsToExport = @(
     'Format-Flat'
     'Format-TimeAsHumanString'
     'Get-CommandAlias'
+    'Get-Interface'
     'Get-MemoizedResult'
     'Get-Password'
     'Get-Property'
     'Get-Uptime'
     'Import-Env'
-    'Initialize-ModulePSProfile'
+    'Initialize-ModularPSProfile'
     'New-ModulePackage'
     'New-Project'
     'New-Tuple'
@@ -119,6 +121,7 @@ AliasesToExport = '*'
 
 # List of all files packaged with this module
 FileList = @(
+    'Public/Add-ToCollection.ps1'
     'Public/Convert-PSObjectToHashtable.ps1'
     'Public/ConvertFrom-Json.ps1'
     'Public/ConvertFrom-StringTable.ps1'
@@ -137,6 +140,7 @@ FileList = @(
     'Public/Get-Uptime.ps1'
     'Public/Import-Env.ps1'
     'Public/Initialize-ModularPSProfile.ps1'
+    'Public/Get-Interface.ps1'
     'Public/New-ModulePackage.ps1'
     'Public/New-Project.ps1'
     'Public/New-Tuple.ps1'
@@ -191,4 +195,3 @@ PrivateData = @{
 # DefaultCommandPrefix = ''
 
 }
-

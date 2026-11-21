@@ -66,6 +66,35 @@ $tool = "$(git rev-parse --show-toplevel)/.github/skills/bulk-replace/scripts/In
 - Add contextual guards (for example uppercase/PascalCase lookaheads) to reduce prose hits.
 - Start broad in search-only mode, then tighten incrementally.
 
+### Discovery filters versus rule filters
+
+- Directory discovery defaults to PowerShell files (`*.ps1`, `*.psm1`, `*.psd1`).
+- `-Include` selects file names discovered in directories; `-Exclude` takes precedence.
+- `-FilePattern` (or a rule's `FilePattern`) only filters those discovered files by
+  full path or file name. It does **not** expand discovery. The tool warns when an
+  actual file requested by a rule's pattern is masked by `-Include`, unless excluded
+  intentionally with `-Exclude`.
+- Explicit file paths bypass directory `-Include`/`-Exclude` filters.
+- For Markdown, use `-Include '*.md'`; for a mixed migration, use
+  `-Include '*.ps1','*.psm1','*.psd1','*.md'`.
+
+```powershell
+& $tool -Path src -Recurse -Include '*.md' -Find 'OldCommand' -SearchOnly -PassThru
+```
+
+### Search counts versus replacement counts
+
+`-SearchOnly` searches the **original content independently for every rule**.
+Default counts are matching lines per rule, not individual occurrences.
+`-SearchOnly -SearchMultiline` counts text matches per rule instead.
+Rules may count overlapping text, and `-MaxMatchesPerFile` caps reported hits and
+their counts. Search run summaries expose `MatchBasis = OriginalContent` and
+`CountUnit = MatchingLinePerRule` or `TextMatchPerRule`.
+
+Search totals do not predict sequential replacements. Use `-WhatIf` **without**
+`-SearchOnly` to preview rules applied in order to the evolving content, including
+the replacement counts and resulting changes.
+
 ### Comments/strings and false positives
 
 - This tool is text-based, not AST-aware.
@@ -98,5 +127,7 @@ Get-Help "$(git rev-parse --show-toplevel)/.github/skills/bulk-replace/scripts/I
 When this skill or its script is modified, validate with:
 
 ```powershell
-Invoke-Pester -Path "$(git rev-parse --show-toplevel)/.github/skills/bulk-replace/tests/Invoke-BulkReplace.Tests.ps1"
+& .\tools\Invoke-Test.ps1 -Suite TestRunnerSkills `
+    -Path (Join-Path $PWD '.github\skills\bulk-replace\tests\Invoke-BulkReplace.Tests.ps1') `
+    -ExitOnError
 ```

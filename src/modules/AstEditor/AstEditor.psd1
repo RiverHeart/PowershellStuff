@@ -9,11 +9,20 @@
     Description = 'Edits PowerShell source using immutable ASTs and validated text overlays.'
     PowerShellVersion = '5.1'
     FunctionsToExport = @(
+        # PowerShellData
+        'ConvertFrom-PowerShellData'
+
+        # General
+        'Add-AstTextEdit'
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
-        'Extract-AstFunction'
-        'Find-AEAstNode'
+        'Find-AstNode'
+        'Find-AstScriptExtent'
+        'Get-AstExtractedFunction'
         'New-AstDocument'
+        'New-AstCollectionEdit'
+        'New-AstScriptExtent'
+        'New-AstTextEdit'
         'Resolve-AstDocument'
         'Save-AstDocument'
         'Set-AstFunction'
@@ -22,10 +31,10 @@
     )
     CmdletsToExport = @()
     VariablesToExport = @()
-    AliasesToExport = @()
+    AliasesToExport = '*'
     PrivateData = @{
         PSData = @{
-            Tags = @('AST', 'Editor', 'PowerShell')
+            Tags = @('AST', 'PowerShell')
         }
     }
 }

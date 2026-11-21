@@ -1,9 +1,12 @@
+using namespace System.IO
+
 <#
 .SYNOPSIS
     Resolves an explicit TaskFile or discovers one in the current directory hierarchy.
 #>
 function Resolve-TaskFilePath {
     [CmdletBinding()]
+    [OutputType([string])]
     param (
         [Parameter()]
         [string] $Path
@@ -17,7 +20,7 @@ function Resolve-TaskFilePath {
         throw 'TaskFile discovery requires a FileSystem location.'
     }
 
-    $Directory = [System.IO.DirectoryInfo]::new($PWD.ProviderPath)
+    $Directory = [DirectoryInfo]::new($PWD.ProviderPath)
     while ($null -ne $Directory) {
         $Candidate = Join-Path $Directory.FullName 'TaskFile.ps1'
         if (Test-Path -LiteralPath $Candidate -PathType Leaf) {

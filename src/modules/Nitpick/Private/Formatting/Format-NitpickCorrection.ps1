@@ -1,0 +1,133 @@
+using namespace System.Collections.Generic
+
+<#
+.SYNOPSIS
+    Formats one Nitpick correction result as console-friendly text.
+
+.DESCRIPTION
+    Formats the correction section that Start-Nitpicking -FixMode Apply writes for one target in
+    text output: the proposal diff, labeled by the line:column where each correction
+    starts, followed by a trailer stating the outcome once. Lines are indented to sit
+    beneath the target header written by Format-NitpickText, which lets editors such
+    as VS Code resolve each line:column against that header. The header itself and
+    spacing between targets are left to the caller.
+
+    Returns nothing when there is nothing worth reporting, meaning no accepted,
+    applied, skipped, undecided, or conflicting corrections and no failure. Applied and
+    accepted counts are per correction, however many edits each contains; skipped and
+    undecided counts are per finding, since a finding's alternative corrections are
+    different ways to resolve it rather than separate outcomes.
+
+.PARAMETER CorrectionResult
+    The NitpickCorrectionResult for one target, as produced by
+    New-NitpickCorrectionResult.
+
+.EXAMPLE
+    Format a correction result.
+
+    $NitpickModule = Import-Module Nitpick -PassThru
+    $NitpickModule.NewBoundScriptBlock({
+        $Source = 'param([Parameter(Mandatory=$true)] [string] $Foo)'
+        $SourceAst = [scriptblock]::Create($Source).Ast
+
+        $Finding = Test-AvoidParameterAttributeBool `
+            -ScriptBlockAst $SourceAst `
+            -Context @{ RuleBehavior = @{ SearchNestedScriptBlocks = $true } }
+
+        $Proposal = Resolve-NitpickCorrectionProposal `
+            -Script $Source `
+            -Finding $Finding
+
+        $CorrectionResult = New-NitpickCorrectionResult `
+            -Proposal $Proposal `
+            -Application @{ Status = 'Preview' }
+
+        Format-NitpickCorrection -CorrectionResult $CorrectionResult
+    }).Invoke()
+#>
+function Format-NitpickCorrection {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param (
+        [Parameter(Mandatory)]
+        [NitpickCorrectionResult] $CorrectionResult
+    )
+
+    $Proposal = $CorrectionResult.Proposal
+    $Application = $CorrectionResult.Application
+    $ApplicationStatus = $Application.Status
+    $ProposalStatus = if ($Proposal) { $Proposal.Status } else { 'Unavailable' }
+
+    $AcceptedCount = if ($Proposal) { $Proposal.AcceptedCorrections.Count } else { 0 }
+    $AppliedCount = $Application.AppliedCorrections.Count
+    $SkippedCount = if ($Proposal) { $Proposal.SkippedFindings.Count } else { 0 }
+    $UndecidedCount = if ($Proposal) { $Proposal.UndecidedFindings.Count } else { 0 }
+    $ConflictCount = if ($Proposal) { $Proposal.Conflicts.Count } else { 0 }
+    $HasFailure =
+        $Application.ErrorRecord -or
+        $ProposalStatus -in 'Rejected', 'FailedValidation' -or
+        $ApplicationStatus -in @(
+            'FailedRead', 'FailedValidation', 'StaleSource', 'StaleTarget', 'InvalidTarget', 'FailedWrite'
+        )
+
+    if ($AcceptedCount -eq 0 -and
+        $AppliedCount -eq 0 -and
+        $SkippedCount -eq 0 -and
+        $UndecidedCount -eq 0 -and
+        $ConflictCount -eq 0 -and
+        -not $HasFailure
+    ) {
+        return
+    }
+
+    $Indent = '  '
+    $Lines = [List[string]]::new()
+    if ($AcceptedCount -gt 0 -and $Proposal.Diff) {
+        foreach ($Line in ([string] $Proposal.Diff) -split '\r?\n') {
+            $Lines.Add($(if ($Line) { "$Indent$Line" } else { '' }))
+        }
+        $Lines.Add('')
+    }
+
+    $CorrectionNoun = if ($AcceptedCount -eq 1) { 'correction' } else { 'corrections' }
+    $IsCleanOutcome =
+        $AcceptedCount -gt 0 -and
+        $SkippedCount -eq 0 -and
+        $UndecidedCount -eq 0 -and
+        $ConflictCount -eq 0 -and
+        -not $HasFailure
+
+    $Trailer = if ($IsCleanOutcome) {
+        # Preview and WhatIf share wording: "proposed" already implies the file is unchanged.
+        switch ($ApplicationStatus) {
+            'Preview' { '{0} proposed {1}.' -f $AcceptedCount, $CorrectionNoun }
+            'WhatIf' { '{0} proposed {1}.' -f $AcceptedCount, $CorrectionNoun }
+            'Declined' { '{0} proposed {1} declined.' -f $AcceptedCount, $CorrectionNoun }
+            'InMemory' {
+                $AppliedNoun = if ($AppliedCount -eq 1) { 'correction' } else { 'corrections' }
+                '{0} {1} applied in memory.' -f $AppliedCount, $AppliedNoun
+            }
+            'Written' {
+                $AppliedNoun = if ($AppliedCount -eq 1) { 'correction' } else { 'corrections' }
+                '{0} {1} applied.' -f $AppliedCount, $AppliedNoun
+            }
+        }
+    }
+    if (-not $Trailer) {
+        $SkippedNoun = if ($SkippedCount -eq 1) { 'finding' } else { 'findings' }
+        $UndecidedNoun = if ($UndecidedCount -eq 1) { 'finding' } else { 'findings' }
+        $ConflictNoun = if ($ConflictCount -eq 1) { 'conflict' } else { 'conflicts' }
+        $Counts = @(
+            '{0} corrections applied' -f $AppliedCount
+            '{0} corrections accepted' -f $AcceptedCount
+            '{0} {1} skipped' -f $SkippedCount, $SkippedNoun
+            if ($UndecidedCount -gt 0) { '{0} {1} undecided' -f $UndecidedCount, $UndecidedNoun }
+            '{0} {1}' -f $ConflictCount, $ConflictNoun
+        )
+        $Trailer = '{0} (proposal: {1}; application: {2}).' -f
+            ($Counts -join ', '), $ProposalStatus, $ApplicationStatus
+    }
+    $Lines.Add("$Indent$Trailer")
+
+    Write-Output ($Lines -join [Environment]::NewLine)
+}

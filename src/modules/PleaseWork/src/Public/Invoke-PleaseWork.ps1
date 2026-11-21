@@ -1,4 +1,5 @@
 using namespace System.Collections.Generic
+using namespace System.Management.Automation
 
 <#
 .SYNOPSIS
@@ -30,16 +31,15 @@ function Invoke-PleaseWork {
         [string] $TaskFile,
 
         [Parameter(ParameterSetName='Run')]
-        [switch] $PassThru,
-
-        [Parameter()]
-        [switch] $Runspace
+        [switch] $PassThru
     )
 
     dynamicparam {
         # Build task parameters from declaration ASTs so PowerShell can bind them normally without
         # executing TaskFile setup code while it is still discovering this command's parameters.
-        $TaskParameters = [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
+        $TaskParameters =
+            [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
+
         if (-not $PSBoundParameters.ContainsKey('List')) {
             # Unbound parameter variables can fall through to an outer scope during dynamicparam.
             # PSBoundParameters contains only the static values supplied for this invocation.
@@ -48,11 +48,13 @@ function Invoke-PleaseWork {
             } else {
                 $null
             }
+
             $BoundTaskName = if ($PSBoundParameters.ContainsKey('Name')) {
                 $PSBoundParameters['Name']
             } else {
                 $null
             }
+
             $TaskFilePath = Resolve-TaskFilePath -Path $BoundTaskFile
             $TaskDeclarations = @(Get-TaskFileDeclaration -Path $TaskFilePath)
             $SelectedTaskName = if ([string]::IsNullOrEmpty($BoundTaskName)) {
@@ -64,15 +66,18 @@ function Invoke-PleaseWork {
             } else {
                 $BoundTaskName
             }
+
             $TaskDeclaration = $TaskDeclarations |
                 Where-Object { $_.Name -ieq $SelectedTaskName } |
                 Select-Object -First 1
+
             if ($null -ne $TaskDeclaration -and $TaskDeclaration.ParameterAsts.Count -gt 0) {
                 $TaskParameters = Resolve-ParamBlock `
                     -ParameterAsts $TaskDeclaration.ParameterAsts `
                     -DefaultParameterSetName Run
             }
         }
+
         return $TaskParameters
     }
 
@@ -89,46 +94,28 @@ function Invoke-PleaseWork {
             }
         }
 
-        if ($Runspace) {
-            $InvocationParameters = @{}
-            foreach ($ParameterName in $PSBoundParameters.Keys) {
-                if ($ParameterName -ne 'Runspace') {
-                    $InvocationParameters[$ParameterName] = $PSBoundParameters[$ParameterName]
-                }
-            }
-            $InvocationParameters.TaskFile = $TaskFilePath
+        $TaskDeclarations = @(Get-TaskFileDeclaration -Path $TaskFilePath)
+        $UseNativeHelp = $Name -ieq 'help' -and
+            -not @($TaskDeclarations | Where-Object Name -ieq 'help')
 
-            Invoke-PleaseWorkInRunspace `
-                -ModulePath $MyInvocation.MyCommand.Module.Path `
-                -InvocationParameters $InvocationParameters `
-                -WorkingDirectory $PWD.ProviderPath
-            return
-        }
-
-        # The runspace bootstrap registers tasks directly and places its prepared set in this
-        # module's private state. Standard invocation retains the dynamic-module loader.
-        $TaskSet = if ($null -ne $script:PreparedTaskSet) {
-            $script:PreparedTaskSet
-        } else {
-            Read-TaskFile -Path $TaskFilePath
-        }
-
-        # Support a native 'help' task that displays the available tasks and their descriptions.
-        $UseNativeHelp = $Name -ieq 'help' -and -not $TaskSet.Tasks.ContainsKey('help')
-
-        # If the user requested a task list or help, build a list of tasks and their descriptions.
         if ($List -or $UseNativeHelp) {
-            $TaskList = foreach ($TaskName in $TaskSet.TaskNames) {
-                $Description = $TaskSet.Tasks[$TaskName].Description
+            $DefaultTaskName = if ($env:PLEASE_DEFAULT_TASK) {
+                $env:PLEASE_DEFAULT_TASK
+            } else {
+                $TaskDeclarations[0].Name
+            }
+
+            $TaskList = foreach ($Declaration in $TaskDeclarations) {
+                $Description = $Declaration.Description
                 if (-not [string]::IsNullOrWhiteSpace($Description)) {
                     $Description = $Description.Trim()
                 }
 
                 [pscustomobject] @{
-                    Name = $TaskName
-                    Dependencies = [string[]] $TaskSet.Tasks[$TaskName].Dependencies
-                    PathSpecs = [string[]] $TaskSet.Tasks[$TaskName].PathSpecs
-                    Default = $TaskName -eq $TaskSet.DefaultTask
+                    Name = $Declaration.Name
+                    Dependencies = [string[]] $Declaration.Dependencies
+                    PathSpecs = [string[]] $Declaration.PathSpecs
+                    Default = $Declaration.Name -eq $DefaultTaskName
                     Description = $Description
                 }
             }
@@ -137,16 +124,24 @@ function Invoke-PleaseWork {
         if ($List) { return $TaskList }
 
         if ($UseNativeHelp -and -not [string]::IsNullOrWhiteSpace($HelpTaskName)) {
-            if (-not $TaskSet.Tasks.ContainsKey($HelpTaskName)) {
+            $HelpDeclaration = $TaskDeclarations |
+                Where-Object Name -ieq $HelpTaskName |
+                Select-Object -First 1
+
+            if ($null -eq $HelpDeclaration) {
                 throw "Task '$HelpTaskName' is not defined."
             }
-            return $TaskSet.Tasks[$HelpTaskName].Help
+
+            return $HelpDeclaration.Help
         }
 
         if ($UseNativeHelp) {
             $TaskList | Format-PleaseWorkTaskHelp
             return
         }
+
+        $TaskSnapshot = New-PleaseWorkTaskSnapshot -Path $TaskFilePath
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $TaskSnapshot
 
         if ([string]::IsNullOrEmpty($Name)) {
             $Name = $TaskSet.DefaultTask
@@ -166,17 +161,21 @@ function Invoke-PleaseWork {
             -TaskOrder $TaskOrder `
             -Tasks $TaskSet.Tasks `
             -Config $TaskSet.Config
+
         $Changeset = $TaskContext.Changeset
         $ExecutedTasks = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         $OriginalLocation = Get-Location
         $OriginalPleaseWorkConfig = $script:PleaseWorkConfig
+
         try {
             # Expose this TaskFile's config to module helpers, then restore prior module state.
             $script:PleaseWorkConfig = $TaskSet.Config
             foreach ($TaskName in $TaskOrder) {
                 Set-Location -LiteralPath $TaskFileRoot
+
                 $Task = $TaskSet.Tasks[$TaskName]
                 [string[]] $ChangedFiles = @()
+
                 if ($Task.PathSpecs.Count -gt 0) {
                     $DependencyRan = @($Task.Dependencies | Where-Object { $ExecutedTasks.Contains($_) }).Count -gt 0
                     $ChangedFiles = @(Get-GitChangedPath `
@@ -185,6 +184,7 @@ function Invoke-PleaseWork {
                         ForEach-Object {
                             [System.IO.Path]::GetFullPath((Join-Path $Changeset.Root $_))
                         })
+
                     if ($ChangedFiles.Count -eq 0 -and -not $DependencyRan) {
                         Write-Verbose "Skipped task '$TaskName' because its changeset filters did not match."
                         continue
@@ -195,6 +195,7 @@ function Invoke-PleaseWork {
                 foreach ($ContextName in $TaskContext.Keys) {
                     $CurrentTaskContext[$ContextName] = $TaskContext[$ContextName]
                 }
+
                 $CurrentTaskContext.ChangedFiles = $ChangedFiles
                 $TaskResult = $null
                 $TaskOutput = [List[object]]::new()
@@ -202,16 +203,18 @@ function Invoke-PleaseWork {
                     # Dependencies run without the requested task's arguments.
                     Invoke-PleaseWorkTask `
                         -Name $TaskName `
-                        -ScriptBlock $Task.ScriptBlock `
                         -Arguments $(if ($TaskName -ieq $Name) { $TaskArguments } else { $null }) `
                         -Context $CurrentTaskContext `
-                        -Invoker $TaskSet.Invoker `
+                        -WorkingDirectory $TaskFileRoot `
+                        -Snapshot $TaskSet.Snapshot `
+                        -StreamCaller $PSCmdlet `
                         -Result ([ref] $TaskResult) |
                         ForEach-Object { $TaskOutput.Add($_) }
                 } catch {
                     $TaskResult | Add-Member `
                         -NotePropertyName Output `
-                        -NotePropertyValue $TaskOutput.ToArray()
+                        -NotePropertyValue $TaskOutput.ToArray() `
+                        -Force
 
                     if ($PassThru) {
                         $TaskResult
@@ -223,7 +226,8 @@ function Invoke-PleaseWork {
 
                 $TaskResult | Add-Member `
                     -NotePropertyName Output `
-                    -NotePropertyValue $TaskOutput.ToArray()
+                    -NotePropertyValue $TaskOutput.ToArray() `
+                    -Force
 
                 Write-Verbose (
                     "Completed task '$TaskName' in $($TaskResult.Duration). " +
@@ -237,8 +241,16 @@ function Invoke-PleaseWork {
                 }
 
                 if (-not $TaskResult.Succeeded) {
-                    throw "Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."
+                    $PSCmdlet.ThrowTerminatingError(
+                        [ErrorRecord]::new(
+                            [Exception]::new("Task '$TaskName' failed with exit code $($TaskResult.ExitCode)."),
+                            "TaskFailed",
+                            [ErrorCategory]::OperationStopped,
+                            $null
+                        )
+                    )
                 }
+
                 $null = $ExecutedTasks.Add($TaskName)
             }
         } finally {

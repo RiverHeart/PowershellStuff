@@ -51,7 +51,9 @@ function New-AstFunctionRewritePlan {
             }
 
             $Ancestor = $Node.Parent
-            while ($null -ne $Ancestor) {
+            while ($null -ne $Ancestor -and
+                -not [object]::ReferenceEquals($Ancestor, $Document.Ast.Parent)
+            ) {
                 if ($Ancestor -is [FunctionDefinitionAst]) {
                     return $false
                 }
@@ -88,7 +90,7 @@ function New-AstFunctionRewritePlan {
     $ReplacementStatements = @($ReplacementAst.EndBlock.Statements)
     if ($ReplacementAst.UsingStatements.Count -gt 0 -or
         $ReplacementStatements.Count -ne 1 -or
-        -not ($ReplacementStatements[0] -is [FunctionDefinitionAst])
+        $ReplacementStatements[0] -isnot [FunctionDefinitionAst]
     ) {
         throw 'Replacement must contain exactly one complete function definition.'
     }
@@ -129,7 +131,8 @@ function New-AstFunctionRewritePlan {
         }
 
         $CommentText = ($CommentGroup | ForEach-Object { $_.Text }) -join $Document.NewLineSequence
-        if ($CommentText -match '(?im)^\s*#?\s*\.(SYNOPSIS|DESCRIPTION|PARAMETER|EXAMPLE|INPUTS|OUTPUTS|NOTES|LINK)\b') {
+        $CommentPattern = '(?im)^\s*#?\s*\.(SYNOPSIS|DESCRIPTION|PARAMETER|EXAMPLE|INPUTS|OUTPUTS|NOTES|LINK)\b'
+        if ($CommentText -match $CommentPattern) {
             $StartOffset = $CommentGroup[0].Extent.StartOffset
             $IncludedHelp = $true
         }

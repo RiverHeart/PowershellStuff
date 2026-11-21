@@ -46,7 +46,7 @@ function {0} {
         try {
             $FindAstNodeParams = @{
                 Type = ''  # Change me
-                Recurse = $true
+                Recurse = $false  # DO NOT RECURSE, you will get duplicate matches from Invoke-ScriptAnalyzer
             }
 
             Find-Ast @FindAstNodeParams

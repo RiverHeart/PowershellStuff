@@ -18,12 +18,13 @@ The DSL optimizes for readability, expressing user intent, and reducing boilerpl
 * [Project Goals](#project-goals)
 * [Getting Started](#getting-started)
 * [Similar Projects](#similar-projects)
+  * [Contemporary Projects](#contemporary-projects)
   * [Prior Art](#prior-art)
 * [Documentation](#documentation)
 
 ## Flagship Example
 
-To get a sense of what you can produce and what the syntax looks like, here is a screenshot and trimmed excerpt from the ImageViewer application in [Examples/ImageViewer](./Examples/ImageViewer). The ImageViewer is a [fully featured app](./Examples/ImageViewer/README.md#features), not a trivial example of sticking an image in a box.
+The screenshot and trimmed code excerpt below of the [ImageViewer example application](./Examples/ImageViewer) should give you a sense of what you can produce and shows you what the general syntax looks like. While it's neither the greatest nor prettiest ImageViewer in the world it's not some trivial example of sticking an image in a box either. [It implements quite a lot of features](./Examples/ImageViewer/README.md#features) and shows what an actual Powershell application looks like.
 
 ![Image Viewer](./Examples/ImageViewer/ImageViewer.png)
 
@@ -209,12 +210,12 @@ Many reasons, but a few big ones:
 
 ## System Requirements
 
-- Windows
-- PowerShell 5 compatibility (project goal)
-- A PowerShell editor
-- WPF assemblies available on a standard Windows environment
+- Windows OS
+- PowerShell 5 or greater
+- An editor
+- WPF assemblies (typically available on Windows)
 
-Since Windows PowerShell v5, PowerShell ISE, and WPF come pre-installed on Windows, you already have all of these.
+Since Windows PowerShell v5, PowerShell ISE (editor), and WPF come pre-installed on Windows, you already meet the system requirements.
 
 For a more powerful editing experience, you can install [VSCode](https://code.visualstudio.com/download) with the PowerShell extension. When you open this project, you'll be prompted to install extensions recommended by it.
 
@@ -297,6 +298,10 @@ New-WPFProject MyApp -Bare
 ```
 
 ## Similar Projects
+
+### Contemporary Projects
+
+* **[WinUIShell](https://github.com/mdgrs-mei/WinUIShell) and [GliderUI](https://github.com/mdgrs-mei/GliderUI)**: Powershell modules by the same author that enable the creation of GUIs using WinUI and Avalonia respectively. While their project doesn't appear to provide anything like the WPF DSL, their UI examples look good, their supported frameworks are modern, and they've addressed the issue of running an interactive console and UI concurrently.
 
 ### Prior Art
 

@@ -1,9 +1,12 @@
+using namespace System.Collections
+
 <#
 .SYNOPSIS
     Creates the shared context for a planned task invocation.
 #>
 function New-PleaseWorkTaskContext {
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param (
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -18,10 +21,10 @@ function New-PleaseWorkTaskContext {
         [string[]] $TaskOrder,
 
         [Parameter(Mandatory)]
-        [System.Collections.IDictionary] $Tasks,
+        [IDictionary] $Tasks,
 
         [Parameter(Mandatory)]
-        [System.Collections.IDictionary] $Config
+        [IDictionary] $Config
     )
 
     $TaskContext = @{
@@ -29,12 +32,14 @@ function New-PleaseWorkTaskContext {
         TaskFileRoot = $TaskFileRoot
     }
 
-    if (@($TaskOrder | Where-Object { $Tasks[$_].PathSpecs.Count -gt 0 }).Count -gt 0) {
+    $ChangedTasks = $TaskOrder | Where-Object { $Tasks[$_].PathSpecs.Count -gt 0 }
+    if ($ChangedTasks.Count -gt 0) {
         $BaseRef = if ($Config.Contains('BaseRef')) {
             [string] $Config['BaseRef']
         } else {
             $null
         }
+
         if ([string]::IsNullOrWhiteSpace($BaseRef)) {
             throw @"
 Tasks using changed() require a non-empty `$PleaseConfig.BaseRef.
@@ -43,15 +48,18 @@ For example, to run tasks based on changes in the current branch relative to the
     `$PleaseConfig = @{ BaseRef = 'origin/main' }
 "@
         }
+
         $HeadRef = if ($Config.Contains('HeadRef')) {
             [string] $Config['HeadRef']
         } else {
             'HEAD'
         }
+
         $Changeset = Get-GitChangeset `
             -WorkingDirectory $TaskFileRoot `
             -BaseRef $BaseRef `
             -HeadRef $HeadRef
+
         $TaskContext.Changeset = $Changeset
         $TaskContext.GitRoot = $Changeset.Root
     } elseif (Get-Command 'git' -ErrorAction SilentlyContinue) {

@@ -10,7 +10,11 @@ $OutputPath = Join-Path $PSScriptRoot 'ImageViewer.DSL.mutated.ps1'
 
 $Document = New-AstDocument -Path $SourcePath
 
-$Inserted = Add-WpfDslLoadedHandler -Document $Document -OnExistingHandler InsertAfterExisting -HandlerBody "Write-Verbose 'Loaded handler from AstEditor.'"
+$Inserted = Add-WpfDslLoadedHandler `
+    -Document $Document `
+    -OnExistingHandler InsertAfterExisting `
+    -HandlerBody "Write-Verbose 'Loaded handler from AstEditor.'"
+
 if (-not $Inserted) {
     Write-Host 'Loaded handler already exists in source. Use -Force in Add-WpfDslLoadedHandler to reinsert.'
 }

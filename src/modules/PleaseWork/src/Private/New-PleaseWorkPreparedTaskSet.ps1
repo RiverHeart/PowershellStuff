@@ -1,3 +1,4 @@
+using namespace System.Collections
 using namespace System.Collections.Generic
 
 <#
@@ -6,16 +7,18 @@ using namespace System.Collections.Generic
 #>
 function New-PleaseWorkPreparedTaskSet {
     [CmdletBinding()]
+    [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [List[hashtable]] $Tasks,
 
         [Parameter(Mandatory)]
-        [System.Collections.IDictionary] $Config,
+        [IDictionary] $Config,
 
         [Parameter(Mandatory)]
-        [scriptblock] $Invoker
+        [ValidateNotNull()]
+        [pscustomobject] $Snapshot
     )
 
     $HelpTask = @($Tasks | Where-Object { $_.Name -ieq 'help' })
@@ -26,10 +29,12 @@ function New-PleaseWorkPreparedTaskSet {
     }
 
     $TasksByName = [Dictionary[string, hashtable]]::new([StringComparer]::OrdinalIgnoreCase)
+
     foreach ($TaskDefinition in $Tasks) {
         if ($TasksByName.ContainsKey($TaskDefinition.Name)) {
             throw "Task '$($TaskDefinition.Name)' is declared more than once."
         }
+
         $TasksByName.Add($TaskDefinition.Name, $TaskDefinition)
     }
 
@@ -39,10 +44,10 @@ function New-PleaseWorkPreparedTaskSet {
         } else {
             $Tasks[0].Name
         }
+
         TaskNames = [string[]] $Tasks.Name
         Tasks = $TasksByName
         Config = $Config
-        Module = $null
-        Invoker = $Invoker
+        Snapshot = $Snapshot
     }
 }

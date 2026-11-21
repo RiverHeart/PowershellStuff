@@ -1,4 +1,5 @@
 using namespace System.Collections.Generic
+using namespace System.Management.Automation.Language
 
 <#
 .SYNOPSIS
@@ -6,6 +7,7 @@ using namespace System.Collections.Generic
 #>
 function Get-TaskDeclaration {
     [CmdletBinding()]
+    [OutputType([pscustomobject])]
     param(
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock
@@ -14,27 +16,29 @@ function Get-TaskDeclaration {
     $SourceText = $ScriptBlock.Ast.Extent.Text
     $Tokens = $null
     $ParseErrors = $null
-    $ParsedAst = [System.Management.Automation.Language.Parser]::ParseInput(
+    $ParsedAst = [Parser]::ParseInput(
         $SourceText,
         [ref] $Tokens,
         [ref] $ParseErrors
     )
+
     $CommentTokens = @($Tokens | Where-Object {
-            $_.Kind -eq [System.Management.Automation.Language.TokenKind]::Comment
-        })
+        $_.Kind -eq [TokenKind]::Comment
+    })
 
     $TaskNames = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($Statement in $ParsedAst.EndBlock.Statements) {
         # Only top-level, single-command pipelines can be task declarations.
-        if (-not ($Statement -is [System.Management.Automation.Language.PipelineAst]) -or
+        if (-not ($Statement -is [PipelineAst]) -or
             $Statement.PipelineElements.Count -ne 1 -or
-            -not ($Statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])
+            -not ($Statement.PipelineElements[0] -is [CommandAst])
         ) {
             continue
         }
 
         $CommandAst = $Statement.PipelineElements[0]
         $CommandToken = $CommandAst.GetCommandName()
+
         # The trailing colon distinguishes task declarations from ordinary commands.
         if ([string]::IsNullOrEmpty($CommandToken) -or
             -not $CommandToken.EndsWith(':')
@@ -46,13 +50,14 @@ function Get-TaskDeclaration {
         if ([string]::IsNullOrEmpty($TaskName)) {
             throw 'Task names cannot be empty.'
         }
+
         if (-not $TaskNames.Add($TaskName)) {
             throw "Task '$TaskName' is declared more than once."
         }
 
         $CommandElements = $CommandAst.CommandElements
         if ($CommandElements.Count -lt 2 -or
-            -not ($CommandElements[-1] -is [System.Management.Automation.Language.ScriptBlockExpressionAst])
+            -not ($CommandElements[-1] -is [ScriptBlockExpressionAst])
         ) {
             throw "Task '$TaskName' must end with a scriptblock body."
         }
@@ -63,8 +68,8 @@ function Get-TaskDeclaration {
         while ($ElementIndex -lt ($CommandElements.Count - 1)) {
             $DependencyAst = $CommandElements[$ElementIndex]
             if (
-                -not ($DependencyAst -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
-                $DependencyAst.StringConstantType -ne [System.Management.Automation.Language.StringConstantType]::BareWord
+                -not ($DependencyAst -is [StringConstantExpressionAst]) -or
+                $DependencyAst.StringConstantType -ne [StringConstantType]::BareWord
             ) {
                 throw "Dependencies for task '$TaskName' must be bare task names."
             }
@@ -77,20 +82,20 @@ function Get-TaskDeclaration {
 
             $ElementIndex++
             if ($ElementIndex -ge ($CommandElements.Count - 1) -or
-                -not ($CommandElements[$ElementIndex] -is [System.Management.Automation.Language.ParenExpressionAst])
+                -not ($CommandElements[$ElementIndex] -is [ParenExpressionAst])
             ) {
                 throw "Changeset filter for task '$TaskName' must use changed('pathspec', ...)."
             }
 
             $FilterPipeline = $CommandElements[$ElementIndex].Pipeline
             if ($FilterPipeline.PipelineElements.Count -ne 1 -or
-                -not ($FilterPipeline.PipelineElements[0] -is [System.Management.Automation.Language.CommandExpressionAst])
+                -not ($FilterPipeline.PipelineElements[0] -is [CommandExpressionAst])
             ) {
                 throw "Changeset filters for task '$TaskName' must contain only string pathspecs."
             }
 
             $FilterExpression = $FilterPipeline.PipelineElements[0].Expression
-            if ($FilterExpression -is [System.Management.Automation.Language.ArrayLiteralAst]) {
+            if ($FilterExpression -is [ArrayLiteralAst]) {
                 $FilterElements = @($FilterExpression.Elements)
             } else {
                 $FilterElements = @($FilterExpression)
@@ -99,8 +104,9 @@ function Get-TaskDeclaration {
             if ($FilterElements.Count -eq 0) {
                 throw "Changeset filter for task '$TaskName' must contain at least one pathspec."
             }
+
             foreach ($FilterElement in $FilterElements) {
-                if (-not ($FilterElement -is [System.Management.Automation.Language.StringConstantExpressionAst]) -or
+                if (-not ($FilterElement -is [StringConstantExpressionAst]) -or
                     [string]::IsNullOrWhiteSpace($FilterElement.Value)
                 ) {
                     throw "Changeset filters for task '$TaskName' must contain only string pathspecs."
@@ -113,12 +119,12 @@ function Get-TaskDeclaration {
         $Comments = [List[string]]::new()
         $CommentBoundary = $CommandAst.Extent.StartOffset
         $CommentBoundaryLine = $CommandAst.Extent.StartLineNumber
+
         foreach ($CommentToken in (
             $CommentTokens |
             Where-Object { $_.Extent.EndOffset -le $CommentBoundary } |
             Sort-Object { $_.Extent.StartOffset } -Descending
         )) {
-
             if ($CommentToken.Extent.EndLineNumber -ne ($CommentBoundaryLine - 1)) {
                 break
             }
@@ -139,19 +145,19 @@ function Get-TaskDeclaration {
 
         # Preserve parameter metadata for dynamic binding without loading or executing the TaskFile.
         $TaskBodyAst = $CommandElements[-1].ScriptBlock
-        [pscustomobject] @{
+        $ParameterAsts = if ($null -ne $TaskBodyAst.ParamBlock) {
+            $TaskBodyAst.ParamBlock.Parameters
+        }
+
+        Write-Output ([pscustomobject] @{
             Name = $TaskName
             CommandToken = $CommandToken
             Dependencies = $Dependencies.ToArray()
             PathSpecs = $PathSpecs.ToArray()
-            ParameterAsts = if ($null -ne $TaskBodyAst.ParamBlock) {
-                $TaskBodyAst.ParamBlock.Parameters
-            } else {
-                @()
-            }
+            ParameterAsts = $ParameterAsts
             Comments = $Comments.ToArray()
             Description = Get-TaskDescription -Comments $Comments.ToArray()
-            Help = $TaskBodyAst.GetHelpContent()
-        }
+            Help = Get-PleaseWorkTaskHelp -ScriptBlockAst $TaskBodyAst
+        })
     }
 }

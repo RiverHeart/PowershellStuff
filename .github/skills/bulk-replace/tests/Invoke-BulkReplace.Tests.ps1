@@ -242,4 +242,141 @@ Describe 'Invoke-BulkReplace' -Tag 'Invoke-BulkReplace' {
         $Result[0].Changed | Should -BeTrue
         $Result[0].ReplacementCount | Should -Be 1
     }
+
+    It 'Warns once when directory Include masks files requested by rule FilePattern in <Mode> mode' -ForEach @(
+        @{ Mode = 'Search'; Options = @{ SearchOnly = $true } }
+        @{ Mode = 'Preview'; Options = @{ WhatIf = $true } }
+        @{ Mode = 'Replace'; Options = @{} }
+    ) {
+        $RootPath = Join-Path $TestDrive $Mode
+        $NestedPath = Join-Path $RootPath 'Nested'
+        New-Item -ItemType Directory -Path $NestedPath -Force | Out-Null
+        $ScriptFile = Join-Path $RootPath 'Example.ps1'
+        $MarkdownFile = Join-Path $NestedPath 'Example.md'
+        [System.IO.File]::WriteAllText($ScriptFile, 'OldCommand')
+        [System.IO.File]::WriteAllText($MarkdownFile, 'OldCommand')
+        $Rules = @(
+            @{ Pattern = 'OldCommand'; Replacement = 'NewCommand'; FilePattern = '*.md' }
+            @{ Pattern = 'Command'; Replacement = 'Function'; FilePattern = '*.md' }
+        )
+
+        $Result = & $ScriptPath -Path $RootPath,$RootPath -Recurse -Rule $Rules `
+            @Options -PassThru -WarningVariable Warnings -WarningAction SilentlyContinue
+
+        $Warnings | Should -HaveCount 1
+        $Warnings[0].Message | Should -Match 'skipped 1 file\(s\)'
+        $Warnings[0].Message | Should -Match '-FilePattern only filters discovered files; broaden -Include'
+        $Result | Should -HaveCount 0
+        [System.IO.File]::ReadAllText($MarkdownFile) | Should -BeExactly 'OldCommand'
+        [System.IO.File]::ReadAllText($ScriptFile) | Should -BeExactly 'OldCommand'
+    }
+
+    It 'Reports discovery filters explicitly when no files are discovered' {
+        $RootPath = Join-Path $TestDrive 'MarkdownOnly'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $RootPath 'Example.md'), 'OldCommand')
+
+        { & $ScriptPath -Path $RootPath -FilePattern '*.md' -Find 'OldCommand' `
+            -SearchOnly -WarningAction SilentlyContinue } |
+            Should -Throw '*-Include/-Exclude discovery filters*'
+    }
+
+    It 'Discovers Markdown when Include explicitly permits it' {
+        $RootPath = Join-Path $TestDrive 'IncludedMarkdown'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+        $MarkdownFile = Join-Path $RootPath 'Example.md'
+        [System.IO.File]::WriteAllText($MarkdownFile, 'OldCommand')
+
+        $Result = & $ScriptPath -Path $RootPath -Include '*.md' -FilePattern '*.md' `
+            -Find 'OldCommand' -Replace 'NewCommand' -PassThru `
+            -WarningVariable Warnings -WarningAction SilentlyContinue
+
+        $Warnings | Should -HaveCount 0
+        $Result.Changed | Should -BeTrue
+        [System.IO.File]::ReadAllText($MarkdownFile) | Should -BeExactly 'NewCommand'
+    }
+
+    It 'Does not warn about intentional exclusions or unrequested file types' {
+        $RootPath = Join-Path $TestDrive 'ExcludedMarkdown'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $RootPath 'Example.ps1'), 'OldCommand')
+        [System.IO.File]::WriteAllText((Join-Path $RootPath 'Example.md'), 'OldCommand')
+        [System.IO.File]::WriteAllText((Join-Path $RootPath 'Example.txt'), 'OldCommand')
+
+        & $ScriptPath -Path $RootPath -Exclude '*.md' -FilePattern '*.md' `
+            -Find 'OldCommand' -SearchOnly -WarningVariable Warnings -WarningAction SilentlyContinue
+
+        $Warnings | Should -HaveCount 0
+        & $ScriptPath -Path $RootPath -Find 'OldCommand' -SearchOnly `
+            -WarningVariable Warnings -WarningAction SilentlyContinue
+        $Warnings | Should -HaveCount 0
+    }
+
+    It 'Preserves explicit file paths bypassing directory filters without a warning' {
+        $MarkdownFile = Join-Path $TestDrive 'Explicit.md'
+        [System.IO.File]::WriteAllText($MarkdownFile, 'OldCommand')
+
+        $Result = & $ScriptPath -Path $MarkdownFile -Exclude '*.md' -FilePattern '*.md' `
+            -Find 'OldCommand' -SearchOnly -PassThru -WarningVariable Warnings -WarningAction SilentlyContinue
+
+        $Warnings | Should -HaveCount 0
+        $Result.MatchCount | Should -Be 1
+        $Result.FilePath | Should -Be $MarkdownFile
+    }
+
+    It 'Does not warn when an explicit file path includes a file masked during directory discovery' {
+        $RootPath = Join-Path $TestDrive 'MixedPaths'
+        New-Item -ItemType Directory -Path $RootPath -Force | Out-Null
+        $MarkdownFile = Join-Path $RootPath 'Explicit.md'
+        [System.IO.File]::WriteAllText($MarkdownFile, 'OldCommand')
+
+        $Result = & $ScriptPath -Path $RootPath,$MarkdownFile -FilePattern '*.md' `
+            -Find 'OldCommand' -SearchOnly -PassThru -WarningVariable Warnings -WarningAction SilentlyContinue
+
+        $Warnings | Should -HaveCount 0
+        $Result.MatchCount | Should -Be 1
+        $Result.FilePath | Should -Be $MarkdownFile
+    }
+
+    It 'Distinguishes independent original-content searches from sequential replacement previews' {
+        $FilePath = Join-Path $TestDrive 'OverlappingRules.ps1'
+        [System.IO.File]::WriteAllText($FilePath, 'Old')
+        $Rules = @(
+            @{ Pattern = 'Old'; Replacement = 'New' }
+            @{ Pattern = 'Old'; Replacement = 'Other' }
+        )
+
+        $Search = @(& $ScriptPath -Path $FilePath -Rule $Rules -SearchOnly -PassThru -IncludeSummaryObject)
+        $Preview = @(& $ScriptPath -Path $FilePath -Rule $Rules -WhatIf -PassThru -IncludeSummaryObject)
+        $Messages = @(& $ScriptPath -Path $FilePath -Rule $Rules -SearchOnly 6>&1)
+
+        $Search[0].MatchCount | Should -Be 2
+        $Search[0].MatchBasis | Should -Be 'OriginalContent'
+        $Search[0].CountUnit | Should -Be 'MatchingLinePerRule'
+        $Rows = @($Search[1])
+        $Rows | Should -HaveCount 2
+        $Rows[0].MatchCount | Should -Be 1
+        $Rows[1].MatchCount | Should -Be 1
+        $Preview[0].ReplacementCount | Should -Be 1
+        $Messages[-1].MessageData.ToString() | Should -Match 'counts can overlap'
+        $Messages[-1].MessageData.ToString() | Should -Match 'Use -WhatIf without -SearchOnly'
+        [System.IO.File]::ReadAllText($FilePath) | Should -BeExactly 'Old'
+    }
+
+    It 'Labels matching-line and text-match counts accurately: <CountUnit>' -ForEach @(
+        @{ Multiline = $false; CountUnit = 'MatchingLinePerRule'; Count = 1; Label = 'matching line\(s\) per rule' }
+        @{ Multiline = $true; CountUnit = 'TextMatchPerRule'; Count = 2; Label = 'text match\(es\) per rule' }
+    ) {
+        $FilePath = Join-Path $TestDrive "$CountUnit.ps1"
+        [System.IO.File]::WriteAllText($FilePath, 'Old Old')
+
+        $Result = @(& $ScriptPath -Path $FilePath -Find 'Old' -SearchOnly -SearchMultiline:$Multiline `
+            -PassThru -IncludeSummaryObject)
+        $Messages = @(& $ScriptPath -Path $FilePath -Find 'Old' -SearchOnly -SearchMultiline:$Multiline 6>&1)
+
+        $Result[0].MatchCount | Should -Be $Count
+        $Result[0].MatchBasis | Should -Be 'OriginalContent'
+        $Result[0].CountUnit | Should -Be $CountUnit
+        $Messages[-1].MessageData.ToString() | Should -Match "Found $Count $Label in original content"
+    }
 }

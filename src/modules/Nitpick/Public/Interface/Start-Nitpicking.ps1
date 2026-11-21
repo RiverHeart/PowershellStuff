@@ -1,0 +1,545 @@
+using namespace System
+using namespace System.Collections
+using namespace System.Diagnostics
+using namespace System.IO
+using namespace System.Security
+using namespace System.Collections.Generic
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
+<#
+.SYNOPSIS
+    Starts applying Nitpick rules to the specified script or path.
+
+.DESCRIPTION
+    Runs the selected Nitpick rules against file-backed or in-memory PowerShell source.
+    Ordinary lint behavior is unchanged when FixMode is Off. FixMode Apply applies safe,
+    validated corrections to file-backed targets using transactional AstEditor saves.
+    In-memory inputs return candidate text without writing. Correction output separates
+    stable proposal facts, application outcomes, and effective reporting. PowerShell
+    parser errors are reported as Error findings. Rule selection must succeed before
+    any targets are read.
+    Native findings and corrections carry the executing rule's qualified RuleId.
+    Parser findings use Nitpick/PowerShellParseError without introducing a selectable rule.
+    Leading standalone '# nitpick disable-target Namespace/Rule' comments skip matching
+    rules for that target, including correction reanalysis. Selectors support wildcards.
+    For a directly submitted braced ScriptBlock, place directives at the start of
+    its body, on their own lines before code. Nested blocks do not start new targets.
+    disable-line comments (standalone or trailing) and standalone disable-next-line
+    comments suppress native findings starting on that physical line or the next
+    physical line, including their corrections. Candidate analysis rereads directives.
+    Standalone disable/enable comments change regional state from the next physical
+    line. The last matching directive wins without stacking or lexical-scope resets;
+    enable cannot override whole-target, invocation-level, or line exclusions.
+    Text output emits one string per reported target with a trailing newline for
+    spacing. Separators remain in the pipeline, including when output is buffered.
+
+.PARAMETER IncludeRule
+    Selects qualified rule IDs (Namespace/Name), such as Nitpick/UseIsNotOperator or
+    WPF/AvoidBlockingUI, not command names such as Test-UseIsNotOperator and not bare
+    local names. Matching is case-insensitive and supports wildcards. Every literal
+    selector must match a discovered or registered rule before exclusions and
+    editor-mode filtering. Unmatched wildcard selectors are allowed, provided at
+    least one eligible rule remains.
+
+.PARAMETER Module
+    Module names or literal paths to acquire as additive rule packages, alongside the
+    built-in package, packages declared by the configuration's Modules key, and any
+    explicit registrations. Relative paths resolve from the caller's current location.
+    Package manifests may declare rule commands and supporting modules; supporting
+    modules use the declared owner's namespace even when acquired directly. Acquiring
+    a package imports its code. Does not register acquired rules. Use IncludeRule and
+    ExcludeRule to control which acquired rules run.
+
+.PARAMETER ConfigFile
+    An explicit PSD1 project-configuration file containing compatibility policy,
+    rule packages (Modules), and/or rule settings (Rules). Configuration is validated
+    before target processing and applies uniformly to every target in this invocation.
+    Relative paths resolve from the caller's current PowerShell location; omitting
+    both ConfigFile and ConfigData supplies no project configuration. Packages it
+    declares are imported, so only use configuration files you trust. Cannot be
+    combined with ConfigData.
+
+.PARAMETER ConfigData
+    Project configuration as in-memory data, either the raw dictionary a
+    configuration file would contain or the output of New-NitpickConfiguration.
+    It is validated by New-NitpickConfiguration either way. There is no file to
+    resolve relative module paths from, so relative paths are rejected; build the
+    configuration with New-NitpickConfiguration -BaseDirectory to use them.
+    Cannot be combined with ConfigFile.
+
+.PARAMETER Path
+    A file, directory, or wildcard path. Literal paths must exist. File targets are
+    resolved across all piped paths before analysis or fixing. Empty wildcard matches
+    are allowed, but the complete invocation must select at least one file.
+
+.PARAMETER IncludePath
+    Filters resolved file targets by full path, before ExcludePath is applied.
+    Literal selectors must match a file's full path; wildcard selectors may match
+    nothing. Validation is across the invocation and precedes analysis or fixing.
+
+.PARAMETER ExcludePath
+    Excludes matching full paths. Unmatched exclusions are allowed, but at least one
+    file must remain after filtering. Path filters do not apply to Script inputs.
+
+.PARAMETER ExcludeRule
+    Excludes matching rule IDs. Unmatched exclusions are allowed. If no eligible
+    rules remain after exclusions and editor-mode filtering, execution terminates.
+    Use 'Nitpick/*' to skip the built-in rules; they are still discovered, so
+    configured settings for them are still validated.
+
+.PARAMETER FixMode
+    Specifies the mode for applying corrections.
+    'Off'     - Do not apply any corrections.
+    'Preview' - Report safe corrections as proposals for file-backed or in-memory inputs.
+    'Guided'  - Apply safe corrections; when a finding needs a choice (several
+                corrections, or only non-Safe ones), select it in the editor via
+                PowerShell Editor Services when available and prompt for the
+                correction to apply. Requires an interactive host.
+    'Apply'   - Apply safe corrections. Findings needing a choice are reported as undecided.
+
+    NOTE: Previewing or applying against in-memory inputs returns candidate text
+    in object output under `Report.EffectiveText` without modifying the input.
+
+.PARAMETER EditorMode
+    Runs only rules whose EditorEnabled metadata is true.
+
+.EXAMPLE
+    Run Start-Nitpicking against a script with the specified rule.
+
+    Start-Nitpicking `
+        -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool
+
+.EXAMPLE
+    Run Start-Nitpicking against a script and apply safe corrections.
+
+    Start-Nitpicking `
+        -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool `
+        -FixMode Apply
+
+.EXAMPLE
+    Run Start-Nitpicking against a script and preview safe corrections.
+
+    Start-Nitpicking `
+        -Script 'param([Parameter(Mandatory=$true)] [string] $Name)' `
+        -IncludeRule Nitpick/AvoidParameterAttributeBool `
+        -FixMode Preview
+
+.EXAMPLE
+    Run Start-Nitpicking using rules sourced from a module against
+    a specified path with preview mode for corrections.
+
+    Start-Nitpicking -Module WPF -Path src/modules/WPF/Public/DSL -FixMode Preview
+
+.EXAMPLE
+    Run Start-Nitpicking with in-memory configuration instead of a file.
+
+    Start-Nitpicking -Script 'four' -IncludeRule Nitpick/AvoidLongLines -ConfigData @{
+        Rules = @{ 'Nitpick/AvoidLongLines' = @{ MaximumLength = 3 } }
+    }
+
+    Reports that line 1 exceeds the configured maximum of 3.
+#>
+function Start-Nitpicking {
+    [CmdletBinding(SupportsShouldProcess,DefaultParameterSetName='Path')]
+    [Alias('nitpick', 'np')]
+    [OutputType([string])]
+    [OutputType('NitpickFinding', 'NitpickSummary', 'NitpickCorrectionResult')]
+    param(
+        [Parameter(ParameterSetName='Path',ValueFromPipeline)]
+        [string] $Path = $PWD,
+
+        [string] $Filter = '*.ps1',
+
+        [Parameter(Mandatory,ParameterSetName='Script')]
+        [ScriptBlockAstTransform()]
+        [ScriptBlockAst] $Script,
+
+        [string[]] $Module,
+
+        [ValidateNotNullOrEmpty()]
+        [string] $ConfigFile,
+
+        [ValidateNotNull()]
+        [IDictionary] $ConfigData,
+
+        [string[]] $IncludeRule,
+        [string[]] $ExcludeRule,
+
+        [string[]] $IncludePath,
+        [string[]] $ExcludePath,
+
+        [ValidateSet('Error', 'Warning', 'Information')]
+        [string] $ErrorOn = 'Error',
+
+        [ValidateSet('Text', 'Object')]
+        [string] $Output = 'Text',
+
+        [ValidateSet('Off', 'Preview', 'Guided', 'Apply')]
+        [string] $FixMode = 'Off',
+
+        [switch] $EditorMode,
+        [switch] $NoSummary
+    )
+
+    # MARK: BEGIN BLK
+    begin {
+        # A plain `return` here would only exit `begin`; `process` and `end` would still run.
+        if ($FixMode -eq 'Guided' -and -not (Test-NitpickInteractiveSession)) {
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    [InvalidOperationException]::new('Guided mode requires an interactive session.'),
+                    'NitpickGuidedModeNonInteractive',
+                    [ErrorCategory]::InvalidOperation,
+                    $FixMode
+                )
+            )
+        }
+
+        if ($PSBoundParameters.ContainsKey('ConfigFile') -and $PSBoundParameters.ContainsKey('ConfigData')) {
+            $PSCmdlet.ThrowTerminatingError(
+                [ErrorRecord]::new(
+                    [ArgumentException]::new('ConfigFile and ConfigData cannot be used together.'),
+                    'NitpickConflictingConfiguration',
+                    [ErrorCategory]::InvalidArgument,
+                    $null
+                )
+            )
+        }
+
+        $ProjectPolicy = @{}
+        $ProjectRuleSettings = @{}
+        $RuleModules = @()
+        $ProjectConfiguration = $null
+        $RuleSettingsSource = 'RuleSettings'
+        if ($PSBoundParameters.ContainsKey('ConfigFile')) {
+            $ProjectConfiguration = Read-NitpickConfiguration -LiteralPath $ConfigFile
+            $RuleSettingsSource = "configuration '$ConfigFile'"
+        } elseif ($PSBoundParameters.ContainsKey('ConfigData')) {
+            $ProjectConfiguration = New-NitpickConfiguration -Data $ConfigData
+            $RuleSettingsSource = 'configuration data'
+        }
+
+        if ($null -ne $ProjectConfiguration) {
+
+            if ($ProjectConfiguration.ContainsKey('Compatibility')) {
+                $ProjectPolicy = @{
+                    Compatibility = $ProjectConfiguration.Compatibility
+                }
+            }
+
+            if ($ProjectConfiguration.ContainsKey('Modules')) {
+                $RuleModules += $ProjectConfiguration.Modules
+            }
+
+            if ($ProjectConfiguration.ContainsKey('Rules')) {
+                $ProjectRuleSettings = $ProjectConfiguration.Rules
+            }
+        }
+        if ($Module) {
+            $RuleModules += $Module
+        }
+
+        [object[]] $Rules = Resolve-NitpickEffectiveRuleSet `
+            -Module $RuleModules `
+            -IncludeRule $IncludeRule `
+            -ExcludeRule $ExcludeRule `
+            -EditorMode:$EditorMode `
+            -RuleSettings $ProjectRuleSettings `
+            -RuleSettingsSource $RuleSettingsSource
+
+        $Summary = [NitpickSummary]::new()
+        $Summary.RuleCount = $Rules.Count
+        $Summary.FixMode = $FixMode
+        $Stopwatch = [Stopwatch]::StartNew()
+        $SeverityRank = @{
+            Information = 0
+            Warning = 1
+            Error = 2
+        }
+        $ThresholdFindingCount = 0
+        $ResolvedTargets = [List[object]]::new()
+        $CandidatePaths = [HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    }
+
+    # MARK: PROCESS BLK
+    process {
+        $Targets = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            $Roots = if ([WildcardPattern]::ContainsWildcardCharacters($Path)) {
+                Get-Item -Path $Path -ErrorAction Stop
+            } else {
+                Get-Item -LiteralPath $Path -ErrorAction Stop
+            }
+
+            $Files = @(
+                foreach ($Root in $Roots) {
+                    if ($Root.PSIsContainer) {
+                        Get-ChildItem -LiteralPath $Root.FullName -File -Recurse -Filter $Filter -ErrorAction Stop
+                    } elseif ($Root -is [FileInfo] -and $Root.Name -like $Filter) {
+                        $Root
+                    }
+                }
+            )
+
+            foreach ($File in $Files) {
+                [void] $CandidatePaths.Add($File.FullName)
+            }
+
+            $Files | Where-NitpickIncluded `
+                -PropertyPath FullName `
+                -Include $IncludePath `
+                -Exclude $ExcludePath `
+                -Wildcard
+        } else {
+            $Script
+        }
+
+        foreach ($Target in $Targets) {
+            $ResolvedTargets.Add($Target)
+        }
+    }
+
+    # MARK: END BLK
+    end {
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            $UnmatchedPaths = @(
+                foreach ($Selector in $IncludePath) {
+                    if (-not [WildcardPattern]::ContainsWildcardCharacters($Selector) -and
+                        -not $CandidatePaths.Contains($Selector)) {
+                        $Selector
+                    }
+                }
+            )
+
+            if ($UnmatchedPaths.Count -gt 0) {
+                throw "No file targets match the literal IncludePath selector(s): $($UnmatchedPaths -join ', '). Use full file paths or wildcard filters."
+            }
+
+            if ($ResolvedTargets.Count -eq 0) {
+                throw 'No file targets remain after resolving paths and applying Filter, IncludePath, and ExcludePath.'
+            }
+        }
+
+        # MARK: NITPICK
+
+        foreach ($Target in $ResolvedTargets) {
+            $Document = $null
+            $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                $Target.FullName
+            } else {
+                '<ScriptBlock>'
+            }
+
+            try {
+                $Document = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                    New-AstDocument -Path $Target.FullName
+                } else {
+                    New-AstDocument -InputObject $Target
+                }
+
+                $Ast = $Document.Ast
+                $ParseErrors = $Document.ParseErrors
+            } catch [IOException], [InvalidDataException], [SecurityException], [ItemNotFoundException], [UnauthorizedAccessException] {
+                $Summary.TargetCount++
+                $Summary.FailedTargetCount++
+
+                if ($FixMode -ne 'Off') {
+                    $ReadFailure = New-NitpickCorrectionResult `
+                        -Path $TargetPath `
+                        -Application @{ Status = 'FailedRead'; ErrorRecord = $_ }
+
+                    if ($Output -eq 'Object') {
+                        Write-Output $ReadFailure
+                    } else {
+                        Write-Output ("{0}`n  Corrections not attempted: the target could not be read.{1}" -f
+                            $ReadFailure.Path, [Environment]::NewLine)
+                    }
+                }
+
+                $PSCmdlet.WriteError($_)
+                continue
+            }
+
+            $Summary.TargetCount++
+            $TargetFindings = [List[object]]::new()
+            foreach ($ParseError in $ParseErrors) {
+                $ParserFinding = New-NitpickFinding `
+                    -RuleId 'Nitpick/PowerShellParseError' `
+                    -Message $ParseError.Message `
+                    -ViolationExtent $ParseError.Extent `
+                    -Severity Error `
+                    -ScriptPath $TargetPath `
+                    -Explanation 'The PowerShell parser could not parse this source.'
+
+                $TargetFindings.Add($ParserFinding)
+            }
+
+            $Suppression = Get-NitpickSuppression -Document $Document
+            foreach ($Diagnostic in $Suppression.Diagnostics) {
+                $TargetFindings.Add($Diagnostic)
+            }
+
+            $Context = New-NitpickInvocationContext `
+                -Target $Document `
+                -Context @{ Policy = $ProjectPolicy }
+
+            $ApplicableRules = [List[NitpickRule]]::new()
+            foreach ($Rule in $Rules) {
+                $TargetPath = if ($PSCmdlet.ParameterSetName -eq 'Path') {
+                    $Ast.Extent.File
+                } else {
+                    $null
+                }
+
+                if (-not $Rule.AppliesToPath($TargetPath)) {
+                    Write-Verbose "Rule '$($Rule.Name)' does not apply to path '$TargetPath'."
+                    continue
+                }
+
+                $ApplicableRules.Add($Rule)
+                $RuleIsSuppressed = Test-NitpickRuleSuppressed `
+                    -RuleId $Rule.Id `
+                    -Suppression $Suppression
+
+                if ($RuleIsSuppressed) { continue }
+
+                $RuleContext = Copy-NitpickPlainData -Value $Context -Path 'Context'
+                if ($ProjectRuleSettings.ContainsKey($Rule.Id)) {
+                    $RuleContext.RuleSettings = $ProjectRuleSettings[$Rule.Id]
+                }
+
+                $Outcome = $Rule.InvokeWithResult($Document, $RuleContext)
+                if ($Outcome.Status -eq 'Inapplicable') {
+                    Write-Verbose "Rule '$($Rule.Id)' was inapplicable during original analysis."
+                    continue
+                }
+
+                foreach ($Finding in $Outcome.Results) {
+                    if ($Finding -is [NitpickFinding] -and (
+                        Test-NitpickRuleSuppressed `
+                            -RuleId $Finding.RuleId `
+                            -StartLineNumber $Finding.ViolationExtent.StartLineNumber `
+                            -Suppression $Suppression
+                    )) {
+                        continue
+                    }
+
+                    $TargetFindings.Add($Finding)
+                }
+            }
+
+            $CorrectionResult = $null
+            $FinalFindings = $TargetFindings.ToArray()
+            if ($FixMode -ne 'Off') {
+                # The resolver rejects settings for rules it was not given, so pass
+                # only the settings for rules that apply to this target.
+                $ApplicableRuleSettings = @{}
+                foreach ($ApplicableRule in $ApplicableRules) {
+                    if ($ProjectRuleSettings.ContainsKey($ApplicableRule.Id)) {
+                        $ApplicableRuleSettings[$ApplicableRule.Id] = $ProjectRuleSettings[$ApplicableRule.Id]
+                    }
+                }
+
+                $CorrectionResult = Resolve-NitpickTargetCorrection `
+                    -FixMode $FixMode `
+                    -Document $Document `
+                    -Finding $TargetFindings.ToArray() `
+                    -Rule $ApplicableRules.ToArray() `
+                    -RuleSettings $ApplicableRuleSettings `
+                    -Context $Context
+
+                $FinalFindings = $CorrectionResult.Report.EffectiveFindings
+
+                $Summary.CorrectedFindingCount +=
+                    $CorrectionResult.Report.FindingsWithAppliedCorrections.Count
+
+                foreach ($AcceptedFinding in $CorrectionResult.Report.FindingsWithAcceptedCorrections) {
+                    if ($AcceptedFinding -notin $CorrectionResult.Report.FindingsWithAppliedCorrections) {
+                        $Summary.CorrectableFindingCount++
+                    }
+                }
+
+                $Summary.UnresolvedFindingCount += $FinalFindings.Count
+                $Summary.UndecidedFindingCount += $CorrectionResult.Proposal.UndecidedFindings.Count
+                $Summary.SkippedFindingCount += $CorrectionResult.Proposal.SkippedFindings.Count
+
+                if ($CorrectionResult.Proposal.Conflicts.Count -gt 0) {
+                    $Summary.ConflictedTargetCount++
+                }
+
+                if ($CorrectionResult.Proposal.Status -eq 'FailedValidation' -or
+                    $CorrectionResult.Application.Status -in
+                        'FailedValidation', 'FailedWrite', 'StaleSource', 'StaleTarget', 'InvalidTarget'
+                ) {
+                    $Summary.FailedTargetCount++
+                }
+            }
+
+            # FindingCount and the severity counters describe detected findings (original analysis,
+            # parse errors included). Pipeline output and the -ErrorOn threshold use effective findings.
+            foreach ($Finding in $TargetFindings) {
+                $Summary.FindingCount++
+
+                switch ($Finding.Severity) {
+                    'Error' { $Summary.ErrorCount++ }
+                    'Warning' { $Summary.WarningCount++ }
+                    'Information' { $Summary.InformationCount++ }
+                }
+            }
+
+            foreach ($Finding in $FinalFindings) {
+                if ($ErrorOn -and
+                    $SeverityRank.ContainsKey($Finding.Severity) -and
+                    $SeverityRank[$Finding.Severity] -ge $SeverityRank[$ErrorOn]
+                ) {
+                    $ThresholdFindingCount++
+                }
+
+                if ($Output -eq 'Object') {
+                    Write-Output $Finding
+                }
+            }
+
+            if ($Output -eq 'Object' -and $CorrectionResult) {
+                Write-Output $CorrectionResult
+            }
+
+            if ($Output -eq 'Text') {
+                [array] $SortedFindings = $FinalFindings | Sort-Object `
+                    -Property @{ Expression = { $_.ViolationExtent.StartLineNumber } },
+                              @{ Expression = { $_.ViolationExtent.StartColumnNumber } }
+
+                $TargetText = Format-NitpickText `
+                    -Ast $Ast `
+                    -Finding $SortedFindings `
+                    -CorrectionResult $CorrectionResult `
+                    -IsFragment:$Document.IsFragment
+
+                if ($TargetText) {
+                    Write-Output ($TargetText + [Environment]::NewLine)
+                }
+            }
+
+            if ($CorrectionResult -and $CorrectionResult.Application.ErrorRecord) {
+                $PSCmdlet.WriteError($CorrectionResult.Application.ErrorRecord)
+            }
+        }
+        $Stopwatch.Stop()
+        $Summary.Duration = $Stopwatch.Elapsed
+
+        if (-not $NoSummary) {
+            if ($Output -eq 'Object') {
+                Write-Output $Summary
+            } else {
+                Write-Output $Summary.ToString()
+            }
+        }
+
+        if ($ThresholdFindingCount -gt 0) {
+            Write-Error "Encountered $ThresholdFindingCount findings at or above the '$ErrorOn' severity threshold."
+            return
+        }
+    }
+}

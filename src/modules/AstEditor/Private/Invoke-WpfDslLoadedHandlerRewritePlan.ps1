@@ -32,7 +32,12 @@ function Invoke-WpfDslLoadedHandlerRewritePlan {
                 throw "Loaded handler was detected but no scriptblock body was found."
             }
 
-            $Document.InsertBeforeScriptBlockClose($ExistingHandlerScriptBlockExpression.ScriptBlock, $Plan.Text, $Plan.Reason)
+            $Document.InsertBeforeScriptBlockClose(
+                $ExistingHandlerScriptBlockExpression.ScriptBlock,
+                $Plan.Text,
+                $Plan.Reason
+            )
+
             return $true
         }
 

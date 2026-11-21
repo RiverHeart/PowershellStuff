@@ -13,13 +13,11 @@ Describe 'Invoke-PleaseWork' {
     It 'runs the first declared task by default' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-first: { $global:PleaseWorkLog.Add('first') }
-second: { $global:PleaseWorkLog.Add('second') }
+first: { 'first' }
+second: { 'second' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        Invoke-PleaseWork -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('first')
+        @(Invoke-PleaseWork -TaskFile $TaskFile) | Should -Be @('first')
     }
 
     It 'binds parameters from the environment-provided default task' {
@@ -79,47 +77,43 @@ build: {
     It 'runs transitive dependencies before the requested task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-lint: { $global:PleaseWorkLog.Add('lint') }
-test: lint { $global:PleaseWorkLog.Add('test') }
-build: test { $global:PleaseWorkLog.Add('build') }
+lint: { 'lint' }
+test: lint { 'test' }
+build: test { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        please build -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('lint', 'test', 'build')
+        @(please build -TaskFile $TaskFile) |
+            Should -Be @('lint', 'test', 'build')
     }
 
     It 'resolves task and dependency names without regard to case' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-lint: { $global:PleaseWorkLog.Add('lint') }
-build: LINT { $global:PleaseWorkLog.Add('build') }
+lint: { 'lint' }
+build: LINT { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        please BUILD -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('lint', 'build')
+        @(please BUILD -TaskFile $TaskFile) | Should -Be @('lint', 'build')
     }
 
     It 'runs a shared dependency only once' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
-restore: { $global:PleaseWorkLog.Add('restore') }
-lint: restore { $global:PleaseWorkLog.Add('lint') }
-test: restore { $global:PleaseWorkLog.Add('test') }
-build: lint test { $global:PleaseWorkLog.Add('build') }
+restore: { 'restore' }
+lint: restore { 'lint' }
+test: restore { 'test' }
+build: lint test { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        please build -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('restore', 'lint', 'test', 'build')
+        @(please build -TaskFile $TaskFile) |
+            Should -Be @('restore', 'lint', 'test', 'build')
     }
 
     It 'skips a filtered task when no changed files match' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
     $PleaseConfig = @{ BaseRef = 'base' }
-build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
+build: changed('./Public') { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
         Mock Get-GitChangeset {
             [pscustomobject] @{
@@ -135,9 +129,7 @@ build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
         }
         Mock Get-GitChangedPath { @() }
 
-        please build -TaskFile $TaskFile
-
-        $global:PleaseWorkLog.Count | Should -Be 0
+        @(please build -TaskFile $TaskFile) | Should -BeNullOrEmpty
     }
 
     It 'exposes matching files and changeset metadata to a filtered task' {
@@ -145,9 +137,10 @@ build: changed('./Public') { $global:PleaseWorkLog.Add('build') }
         @'
     $PleaseConfig = @{ BaseRef = 'configured-base'; HeadRef = 'configured-head' }
 build: changed('./Public') {
-    $global:PleaseWorkLog.Add('build')
-    $global:PleaseWorkChangedFiles = $ChangedFiles
-    $global:PleaseWorkChangeset = $Changeset
+    [pscustomobject] @{
+        ChangedFiles = $ChangedFiles
+        Changeset = $Changeset
+    }
 }
 '@ | Set-Content -LiteralPath $TaskFile
         Mock Get-GitChangeset {
@@ -164,27 +157,24 @@ build: changed('./Public') {
         }
         Mock Get-GitChangedPath { @('Public/One.ps1') }
 
-        please build -TaskFile $TaskFile
+        $Output = please build -TaskFile $TaskFile
 
-        $global:PleaseWorkLog | Should -Be @('build')
-        $global:PleaseWorkChangedFiles | Should -Be @(
+        $Output.ChangedFiles | Should -Be @(
             [System.IO.Path]::GetFullPath((Join-Path 'C:\repo' 'Public/One.ps1'))
         )
-        $global:PleaseWorkChangeset.Files | Should -Be @('Public/One.ps1', 'README.md')
-        $global:PleaseWorkChangeset.Provider | Should -Be 'Git'
+        $Output.Changeset.Files | Should -Be @('Public/One.ps1', 'README.md')
+        $Output.Changeset.Provider | Should -Be 'Git'
         Should -Invoke Get-GitChangeset -Times 1 -Exactly -ParameterFilter {
             $BaseRef -eq 'configured-base' -and $HeadRef -eq 'configured-head'
         }
-        Remove-Variable -Name PleaseWorkChangedFiles -Scope Global
-        Remove-Variable -Name PleaseWorkChangeset -Scope Global
     }
 
     It 'runs an unmatched filtered task when one of its task dependencies ran' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
     $PleaseConfig = @{ BaseRef = 'base' }
-test: changed('./Tests') { $global:PleaseWorkLog.Add('test') }
-build: test changed('./Public') { $global:PleaseWorkLog.Add('build') }
+test: changed('./Tests') { 'test' }
+build: test changed('./Public') { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
         Mock Get-GitChangeset {
             [pscustomobject] @{
@@ -205,9 +195,7 @@ build: test changed('./Public') { $global:PleaseWorkLog.Add('build') }
             return @()
         }
 
-        please build -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('test', 'build')
+        @(please build -TaskFile $TaskFile) | Should -Be @('test', 'build')
     }
 
     It 'rejects a filtered task when no base ref is configured' {
@@ -248,31 +236,39 @@ second: first { $global:PleaseWorkLog.Add('second') }
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 test: {
-    $global:PleaseWorkLog.Add('test')
+    'test'
     throw 'test failed'
 }
-build: test { $global:PleaseWorkLog.Add('build') }
+build: test { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
+        $Output = [List[object]]::new()
 
-        { please build -TaskFile $TaskFile } | Should -Throw 'test failed'
-        $global:PleaseWorkLog | Should -Be @('test')
+        {
+            please build -TaskFile $TaskFile |
+                ForEach-Object { $Output.Add($_) }
+        } | Should -Throw 'test failed'
+        $Output | Should -Be @('test')
     }
 
     It 'treats non-terminating PowerShell errors as task failures' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 test: {
-    $global:PleaseWorkLog.Add('test')
+    'test'
     Write-Error 'test failed'
 }
-build: test { $global:PleaseWorkLog.Add('build') }
+build: test { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
+        $Output = [List[object]]::new()
 
-        { please build -TaskFile $TaskFile } | Should -Throw 'test failed'
-        $global:PleaseWorkLog | Should -Be @('test')
+        {
+            please build -TaskFile $TaskFile |
+                ForEach-Object { $Output.Add($_) }
+        } | Should -Throw 'test failed'
+        $Output | Should -Be @('test')
     }
 
-    It 'stops a non-runspace task when exec receives an unexpected native exit code' {
+    It 'stops an isolated task when exec receives an unexpected native exit code' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
@@ -290,7 +286,7 @@ native: {
         $LASTEXITCODE | Should -Be 7
     }
 
-    It 'allows configured native success exit codes in a non-runspace task' {
+    It 'allows configured native success exit codes in an isolated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
@@ -410,21 +406,27 @@ inspect: {
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
 native: {
-    $global:PleaseWorkLog.Add('native')
-    & $global:PleaseWorkPowerShellPath -NoProfile -Command 'exit 7'
+    & $env:PleaseWorkTestPowerShellPath -NoProfile -Command 'exit 7'
+    'native'
 }
-build: native { $global:PleaseWorkLog.Add('build') }
+build: native { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
-        $global:PleaseWorkPowerShellPath = $PowerShellPath
+        $Output = [List[object]]::new()
+        $env:PleaseWorkTestPowerShellPath = $PowerShellPath
+        try {
+            {
+                please build -TaskFile $TaskFile |
+                    ForEach-Object { $Output.Add($_) }
+            } | Should -Throw "Task 'native' failed with exit code 7."
 
-        { please build -TaskFile $TaskFile } | Should -Throw "Task 'native' failed with exit code 7."
-
-        $LASTEXITCODE | Should -Be 7
-        $global:PleaseWorkLog | Should -Be @('native')
-        Remove-Variable -Name PleaseWorkPowerShellPath -Scope Global
+            $LASTEXITCODE | Should -Be 7
+            $Output | Should -Be @('native')
+        } finally {
+            Remove-Item Env:PleaseWorkTestPowerShellPath
+        }
     }
 
-    It 'captures a native exit code in a dedicated runspace' {
+    It 'captures a native exit code in an isolated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
@@ -439,7 +441,6 @@ native: {
             please native `
                 -TaskFile $TaskFile `
                 -PowerShellPath $PowerShellPath `
-                -Runspace `
                 -PassThru |
                 ForEach-Object { $Results.Add($_) }
         } | Should -Throw "Task 'native' failed with exit code 7."
@@ -449,7 +450,7 @@ native: {
         $Results[0].ExitCode | Should -Be 7
     }
 
-    It 'stops a runspace task when exec receives an unexpected native exit code' {
+    It 'stops exec in an isolated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
@@ -461,11 +462,11 @@ native: {
 '@ | Set-Content -LiteralPath $TaskFile
 
         {
-            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath -Runspace
+            please native -TaskFile $TaskFile -PowerShellPath $PowerShellPath
         } | Should -Throw "Native command '$PowerShellPath' exited with code 7."
     }
 
-    It 'passes PleaseConfig options to exec in a runspace task' {
+    It 'passes PleaseConfig options to exec in an isolated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         $PowerShellPath = (Get-Command powershell.exe).Source
         $UserModulePath = Join-Path `
@@ -488,8 +489,7 @@ inspect: {
             $ChildHasUserModulePath = please inspect `
                 -TaskFile $TaskFile `
                 -PowerShellPath $PowerShellPath `
-                -UserModulePath $UserModulePath `
-                -Runspace
+                -UserModulePath $UserModulePath
 
             [bool]::Parse([string] $ChildHasUserModulePath) | Should -BeFalse
         } finally {
@@ -502,18 +502,20 @@ inspect: {
         $PowerShellPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         @'
 probe: {
-    & $global:PleaseWorkPowerShellPath -NoProfile -Command 'exit 7'
-    & $global:PleaseWorkPowerShellPath -NoProfile -Command 'exit 0'
-    $global:PleaseWorkLog.Add('probe')
+    & $env:PleaseWorkTestPowerShellPath -NoProfile -Command 'exit 7'
+    & $env:PleaseWorkTestPowerShellPath -NoProfile -Command 'exit 0'
+    'probe'
 }
-build: probe { $global:PleaseWorkLog.Add('build') }
+build: probe { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
-        $global:PleaseWorkPowerShellPath = $PowerShellPath
 
-        please build -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('probe', 'build')
-        Remove-Variable -Name PleaseWorkPowerShellPath -Scope Global
+        $env:PleaseWorkTestPowerShellPath = $PowerShellPath
+        try {
+            @(please build -TaskFile $TaskFile) |
+                Should -Be @('probe', 'build')
+        } finally {
+            Remove-Item Env:PleaseWorkTestPowerShellPath
+        }
     }
 
     It 'lists tasks in declaration order without executing them' {
@@ -643,7 +645,8 @@ build: {
 }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $TaskSet = Read-TaskFile -Path $TaskFile
+        $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $Snapshot
 
         $TaskSet.TaskNames | Should -Be @('build')
     }
@@ -652,7 +655,7 @@ build: {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         'build: test' | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } |
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
             Should -Throw "Task 'build' must end with a scriptblock body."
     }
 
@@ -660,7 +663,7 @@ build: {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         "build: 'test' { 'build' }" | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } |
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
             Should -Throw "Dependencies for task 'build' must be bare task names."
     }
 
@@ -672,7 +675,8 @@ FOO: { 'first' }
 foo: { 'second' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } | Should -Throw "Task 'foo' is declared more than once."
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
+            Should -Throw "Task 'foo' is declared more than once."
         Get-Variable -Name PleaseWorkDuplicateTaskFileLoaded -Scope Global -ErrorAction SilentlyContinue |
             Should -BeNullOrEmpty
     }
@@ -681,7 +685,8 @@ foo: { 'second' }
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         ': { ''body'' }' | Set-Content -LiteralPath $TaskFile
 
-        { Read-TaskFile -Path $TaskFile } | Should -Throw 'Task names cannot be empty.'
+        { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
+            Should -Throw 'Task names cannot be empty.'
     }
 
     It 'allows non-task top-level statements' {
@@ -692,18 +697,17 @@ function Get-Message {
     $Message
 }
 Write-Output 'loading'
-build: { $global:PleaseWorkLog.Add((Get-Message)) }
+build: { Get-Message }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $TaskSet = Read-TaskFile -Path $TaskFile
+        $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $Snapshot
         $TaskSet.TaskNames | Should -Be @('build')
 
-        please build -TaskFile $TaskFile
-
-        $global:PleaseWorkLog | Should -Be @('build')
+        @(please build -TaskFile $TaskFile) | Should -Be @('build')
     }
 
-    It 'requires script scope to mutate a top-level TaskFile variable across tasks' {
+    It 'does not carry TaskFile script-state mutations between tasks' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 $Value = 'top-level'
@@ -725,11 +729,11 @@ readAfterScript: changeScript { "after-script:$Value" }
             'local:local-change'
             'after-local:top-level'
             'script:script-change'
-            'after-script:script-change'
+            'after-script:top-level'
         )
     }
 
-    It 'runs the complete task plan in a dedicated runspace' {
+    It 'runs the complete task plan with isolated task state' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 $Value = 'initial'
@@ -745,17 +749,17 @@ build: prepare {
 }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $Output = @(please build -TaskFile $TaskFile -Configuration Release -Runspace)
+        $Output = @(please build -TaskFile $TaskFile -Configuration Release)
 
         $Output | Should -Be @(
             'prepare:prepared'
-            'build:prepared:Release'
+            'build:initial:Release'
             'context:TaskFile.ps1'
             'module-bound:False'
         )
     }
 
-    It 'returns task output before rethrowing an error from a dedicated runspace' {
+    It 'returns task output before rethrowing an isolated task error' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 fail: {
@@ -766,14 +770,14 @@ fail: {
         $Output = [System.Collections.Generic.List[object]]::new()
 
         {
-            please fail -TaskFile $TaskFile -Runspace |
+            please fail -TaskFile $TaskFile |
                 ForEach-Object { $Output.Add($_) }
         } | Should -Throw 'runspace task failed'
 
         $Output | Should -Be @('before failure')
     }
 
-    It 'forwards auxiliary streams from a dedicated runspace' {
+    It 'forwards auxiliary streams from an isolated task' {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 inspect: {
@@ -790,7 +794,6 @@ inspect: {
 
         $Output = @(please inspect `
                 -TaskFile $TaskFile `
-                -Runspace `
                 -Verbose `
                 -ErrorAction Continue `
                 -ErrorVariable Errors `
@@ -811,10 +814,11 @@ inspect: {
         $TaskFile = Join-Path $TestDrive 'TaskFile.ps1'
         @'
 @{ Name = 'injected'; Dependencies = @(); ScriptBlock = { 'injected' } }
-build: { $global:PleaseWorkLog.Add('build') }
+build: { 'build' }
 '@ | Set-Content -LiteralPath $TaskFile
 
-        $TaskSet = Read-TaskFile -Path $TaskFile
+        $Snapshot = New-PleaseWorkTaskSnapshot -Path $TaskFile
+        $TaskSet = New-PleaseWorkSnapshotTaskSet -Snapshot $Snapshot
 
         $TaskSet.DefaultTask | Should -Be 'build'
         $TaskSet.TaskNames | Should -Be @('build')
@@ -830,7 +834,8 @@ build: { $global:PleaseWorkLog.Add('build') }
 
         try {
             $ErrorActionPreference = 'Continue'
-            { Read-TaskFile -Path $TaskFile } | Should -Throw 'setup failed'
+            { New-PleaseWorkTaskSnapshot -Path $TaskFile } |
+                Should -Throw 'setup failed'
         } finally {
             $ErrorActionPreference = $OriginalErrorActionPreference
         }
@@ -892,18 +897,18 @@ test: {
         $NestedDirectory = Join-Path $ProjectRoot 'src/deep'
         $null = New-Item -ItemType Directory -Path $NestedDirectory -Force
         @'
-build: { $global:PleaseWorkLog.Add('build') }
+build: { 'build' }
 '@ | Set-Content -LiteralPath (Join-Path $ProjectRoot 'TaskFile.ps1')
         $OriginalLocation = Get-Location
 
         try {
             Set-Location $NestedDirectory
-            please build
+            $Output = please build
         } finally {
             Set-Location $OriginalLocation
         }
 
-        $global:PleaseWorkLog | Should -Be @('build')
+        $Output | Should -Be 'build'
     }
 
     It 'runs tasks from the TaskFile directory and exposes its paths' {
@@ -913,26 +918,25 @@ build: { $global:PleaseWorkLog.Add('build') }
         $TaskFile = Join-Path $ProjectRoot 'TaskFile.ps1'
         @'
 inspect: {
-    $global:PleaseWorkWorkingDirectory = $PWD.ProviderPath
-    $global:PleaseWorkTaskFilePath = $TaskFilePath
-    $global:PleaseWorkTaskFileRoot = $TaskFileRoot
+    [pscustomobject] @{
+        WorkingDirectory = $PWD.ProviderPath
+        TaskFilePath = $TaskFilePath
+        TaskFileRoot = $TaskFileRoot
+    }
 }
 '@ | Set-Content -LiteralPath $TaskFile
         $OriginalLocation = Get-Location
 
         try {
             Set-Location $NestedDirectory
-            please inspect
+            $Output = please inspect
         } finally {
             Set-Location $OriginalLocation
         }
 
-        $global:PleaseWorkWorkingDirectory | Should -Be $ProjectRoot
-        $global:PleaseWorkTaskFilePath | Should -Be $TaskFile
-        $global:PleaseWorkTaskFileRoot | Should -Be $ProjectRoot
-        Remove-Variable -Name PleaseWorkWorkingDirectory -Scope Global
-        Remove-Variable -Name PleaseWorkTaskFilePath -Scope Global
-        Remove-Variable -Name PleaseWorkTaskFileRoot -Scope Global
+        $Output.WorkingDirectory | Should -Be $ProjectRoot
+        $Output.TaskFilePath | Should -Be $TaskFile
+        $Output.TaskFileRoot | Should -Be $ProjectRoot
     }
 
     It 'resets the working directory before each task' {

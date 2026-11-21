@@ -1,3 +1,4 @@
+using namespace System
 using namespace System.IO
 using namespace System.Management.Automation.Language
 
@@ -10,7 +11,21 @@ using namespace System.Management.Automation.Language
     parsed Ast via the InputObject parameter. The returned object keeps the original
     source text, parse tokens, parse errors, and an edit list that can collect
     text edits without mutating AST nodes. This is the entry point for the
-    immutable-AST + overlay workflow.
+    immutable-AST + overlay workflow. File inputs capture a byte fingerprint and
+    source encoding for transactional saves. BOM-less input must be valid UTF-8;
+    BOM-marked UTF-8, UTF-16, and UTF-32 are also supported.
+    ScriptBlock and Ast inputs reparse their complete parse-time source snapshot.
+    Ast is the submitted node located in that snapshot by type, offsets, and depth;
+    Root groups the complete snapshot's typed Ast, Tokens, and ParseErrors.
+    IsFragment distinguishes a submitted node
+    from the root, even when both cover the same text. These inputs remain in-memory
+    documents: Extent.File is provenance, not permission to save to that file.
+    OriginalText and all offsets refer to the snapshot. Tokens contains only tokens
+    inside Ast.Extent; Root.Tokens contains all snapshot tokens. ParseErrors omits
+    only errors positioned strictly before the fragment start; Root.ParseErrors
+    contains every snapshot error. No render-validation errors are filtered.
+    When GetFullScript() is null, extent text is parsed as standalone input.
+    Strings have no inferred call-site provenance.
 
 .EXAMPLE
     $doc = New-AstDocument -Path '.\ImageViewer.DSL.ps1'
@@ -25,7 +40,7 @@ using namespace System.Management.Automation.Language
 .EXAMPLE
     $doc = New-AstDocument -InputObject { Window Demo { } }
 
-    Uses a ScriptBlock input directly without an explicit parse step.
+    Parses the ScriptBlock's source snapshot and selects its fragment node.
 
 .EXAMPLE
     $tokens = $null
@@ -33,66 +48,44 @@ using namespace System.Management.Automation.Language
     $ast = [Parser]::ParseInput("Window Demo { }", [ref] $tokens, [ref] $errors)
     $doc = New-AstDocument -InputObject $ast
 
-    Wraps an already parsed AST in a document.
+    Parses the supplied AST's snapshot and selects the corresponding node.
 #>
 function New-AstDocument {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
-    [OutputType([void], [object])]
-    param (
+    [OutputType('AstDocument')]
+    [OutputType([void])]
+    param(
         [Parameter(Mandatory, ParameterSetName = 'Path')]
         [ValidateNotNullOrEmpty()]
         [string] $Path,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [AllowEmptyString()]
         [object] $InputObject
     )
 
     process {
-        $Tokens = $null
-        $Errors = $null
-
         if ($null -ne $InputObject -and $InputObject -is [AstDocument]) {
             return $InputObject
         }
 
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
-            $ResolvedPath = (Resolve-Path -LiteralPath $Path).Path
-            $FileText = [File]::ReadAllText($ResolvedPath)
-            $Ast = [Parser]::ParseInput($FileText, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($FileText.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new($ResolvedPath, $FileText, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
+            $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+            $Snapshot = Get-AstFileSnapshot -Path $ResolvedPath
+            $Document = [AstDocument]::new($ResolvedPath, $Snapshot.Text)
+            $Document.IsFileBacked = $true
+            $Document.SourceEncoding = $Snapshot.Encoding
+            $Document.OriginalFingerprint = $Snapshot.Fingerprint
             return $Document
         }
 
-        if ($InputObject -is [string]) {
-            $Text = [string] $InputObject
-            $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
-            return $Document
+        if ($InputObject -is [string] -or $InputObject -is [ScriptBlock] -or $InputObject -is [Ast]) {
+            return [AstDocument]::new($InputObject)
         }
 
-        if ($InputObject -is [ScriptBlock]) {
-            $Text = $InputObject.Ast.Extent.Text
-            $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
-            return $Document
-        }
-
-        if ($InputObject -is [Ast]) {
-            $Text = ([Ast] $InputObject).Extent.Text
-            $Ast = [Parser]::ParseInput($Text, [ref] $Tokens, [ref] $Errors)
-            $NewLineSequence = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-            $Document = [AstDocument]::new('<memory>', $Text, $Ast, $Tokens, $Errors)
-            $Document.NewLineSequence = $NewLineSequence
-            return $Document
-        }
-
-        Write-Error "Unsupported InputObject type '$($InputObject.GetType().FullName)'. Expected String, ScriptBlock, or Ast."
-        return
+        $TypeName = if ($null -eq $InputObject) { '<null>' } else { $InputObject.GetType().FullName }
+        throw [ArgumentException]::new(
+            "Unsupported InputObject type '$TypeName'. Expected String, ScriptBlock, or Ast."
+        )
     }
 }

@@ -37,13 +37,18 @@ using namespace System.Text.RegularExpressions
     Apply case-insensitive matching for the convenience Find/Replace rule.
 
 .PARAMETER FilePattern
-    Optional file glob pattern(s) for the convenience Find/Replace rule.
+    Optional file glob pattern(s) for the convenience Find/Replace rule, matched against
+    discovered full paths or file names. Does not expand directory discovery: use
+    -Include '*.md' to discover Markdown files. Rule objects support the same filter.
 
 .PARAMETER Include
-    File name glob patterns to include when a directory is scanned.
+    File name glob patterns to include when a directory is scanned. Defaults to
+    *.ps1, *.psm1, and *.psd1. Discovery applies Include and Exclude before rule
+    FilePattern filters. Explicit file paths bypass Include and Exclude.
 
 .PARAMETER Exclude
-    File name glob patterns to exclude when a directory is scanned.
+    File name glob patterns to exclude when a directory is scanned, even if Include
+    and a rule's FilePattern match.
 
 .PARAMETER Recurse
     Scan subdirectories when a directory is supplied.
@@ -64,9 +69,15 @@ using namespace System.Text.RegularExpressions
 
 .PARAMETER IncludeSummaryObject
     When set with -PassThru, emits a compact run-level summary object before file-level rows.
+    Search summaries include MatchBasis (OriginalContent) and CountUnit
+    (MatchingLinePerRule, or TextMatchPerRule with SearchMultiline).
 
 .PARAMETER SearchOnly
-    Search for matching lines and return line-numbered hits without writing changes.
+    Search original content independently for each rule without writing changes.
+    By default, counts represent matching lines per rule, not individual occurrences.
+    Multiple rules can count the same text; search totals do not predict sequential
+    replacements. Use -WhatIf without -SearchOnly to preview sequential replacements.
+    MaxMatchesPerFile limits reported search hits and their counts.
 
 .PARAMETER SearchMultiline
     When used with -SearchOnly, searches the full file content and reports regex matches that
@@ -75,6 +86,17 @@ using namespace System.Text.RegularExpressions
 .PARAMETER LiteralReplacement
     In regex replacement mode, treats the replacement text as a literal string. This disables
     regex replacement token expansion such as $1 and ${name}.
+
+.EXAMPLE
+    Search Markdown files using the directory discovery filter
+
+    ./Invoke-BulkReplace.ps1 `
+        -Path 'src' `
+        -Recurse `
+        -Include '*.md' `
+        -Find 'OldCommand' `
+        -SearchOnly `
+        -PassThru
 
 .EXAMPLE
     Search Only (compact output)
@@ -586,10 +608,13 @@ function Get-BulkReplaceTargetFile {
 
         [string[]] $Exclude,
 
+        [object[]] $Rule,
+
         [switch] $Recurse
     )
 
     $resolvedFiles = [List[object]]::new()
+    $maskedFiles = [HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
     foreach ($targetPath in $Path) {
         $resolvedTargets = Resolve-Path -Path $targetPath -ErrorAction Stop
@@ -617,9 +642,30 @@ function Get-BulkReplaceTargetFile {
 
                 if ($includeMatch -and -not $excludeMatch) {
                     $resolvedFiles.Add($childItem)
+                } elseif (-not $includeMatch -and -not $excludeMatch) {
+                    foreach ($ruleItem in $Rule) {
+                        if ($ruleItem.FilePattern.Count -gt 0 -and
+                            (Test-BulkReplaceFilePattern -FilePath $childItem.FullName -FilePattern $ruleItem.FilePattern)
+                        ) {
+                            $null = $maskedFiles.Add($childItem.FullName)
+                            break
+                        }
+                    }
                 }
             }
         }
+    }
+
+    foreach ($resolvedFile in $resolvedFiles) {
+        $null = $maskedFiles.Remove($resolvedFile.FullName)
+    }
+
+    if ($maskedFiles.Count -gt 0) {
+        Write-Warning (
+            ("Directory discovery -Include ({0}) skipped {1} file(s) matching a rule's -FilePattern. " +
+            '-FilePattern only filters discovered files; broaden -Include to discover those files. ' +
+            'No skipped files were searched or modified.') -f ($Include -join ', '), $maskedFiles.Count
+        )
     }
 
     $resolvedFiles | Sort-Object -Property FullName -Unique
@@ -781,11 +827,11 @@ if ($normalizedRules.Count -eq 0) {
 }
 
 $targetFiles = @(
-    Get-BulkReplaceTargetFile -Path $Path -Include $Include -Exclude $Exclude -Recurse:$Recurse
+    Get-BulkReplaceTargetFile -Path $Path -Include $Include -Exclude $Exclude -Rule $normalizedRules -Recurse:$Recurse
 )
 
 if ($targetFiles.Count -eq 0) {
-    throw 'No files matched the supplied path and file pattern filters.'
+    throw 'No files matched the supplied -Path and directory -Include/-Exclude discovery filters. Rule -FilePattern filters do not expand discovery.'
 }
 
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
@@ -920,10 +966,15 @@ foreach ($file in $targetFiles) {
 }
 
 if ($SearchOnly) {
+    $countUnit = if ($SearchMultiline) { 'TextMatchPerRule' } else { 'MatchingLinePerRule' }
+    $countLabel = if ($SearchMultiline) { 'text match(es) per rule' } else { 'matching line(s) per rule' }
     if ($searchHits.Count -eq 0) {
-        $statusMessage = 'No matches found.'
+        $statusMessage = 'No matches found in original content.'
     } else {
-        $statusMessage = ("Found {0} match(es)." -f $searchHits.Count)
+        $statusMessage = ("Found {0} {1} in original content." -f $searchHits.Count, $countLabel)
+    }
+    if (@($normalizedRules).Count -gt 1) {
+        $statusMessage += ' Rules are searched independently; counts can overlap and do not predict sequential replacements. Use -WhatIf without -SearchOnly for a sequential preview.'
     }
 } elseif ($previewFileCount -eq 0) {
     $statusMessage = 'No files required changes.'
@@ -943,6 +994,8 @@ if ($PassThru) {
                     ScannedFileCount = $targetFiles.Count
                     MatchedFileCount = $matchedFileCount
                     MatchCount      = $searchHits.Count
+                    MatchBasis      = 'OriginalContent'
+                    CountUnit       = $countUnit
                 })
         }
 
