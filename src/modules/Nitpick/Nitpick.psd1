@@ -90,6 +90,7 @@ FunctionsToExport = @(
     # Rules
     'Test-ArrayShapeLostThroughControlFlow'
     'Test-AvoidGlobalVars'
+    'Test-AvoidExclaimOperator'
     'Test-AvoidParameterAttributeBool'
     'Test-AvoidAmbiguousPipelineContinuation'
     'Test-AvoidLiveCollectionMutation'
@@ -135,6 +136,7 @@ PrivateData = @{
         Rules = @(
             'Test-ArrayShapeLostThroughControlFlow'
             'Test-AvoidGlobalVars'
+            'Test-AvoidExclaimOperator'
             'Test-AvoidParameterAttributeBool'
             'Test-AvoidAmbiguousPipelineContinuation'
             'Measure-AvoidLongLines'

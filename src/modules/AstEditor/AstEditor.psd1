@@ -23,6 +23,7 @@
         'Expand-AstTokenTree'
         'Find-AstNode'
         'Find-AstScriptExtent'
+        'Find-AstToken'
         'Get-AstChildren'
         'Get-AstExtractedFunction'
         'New-AstDocument'

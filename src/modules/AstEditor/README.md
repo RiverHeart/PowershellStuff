@@ -95,6 +95,7 @@ with another kind of construct (or deleting it) therefore fails validation.
 - `New-AstTextEdit`: creates a detached edit from an extent or document-bound offset range
 - `New-AstCollectionEdit`: creates the same detached edit contract for a structural collection removal
 - `Add-AstTextEdit`: atomically validates and queues one or more detached edits
+- `Find-AstToken`: finds source-ordered tokens by kind, range, and optional predicate
 - `Resolve-AstDocument`: renders queued edits and validates parse correctness
 - `Show-AstDiff`: displays all or selected queued edits as whole-line hunks; edits on the same or adjacent lines are grouped, identical reasons within a hunk share a label, `-Label` chooses edit indexes (`Index`, default) or the first edit's `line:column` (`Position`), and `-Context` adds surrounding unchanged lines (default `0`)
 - `Save-AstDocument`: validates and transactionally saves output with a structured write result

@@ -43,6 +43,9 @@ using namespace System.Management.Automation.Language
     Optional source text guard for an offset-based edit. Matching is case-sensitive.
     Mandatory for an explicit-coordinate edit, since no document is available to derive it.
 
+    With Extent, the extent's text is authoritative and ExpectedText is ignored
+    with a warning.
+
 .EXAMPLE
     Describe trailing spaces and create a detached deletion for that exact range
     so it can be trimmed from the document.
@@ -99,6 +102,7 @@ function New-AstTextEdit {
         [string] $Reason,
 
         [Parameter(ParameterSetName = 'ByOffset')]
+        [Parameter(ParameterSetName = 'ByExtent')]
         [Parameter(Mandatory, ParameterSetName = 'ByExplicitRange')]
         [AllowEmptyString()]
         [string] $ExpectedText
@@ -120,6 +124,12 @@ function New-AstTextEdit {
         }
 
         if ($PSCmdlet.ParameterSetName -eq 'ByExtent') {
+            if ($PSBoundParameters.ContainsKey('ExpectedText')) {
+                Write-Warning (
+                    'ExpectedText is redundant with Extent; the extent text is authoritative and ExpectedText will be ignored.'
+                )
+            }
+
             return [AstTextEdit]::new(@{
                 StartLineNumber = $Extent.StartLineNumber
                 EndLineNumber = $Extent.EndLineNumber
