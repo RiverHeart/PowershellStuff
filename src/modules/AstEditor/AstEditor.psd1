@@ -12,12 +12,17 @@
         # PowerShellData
         'ConvertFrom-PowerShellData'
 
+        # Formatting
+        'Format-AstText'
+        'Format-AstTree'
+
         # General
         'Add-AstTextEdit'
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
         'Find-AstNode'
         'Find-AstScriptExtent'
+        'Get-AstChildren'
         'Get-AstExtractedFunction'
         'New-AstDocument'
         'New-AstCollectionEdit'
