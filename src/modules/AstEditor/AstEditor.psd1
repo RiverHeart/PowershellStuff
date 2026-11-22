@@ -20,6 +20,7 @@
         'Add-AstTextEdit'
         'Add-WpfDslLoadedHandler'
         'Edit-PSFunction'
+        'Expand-AstTokenTree'
         'Find-AstNode'
         'Find-AstScriptExtent'
         'Get-AstChildren'

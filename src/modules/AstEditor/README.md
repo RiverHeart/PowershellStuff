@@ -58,10 +58,10 @@ ambiguous matches, or extent text inconsistent with the snapshot, throw. If
 `GetFullScript()` is null, extent text is parsed as standalone input instead.
 
 `OriginalText` and all extents and edits use snapshot coordinates. `IsFragment` means
-`Ast` is not `Root.Ast`, regardless of how much text it covers. `Tokens` contains only
-tokens fully inside the fragment, descending into expandable-string nested tokens
-when the fragment is inside interpolation. `Root.Tokens` retains the parser's original
-token structure.
+`Ast` is not `Root.Ast`, regardless of how much text it covers. `Tokens` is a
+source-ordered token view containing only tokens fully inside the submitted AST,
+including tokens nested inside expandable-string subexpressions. `Root.Tokens`
+retains the parser's original hierarchical token structure.
 `Root.ParseErrors` contains every snapshot error. `ParseErrors` omits only errors
 positioned strictly before the fragment start; errors after its end may still have
 been caused by it and are retained. For strings and root ASTs, fragment and root views
@@ -73,6 +73,10 @@ are provenance, not save targets; only `-Path` captures a transactional file sna
 The source is not reread from disk, so later disk changes can make navigation stale.
 Use AST and token extents directly for source paths and one-based line/column positions;
 no coordinate translation is needed.
+
+`Expand-AstTokenTree` provides the same flattened, source-ordered view for callers
+that already have parser tokens and do not need an `AstDocument`. It preserves the
+top-level expandable-string token and recursively includes its nested tokens.
 
 `Resolve-AstDocument -PassThruText` returns the complete rendered snapshot as
 `RenderedText` and the submitted fragment's slice as `RenderedFragmentText`; they are

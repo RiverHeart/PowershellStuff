@@ -59,7 +59,7 @@ Describe 'Snapshot-backed fragment documents' {
             $Document = New-AstDocument -InputObject $InputObject
             $Document.IsFragment | Should -BeFalse
             [object]::ReferenceEquals($Document.Ast, $Document.Root.Ast) | Should -BeTrue
-            [object]::ReferenceEquals($Document.Tokens, $Document.Root.Tokens) | Should -BeTrue
+            $Document.Tokens.Count | Should -Be $Document.Root.Tokens.Count
             $Document.OriginalText | Should -BeExactly $Text
 
             $Result = Resolve-AstDocument -Document $Document -PassThruText
@@ -77,7 +77,18 @@ Describe 'Snapshot-backed fragment documents' {
         $Document.IsFileBacked | Should -BeTrue
         $Document.IsFragment | Should -BeFalse
         [object]::ReferenceEquals($Document.Ast, $Document.Root.Ast) | Should -BeTrue
-        [object]::ReferenceEquals($Document.Tokens, $Document.Root.Tokens) | Should -BeTrue
+        $Document.Tokens.Count | Should -Be $Document.Root.Tokens.Count
+    }
+
+    It 'flattens nested expandable-string tokens in root documents' {
+        $Document = New-AstDocument -InputObject '"outer $(-not $Value)"'
+
+        $Document.Root.Tokens | Should -HaveCount 2
+        $Document.Tokens.Count | Should -BeGreaterThan 1
+        @($Document.Tokens | Where-Object { $_.Kind -eq [TokenKind]::Not }) |
+            Should -HaveCount 1
+        @($Document.Tokens | Where-Object { $_.Kind -eq [TokenKind]::Variable }).Text |
+            Should -BeExactly '$Value'
     }
 
     It 'distinguishes a root and a literal that share type and extent' -ForEach @(

@@ -1,5 +1,3 @@
-using namespace System.Collections
-using namespace System.Collections.Generic
 using namespace System.Management.Automation.Language
 
 <#
@@ -95,30 +93,8 @@ function Test-UseIsNotOperator {
 
             $Tokens = $null
             if ($MatchingExpressions.Count -gt 0) {
-                $Source = $ScriptBlockAst.Extent.StartScriptPosition.GetFullScript()
-                $ParseErrors = $null
-                [void] [Parser]::ParseInput($Source, [ref] $Tokens, [ref] $ParseErrors)
-
-                # Interpolated-string subexpressions store their tokens separately.
-                $PendingTokens = [Queue[Token]]::new()
-                $AllTokens = [List[Token]]::new()
-
-                foreach ($Token in $Tokens) {
-                    $PendingTokens.Enqueue($Token)
-                }
-
-                while ($PendingTokens.Count -gt 0) {
-                    $Token = $PendingTokens.Dequeue()
-                    $AllTokens.Add($Token)
-
-                    if ($Token -is [StringExpandableToken]) {
-                        foreach ($NestedToken in $Token.NestedTokens) {
-                            $PendingTokens.Enqueue($NestedToken)
-                        }
-                    }
-                }
-
-                $Tokens = $AllTokens.ToArray()
+                $Document = New-AstDocument -InputObject $ScriptBlockAst
+                $Tokens = $Document.Tokens
             }
 
             #-----------------
