@@ -57,7 +57,7 @@ $env:FEATURE = 'enabled'
     It 'supports metadata, discovery, coordination, and suppression' {
         $Details = Test-AvoidGlobalVars -Details
         $Details.Name | Should -Be 'AvoidGlobalVars'
-        $Details.Category | Should -Be 'Correctness'
+        $Details.Category | Should -Be 'Maintainability'
         $Details.Severity | Should -Be 'Warning'
         @(Find-Nitpick -IncludeRule Nitpick/AvoidGlobalVars) | Should -HaveCount 1
 

@@ -7,9 +7,10 @@ using namespace System.Management.Automation.Language
 
 .DESCRIPTION
     Reports reads and writes that explicitly use the global variable scope.
-    Global variables can couple otherwise unrelated commands through mutable
-    process-wide state. Findings are diagnostic-only; use a narrower scope or
-    explicitly suppress intentional process-wide state.
+    Intentional global state is valid, but process-wide mutable state makes
+    behavior harder to reason about, isolate, and safely change. Findings are
+    diagnostic-only; use a narrower scope or explicitly suppress intentional
+    process-wide state.
 
 .PARAMETER Context
     RuleBehavior.SearchNestedScriptBlocks controls traversal. The default is
@@ -41,10 +42,14 @@ function Test-AvoidGlobalVars {
     $Metadata = [pscustomobject]@{
         Name = $RuleName
         CommandName = $Command.Name
-        Category = 'Correctness'
+        Category = 'Maintainability'
         Description = 'Detects variables declared in the global scope.'
         Severity = 'Warning'
-        Explanation = 'Global variables create process-wide mutable state and can unexpectedly couple commands. Prefer a local, script, or caller-owned value when possible.'
+        Explanation = (
+            'Global variables make behavior depend on process-wide mutable state,' +
+            ' making code harder to reason about, isolate, and change. Prefer a local,' +
+            ' script, or caller-owned value when possible.'
+        )
     }
 
     if ($Details) {
@@ -56,6 +61,7 @@ function Test-AvoidGlobalVars {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
+
     $GlobalVariables = $ScriptBlockAst.FindAll({
         param($Node)
 
