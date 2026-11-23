@@ -84,19 +84,14 @@ Describe 'Select-NitpickGuidedCorrection' {
         $Fixture = New-TestSourceDocument
         $Finding = New-TestChoiceFinding -Fixture $Fixture -Applicability 'Safe', 'Unsafe'
         $Answers.Enqueue('0')
+        Mock Write-Warning -ModuleName Nitpick { }
 
-        $WarningMessages = @(InModuleScope Nitpick -Parameters @{ Fixture = $Fixture; Finding = $Finding } {
-            param($Fixture, $Finding)
-            $null = Select-NitpickGuidedCorrection `
-                -Finding $Finding `
-                -Correction $Finding.Corrections `
-                -Document $Fixture.Document `
-                -WarningVariable Warnings 3>$null
-            @($Warnings | ForEach-Object { $_.Message })
-        })
+        $Chosen = Invoke-GuidedSelection $Fixture $Finding
 
-        $WarningMessages | Should -HaveCount 1
-        $WarningMessages[0] | Should -Match 'Could not navigate.*editor unavailable'
+        [object]::ReferenceEquals($Chosen, $Finding.Corrections[0]) | Should -BeTrue
+        Should -Invoke Write-Warning -ModuleName Nitpick -ParameterFilter {
+            $Message -match 'Could not navigate.*editor unavailable'
+        } -Times 1 -Exactly
         Should -Invoke Read-Host -ModuleName Nitpick -Times 1 -Exactly
     }
 
