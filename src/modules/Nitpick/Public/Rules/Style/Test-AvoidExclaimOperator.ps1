@@ -50,6 +50,8 @@ function Test-AvoidExclaimOperator {
 
         # Rule Behavior
         $Behavior = $Context.RuleBehavior
+
+        # ScriptAnalyzer analyzes nested scopes separately; native callers opt into recursion.
         $ShouldRecurse =
             if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
             else { $Behavior.SearchNestedScriptBlocks }
@@ -69,7 +71,7 @@ function Test-AvoidExclaimOperator {
                 $AstNode -is [UnaryExpressionAst] -and
                 $AstNode.TokenKind -eq 'Exclaim'
 
-            }, $ShouldRecurse <# ScriptAnalyzer analyzes nested scopes separately; native callers opt into recursion. #>)
+            }, $ShouldRecurse)
 
             $Document = $null
             if ($MatchingExpressions.Count -gt 0) {
@@ -83,19 +85,20 @@ function Test-AvoidExclaimOperator {
             $MatchingExpressions | ForEach-Object {
                 $BadNode = $_
                 $FilePath = if ($BadNode.Extent.File) { $BadNode.Extent.File } else { '<ScriptBlock>' }
-                $Operator = @(Find-AstToken `
+                $Operator = Find-AstToken `
                     -Document $Document `
                     -Kind Exclaim `
                     -Range @($BadNode.Extent.StartOffset, $BadNode.Child.Extent.StartOffset) `
-                    -All)
+                    -All
 
                 if ($Operator.Count -ne 1) {
+                    # nitpick disable-next-line Nitpick/AvoidLongLines
                     throw "Rule '$($Metadata.Name)' could not uniquely locate the exclaim token at offsets [$($BadNode.Extent.StartOffset), $($BadNode.Extent.EndOffset))."
                 }
 
                 $BetweenOperatorAndChild = $Document.OriginalText.Substring(
-                    $Operator[0].Extent.EndOffset,
-                    $BadNode.Child.Extent.StartOffset - $Operator[0].Extent.EndOffset
+                    $Operator.Extent.EndOffset,
+                    $BadNode.Child.Extent.StartOffset - $Operator.Extent.EndOffset
                 )
 
                 $Replacement = if ($BetweenOperatorAndChild -match '^\s') {
@@ -113,7 +116,7 @@ function Test-AvoidExclaimOperator {
                     -Corrections @(
                         New-NitpickCorrection `
                             -TextEdit (New-AstTextEdit `
-                                -Extent $Operator[0].Extent `
+                                -Extent $Operator.Extent `
                                 -ReplacementText $Replacement `
                                 -Reason $ChangeReason) `
                             -FilePathOrContext $FilePath `
