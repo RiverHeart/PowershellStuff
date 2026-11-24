@@ -25,6 +25,31 @@
                 "panel": "shared"
             },
             "problemMatcher": []
+        },
+
+        // Update keybindings.json to use F7 for this task
+        {
+            "label": "Nitpick Current File",
+            "type": "shell",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Start-Nitpicking -Path '${file}'"
+            ],
+            "group": {
+                "kind": "none",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
         }
     ]
 }
