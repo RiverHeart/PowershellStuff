@@ -49,7 +49,7 @@ function Measure-AvoidLongLines {
             CommandName = $Command.Name
             Category = 'Style'
             Description = 'Detects physical lines that exceed a configured length.'
-            Severity = 'Warning'
+            Severity = 'Information'
             Explanation = 'Keep physical lines within the configured maximum length.'
             Settings = $SettingsSchema
         }
@@ -108,7 +108,8 @@ function Measure-AvoidLongLines {
                 -LineBreakEnd $LineBreakEnd `
                 -FragmentStart $FragmentStart `
                 -FragmentEnd $FragmentEnd `
-                -MaximumLength $MaximumLength
+                -MaximumLength $MaximumLength `
+                -Severity $Metadata.Severity
 
             $Offset = $LineBreakEnd
             $LineStart = $LineBreakEnd
@@ -125,7 +126,8 @@ function Measure-AvoidLongLines {
                 -LineBreakEnd $Text.Length `
                 -FragmentStart $FragmentStart `
                 -FragmentEnd $FragmentEnd `
-                -MaximumLength $MaximumLength
+                -MaximumLength $MaximumLength `
+                -Severity $Metadata.Severity
         }
     }
 }
@@ -161,7 +163,11 @@ function New-AvoidLongLinesFinding {
         [int] $FragmentEnd,
 
         [Parameter(Mandatory)]
-        [int] $MaximumLength
+        [int] $MaximumLength,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Information', 'Warning', 'Error')]
+        [string] $Severity
     )
 
     $LineLength = $LineEnd - $LineStart
@@ -192,7 +198,7 @@ function New-AvoidLongLinesFinding {
         -RuleId $RuleId `
         -Message "Line has $LineLength UTF-16 code units; maximum is $MaximumLength." `
         -ViolationExtent $Extent `
-        -Severity Warning `
+        -Severity $Severity `
         -Corrections @() `
         -ScriptPath $FilePath `
         -Explanation 'The physical source line exceeds the configured maximum length.'
