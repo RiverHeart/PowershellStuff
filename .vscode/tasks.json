@@ -49,7 +49,30 @@
                 "focus": false,
                 "panel": "shared"
             },
-            "problemMatcher": []
+            "problemMatcher": {
+                "owner": "nitpick",
+                "source": "Nitpick",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": [
+                    // Match the shared file header
+                    {
+                        "regexp": "^([A-Za-z]:\\\\.*\\.[pP][sS](?:1|[mMdD]1))\\r?$",
+                        "file": 1
+                    },
+                    // Loop through the aggregated findings
+                    {
+                        "regexp": "^\\s+(\\d+):(\\d+)\\s+(?=(info|warning|error))(?:information|warning|error)\\s+(\\S+)\\s+(.*)$",
+                        "line": 1,
+                        "column": 2,
+                        "severity": 3,
+                        "code": 4,
+                        "message": 5,
+                        "loop": true
+                    }
+                ]
+            }
         }
     ]
 }
