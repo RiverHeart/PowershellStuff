@@ -98,7 +98,7 @@ Below is a quick overview of the key differences between PSScriptAnalyzer and Ni
 | Criterion | PSScriptAnalyzer | Nitpick | Explanation |
 | :---      | :------: | :--------: | :--- |
 | **Core Language** | C# | PowerShell |  |
-| **Built-In Ruleset** | 75 Rules | 13 Rules |  |
+| **Built-In Ruleset** | 75 Rules | 14 Rules |  |
 | **VSCode Integration** | Yes | Working on it | I can't provide tight integration for squigglies but PowershellEditorServices does allow for driving the editor when Nitpick is run with `-FixMode Guided` from the Powershell Extension terminal. |
 | **VSCode Debuggable** | No | Yes | ScriptAnalyzer isn't available from the VSCode Powershell Extension |
 | **Configuration File** | Yes | No | |

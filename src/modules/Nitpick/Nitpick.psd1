@@ -102,6 +102,7 @@ FunctionsToExport = @(
     'Test-PossibleNullItemFromIndexedLookup'
     'Test-PossibleTypeResolutionFailure'
     'Test-StringArgToSwitchParameter'
+    'Test-UseActionPreferenceForStreamSuppression'
     'Test-UseDeclaredVarsMoreThanAssignments'
     'Test-UseIsNotOperator'
     'Measure-AvoidLongLines'
@@ -149,6 +150,7 @@ PrivateData = @{
             'Test-PossibleTypeResolutionFailure'
             'Measure-AvoidTrailingWhitespace'
             'Test-StringArgToSwitchParameter'
+            'Test-UseActionPreferenceForStreamSuppression'
             'Test-UseDeclaredVarsMoreThanAssignments'
             'Test-UseIsNotOperator'
         )
