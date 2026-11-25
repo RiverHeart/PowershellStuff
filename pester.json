@@ -2,6 +2,10 @@
   "isRoot": true,
   "TestSuites": [
     {
+      "Name": "Tools",
+      "ConfigPath": "tools/Tests/pester.json"
+    },
+    {
       "Name": "TestRunnerSkills",
       "ConfigPath": ".github/skills/pwsh-test-runner/tests/pester.json"
     },
