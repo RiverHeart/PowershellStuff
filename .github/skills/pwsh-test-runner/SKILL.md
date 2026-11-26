@@ -1,6 +1,6 @@
 ---
 name: pwsh-test-runner
-description: Use when you need to discover, list, or run Powershell tests anywhere in this repository, including Pester suite discovery, tag discovery, and execution.
+description: Use when you need to discover, list, or run PowerShell tests anywhere in this repository, including Pester suite discovery, tag discovery, and execution.
 ---
 
 # Repository Test Runner
@@ -19,52 +19,59 @@ This is the preferred path for any project in the workspace unless the user expl
 
 ## Repository tools
 
-Use the repository test runner at:
+Import the repository's ModuleDevKit module from the repository root:
 
 ```powershell
-"$(git rev-parse --show-toplevel)/tools/Invoke-Test.ps1"
+Import-Module ./src/modules/ModuleDevKit/ModuleDevKit.psd1 -Force
 ```
 
-The dedicated coverage runner remains a bundled skill asset at:
+Then use the module's test runner:
 
 ```powershell
-"$(git rev-parse --show-toplevel)/.github/skills/pwsh-test-runner/scripts/Invoke-TestCoverage.ps1"
+Invoke-MDKTest
+```
+
+Use the dedicated module command for coverage and optional new-code gating:
+
+```powershell
+Invoke-MDKTestCoverage
 ```
 
 Instead of reading the entire script, discover capabilities and usage with:
 
 ```powershell
-Get-Help "$(git rev-parse --show-toplevel)/tools/Invoke-Test.ps1" -Detailed
+Get-Help Invoke-MDKTest -Detailed
 ```
 
 Use compact output by default. Only enable detailed Pester console output when needed with `-DetailedOutput`.
-Use `Invoke-TestCoverage.ps1` when you need a dedicated coverage command and optional new-code gate integration.
+Use `Invoke-MDKTestCoverage` when you need a dedicated coverage command and optional new-code gate integration.
 
 ## Common invocations
 
 Run a configured suite (`-Suite` is an alias for `-TestSuite`):
 
 ```powershell
-./tools/Invoke-Test.ps1 -Suite TabCentral
+Import-Module ./src/modules/ModuleDevKit/ModuleDevKit.psd1 -Force
+Invoke-MDKTest -Suite TabCentral
 ```
 
-The host used to launch `Invoke-Test.ps1` selects the PowerShell runtime. Always
+The host used to launch `Invoke-MDKTest` selects the PowerShell runtime. Always
 run tests through the repository runner so it can restore the edition-specific
 CurrentUser module path before discovering Pester. For a PowerShell 5.1 run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/Invoke-Test.ps1 -Suite AstEditor
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `
+    'Import-Module ./src/modules/ModuleDevKit/ModuleDevKit.psd1 -Force; Invoke-MDKTest -Suite AstEditor'
 ```
 
 Do not probe Pester availability by launching `powershell.exe` directly from
 `pwsh`; the inherited `PSModulePath` can hide Windows PowerShell user modules.
 
-When launching with `-File`, join multiple `-Path` values with commas and no
-spaces. `-File` passes arguments verbatim, so `-Path a, b` leaves `b` unbound:
-
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/Invoke-Test.ps1 `
-    -Suite AstEditor -Path Tests/A.Tests.ps1,Tests/B.Tests.ps1
+powershell.exe `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -Command 'Import-Module ./src/modules/ModuleDevKit/ModuleDevKit.psd1 -Force; Invoke-MDKTest -Suite AstEditor -Path Tests/A.Tests.ps1,Tests/B.Tests.ps1'
 ```
 
 Use `-ExitOnError` for external automation that needs a failed run to terminate
@@ -75,13 +82,13 @@ are printed as `[-] Container failed:` / `[-] Block failed:` lines and a
 toward `Tests Passed`/`Failed`:
 
 ```powershell
-./tools/Invoke-Test.ps1 -Suite TabCentral -ExitOnError
+Invoke-MDKTest -Suite TabCentral -ExitOnError
 ```
 
 Run one or more focused paths instead of all paths configured by the suite:
 
 ```powershell
-./tools/Invoke-Test.ps1 `
+Invoke-MDKTest `
     -Suite TabCentral `
     -Path Tests/TabCentralState.tests.ps1
 ```
@@ -89,7 +96,7 @@ Run one or more focused paths instead of all paths configured by the suite:
 Relative `-Path` values are resolved from the directory containing the selected suite's configuration file. Absolute paths are also accepted. Use `-DetailedOutput` when full Pester discovery and test output is needed:
 
 ```powershell
-./tools/Invoke-Test.ps1 `
+Invoke-MDKTest `
     -Suite TabCentral `
     -Path Tests/TabCentralState.tests.ps1 `
     -DetailedOutput
@@ -110,7 +117,7 @@ Relative `-Path` values are resolved from the directory containing the selected 
 4. Run targeted tests for changed code first (for example with `-Tag` or `-Path`).
 5. If there are known failures from a prior run, re-run those failing tests before broad runs.
 6. Keep the default edit/test loop fast by running tests without coverage.
-7. Only run coverage when explicitly requested (for example, feature-complete validation or CI) using `Invoke-Test.ps1 -CoverageMode Full` or `Invoke-TestCoverage.ps1`.
+7. Only run coverage when explicitly requested (for example, feature-complete validation or CI) using `Invoke-MDKTestCoverage -TestSuite <Suite>` or `Invoke-MDKTest -CoverageMode Full`.
 8. Keep tests and coverage as separate commands: finish the green test loop first, confirm feature completion with the user, then run a dedicated coverage command.
 9. Run full suite validation only after focused and known-failing tests pass.
 10. Run Pester with PassThru and print a compact summary for each run.

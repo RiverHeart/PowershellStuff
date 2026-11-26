@@ -4,40 +4,29 @@
 param ()
 
 BeforeAll {
-    $BuildScript = Join-Path -Path $PSScriptRoot -ChildPath '../Build-PSResource.ps1'
-    $ShouldContinueScript = Join-Path -Path $PSScriptRoot -ChildPath '../Private/Should-Continue.ps1'
+    $ModuleManifest = Join-Path -Path $PSScriptRoot -ChildPath '../ModuleDevKit.psd1'
+    $ShouldContinueScript = Join-Path -Path $PSScriptRoot -ChildPath '../src/Private/Should-Continue.ps1'
+    Import-Module $ModuleManifest -Force -ErrorAction Stop
 
-    <#
-    .SYNOPSIS
-        Captures the staged module file list for package builder tests.
-
-    .PARAMETER Path
-        Path to the staged module.
-
-    .PARAMETER DestinationPath
-        Path in which to write the captured file list.
-
-    .PARAMETER PassThru
-        Accepted for compatibility with Compress-PSResource; no value is returned.
-
-    .EXAMPLE
-        Compress-PSResource -Path ./staging/Example -DestinationPath ./packages -PassThru
-    #>
-    function Compress-PSResource {
-        param (
-            [string] $Path,
-            [string] $DestinationPath,
-            [switch] $PassThru
+    function Get-PackagedFile {
+        param(
+            [Parameter(Mandatory)]
+            [string] $DestinationPath
         )
 
-        @(
-            Get-ChildItem -LiteralPath $Path -File -Recurse |
-                ForEach-Object {
-                    $_.FullName.Substring($Path.Length).TrimStart('\', '/').Replace('\', '/')
-                }
-        ) |
-        ConvertTo-Json |
-        Set-Content -LiteralPath (Join-Path -Path $DestinationPath -ChildPath 'packaged-files.json')
+        $PackagePath = Get-ChildItem -LiteralPath $DestinationPath -Filter '*.nupkg' -File |
+            Select-Object -First 1
+        $Archive = [System.IO.Compression.ZipFile]::OpenRead($PackagePath.FullName)
+        try {
+            Write-Output -InputObject @(
+                $Archive.Entries |
+                    Where-Object { $_.FullName -notlike '*/' } |
+                    Select-Object -ExpandProperty FullName |
+                    ForEach-Object { $_.Replace('\', '/') }
+            )
+        } finally {
+            $Archive.Dispose()
+        }
     }
 }
 
@@ -85,7 +74,7 @@ Describe 'Should-Continue prompt behavior' {
     }
 }
 
-Describe 'Build-PSResource Git ignore filtering' {
+Describe 'Build-MDKModule Git ignore filtering' {
     BeforeEach {
         $TestRoot = Join-Path -Path $TestDrive -ChildPath ([guid]::NewGuid().ToString('N'))
         $ProjectRoot = Join-Path -Path $TestRoot -ChildPath 'PackageProject'
@@ -123,13 +112,6 @@ Describe 'Build-PSResource Git ignore filtering' {
 
     }
 
-    AfterEach {
-        Remove-Item `
-            -LiteralPath (Join-Path -Path $Destination -ChildPath 'packaged-files.json') `
-            -Force `
-            -ErrorAction SilentlyContinue
-    }
-
     It 'omits ignored files from explicitly included directories' {
         @(
             '*.local.ps1'
@@ -138,12 +120,11 @@ Describe 'Build-PSResource Git ignore filtering' {
         & git -C $TestRoot init --quiet
         & git -C $TestRoot add --force PackageProject/Public/Secret.local.ps1
 
-        & $BuildScript `
+        Build-MDKModule `
             -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
             -DestinationPath $Destination
 
-        $PackagedFiles = Get-Content -LiteralPath (Join-Path -Path $Destination -ChildPath 'packaged-files.json') |
-            ConvertFrom-Json
+        $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
         $PackagedFiles | Should -Contain 'Public/Keep.ps1'
         $PackagedFiles | Should -Contain 'Public/Generated.keep.ps1'
         $PackagedFiles | Should -Not -Contain 'Public/Secret.local.ps1'
@@ -158,38 +139,38 @@ Describe 'Build-PSResource Git ignore filtering' {
         ) | Set-Content -LiteralPath (Join-Path -Path $PublicRoot -ChildPath '.gitignore')
         & git -C $TestRoot init --quiet
 
-        & $BuildScript `
+        Build-MDKModule `
             -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
             -DestinationPath $Destination
 
-        $PackagedFiles = Get-Content -LiteralPath (Join-Path -Path $Destination -ChildPath 'packaged-files.json') |
-            ConvertFrom-Json
+        $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
         $PackagedFiles | Should -Contain 'Public/Generated.keep.ps1'
         $PackagedFiles | Should -Not -Contain 'Public/Generated.ps1'
     }
 
     It 'keeps all included files outside a Git worktree' {
-        & $BuildScript `
+        Build-MDKModule `
             -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
             -DestinationPath $Destination
 
-        $PackagedFiles = Get-Content -LiteralPath (Join-Path -Path $Destination -ChildPath 'packaged-files.json') |
-            ConvertFrom-Json
+        $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
         $PackagedFiles | Should -Contain 'Public/Secret.local.ps1'
         $PackagedFiles | Should -Contain 'Public/Generated.ps1'
     }
 
     It 'continues without Git ignore filtering only when explicitly forced' {
         '*.local.ps1' | Set-Content -LiteralPath (Join-Path -Path $PublicRoot -ChildPath '.gitignore')
-        Mock Get-Command -ParameterFilter { $Name -eq 'git' } -MockWith { Write-Output $null }
+        Mock Get-Command `
+            -ModuleName ModuleDevKit `
+            -ParameterFilter { $Name -eq 'git' } `
+            -MockWith { Write-Output $null }
 
-        & $BuildScript `
+        Build-MDKModule `
             -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
             -DestinationPath $Destination `
             -Force
 
-        $PackagedFiles = Get-Content -LiteralPath (Join-Path -Path $Destination -ChildPath 'packaged-files.json') |
-            ConvertFrom-Json
+        $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
         $PackagedFiles | Should -Contain 'Public/Secret.local.ps1'
     }
 }
