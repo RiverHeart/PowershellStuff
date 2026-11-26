@@ -17,3 +17,15 @@ lint: {
         git diff --name-only --diff-filter=d --relative $TaskFileRoot | Start-Nitpicking
     }
 }
+
+build: {
+    param([string] $Path)
+
+    & "$GitRoot/tools/Build-PSResource.ps1" -ProjectPath $Path
+}
+
+publish: {
+    Publish-Module `
+        -Path $TaskFileRoot `
+        -ApiKey (Read-Host -Prompt 'Enter NuGet API Key')
+}
