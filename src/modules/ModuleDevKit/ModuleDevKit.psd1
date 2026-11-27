@@ -19,6 +19,7 @@
         'Compress-MDKModule'
         'Get-GitIgnoreFile'
         'Get-GitRepositoryRoot'
+        'New-MDKProject'
         'Test-GitIgnoredPath'
     )
     CmdletsToExport = @()
