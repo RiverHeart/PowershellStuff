@@ -1,3 +1,20 @@
+<#
+.SYNOPSIS
+    Validates a root Pester configuration layout.
+
+.DESCRIPTION
+    Requires a root marker and exactly one of Projects, TestSuites, or Run,
+    then validates the selected layout.
+
+.PARAMETER RootConfig
+    Parsed root Pester configuration.
+
+.PARAMETER Path
+    Config file path used in validation errors.
+
+.NOTES
+    Examples for this private helper run in the module's scope.
+#>
 function Test-RootManifest {
     [CmdletBinding()]
     param(
@@ -14,42 +31,50 @@ function Test-RootManifest {
         throw "Root config '$Path' must contain isRoot=true."
     }
 
-    if (-not ($RootConfig.PSObject.Properties.Name -contains 'TestSuites')) {
-        throw "Root config '$Path' is missing TestSuites."
+    $Layouts = @(
+        'Projects'
+        'TestSuites'
+        'Run'
+    ) | Where-Object { $RootConfig.PSObject.Properties.Name -contains $_ }
+
+    if ($Layouts.Count -ne 1) {
+        throw "Root config '$Path' must define exactly one of Projects, TestSuites, or Run."
     }
 
-    $Suites = @($RootConfig.TestSuites)
-    if ($Suites.Count -eq 0) {
-        throw "Root config '$Path' must define at least one suite in TestSuites."
-    }
+    switch ($Layouts[0]) {
+        'Projects' {
+            $Projects = @($RootConfig.Projects)
+            if ($Projects.Count -eq 0) {
+                throw "Root config '$Path' must define at least one project in Projects."
+            }
 
-    foreach ($Suite in $Suites) {
-        if (-not ($Suite.PSObject.Properties.Name -contains 'Name') -or
-            [string]::IsNullOrWhiteSpace([string] $Suite.Name)
-        ) {
-            throw "Each suite in '$Path' must define a non-empty Name."
+            $ProjectNames = [System.Collections.Generic.HashSet[string]]::new(
+                [System.StringComparer]::OrdinalIgnoreCase
+            )
+
+            foreach ($Project in $Projects) {
+                if (-not ($Project.PSObject.Properties.Name -contains 'Name') -or
+                    [string]::IsNullOrWhiteSpace([string] $Project.Name)
+                ) {
+                    throw "Each project in '$Path' must define a non-empty Name."
+                }
+
+                if (-not $ProjectNames.Add([string] $Project.Name)) {
+                    throw "Project '$($Project.Name)' is defined more than once in '$Path'."
+                }
+
+                if (-not ($Project.PSObject.Properties.Name -contains 'ConfigPath') -or
+                    [string]::IsNullOrWhiteSpace([string] $Project.ConfigPath)
+                ) {
+                    throw "Project '$($Project.Name)' in '$Path' must define ConfigPath."
+                }
+            }
         }
-
-        $hasConfigPath = (
-            ($Suite.PSObject.Properties.Name -contains 'ConfigPath') -and
-            -not [string]::IsNullOrWhiteSpace([string] $Suite.ConfigPath)
-        )
-
-        $hasInlineSuiteConfig = (
-            ($Suite.PSObject.Properties.Name -contains 'Run') -and
-            $null -ne $Suite.Run
-        )
-
-        if ($hasConfigPath -and $hasInlineSuiteConfig) {
-            throw "Suite '$($Suite.Name)' in '$Path' cannot define both ConfigPath and inline Run configuration. Choose one style per suite."
+        'TestSuites' {
+            Test-MDKTestSuiteCollection -TestSuites @($RootConfig.TestSuites) -Path $Path
         }
-
-        if (-not $hasConfigPath -and -not $hasInlineSuiteConfig) {
-            throw "Suite '$($Suite.Name)' in '$Path' must define either ConfigPath or an inline suite Run configuration."
-        }
-
-        if ($hasInlineSuiteConfig) {
-            Test-SuiteManifest -SuiteConfig $Suite -Path "$Path (suite '$($Suite.Name)')"
+        'Run' {
+            Test-SuiteManifest -SuiteConfig $RootConfig -Path $Path
         }
     }
 }

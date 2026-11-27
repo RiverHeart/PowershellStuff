@@ -1,6 +1,6 @@
 {
   "isRoot": true,
-  "TestSuites": [
+  "Projects": [
     {
       "Name": "ModuleDevKit",
       "ConfigPath": "src/modules/ModuleDevKit/pester.json"

@@ -1,5 +1,3 @@
-using namespace System.IO
-
 <#
 .SYNOPSIS
     Runs suite coverage and optionally enforces a new-code coverage gate.
@@ -9,8 +7,12 @@ using namespace System.IO
     gate via Invoke-MDKNewCodeGate. Coverage mode can be selected explicitly
     or read from suite config Coverage.Mode.
 
+.PARAMETER Project
+    Optional name of the configured project.
+
 .PARAMETER TestSuite
-    Name of the configured test suite.
+    Optional name of the configured test suite. A project or suite must identify
+    exactly one coverage target.
 
 .PARAMETER CoverageMode
     Coverage execution mode:
@@ -57,7 +59,9 @@ using namespace System.IO
 function Invoke-MDKTestCoverage {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Project,
+
         [ValidateNotNullOrEmpty()]
         [string] $TestSuite,
 
@@ -96,19 +100,35 @@ function Invoke-MDKTestCoverage {
         $rootConfigPath = Join-Path -Path $repoRoot -ChildPath 'pester.json'
         $rootConfig = Read-JsonFile -Path $rootConfigPath -Description 'Root test config'
 
-        $suite = @($rootConfig.TestSuites | Where-Object { $_.Name -eq $TestSuite } | Select-Object -First 1)
-        if ($suite.Count -eq 0) {
-            $availableSuites = @($rootConfig.TestSuites | ForEach-Object { $_.Name }) -join ', '
-            throw "Unknown test suite '$TestSuite'. Available suites: $availableSuites"
+        if ((($rootConfig.PSObject.Properties.Name -contains 'isRoot') -and [bool] $rootConfig.isRoot) -or
+            ($rootConfig.PSObject.Properties.Name -contains 'Projects')
+        ) {
+            Test-RootManifest -RootConfig $rootConfig -Path $rootConfigPath
         }
 
-        $suiteConfigPath = if ([Path]::IsPathRooted([string] $suite[0].ConfigPath)) {
-            [string] $suite[0].ConfigPath
+        $configuredTargets = Get-MDKTestTargets `
+                -RootConfig $rootConfig `
+                -RootConfigPath $rootConfigPath
+
+        $selectedTargets = $configuredTargets | Where-Object {
+            ([string]::IsNullOrWhiteSpace($Project) -or $_.ProjectName -eq $Project) -and
+            ([string]::IsNullOrWhiteSpace($TestSuite) -or $_.TestSuiteName -eq $TestSuite)
+        }
+
+        if ($selectedTargets.Count -eq 0) {
+            throw "No coverage target matches project '$Project' and test suite '$TestSuite'."
+        }
+        if ($selectedTargets.Count -gt 1) {
+            throw 'Coverage requires a selection that identifies exactly one project and test suite.'
+        }
+
+        $target = $selectedTargets[0]
+        $suiteConfig = $target.Config
+        $coverageTestSuite = if ([string]::IsNullOrWhiteSpace($target.TestSuiteName)) {
+            $target.ProjectName
         } else {
-            Join-Path -Path $repoRoot -ChildPath ([string] $suite[0].ConfigPath)
+            $target.TestSuiteName
         }
-
-        $suiteConfig = Read-JsonFile -Path $suiteConfigPath -Description 'Suite config'
         $effectiveCoverageMode = Resolve-EffectiveCoverageMode `
             -RequestedMode $CoverageMode `
             -SuiteConfig $suiteConfig
@@ -116,13 +136,17 @@ function Invoke-MDKTestCoverage {
         $coverageOutputPath = Resolve-CoverageOutputPath `
             -SuiteConfig $suiteConfig `
             -RepositoryRoot $repoRoot `
-            -TestSuite $TestSuite
+            -ProjectName $target.ProjectName `
+            -TestSuite $coverageTestSuite
 
         $invokeTestParameters = @{
-            TestSuite = $TestSuite
+            Project = $target.ProjectName
             CoverageMode = 'Full'
             PassThru = $true
             ErrorAction = 'Stop'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($target.TestSuiteName)) {
+            $invokeTestParameters.TestSuite = $target.TestSuiteName
         }
 
         if ($null -ne $Tag -and $Tag.Count -gt 0) {
@@ -146,7 +170,10 @@ function Invoke-MDKTestCoverage {
         }
 
         Write-Host ("Coverage Mode: {0}" -f $effectiveCoverageMode)
-        Write-Host ("Running coverage for suite '{0}'..." -f $TestSuite)
+        Write-Host ("Running coverage for '{0}'..." -f $target.ProjectName)
+        if (-not [string]::IsNullOrWhiteSpace($target.TestSuiteName)) {
+            Write-Host ("Test Suite: {0}" -f $target.TestSuiteName)
+        }
         [void] (Invoke-MDKTest @invokeTestParameters)
 
         if ($effectiveCoverageMode -eq 'NewCodeAnalysis') {

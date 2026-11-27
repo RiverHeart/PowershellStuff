@@ -6,10 +6,11 @@ using namespace System.Management.Automation.Host
 
 <#
 .SYNOPSIS
-    Runs Pester tests with compact, failure-focused output using suite configuration.
+    Runs Pester tests with compact, failure-focused output using project configuration.
 
 .DESCRIPTION
     Invokes Pester using PassThru so results can be summarized without parsing noisy console output.
+    When no project or test suite is selected, all configured targets are run.
     By default, only failing or non-passing tests are printed, followed by stable summary lines:
 
     Tests completed in <seconds>s
@@ -29,20 +30,23 @@ using namespace System.Management.Automation.Host
     to run the script until all tests are passing. Additionally, I need to figure out how to
     require coverage for code so that the agent doesn't forget to add a test for new code.
 
+.PARAMETER Project
+    Optional name of a configured project. If omitted, all configured projects are considered.
+
 .PARAMETER TestSuite
-    Name of the configured test suite to run.
+    Optional name of a configured test suite. If omitted, all configured test suites are considered.
 
 .PARAMETER Path
-    Optional test paths to run instead of the paths configured by the suite. Relative paths
-    are resolved from the directory containing the suite configuration. Each entry may also
-    contain comma-separated paths, which is required when launching the script with
-    `powershell.exe -File`, because that host does not parse `-Path a, b` as an array.
+    Optional test paths to run instead of the paths configured by each selected target.
+    Relative paths are resolved from the directory containing each target configuration.
+    Each entry may also contain comma-separated paths, which is required when launching the
+    script with `powershell.exe -File`, because that host does not parse `-Path a, b` as an array.
 
 .PARAMETER ListSuites
-    Lists configured test suites and exits.
+    Lists configured projects and test suites, then exits.
 
 .PARAMETER ListTags
-    Lists discovered tags for the selected test suite and exits.
+    Lists discovered tags for the selected project and test suite(s), then exits.
 
 .PARAMETER Tag
     Optional list of tags to include.
@@ -72,7 +76,13 @@ using namespace System.Management.Automation.Host
     Runs Pester with the suite's Coverage configuration when set to Full.
 
 .EXAMPLE
-    Invoke-MDKTest -TestSuite Example
+    Invoke-MDKTest
+
+.EXAMPLE
+    Invoke-MDKTest -Project Example
+
+.EXAMPLE
+    Invoke-MDKTest -Project Example -TestSuite Unit
 
 .EXAMPLE
     Invoke-MDKTest -TestSuite Example -DebugOutput
@@ -107,13 +117,16 @@ using namespace System.Management.Automation.Host
     Invoke-MDKTest -Suite Example -ExitOnError
 #>
 function Invoke-MDKTest {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Run')]
     param(
-        [Parameter(Mandatory, ParameterSetName = 'Run')]
-        [Parameter(Mandatory, ParameterSetName = 'ListTags')]
+        [Parameter(ParameterSetName = 'Run')]
+        [Parameter(ParameterSetName = 'ListTags')]
         [ValidateNotNullOrEmpty()]
         [Alias('Suite')]
         [string] $TestSuite,
+
+        [ValidateNotNullOrEmpty()]
+        [string] $Project,
 
         [Parameter(Mandatory, ParameterSetName = 'List')]
         [switch] $ListSuites,
@@ -151,7 +164,10 @@ function Invoke-MDKTest {
         Initialize-UserModulePath
         $isInteractive = Test-IsInteractive
 
-        $IsLatestPesterAvailable = Get-Module -ListAvailable Pester | Where-Object { $_.Version.Major -ge 5 } | Select-Object -First 1
+        $IsLatestPesterAvailable = Get-Module -ListAvailable Pester |
+            Where-Object { $_.Version.Major -ge 5 } |
+            Select-Object -First 1
+
         if (-not $IsLatestPesterAvailable) {
             if (-not $isInteractive) {
                 Write-Error 'Pester module was not found and this is a non-interactive session (CI or redirected console). Install Pester before running tests.'
@@ -194,7 +210,10 @@ function Invoke-MDKTest {
             }
         }
 
-        $IsUsingLatestPester = Get-Module Pester | Where-Object { $_.Version.Major -ge 5 } | Select-Object -First 1
+        $IsUsingLatestPester = Get-Module Pester |
+            Where-Object { $_.Version.Major -ge 5 } |
+            Select-Object -First 1
+
         if (-not $IsUsingLatestPester -and $IsLatestPesterAvailable) {
             Import-Module -Name Pester -MinimumVersion '5.0.0' -Force
         }
@@ -233,15 +252,15 @@ function Invoke-MDKTest {
                 [bool] $RootConfig.isRoot
             )
 
-            if ($HasRootLayout) {
+            if ($HasRootLayout -or
+                ($RootConfig.PSObject.Properties.Name -contains 'Projects')
+            ) {
                 Test-RootManifest -RootConfig $RootConfig -Path $RootConfigPath
-                $ConfiguredSuites = @($RootConfig.TestSuites)
-            } else {
-                # Alternative manifest style: allow a direct single-suite config at repo root.
-                $ConfiguredSuites = Convert-SingleSuiteManifestToSuiteList `
-                    -Config $RootConfig `
-                    -ConfigPath $RootConfigPath
             }
+
+            $ConfiguredTargets = Get-MDKTestTargets `
+                -RootConfig $RootConfig `
+                -RootConfigPath $RootConfigPath
         } catch {
             Write-Error $_
             return
@@ -249,75 +268,142 @@ function Invoke-MDKTest {
 
         if ($ListSuites) {
             Write-Host "Repository Root: $RepoRoot"
-            Write-Host 'Configured test suites:'
-            foreach ($ConfiguredSuite in $ConfiguredSuites) {
-                $SuiteSource = if (
-                    ($ConfiguredSuite.PSObject.Properties.Name -contains 'ConfigPath') -and
-                    -not [string]::IsNullOrWhiteSpace([string] $ConfiguredSuite.ConfigPath)
+            Write-Host 'Configured test targets:'
+            foreach ($ConfiguredTarget in $ConfiguredTargets) {
+                $TargetName = if (
+                    -not [string]::IsNullOrWhiteSpace($ConfiguredTarget.TestSuiteName) -and
+                    $ConfiguredTarget.TestSuiteName -ne $ConfiguredTarget.ProjectName
                 ) {
-                    [string] $ConfiguredSuite.ConfigPath
+                    '{0} / {1}' -f $ConfiguredTarget.ProjectName, $ConfiguredTarget.TestSuiteName
                 } else {
-                    '(inline in root manifest)'
+                    $ConfiguredTarget.ProjectName
                 }
 
-                Write-Host ("  {0} -> {1}" -f $ConfiguredSuite.Name, $SuiteSource)
+                Write-Host ("  {0} -> {1}" -f $TargetName, $ConfiguredTarget.ConfigPath)
             }
             return
         }
 
-        $Suite = @($ConfiguredSuites |
-            Where-Object { $_.Name -eq $TestSuite } |
-            Select-Object -First 1)
+        $SelectedTargets = @($ConfiguredTargets | Where-Object {
+            ([string]::IsNullOrWhiteSpace($Project) -or $_.ProjectName -eq $Project) -and
+            ([string]::IsNullOrWhiteSpace($TestSuite) -or $_.TestSuiteName -eq $TestSuite)
+        })
 
-        if ($Suite.Count -eq 0) {
-            $AvailableSuites = @($ConfiguredSuites | ForEach-Object { $_.Name }) -join ', '
-            Write-Error "Unknown test suite '$TestSuite'. Available suites: $AvailableSuites"
-            return
-        }
+        if ($SelectedTargets.Count -eq 0) {
+            $KnownProjects = @(
+                $ConfiguredTargets |
+                    ForEach-Object { $_.ProjectName } |
+                    Sort-Object -Unique
+            )
 
-        $SuiteConfigPath = $null
-        $SuiteConfig = $null
-        $SuiteBaseDirectory = $RepoRoot
-
-        $HasSuiteConfigPath = (
-            ($Suite[0].PSObject.Properties.Name -contains 'ConfigPath') -and
-            -not [string]::IsNullOrWhiteSpace([string] $Suite[0].ConfigPath)
-        )
-
-        if ($HasSuiteConfigPath) {
-            $SuiteConfigPath = if ([Path]::IsPathRooted($Suite[0].ConfigPath)) {
-                $Suite[0].ConfigPath
+            if (-not [string]::IsNullOrWhiteSpace($Project) -and $Project -notin $KnownProjects) {
+                $AvailableProjects = @(
+                    $KnownProjects
+                ) -join ', '
+                Write-Error "Unknown project '$Project'. Available projects: $AvailableProjects"
+            } elseif (-not [string]::IsNullOrWhiteSpace($TestSuite)) {
+                $AvailableSuites = @(
+                    $ConfiguredTargets |
+                        Where-Object {
+                            [string]::IsNullOrWhiteSpace($Project) -or $_.ProjectName -eq $Project
+                        } |
+                        Where-Object { -not [string]::IsNullOrWhiteSpace($_.TestSuiteName) } |
+                        ForEach-Object { $_.TestSuiteName } |
+                        Sort-Object -Unique
+                ) -join ', '
+                Write-Error "Unknown test suite '$TestSuite' for project '$Project'. Available suites: $AvailableSuites"
+            } elseif (-not [string]::IsNullOrWhiteSpace($Project)) {
+                Write-Error "Project '$Project' has no configured test targets."
             } else {
-                Join-Path $RepoRoot $Suite[0].ConfigPath
+                Write-Error 'No test targets were configured.'
             }
-
-            if (-not (Test-Path -Path $SuiteConfigPath)) {
-                Write-Error "Suite config was not found: $SuiteConfigPath"
-                return
-            }
-
-            try {
-                $SuiteConfig = Read-JsonFile -Path $SuiteConfigPath -Description 'Suite config'
-                Test-SuiteManifest -SuiteConfig $SuiteConfig -Path $SuiteConfigPath
-            } catch {
-                Write-Error $_
-                return
-            }
-
-            $SuiteBaseDirectory = Split-Path -Path $SuiteConfigPath -Parent
-        } else {
-            $SuiteConfigPath = $RootConfigPath
-            $SuiteConfig = $Suite[0]
-
-            try {
-                Test-SuiteManifest `
-                    -SuiteConfig $SuiteConfig `
-                    -Path "$RootConfigPath (suite '$($Suite[0].Name)')"
-            } catch {
-                Write-Error $_
-                return
-            }
+            return
         }
+
+        if ($SelectedTargets.Count -gt 1) {
+            if ($ListTags) {
+                foreach ($Target in $SelectedTargets) {
+                    $InvokeParameters = @{
+                        Project = $Target.ProjectName
+                        ListTags = $true
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($Target.TestSuiteName)) {
+                        $InvokeParameters.TestSuite = $Target.TestSuiteName
+                    }
+
+                    Invoke-MDKTest @InvokeParameters
+                }
+                return
+            }
+
+            $Results = [List[object]]::new()
+            $RunFailed = $false
+
+            foreach ($Target in $SelectedTargets) {
+                $InvokeParameters = @{
+                    Project = $Target.ProjectName
+                    PassThru = $true
+                    ErrorAction = 'Continue'
+                    CoverageMode = $CoverageMode
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($Target.TestSuiteName)) {
+                    $InvokeParameters.TestSuite = $Target.TestSuiteName
+                }
+
+                foreach ($ParameterName in @(
+                    'Path'
+                    'Tag'
+                    'ExcludeTag'
+                    'DebugOutput'
+                    'DetailedOutput'
+                    'ShowPassed'
+                )) {
+                    if ($PSBoundParameters.ContainsKey($ParameterName)) {
+                        $InvokeParameters[$ParameterName] = $PSBoundParameters[$ParameterName]
+                    }
+                }
+
+                $TargetResults = @(Invoke-MDKTest @InvokeParameters)
+                foreach ($TargetResult in $TargetResults) {
+                    $Results.Add($TargetResult)
+                    if (
+                        $TargetResult.Result -eq 'Failed' -or
+                        $TargetResult.FailedCount -gt 0
+                    ) {
+                        $RunFailed = $true
+                    }
+                }
+
+                if ($TargetResults.Count -eq 0) {
+                    $RunFailed = $true
+                }
+            }
+
+            if ($PassThru) {
+                Write-Output $Results.ToArray()
+            }
+
+            if ($RunFailed -and $ExitOnError) {
+                exit 2
+            }
+            return
+        }
+
+        $Target = $SelectedTargets[0]
+        $TestSuiteName = $Target.TestSuiteName
+        $TargetDisplayName = if ([string]::IsNullOrWhiteSpace($TestSuiteName)) {
+            $Target.ProjectName
+        } elseif ($TestSuiteName -eq $Target.ProjectName) {
+            $Target.ProjectName
+        } else {
+            '{0} / {1}' -f $Target.ProjectName, $TestSuiteName
+        }
+        $SuiteConfigPath = $Target.ConfigPath
+        $SuiteConfig = $Target.Config
+        $SuiteBaseDirectory = $Target.BaseDirectory
+
         # Under `powershell.exe -File`, `-Path a,b` arrives as the single string 'a,b'.
         $RequestedPath = if ($null -ne $Path -and $Path.Count -gt 0) {
             @($Path -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -342,7 +428,12 @@ function Invoke-MDKTest {
         }
 
         Write-Host "Repository Root: $RepoRoot"
-        Write-Host "Test Suite: $TestSuite"
+        Write-Host "Project: $($Target.ProjectName)"
+        if ([string]::IsNullOrWhiteSpace($TestSuiteName)) {
+            Write-Host 'Test Suite: (all configured tests)'
+        } else {
+            Write-Host "Test Suite: $TestSuiteName"
+        }
         Write-Host "Suite Config: $SuiteConfigPath"
         Write-Host 'Running tests in the following path(s):'
         $ResolvedPath | ForEach-Object { Write-Host "  $_" }
@@ -401,7 +492,7 @@ function Invoke-MDKTest {
 
             $DistinctTags = @($AllTags | Sort-Object -Unique)
             if ($DistinctTags.Count -eq 0) {
-                Write-Host 'No tags were discovered for this suite.'
+                Write-Host "No tags were discovered for '$TargetDisplayName'."
             } else {
                 Write-Host 'Discovered tags:'
                 foreach ($DiscoveredTag in $DistinctTags) {
@@ -455,7 +546,7 @@ function Invoke-MDKTest {
                     -not ($SuiteConfig.PSObject.Properties.Name -contains 'Coverage') -or
                     $null -eq $SuiteConfig.Coverage
                 ) {
-                    throw "Suite '$TestSuite' does not define Coverage configuration."
+                    throw "Test target '$TargetDisplayName' does not define Coverage configuration."
                 }
 
                 $Configuration.CodeCoverage.Enabled = $true
@@ -467,14 +558,15 @@ function Invoke-MDKTest {
                     }
                 })
                 if ($CoveragePath.Count -eq 0) {
-                    throw "Suite '$TestSuite' must define at least one Coverage.Path entry."
+                    throw "Test target '$TargetDisplayName' must define at least one Coverage.Path entry."
                 }
 
                 $Configuration.CodeCoverage.Path = $CoveragePath
                 $Configuration.CodeCoverage.OutputPath = Resolve-CoverageOutputPath `
                     -SuiteConfig $SuiteConfig `
                     -RepositoryRoot $RepoRoot `
-                    -TestSuite $TestSuite
+                    -ProjectName $Target.ProjectName `
+                    -TestSuite $(if ($TestSuiteName) { $TestSuiteName } else { $Target.ProjectName })
 
                 $Configuration.CodeCoverage.UseBreakpoints = $false
                 $CoverageOptions = @(
@@ -487,17 +579,15 @@ function Invoke-MDKTest {
                     'UseBreakpoints'
                 )
                 foreach ($CoverageOption in $CoverageOptions) {
-                    if (
-                        $SuiteConfig.Coverage.PSObject.Properties.Name -contains $CoverageOption
-                    ) {
-                        $Configuration.CodeCoverage.$CoverageOption =
-                            $SuiteConfig.Coverage.$CoverageOption
+                    if ($SuiteConfig.Coverage.PSObject.Properties.Name -contains $CoverageOption) {
+                        $Configuration.CodeCoverage.$CoverageOption = $SuiteConfig.Coverage.$CoverageOption
                     }
                 }
 
                 $CoverageOutputDirectory = Split-Path `
                     -Path $Configuration.CodeCoverage.OutputPath.Value `
                     -Parent
+
                 New-Item -Path $CoverageOutputDirectory `
                     -ItemType Directory `
                     -Force `
@@ -569,7 +659,11 @@ function Invoke-MDKTest {
                 # Parse errors put the location first and the message several lines down.
                 if ($Exception -is [ParseException] -and @($Exception.Errors).Count -gt 0) {
                     $ParseError = @($Exception.Errors)[0]
-                    return ('{0}:{1}: {2}' -f $ParseError.Extent.File, $ParseError.Extent.StartLineNumber, $ParseError.Message)
+                    return ('{0}:{1}: {2}' -f
+                        $ParseError.Extent.File,
+                        $ParseError.Extent.StartLineNumber,
+                        $ParseError.Message
+                    )
                 }
 
                 $Message = if ($Exception) { $Exception.Message } else { "$Record" }
@@ -582,11 +676,17 @@ function Invoke-MDKTest {
         }
 
         foreach ($Container in $FailedContainers) {
-            Write-Host ("[-] Container failed: {0}`n    {1}" -f $Container.Item, (Get-FirstErrorLine $Container.ErrorRecord))
+            Write-Host ("[-] Container failed: {0}`n    {1}" -f
+                $Container.Item,
+                (Get-FirstErrorLine $Container.ErrorRecord)
+            )
         }
 
         foreach ($Block in $FailedBlocks) {
-            Write-Host ("[-] Block failed: {0}`n    {1}" -f $Block.ExpandedPath, (Get-FirstErrorLine $Block.ErrorRecord))
+            Write-Host ("[-] Block failed: {0}`n    {1}" -f
+                $Block.ExpandedPath,
+                (Get-FirstErrorLine $Block.ErrorRecord)
+            )
         }
 
         if ($NonPassing.Count -gt 0) {

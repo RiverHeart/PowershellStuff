@@ -12,6 +12,9 @@ function Resolve-CoverageOutputPath {
         [string] $RepositoryRoot,
 
         [Parameter(Mandatory)]
+        [string] $ProjectName,
+
+        [Parameter(Mandatory)]
         [string] $TestSuite
     )
 
@@ -27,5 +30,14 @@ function Resolve-CoverageOutputPath {
         return (Join-Path -Path $RepositoryRoot -ChildPath $configuredOutputPath)
     }
 
-    return (Join-Path -Path $RepositoryRoot -ChildPath ("artifacts/coverage/{0}.coverage.xml" -f $TestSuite))
+    $CoverageName = if ($TestSuite -eq $ProjectName) {
+        $ProjectName
+    } else {
+        '{0}.{1}' -f $ProjectName, $TestSuite
+    }
+
+    return (Join-Path `
+        -Path $RepositoryRoot `
+        -ChildPath ("artifacts/coverage/{0}.coverage.xml" -f $CoverageName)
+    )
 }
