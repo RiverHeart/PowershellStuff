@@ -62,19 +62,31 @@ Describe 'Reset-TabExpansion2' {
     }
 
     It 'restores the captured original TabExpansion2 function when requested' {
-        $Result = InModuleScope TabCentral {
-            $SavedOriginal = $script:OriginalTabExpansion2
-            try {
+        $TabCentralModule = Get-Module -Name TabCentral | Select-Object -First 1
+        $SavedOriginal = & $TabCentralModule { $script:OriginalTabExpansion2 }
+        $SavedGlobalTabExpansion = Get-Item -Path Function:\global:TabExpansion2 -ErrorAction SilentlyContinue
+
+        try {
+            $Result = InModuleScope TabCentral {
                 $script:OriginalTabExpansion2 = { 'original-tab-expansion' }
                 Set-Item -Path Function:\global:TabExpansion2 -Value { 'replacement-tab-expansion' } -Force
 
                 Reset-TabExpansion2 -RestoreOriginal
                 & ${Function:Global:TabExpansion2}
-            } finally {
-                $script:OriginalTabExpansion2 = $SavedOriginal
+            }
+
+            $Result | Should -Be 'original-tab-expansion'
+        } finally {
+            $null = & $TabCentralModule {
+                param ($Original)
+                $script:OriginalTabExpansion2 = $Original
+            } $SavedOriginal
+
+            if ($SavedGlobalTabExpansion) {
+                $null = Set-Item -Path Function:\global:TabExpansion2 -Value $SavedGlobalTabExpansion.ScriptBlock -Force
+            } else {
+                Remove-Item -Path Function:\global:TabExpansion2 -ErrorAction SilentlyContinue
             }
         }
-
-        $Result | Should -Be 'original-tab-expansion'
     }
 }
