@@ -5,8 +5,18 @@
      — Ralph Waldo Emerson
 ```
 \
-\
-Please Work is a small PowerShell task runner with makefile-like task declarations.
+Please Work is a small PowerShell task runner with makefile-like task declarations. The name is a play on the bargaining stage of grief we all experience when trying to get something to work, usually after percussive maintenance and profuse swearing has failed us.
+
+## Table of Contents
+
+* [Task Definitions](#task-definitions)
+* [Task Isolation](#task-isolation)
+* [Task Results and Exit Codes](#task-results-and-exit-codes)
+  * [Incremental Builds](#incremental-builds)
+* [Future Parallel Execution](#future-parallel-execution)
+* [TODO](#todo)
+
+## Task Definitions
 
 Tasks are defined as `name: dependencies { body }`. Dependencies are optional:
 
