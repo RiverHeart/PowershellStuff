@@ -1,13 +1,15 @@
+# Runs Pester tests
 test: {
-    param([string] $Path)
+    param(
+        [string] $Project,
+        [string] $TestSuite,
+        [string[]] $Path
+    )
 
-    if ($Path) {
-        & "$GitRoot/tools/Invoke-Test.ps1" -Suite AstEditor -Path $Path
-    } else {
-        & "$GitRoot/tools/Invoke-Test.ps1" -Suite AstEditor
-    }
+    Invoke-MDKTest @PSBoundParameters
 }
 
+# Runs the Nitpick linter against changed files or all when `-All` is given.
 lint: {
     param([switch] $All)
 
@@ -18,6 +20,7 @@ lint: {
     }
 }
 
+# Cleans the build artifact directory
 clean: {
     if ([string]::IsNullOrEmpty($TaskFileRoot)) {
         throw 'The $TaskFileRoot variable is not set.'
@@ -28,10 +31,12 @@ clean: {
     Remove-Item -Path "$TaskFileRoot/artifacts" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Builds the module as a nuget package
 build: clean {
     Build-MDKModule -ProjectPath $TaskFileRoot
 }
 
+# Publishes the module to the PowerShell Gallery
 publish: {
     $ModuleName = Split-Path -Path $TaskFileRoot -Leaf
     $Manifest = Import-PowerShellDataFile -LiteralPath "$TaskFileRoot/$ModuleName.psd1" -ErrorAction Stop
@@ -40,7 +45,7 @@ publish: {
         throw 'The PSGalleryApiKey environment variable is required to publish.'
     }
     Publish-PSResource `
-        -NupkgPath "$TaskFileRoot/artifacts/packages/AstEditor.$Version.nupkg" `
+        -NupkgPath "$TaskFileRoot/artifacts/packages/$ModuleName.$Version.nupkg" `
         -Repository 'PSGallery' `
         -ApiKey $env:PSGalleryApiKey `
         -Verbose

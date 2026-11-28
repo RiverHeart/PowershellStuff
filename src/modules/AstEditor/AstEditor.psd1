@@ -90,7 +90,7 @@
     PrivateData = @{
         PSData = @{
             LicenseUri = 'https://github.com/RiverHeart/PowershellStuff/blob/main/LICENSE'
-            ProjectUri = 'https://github.com/RiverHeart/PowershellStuff'
+            ProjectUri = 'https://github.com/RiverHeart/PowershellStuff/tree/main/src/modules/AstEditor'
             Tags = @('AST', 'PowerShell')
         }
     }

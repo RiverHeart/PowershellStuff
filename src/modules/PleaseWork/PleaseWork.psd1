@@ -52,7 +52,9 @@
     )
     PrivateData = @{
         PSData = @{
-            Tags = @('TaskRunner', 'Build')
+            Tags = @('TaskRunner')
+            LicenseUri = 'https://github.com/RiverHeart/PowershellStuff/blob/main/LICENSE'
+            ProjectUri = 'https://github.com/RiverHeart/PowershellStuff/tree/main/src/modules/PleaseWork'
         }
     }
 }

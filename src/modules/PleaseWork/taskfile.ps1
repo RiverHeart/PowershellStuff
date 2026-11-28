@@ -2,40 +2,60 @@ $PleaseConfig = @{
     BaseRef = 'origin/main'
 }
 
-#.DESCRIPTION
-#  Packages the module
-build: test changed('./src', './project.psd1') {
-    & "$GitRoot/tools/Build-PSResource.ps1" `
-        -ProjectPath ./project.psd1 `
-        -DestinationPath "$GitRoot/artifacts/packages"
+# Runs Pester tests
+test: {
+    param(
+        [string] $Project,
+        [string] $TestSuite,
+        [string[]] $Path
+    )
+
+    Invoke-MDKTest @PSBoundParameters
 }
 
-#.DESCRIPTION
-#    Runs PSScriptAnalyzer
-lint: changed('./**/*.ps1') {
-    Write-Host "Found $($ChangedFiles.Count) changed files to analyze."
-    $Results = $ChangedFiles | Invoke-ScriptAnalyzer -Settings "$GitRoot/PSScriptAnalyzerSettings.psd1"
-    if ($Results.Count -gt 0) {
-        Write-Host "Found $($Results.Count) issues."
-        $Results | Select-Object `
-            -Property RuleName, Severity, ScriptPath, `
-            @{ Name = 'Line'; Expression = { $_.Extent.StartLineNumber } }, `
-            @{ Name = 'Column'; Expression = { $_.Extent.StartColumnNumber } }, `
-            Message
-        throw "PSScriptAnalyzer found issues."
+# Runs the Nitpick linter against changed files or all when `-All` is given.
+lint: {
+    param([switch] $All)
+
+    if ($All) {
+        Start-Nitpicking
     } else {
-        Write-Host "No issues found."
+        git diff --name-only --diff-filter=d --relative $TaskFileRoot | Start-Nitpicking
     }
 }
 
-#.DESCRIPTION
-#     Runs Pester tests
-test: lint changed('./src', './Tests') {
-    & "$GitRoot/tools/Invoke-Test.ps1" -TestSuite PleaseWork
+# Cleans the build artifact directory
+clean: {
+    if ([string]::IsNullOrEmpty($TaskFileRoot)) {
+        throw 'The $TaskFileRoot variable is not set.'
+    }
+    if (-not (Test-Path -LiteralPath $TaskFileRoot -PathType Container)) {
+        return
+    }
+    Remove-Item -Path "$TaskFileRoot/artifacts" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-#.DESCRIPTION
-#     Installs dev dependencies
+# Builds the module as a nuget package
+build: clean {
+    Build-MDKModule -ProjectPath $TaskFileRoot
+}
+
+# Publishes the module to the PowerShell Gallery
+publish: {
+    $ModuleName = Split-Path -Path $TaskFileRoot -Leaf
+    $Manifest = Import-PowerShellDataFile -LiteralPath "$TaskFileRoot/$ModuleName.psd1" -ErrorAction Stop
+    $Version = $Manifest.ModuleVersion
+    if ([string]::IsNullOrWhiteSpace($env:PSGalleryApiKey)) {
+        throw 'The PSGalleryApiKey environment variable is required to publish.'
+    }
+    Publish-PSResource `
+        -NupkgPath "$TaskFileRoot/artifacts/packages/$ModuleName.$Version.nupkg" `
+        -Repository 'PSGallery' `
+        -ApiKey $env:PSGalleryApiKey `
+        -Verbose
+}
+
+# Installs dev dependencies
 install: {
     if ($null -ne $env:VSCODE_INJECTION) {
         Write-Warning "Skipping install in VSCode injection context."

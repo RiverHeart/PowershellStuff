@@ -12,7 +12,7 @@
 RootModule = 'Nitpick.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.0.1'
+ModuleVersion = '0.0.2'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Core', 'Desktop')
@@ -30,7 +30,7 @@ CompanyName = 'Unknown'
 Copyright = '2026'
 
 # Description of the functionality provided by this module
-# Description = ''
+Description = 'A module for performing static code analysis and linting in PowerShell.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -127,7 +127,105 @@ AliasesToExport = @(
 # ModuleList = @()
 
 # List of all files packaged with this module
-# FileList = @()
+FileList = @(
+    'Nitpick.psd1'
+    'Nitpick.psm1'
+    'Nitpick.format.ps1xml'
+    'README.md'
+
+    # Private
+    'Private/Assert-CallableSignature.ps1'
+    'Private/Assert-NitpickIdentitySegment.ps1'
+    'Private/Assert-NitpickRuleId.ps1'
+    'Private/Get-CallableParameter.ps1'
+    'Private/Get-NitpickModuleLinting.ps1'
+    'Private/Get-NitpickPackage.ps1'
+    'Private/Get-NitpickRegistry.ps1'
+    'Private/Get-NitpickRuleLabel.ps1'
+    'Private/Get-NitpickSuppression.ps1'
+    'Private/New-NitpickModule.ps1'
+    'Private/Resolve-NitpickDispatchSignature.ps1'
+    'Private/Resolve-NitpickEffectiveRuleSet.ps1'
+    'Private/Resolve-NitpickPackageGraph.ps1'
+    'Private/Resolve-NitpickTargetCorrection.ps1'
+    'Private/Resolve-Version.ps1'
+    'Private/Select-NitpickGuidedCorrection.ps1'
+    'Private/Test-Assembly.ps1'
+    'Private/Test-NitpickCallableIdentity.ps1'
+    'Private/Test-NitpickInteractiveSession.ps1'
+    'Private/Test-NitpickRuleSuppressed.ps1'
+    'Private/Where-NitpickIncluded.ps1'
+
+    # Private/Context
+    'Private/Context/ConvertTo-NitpickPolicy.ps1'
+    'Private/Context/Invoke-NitpickRuleWithCoordinatorContext.ps1'
+    'Private/Context/New-NitpickCoordinatorDispatch.ps1'
+    'Private/Context/New-NitpickInvocationContext.ps1'
+    'Private/Context/Read-NitpickConfiguration.ps1'
+    'Private/Context/Test-NitpickCoordinatorDispatch.ps1'
+    'Private/Context/Test-NitpickRuleApplicability.ps1'
+
+    # Private/Formatting
+    'Private/Formatting/Format-NitpickCorrection.ps1'
+    'Private/Formatting/Format-NitpickHyperlink.ps1'
+    'Private/Formatting/Format-NitpickText.ps1'
+
+    # Private/Helpers
+    'Private/Helpers/Copy-NitpickPlainData.ps1'
+    'Private/Helpers/Should-Process.ps1'
+
+    # Private/ModuleResolution
+    'Private/ModuleResolution/Get-NitpickModuleManifestPath.ps1'
+    'Private/ModuleResolution/Resolve-NitpickModuleNameSource.ps1'
+    'Private/ModuleResolution/Resolve-NitpickModulePathSource.ps1'
+    'Private/ModuleResolution/Resolve-NitpickModuleSource.ps1'
+    'Private/ModuleResolution/Test-NitpickModulePathShape.ps1'
+
+    # Private/Settings
+    'Private/Settings/ConvertTo-NitpickEffectiveRuleSettings.ps1'
+    'Private/Settings/ConvertTo-NitpickInt32SettingValue.ps1'
+    'Private/Settings/ConvertTo-NitpickRuleSettingsMap.ps1'
+    'Private/Settings/ConvertTo-NitpickRuleSettingsSchema.ps1'
+
+    # Public/Helpers
+    'Public/Helpers/Complete-NitpickCategory.ps1'
+    'Public/Helpers/Find-NitpickAstNode.ps1'
+    'Public/Helpers/Import-ScriptBlockAst.ps1'
+    'Public/Helpers/New-NitpickCorrection.ps1'
+    'Public/Helpers/New-NitpickCorrectionResult.ps1'
+    'Public/Helpers/New-NitpickFinding.ps1'
+
+    # Public/Interface
+    'Public/Interface/Find-Nitpick.ps1'
+    'Public/Interface/Get-Nitpick.ps1'
+    'Public/Interface/New-Nitpick.ps1'
+    'Public/Interface/New-NitpickConfiguration.ps1'
+    'Public/Interface/New-NitpickTemplate.ps1'
+    'Public/Interface/Register-Nitpick.ps1'
+    'Public/Interface/Resolve-NitpickCorrectionProposal.ps1'
+    'Public/Interface/Start-Nitpicking.ps1'
+    'Public/Interface/Unregister-Nitpick.ps1'
+
+    # Public/Rules
+    'Public/Rules/Compatibility/7.0/Test-AvoidUnsupportedTernarySyntax.Rule.ps1'
+    'Public/Rules/Correctness/Test-ArrayShapeLostThroughControlFlow.Rule.ps1'
+    'Public/Rules/Correctness/Test-AvoidLiveCollectionMutation.Rule.ps1'
+    'Public/Rules/Correctness/Test-CollectionComparisonUsedAsAPredicate.Rule.ps1'
+    'Public/Rules/Correctness/Test-EmptyCollectionMemberAccess.Rule.ps1'
+    'Public/Rules/Correctness/Test-MisleadingBooleanConversion.Rule.ps1'
+    'Public/Rules/Correctness/Test-PossibleNullItemFromIndexedLookup.Rule.ps1'
+    'Public/Rules/Correctness/Test-PossibleTypeResolutionFailure.Rule.ps1'
+    'Public/Rules/Correctness/Test-StringArgToSwitchParameter.Rule.ps1'
+    'Public/Rules/Maintainability/Test-AvoidGlobalVars.Rule.ps1'
+    'Public/Rules/Quality/Test-UseActionPreferenceForStreamSuppression.Rule.ps1'
+    'Public/Rules/Quality/Test-UseDeclaredVarsMoreThanAssignments.Rule.ps1'
+    'Public/Rules/Style/Test-AvoidAmbiguousPipelineContinuation.Rule.ps1'
+    'Public/Rules/Style/Test-AvoidExclaimOperator.ps1'
+    'Public/Rules/Style/Test-AvoidLongLines.ps1'
+    'Public/Rules/Style/Test-AvoidParameterAttributeBool.Rule.ps1'
+    'Public/Rules/Style/Test-AvoidTrailingWhitespace.ps1'
+    'Public/Rules/Style/Test-UseIsNotOperator.Rule.ps1'
+)
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess.
 # This may also contain a PSData hashtable with additional module metadata used by PowerShell.
@@ -159,13 +257,13 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        # Tags = @()
+        Tags = @('Lint', 'Linter', 'Linting', 'StaticAnalysis')
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        LicenseUri = 'https://github.com/RiverHeart/PowershellStuff/blob/main/LICENSE'
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
+        ProjectUri = 'https://github.com/RiverHeart/PowershellStuff/tree/main/src/modules/Nitpick'
 
         # A URL to an icon representing this module.
         # IconUri = ''

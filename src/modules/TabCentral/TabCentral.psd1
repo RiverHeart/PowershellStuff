@@ -96,7 +96,29 @@ AliasesToExport = @()
 # ModuleList = @()
 
 # List of all files packaged with this module
-# FileList = @()
+FileList = @(
+    'TabCentral.psd1'
+    'TabCentral.psm1'
+    'README.md'
+
+    # Private
+    'Private/Assert-Property.ps1'
+    'Private/Assert-TabCentralHookCallableSignature.ps1'
+    'Private/Assert-TabCentralOwnsExpansion.ps1'
+    'Private/Get-TabCentralHookCallableParameterName.ps1'
+    'Private/Get-TabCentralRegistry.ps1'
+    'Private/Test-Property.ps1'
+
+    # Public
+    'Public/Disable-TabCentral.ps1'
+    'Public/Enable-TabCentral.ps1'
+    'Public/Get-TabCentralHook.ps1'
+    'Public/New-TabCentralHook.ps1'
+    'Public/Register-TabCentralHook.ps1'
+    'Public/Reset-TabExpansion2.ps1'
+    'Public/TabExpansion2.ps1'
+    'Public/Unregister-TabCentralHook.ps1'
+)
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
@@ -104,13 +126,13 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        # Tags = @()
+        Tags = @('TabCompletion', 'TabExpansion', 'AutoComplete')
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        LicenseUri = 'https://github.com/RiverHeart/PowershellStuff/blob/main/LICENSE'
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
+        ProjectUri = 'https://github.com/RiverHeart/PowershellStuff/tree/main/src/modules/TabCentral'
 
         # A URL to an icon representing this module.
         # IconUri = ''
