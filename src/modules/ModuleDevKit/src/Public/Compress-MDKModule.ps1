@@ -79,7 +79,8 @@ function Compress-MDKModule {
         New-Item -Type Directory -Path (Join-Path -Path $TempDir.FullName -ChildPath '_rels') | Out-Null
 
         $FileList = if ($ModuleManifest.FileList) {
-            $ModuleManifest.FileList
+            @($ModuleManifest.FileList) + @((Get-Item -LiteralPath $ManifestPath).Name) |
+                Select-Object -Unique
         } else {
             '**'
         }
@@ -201,27 +202,31 @@ function Compress-MDKModule {
         }
 
         # Copy files
+        $FilesToCopy = if ($FileList -eq '**') {
+            Get-ChildItem -LiteralPath $ModulePath -File -Recurse -Force -ErrorAction Stop
+        } else {
+            foreach ($File in $FileList) {
+                if ([WildcardPattern]::ContainsWildcardCharacters($File)) {
+                    throw "Module manifest FileList path '$File' must not contain wildcards."
+                }
 
-        $GetChildItemParams = @{
-            Path = $ModulePath
-            File = $true
-            Recurse = $true
+                Get-Item -LiteralPath (Join-Path -Path $ModulePath -ChildPath $File) `
+                    -ErrorAction Stop
+            }
         }
 
-        if ($FileList -eq '*') {
-            $GetChildItemParams.Recurse = $false
-        } elseif ($FileList -ne '**') {
-            $GetChildItemParams.Include = $FileList
-        }
+        $FilesToCopy | ForEach-Object {
+            if ($_.PSIsContainer) {
+                throw "Module manifest FileList path '$($_.FullName)' is not a file."
+            }
 
-        Get-ChildItem @GetChildItemParams | ForEach-Object {
             $RelativePath = $_.FullName.Substring($ModulePath.Length).TrimStart('\','/')
-            $DestinationPath = Join-Path -Path $TempDir.FullName -ChildPath "$RelativePath"
+            $DestinationPath = Join-Path -Path $TempDir.FullName -ChildPath $RelativePath
             $DestinationDir = Split-Path -Path $DestinationPath -Parent
             if (-not (Test-Path -Path $DestinationDir)) {
                 New-Item -Type Directory -Path $DestinationDir | Out-Null
             }
-            Copy-Item -Path $_.FullName -Destination $DestinationPath
+            Copy-Item -LiteralPath $_.FullName -Destination $DestinationPath
         }
 
         # Create .nupkg (zip) file. Compress-Archive in Windows PowerShell 5.1
@@ -229,12 +234,15 @@ function Compress-MDKModule {
         $PackagePath = Join-Path `
             -Path $OutputPath `
             -ChildPath "$Name.$($ModuleManifest.ModuleVersion).nupkg"
+
         $ArchivePath = [Path]::ChangeExtension($PackagePath, '.zip')
+
         Compress-Archive `
             -Path "$($TempDir.FullName)\*" `
             -DestinationPath $ArchivePath `
             -Force `
             -ErrorAction Stop
+
         Move-Item -LiteralPath $ArchivePath -Destination $PackagePath -Force -ErrorAction Stop
 
         if ($PassThru) {

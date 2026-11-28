@@ -21,6 +21,35 @@
         'pw'
         'please'
     )
+    FileList = @(
+        'PleaseWork.psd1'
+        'PleaseWork.psm1'
+        'README.md'
+        'src/Classes/DirectedAcyclicGraph.ps1'
+        'src/Private/Copy-PleaseWorkSnapshotValue.ps1'
+        'src/Private/Format-PleaseWorkTaskHelp.ps1'
+        'src/Private/Get-GitChangedPath.ps1'
+        'src/Private/Get-GitChangeset.ps1'
+        'src/Private/Get-PleaseWorkTaskHelp.ps1'
+        'src/Private/Get-TaskDeclaration.ps1'
+        'src/Private/Get-TaskDescription.ps1'
+        'src/Private/Get-TaskFileDeclaration.ps1'
+        'src/Private/Invoke-PleaseWorkTask.ps1'
+        'src/Private/New-PleaseWorkInitialSessionState.ps1'
+        'src/Private/New-PleaseWorkPreparedTaskSet.ps1'
+        'src/Private/New-PleaseWorkSnapshotTaskSet.ps1'
+        'src/Private/New-PleaseWorkTaskContext.ps1'
+        'src/Private/New-PleaseWorkTaskExecutor.ps1'
+        'src/Private/New-PleaseWorkTaskSnapshot.ps1'
+        'src/Private/Resolve-ParamBlock.ps1'
+        'src/Private/Resolve-TaskOrder.ps1'
+        'src/Private/Should-Process.ps1'
+        'src/Private/Write-PleaseWorkTaskExecutorStream.ps1'
+        'src/Public/Complete-PleaseWorkTask.ps1'
+        'src/Public/Invoke-PleaseWork.ps1'
+        'src/Public/Invoke-PleaseWorkNativeCommand.ps1'
+        'src/Public/Resolve-TaskFilePath.ps1'
+    )
     PrivateData = @{
         PSData = @{
             Tags = @('TaskRunner', 'Build')
