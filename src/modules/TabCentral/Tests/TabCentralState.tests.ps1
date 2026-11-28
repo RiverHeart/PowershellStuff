@@ -1,7 +1,7 @@
 BeforeAll {
     $script:SavedGlobalTabExpansion = Get-Item -Path Function:\global:TabExpansion2 -ErrorAction SilentlyContinue
     $script:SavedTabCentralEnabled = Get-Variable -Name TabCentralEnabled -Scope Global -ErrorAction SilentlyContinue
-    Import-Module -Name "$PSScriptRoot/../TabCentral.psd1" -Force
+    Import-Module -Name "$PSScriptRoot/../TabCentral.psd1"
 }
 
 AfterAll {

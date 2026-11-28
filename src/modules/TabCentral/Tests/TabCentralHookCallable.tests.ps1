@@ -1,5 +1,5 @@
 BeforeAll {
-    Import-Module -Name "$PSScriptRoot/../TabCentral.psd1" -Force
+    Import-Module -Name "$PSScriptRoot/../TabCentral.psd1"
 }
 
 Describe 'Get-TabCentralHookCallableParameterName' {
