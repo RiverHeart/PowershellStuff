@@ -131,6 +131,44 @@ function Compress-MDKModule {
 </package>
 "@
 
+        if ($ModuleManifest.RequiredModules) {
+            $DependenciesNode = $NuspecTemplate.CreateElement(
+                'dependencies',
+                $NuspecTemplate.DocumentElement.NamespaceURI
+            )
+
+            foreach ($RequiredModule in @($ModuleManifest.RequiredModules)) {
+                $DependencyNode = $NuspecTemplate.CreateElement(
+                    'dependency',
+                    $NuspecTemplate.DocumentElement.NamespaceURI
+                )
+
+                if ($RequiredModule -is [string]) {
+                    $DependencyNode.SetAttribute('id', $RequiredModule)
+                } else {
+                    $DependencyNode.SetAttribute('id', [string] $RequiredModule.ModuleName)
+
+                    $VersionRange = if ($RequiredModule.RequiredVersion) {
+                        "[$($RequiredModule.RequiredVersion)]"
+                    } elseif ($RequiredModule.ModuleVersion -and $RequiredModule.MaximumVersion) {
+                        "[$($RequiredModule.ModuleVersion),$($RequiredModule.MaximumVersion)]"
+                    } elseif ($RequiredModule.ModuleVersion) {
+                        "[$($RequiredModule.ModuleVersion),)"
+                    } elseif ($RequiredModule.MaximumVersion) {
+                        "(,$($RequiredModule.MaximumVersion)]"
+                    }
+
+                    if ($VersionRange) {
+                        $DependencyNode.SetAttribute('version', $VersionRange)
+                    }
+                }
+
+                $DependenciesNode.AppendChild($DependencyNode) | Out-Null
+            }
+
+            $NuspecTemplate.package.metadata.AppendChild($DependenciesNode) | Out-Null
+        }
+
         # Add files node if there are files to include
         $FilesNode = $NuspecTemplate.CreateElement("files")
 

@@ -28,6 +28,30 @@ BeforeAll {
             $Archive.Dispose()
         }
     }
+
+    function Get-PackagedNuspec {
+        param(
+            [Parameter(Mandatory)]
+            [string] $DestinationPath
+        )
+
+        $PackagePath = Get-ChildItem -LiteralPath $DestinationPath -Filter '*.nupkg' -File |
+            Select-Object -First 1
+        $Archive = [System.IO.Compression.ZipFile]::OpenRead($PackagePath.FullName)
+        try {
+            $NuspecEntry = $Archive.Entries |
+                Where-Object { $_.Name -like '*.nuspec' } |
+                Select-Object -First 1
+            $Reader = [System.IO.StreamReader]::new($NuspecEntry.Open())
+            try {
+                Write-Output -InputObject $Reader.ReadToEnd()
+            } finally {
+                $Reader.Dispose()
+            }
+        } finally {
+            $Archive.Dispose()
+        }
+    }
 }
 
 Describe 'Should-Continue prompt behavior' {
@@ -168,6 +192,39 @@ Describe 'Build-MDKModule packaging' {
         $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
         $PackagedFiles | Should -Contain 'PackageProject.psd1'
         $PackagedFiles | Should -Contain 'Public/Keep.ps1'
+    }
+
+    It 'adds manifest RequiredModules to the NuGet dependencies' {
+        @(
+            '@{'
+            "    RootModule = 'PackageProject.psm1'"
+            "    ModuleVersion = '1.0.0'"
+            "    GUID = '8ad9cb8c-ca35-4c4b-bd87-5efc1f0afc9f'"
+            "    Author = 'Test'"
+            "    Description = 'Package test fixture.'"
+            '    RequiredModules = @('
+            "        'AstEditor'"
+            "        @{ ModuleName = 'PSScriptAnalyzer'; RequiredVersion = '1.22.0' }"
+            "        @{ ModuleName = 'Pester'; ModuleVersion = '5.0.0'; MaximumVersion = '5.9.9' }"
+            '    )'
+            "    FileList = @('PackageProject.psd1', 'PackageProject.psm1')"
+            '}'
+        ) | Set-Content -LiteralPath (Join-Path -Path $ProjectRoot -ChildPath 'PackageProject.psd1')
+
+        Build-MDKModule `
+            -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
+            -DestinationPath $Destination
+
+        [xml] $Nuspec = Get-PackagedNuspec -DestinationPath $Destination
+        $Dependencies = @($Nuspec.SelectNodes("//*[local-name()='dependency']"))
+
+        $Dependencies | Should -HaveCount 3
+        ($Dependencies | Where-Object id -eq 'AstEditor').HasAttribute('version') |
+            Should -BeFalse
+        ($Dependencies | Where-Object id -eq 'PSScriptAnalyzer').version |
+            Should -Be '[1.22.0]'
+        ($Dependencies | Where-Object id -eq 'Pester').version |
+            Should -Be '[5.0.0,5.9.9]'
     }
 
     It 'packages only files listed in the module manifest' {
