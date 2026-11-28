@@ -13,10 +13,10 @@ BeforeAll {
         )
 
         $Directory = New-Item -Path (Join-Path $Root $Name) -ItemType Directory -Force
-        $ScriptModulePath = Join-Path $Directory.FullName ($Name + '.psm1')
+        $ScriptModulePath = Join-Path $Directory.FullName "$Name.psm1"
         Set-Content -LiteralPath $ScriptModulePath -Value "function Test-$Name { param(`$ScriptBlockAst) }"
-        $ManifestPath = Join-Path $Directory.FullName ($Name + '.psd1')
-        New-ModuleManifest -Path $ManifestPath -RootModule ($Name + '.psm1') -ModuleVersion $Version
+        $ManifestPath = Join-Path $Directory.FullName "$Name.psd1"
+        New-ModuleManifest -Path $ManifestPath -RootModule "$Name.psm1" -ModuleVersion $Version
 
         [pscustomobject] @{
             Name = $Name
