@@ -35,12 +35,18 @@ function Test-GitIgnoredPath {
         [string] $GitExecutable
     )
 
-    & $GitExecutable -C $GitRepositoryRoot check-ignore --quiet --no-index -- $Path
-    switch ($LASTEXITCODE) {
-        0 { return $true }
-        1 { return $false }
-        default {
-            throw "Git could not evaluate ignore rules for '$Path' (exit code $LASTEXITCODE)."
+    $OriginalExitCode = $global:LASTEXITCODE
+    try {
+        & $GitExecutable -C $GitRepositoryRoot check-ignore --quiet --no-index -- $Path
+        $GitExitCode = $LASTEXITCODE
+        switch ($GitExitCode) {
+            0 { Write-Output -InputObject $true }
+            1 { Write-Output -InputObject $false }
+            default {
+                throw "Git could not evaluate ignore rules for '$Path' (exit code $GitExitCode)."
+            }
         }
+    } finally {
+        $global:LASTEXITCODE = $OriginalExitCode
     }
 }

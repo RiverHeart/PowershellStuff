@@ -131,6 +131,7 @@ Describe 'Build-MDKModule packaging' {
         $PackagedFiles | Should -Not -Contain 'Public/Secret.local.ps1'
         $PackagedFiles | Should -Not -Contain 'Public/Generated.ps1'
         $PackagedFiles | Should -Not -Contain 'Public/.gitignore'
+        $LASTEXITCODE | Should -Be 0
     }
 
     It 'honors negated patterns in Git ignore rules' {

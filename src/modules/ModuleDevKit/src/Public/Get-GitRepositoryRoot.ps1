@@ -23,12 +23,17 @@ function Get-GitRepositoryRoot {
         [string] $GitExecutable
     )
 
-    $RepositoryRoot = & $GitExecutable -C $Path rev-parse --show-toplevel 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        return
-    }
+    $OriginalExitCode = $global:LASTEXITCODE
+    try {
+        $RepositoryRoot = & $GitExecutable -C $Path rev-parse --show-toplevel 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            return
+        }
 
-    Write-Output -InputObject (
-        [System.IO.Path]::GetFullPath(([string] $RepositoryRoot).Trim())
-    ) -NoEnumerate
+        Write-Output -InputObject (
+            [System.IO.Path]::GetFullPath(([string] $RepositoryRoot).Trim())
+        ) -NoEnumerate
+    } finally {
+        $global:LASTEXITCODE = $OriginalExitCode
+    }
 }
