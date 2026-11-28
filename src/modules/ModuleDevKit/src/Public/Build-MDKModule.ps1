@@ -179,7 +179,7 @@ function Invoke-MDKModuleBuild {
 
         foreach ($ManifestFile in $ManifestFiles) {
             $SourceItem = $ManifestFile.SourceItem
-            if ($SourceItem.FullName.Equals($ManifestPath, [StringComparison]::OrdinalIgnoreCase)) {
+            if ($SourceItem.FullName -ieq $ManifestPath) {
                 continue
             }
 
@@ -212,6 +212,7 @@ function Invoke-MDKModuleBuild {
             }
         }
 
+        # MARK: UPDATE MANIFEST
         $StagedManifestPath = Join-Path $StagingModulePath "$($Project.Name).psd1"
         Update-ModuleManifest `
             -Path $StagedManifestPath `
