@@ -34,9 +34,7 @@ function New-PleaseWorkTaskExecutor {
         $Runspace = if ($null -eq $InitialSessionState) {
             [RunspaceFactory]::CreateRunspace()
         } else {
-            [RunspaceFactory]::CreateRunspace(
-                $InitialSessionState
-            )
+            [RunspaceFactory]::CreateRunspace($InitialSessionState)
         }
 
         try {

@@ -251,6 +251,7 @@ build: test { 'build' }
                 ForEach-Object { $Output.Add($_) }
         } | Should -Throw 'test failed'
         $Output | Should -Be @('test')
+        $LASTEXITCODE | Should -Be 1
     }
 
     It 'treats non-terminating PowerShell errors as task failures' {
@@ -269,6 +270,7 @@ build: test { 'build' }
                 ForEach-Object { $Output.Add($_) }
         } | Should -Throw 'test failed'
         $Output | Should -Be @('test')
+        $LASTEXITCODE | Should -Be 1
     }
 
     It 'stops an isolated task when exec receives an unexpected native exit code' {

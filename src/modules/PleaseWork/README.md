@@ -123,7 +123,7 @@ Each task produces an internal result containing:
 TaskName, Succeeded, ExitCode, Error, StartedAt, FinishedAt, Duration, Output
 ```
 
-Before each task, PleaseWork resets `$global:LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to `Stop` for the task invocation. A PowerShell error therefore fails the task immediately. Otherwise, the last native command executed by the task determines its native exit status after the scriptblock finishes. PleaseWork reads `$global:LASTEXITCODE`; assigning to an unscoped `$LASTEXITCODE` inside a task creates or updates a task-local variable and does not affect the task result. A nonzero final status fails the task and prevents its dependents from running.
+Before each task, PleaseWork resets `$global:LASTEXITCODE` to `0` and sets `$ErrorActionPreference` to `Stop` for the task invocation. A PowerShell error therefore fails the task immediately and sets its exit code to `1` unless a native command has already supplied a different nonzero exit code. Otherwise, the last native command executed by the task determines its native exit status after the scriptblock finishes. PleaseWork reads `$global:LASTEXITCODE`; assigning to an unscoped `$LASTEXITCODE` inside a task creates or updates a task-local variable and does not affect the task result. A nonzero final status fails the task and prevents its dependents from running.
 
 Intermediate nonzero statuses do not stop the scriptblock, so task authors can inspect and handle expected native failures using normal PowerShell control flow.
 
@@ -153,7 +153,7 @@ On PowerShell 7, callers can set `$PSNativeCommandUseErrorActionPreference` to `
 `$ErrorActionPreference = 'Stop'` causes the task to stop at the first failing native command.
 PleaseWork does not set this PowerShell 7-only preference so its default behavior remains compatible with Windows PowerShell 5.1.
 
-By default, task output remains in the normal output pipeline. With `-PassThru`, PleaseWork instead returns one result object per executed task and stores each task's output in that result's `Output` property. The final native status remains available through `$LASTEXITCODE`.
+By default, task output remains in the normal output pipeline. With `-PassThru`, PleaseWork instead returns one result object per executed task and stores each task's output in that result's `Output` property. The final status remains available through `$LASTEXITCODE`.
 
 Tasks can use `changed()` filters containing literal Git pathspecs. A filtered task runs when a
 matching file changed or when one of its task dependencies ran:
@@ -199,4 +199,5 @@ The runner's overall outcome is therefore aggregate: it fails when any task fail
 # TODO
 
 * Tasks beginning with an underscore should be considered hidden/internal.
-* Ensure that the base PleaseWork cmdlet does not take positional parameters other than the task name so users can effectively forward remaining arguments to the task itself. This would be in service of calling CLI utilities from those tasks that depend on positional params themselves. 
+* Ensure that the base PleaseWork cmdlet does not take positional parameters other than the task name so users can effectively forward remaining arguments to the task itself. This would be in service of calling CLI utilities from those tasks that depend on positional params themselves.
+* The switch to runspaces means that attempting to run commands that rely on user interaction will fail. Possible solutions involve passing the parent host to InitialSessionState as `$ParentHost` and calling methods off it or assigning the runspace to a new Powershell instance.

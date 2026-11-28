@@ -112,7 +112,10 @@ function Invoke-PleaseWorkTask {
         }
     }
 
-    $InitialSessionState = New-PleaseWorkInitialSessionState -Snapshot $Snapshot
+    $InitialSessionState = New-PleaseWorkInitialSessionState `
+        -Snapshot $Snapshot `
+        -SessionState $PSCmdlet.SessionState
+
     $IsolatedConfig = Copy-PleaseWorkSnapshotValue `
         -InputObject $Snapshot.Config `
         -Name PleaseConfig
@@ -196,6 +199,10 @@ function Invoke-PleaseWorkTask {
             }
 
             $Runspace.Dispose()
+        }
+
+        if ($null -ne $TaskError -and $ExitCode -eq 0) {
+            $ExitCode = 1
         }
 
         if ($null -ne $Executor) { $Executor.Dispose() }

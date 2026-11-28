@@ -100,8 +100,10 @@ build: {
             } | Should -Throw '*task failed*'
 
             $Result.Succeeded | Should -BeFalse
+            $Result.ExitCode | Should -Be 1
             $Result.Error.Exception.Message | Should -Match 'task failed'
             $Result.Output | Should -Be @('before failure')
+            $LASTEXITCODE | Should -Be 1
         }
     }
 }

@@ -27,6 +27,41 @@ build: prepare {
         )
     }
 
+    It 'copies environment variables from the caller SessionState' {
+        $VariableName = "PleaseWorkEnv_$([guid]::NewGuid().ToString('N'))"
+        $VariablePath = "Env:$VariableName"
+        Set-Item -LiteralPath $VariablePath -Value 'caller-value'
+
+        try {
+            $CallerSessionState = $ExecutionContext.SessionState
+            $Snapshot = [pscustomobject] @{
+                Variables = @()
+                Functions = @()
+                Aliases = @()
+                RunnerModulePath = (Get-Module PleaseWork).Path
+                Modules = @()
+            }
+
+            $InitialSessionState = & (Get-Module PleaseWork) {
+                param ($TaskSnapshot, $CallerState)
+
+                New-PleaseWorkInitialSessionState `
+                    -Snapshot $TaskSnapshot `
+                    -SessionState $CallerState
+            } $Snapshot $CallerSessionState
+
+            $EnvironmentVariable = @(
+                $InitialSessionState.EnvironmentVariables |
+                    Where-Object { $_.Name -eq $VariableName }
+            )
+
+            $EnvironmentVariable | Should -HaveCount 1
+            $EnvironmentVariable[0].Value | Should -Be 'caller-value'
+        } finally {
+            Remove-Item -LiteralPath $VariablePath -ErrorAction Ignore
+        }
+    }
+
     It 'returns structured task results without mixing task output' {
         $Results = @(please build -TaskFile $TestTaskFile -PassThru)
 

@@ -1,3 +1,4 @@
+using namespace System.Management.Automation
 using namespace System.Management.Automation.Runspaces
 
 <#
@@ -10,6 +11,9 @@ using namespace System.Management.Automation.Runspaces
 
 .PARAMETER Snapshot
     The Task Snapshot to recreate.
+
+.PARAMETER SessionState
+    The caller session state whose environment variables should be copied.
 
 .EXAMPLE
     $State = New-PleaseWorkInitialSessionState -Snapshot $Snapshot
@@ -25,10 +29,26 @@ function New-PleaseWorkInitialSessionState {
     param (
         [Parameter(Mandatory)]
         [ValidateNotNull()]
-        [pscustomobject] $Snapshot
+        [pscustomobject] $Snapshot,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        [SessionState] $SessionState
     )
 
     $InitialSessionState = [InitialSessionState]::CreateDefault2()
+
+    $SessionState.InvokeProvider.ChildItem.Get('Env:', $false) |
+        ForEach-Object {
+            $EnvVar = $_
+            $InitialSessionState.EnvironmentVariables.Add(
+                [SessionStateVariableEntry]::new(
+                    $EnvVar.Name,
+                    $EnvVar.Value,
+                    "TaskFile environment variable '$($EnvVar.Name)'."
+                )
+            )
+        }
 
     foreach ($Variable in $Snapshot.Variables) {
         $Value = Copy-PleaseWorkSnapshotValue `
