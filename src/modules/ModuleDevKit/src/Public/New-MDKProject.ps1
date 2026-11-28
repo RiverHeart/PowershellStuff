@@ -87,7 +87,8 @@ function New-MDKProject {
         -ModuleVersion $ModuleVersion `
         -Author $Author `
         -Description $Description `
-        -RootModule $ModuleFile
+        -RootModule $ModuleFile `
+        -FileList @("$Name.psd1", "$Name.psm1")
 
     Copy-Item -Path $ModuleFileTemplate -Destination $ModuleFile
     (Get-Content -Raw -Path $ProjectFileTemplate) -replace '__ModuleName__', $Name |

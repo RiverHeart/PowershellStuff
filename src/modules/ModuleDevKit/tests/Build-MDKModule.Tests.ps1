@@ -74,7 +74,7 @@ Describe 'Should-Continue prompt behavior' {
     }
 }
 
-Describe 'Build-MDKModule Git ignore filtering' {
+Describe 'Build-MDKModule packaging' {
     BeforeEach {
         $TestRoot = Join-Path -Path $TestDrive -ChildPath ([guid]::NewGuid().ToString('N'))
         $ProjectRoot = Join-Path -Path $TestRoot -ChildPath 'PackageProject'
@@ -89,6 +89,14 @@ Describe 'Build-MDKModule Git ignore filtering' {
             "    GUID = '8ad9cb8c-ca35-4c4b-bd87-5efc1f0afc9f'"
             "    Author = 'Test'"
             "    Description = 'Package test fixture.'"
+            '    FileList = @('
+            "        'PackageProject.psd1'"
+            "        'PackageProject.psm1'"
+            "        'Public/Keep.ps1'"
+            "        'Public/Secret.local.ps1'"
+            "        'Public/Generated.ps1'"
+            "        'Public/Generated.keep.ps1'"
+            '    )'
             '}'
         ) | Set-Content -LiteralPath (Join-Path -Path $ProjectRoot -ChildPath 'PackageProject.psd1')
         '' | Set-Content -LiteralPath (Join-Path -Path $ProjectRoot -ChildPath 'PackageProject.psm1')
@@ -100,13 +108,6 @@ Describe 'Build-MDKModule Git ignore filtering' {
         @(
             '@{'
             "    Name = 'PackageProject'"
-            '    Package = @{'
-            '        Include = @('
-            "            'PackageProject.psd1'"
-            "            'PackageProject.psm1'"
-            "            'Public'"
-            '        )'
-            '    }'
             '}'
         ) | Set-Content -LiteralPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1')
 
@@ -156,6 +157,65 @@ Describe 'Build-MDKModule Git ignore filtering' {
         $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
         $PackagedFiles | Should -Contain 'Public/Secret.local.ps1'
         $PackagedFiles | Should -Contain 'Public/Generated.ps1'
+    }
+
+    It 'does not require Package metadata in project.psd1' {
+        Build-MDKModule `
+            -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
+            -DestinationPath $Destination
+
+        $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
+        $PackagedFiles | Should -Contain 'PackageProject.psd1'
+        $PackagedFiles | Should -Contain 'Public/Keep.ps1'
+    }
+
+    It 'packages only files listed in the module manifest' {
+        'unlisted' | Set-Content -LiteralPath (Join-Path -Path $PublicRoot -ChildPath 'Unlisted.ps1')
+
+        Build-MDKModule `
+            -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
+            -DestinationPath $Destination
+
+        $PackagedFiles = Get-PackagedFile -DestinationPath $Destination
+        $PackagedFiles | Should -Contain 'Public/Keep.ps1'
+        $PackagedFiles | Should -Not -Contain 'Public/Unlisted.ps1'
+    }
+
+    It 'requires a FileList in the module manifest' {
+        @(
+            '@{'
+            "    RootModule = 'PackageProject.psm1'"
+            "    ModuleVersion = '1.0.0'"
+            "    GUID = '8ad9cb8c-ca35-4c4b-bd87-5efc1f0afc9f'"
+            "    Author = 'Test'"
+            "    Description = 'Package test fixture.'"
+            '}'
+        ) | Set-Content -LiteralPath (Join-Path -Path $ProjectRoot -ChildPath 'PackageProject.psd1')
+
+        {
+            Build-MDKModule `
+                -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
+                -DestinationPath $Destination
+        } | Should -Throw '*must define a non-empty FileList*'
+    }
+
+    It 'rejects wildcard entries in the module manifest FileList' {
+        @(
+            '@{'
+            "    RootModule = 'PackageProject.psm1'"
+            "    ModuleVersion = '1.0.0'"
+            "    GUID = '8ad9cb8c-ca35-4c4b-bd87-5efc1f0afc9f'"
+            "    Author = 'Test'"
+            "    Description = 'Package test fixture.'"
+            "    FileList = @('PackageProject.psm1', 'Public/*.ps1')"
+            '}'
+        ) | Set-Content -LiteralPath (Join-Path -Path $ProjectRoot -ChildPath 'PackageProject.psd1')
+
+        {
+            Build-MDKModule `
+                -ProjectPath (Join-Path -Path $ProjectRoot -ChildPath 'project.psd1') `
+                -DestinationPath $Destination
+        } | Should -Throw "*FileList path 'Public/*.ps1' must be a literal path*"
     }
 
     It 'continues without Git ignore filtering only when explicitly forced' {

@@ -17,3 +17,9 @@ lint: {
         git diff --name-only --diff-filter=d --relative $TaskFileRoot | Start-Nitpicking
     }
 }
+
+build: {
+    Build-MDKModule `
+        -ProjectPath $TaskFileRoot `
+        -DestinationPath "$TaskFileRoot/artifacts"
+}
