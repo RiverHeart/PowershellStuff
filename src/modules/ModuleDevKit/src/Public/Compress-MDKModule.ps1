@@ -50,16 +50,12 @@ function Compress-MDKModule {
         return
     }
 
-    if ($OutputPath) {
-        if (-not (Test-Path -Path $OutputPath)) {
-            New-Item -Type Directory -Path $OutputPath | Out-Null
-        }
-    } else {
+    if (-not $OutputPath) {
         $OutputPath = Get-Location
     }
 
     if (-not $Name) {
-        $Name = (Get-Item -Path $ModulePath).BaseName
+        $Name = (Get-Item $ModulePath).BaseName
     }
 
     $TempDir = $null
@@ -67,16 +63,27 @@ function Compress-MDKModule {
     # Where the work is done
     try {
         # Load module manifest
-        $ManifestPath = Join-Path -Path $ModulePath -ChildPath (Get-ChildItem -Path $ModulePath -Filter *.psd1).Name
+        $ManifestPath = Join-Path $ModulePath (Get-ChildItem $ModulePath -Filter *.psd1).Name
         $ModuleManifest = Import-PowerShellDataFile -Path $ManifestPath
 
-        $TempDirPath = Join-Path -Path ([Path]::GetTempPath()) -ChildPath (
-            "New-ModulePackage_${Name}_$([guid]::NewGuid().ToString('N'))"
-        )
-        $TempDir = New-Item -Path $TempDirPath -ItemType Directory -ErrorAction Stop
+        $PackagePath = Join-Path `
+            -Path $OutputPath `
+            -ChildPath "$Name.$($ModuleManifest.ModuleVersion).nupkg"
 
-        New-Item -Type Directory -Path (Join-Path -Path $TempDir.FullName -ChildPath 'package/services/metadata/core-properties') | Out-Null
-        New-Item -Type Directory -Path (Join-Path -Path $TempDir.FullName -ChildPath '_rels') | Out-Null
+        if (-not $PSCmdlet.ShouldProcess($PackagePath, 'Create module package')) {
+            return
+        }
+
+        New-Directory $OutputPath -ErrorAction Stop
+
+        $TempDirPath = Join-Path `
+            -Path ([Path]::GetTempPath()) `
+            -ChildPath "New-ModulePackage_${Name}_$([guid]::NewGuid().ToString('N'))"
+
+        $TempDir = New-Directory $TempDirPath -ErrorAction Stop -PassThru
+
+        New-Directory "$($TempDir.FullName)/package/services/metadata/core-properties"
+        New-Directory "$($TempDir.FullName)/_rels"
 
         $FileList = if ($ModuleManifest.FileList) {
             @($ModuleManifest.FileList) + @((Get-Item -LiteralPath $ManifestPath).Name) |
@@ -137,7 +144,7 @@ function Compress-MDKModule {
 
         $NuspecTemplate.package.AppendChild($FilesNode) | Out-Null
 
-        $NuspecPath = Join-Path -Path $TempDir.FullName -ChildPath "$Name.nuspec"
+        $NuspecPath = Join-Path $TempDir.FullName "$Name.nuspec"
         if ($PSCmdlet.ShouldProcess($NuspecPath, "Create 'nuspec' file")) {
             $NuspecTemplate.Save($NuspecPath)
         }
@@ -154,7 +161,7 @@ function Compress-MDKModule {
 </Relationships>
 "@
 
-        $RelsPath = Join-Path -Path $TempDir.FullName -ChildPath '_rels/.rels'
+        $RelsPath = Join-Path $TempDir.FullName '_rels/.rels'
         if ($PSCmdlet.ShouldProcess($RelsPath, "Create 'rel' file")) {
             $RelsTemplate.Save($RelsPath)
         }
@@ -174,7 +181,7 @@ function Compress-MDKModule {
 </coreProperties>
 "@
 
-        $MetadataPath = Join-Path -Path $TempDir.FullName -ChildPath "package/services/metadata/core-properties/$MetadataId.psmdcp"
+        $MetadataPath = Join-Path $TempDir.FullName "package/services/metadata/core-properties/$MetadataId.psmdcp"
         if ($PSCmdlet.ShouldProcess($MetadataPath, "Create 'metadata' file")) {
             $MetadataTemplate.Save($MetadataPath)
         }
@@ -196,7 +203,7 @@ function Compress-MDKModule {
 </Types>
 "@
 
-        $ContentTypesPath = Join-Path -Path $TempDir.FullName -ChildPath '[Content_Types].xml'
+        $ContentTypesPath = Join-Path $TempDir.FullName '[Content_Types].xml'
         if ($PSCmdlet.ShouldProcess($ContentTypesPath, "Create 'ContentTypes' file")) {
             $ContentTypesTemplate.Save($ContentTypesPath)
         }
@@ -221,20 +228,16 @@ function Compress-MDKModule {
             }
 
             $RelativePath = $_.FullName.Substring($ModulePath.Length).TrimStart('\','/')
-            $DestinationPath = Join-Path -Path $TempDir.FullName -ChildPath $RelativePath
-            $DestinationDir = Split-Path -Path $DestinationPath -Parent
+            $DestinationPath = Join-Path $TempDir.FullName $RelativePath
+            $DestinationDir = Split-Path $DestinationPath -Parent
             if (-not (Test-Path -Path $DestinationDir)) {
-                New-Item -Type Directory -Path $DestinationDir | Out-Null
+                New-Directory $DestinationDir
             }
             Copy-Item -LiteralPath $_.FullName -Destination $DestinationPath
         }
 
         # Create .nupkg (zip) file. Compress-Archive in Windows PowerShell 5.1
         # does not support PassThru, so return the created file explicitly.
-        $PackagePath = Join-Path `
-            -Path $OutputPath `
-            -ChildPath "$Name.$($ModuleManifest.ModuleVersion).nupkg"
-
         $ArchivePath = [Path]::ChangeExtension($PackagePath, '.zip')
 
         Compress-Archive `

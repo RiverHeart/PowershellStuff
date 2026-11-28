@@ -51,14 +51,14 @@ function Invoke-MDKModuleBuild {
 
     $ProjectPathResolved = Resolve-Path -LiteralPath $ProjectPath -ErrorAction Stop
     if ((Test-Path $ProjectPathResolved -PathType Container)) {
-        $ProjectFile = Join-Path -Path $ProjectPathResolved -ChildPath 'project.psd1'
+        $ProjectFile = Join-Path $ProjectPathResolved 'project.psd1'
     } else {
         $ProjectFile = $ProjectPathResolved
     }
-    $ProjectRoot = Split-Path -Path $ProjectFile -Parent
+    $ProjectRoot = Split-Path $ProjectFile -Parent
 
     if (-not $DestinationPath) {
-        $DestinationPath = Join-Path -Path $ProjectRoot -ChildPath './artifacts/packages'
+        $DestinationPath = Join-Path $ProjectRoot './artifacts/packages'
     }
 
     if (-not (Test-Path $ProjectFile -PathType Leaf)) {
@@ -76,7 +76,7 @@ function Invoke-MDKModuleBuild {
 
         $UserChoice = $Host.UI.PromptForChoice($Title, $Message, $Options, 0)
         if ($UserChoice -eq 0) {
-            $ProjectName = Split-Path -Path $ProjectRoot -Leaf
+            $ProjectName = Split-Path $ProjectRoot -Leaf
             $ProjectFileTemplate = "$script:ModuleRoot/src/Data/Templates/project.psd1"
             (Get-Content $ProjectFileTemplate) -replace '__ModuleName__', $ProjectName |
                     Out-File -FilePath $ProjectFile -Force
@@ -92,18 +92,18 @@ function Invoke-MDKModuleBuild {
         throw "Project metadata '$ProjectFile' must define a non-empty Name."
     }
 
-    $ManifestPath = Join-Path -Path $ProjectRoot -ChildPath "$($Project.Name).psd1"
+    $ManifestPath = Join-Path $ProjectRoot "$($Project.Name).psd1"
     if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
         throw "Module manifest not found at '$ManifestPath'."
     }
 
     $ModuleManifest = Import-PowerShellDataFile -LiteralPath $ManifestPath -ErrorAction Stop
-    if (-not $ModuleManifest.FileList -or @($ModuleManifest.FileList).Count -eq 0) {
+    if (-not $ModuleManifest.FileList -or $ModuleManifest.FileList.Count -eq 0) {
         throw "Module manifest '$ManifestPath' must define a non-empty FileList."
     }
 
     $ProjectRootPath = [Path]::GetFullPath($ProjectRoot).TrimEnd('\', '/')
-    $ManifestFiles = foreach ($IncludePath in @($ModuleManifest.FileList)) {
+    $ManifestFiles = foreach ($IncludePath in $ModuleManifest.FileList) {
         if ([string]::IsNullOrWhiteSpace([string] $IncludePath)) {
             throw 'Module manifest FileList cannot contain an empty path.'
         }
@@ -114,7 +114,7 @@ function Invoke-MDKModuleBuild {
             throw "Module manifest FileList path '$IncludePath' must be a literal path relative to the module directory."
         }
 
-        $SourcePath = [Path]::GetFullPath((Join-Path -Path $ProjectRootPath -ChildPath $IncludePath))
+        $SourcePath = [Path]::GetFullPath((Join-Path $ProjectRootPath $IncludePath))
         $IsWithinProject =
             $SourcePath.Equals($ProjectRootPath, [StringComparison]::OrdinalIgnoreCase) -or
             $SourcePath.StartsWith(
@@ -172,7 +172,7 @@ function Invoke-MDKModuleBuild {
     $StagingModulePath = Join-Path -Path $StagingRoot -ChildPath ([string] $Project.Name)
 
     try {
-        New-Item -Path $StagingModulePath -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        New-Directory $StagingModulePath -ErrorAction Stop
         Copy-Item -LiteralPath $ManifestPath -Destination $StagingModulePath -Force -ErrorAction Stop
         $StagedFileList = @("$($Project.Name).psd1")
         $IgnoredStagedPaths = @()
@@ -200,9 +200,9 @@ function Invoke-MDKModuleBuild {
             }
 
             $RelativePath = $SourceItem.FullName.Substring($ProjectRootPath.Length).TrimStart('\', '/')
-            $StagedPath = Join-Path -Path $StagingModulePath -ChildPath $RelativePath
-            $StagedParent = Split-Path -Path $StagedPath -Parent
-            New-Item -Path $StagedParent -ItemType Directory -Force -ErrorAction Stop | Out-Null
+            $StagedPath = Join-Path $StagingModulePath $RelativePath
+            $StagedParent = Split-Path $StagedPath -Parent
+            New-Directory $StagedParent -ErrorAction Stop
             Copy-Item -LiteralPath $SourceItem.FullName -Destination $StagedPath -Force -ErrorAction Stop
 
             if ($IsIgnored) {
@@ -212,7 +212,7 @@ function Invoke-MDKModuleBuild {
             }
         }
 
-        $StagedManifestPath = Join-Path -Path $StagingModulePath -ChildPath "$($Project.Name).psd1"
+        $StagedManifestPath = Join-Path $StagingModulePath "$($Project.Name).psd1"
         Update-ModuleManifest `
             -Path $StagedManifestPath `
             -FileList $StagedFileList `
@@ -225,7 +225,7 @@ function Invoke-MDKModuleBuild {
         Test-ModuleManifest -Path $StagedManifestPath -ErrorAction Stop | Out-Null
 
         $ResolvedDestinationPath = [Path]::GetFullPath($DestinationPath)
-        New-Item -Path $ResolvedDestinationPath -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        New-Directory $ResolvedDestinationPath -ErrorAction Stop
 
         Compress-MDKModule `
             -ModulePath $StagingModulePath `
