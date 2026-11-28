@@ -41,7 +41,7 @@ function Invoke-Thing {
 - If a `[Parameter()]` arg would take a boolean, include or exclude the name to indicate true and false. For example, instead of `[Parameter(Mandatory=$true)]`, use `[Parameter(Mandatory)]`.
 
 ```powershell
-param (
+param(
     [Parameter(Mandatory,ValueFromPipeline)]
     [ValidateNotNullOrEmpty()]
     [string] $InputObject,

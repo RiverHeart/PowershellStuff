@@ -1,5 +1,9 @@
 # Todo
 
+- [ ] Implement `AvoidObviousParameters` which discourages the use of path parameters for cmdlets like `Join-Path` and `Copy-Item` where the arguments are obvious and only contribute noise. Exceptions include commands that span multiple lines or use `-LiteralPath`.
+- [ ] Investigate if there's a way to detect a leaked `$LASTEXITCODE` or an enforceable convention that protects against leaks.
+  - For reference, PleaseWork had an issue where `Test-GitIgnoredPath` called `git check-ignore` which correctly returned exit code 1 meaning “not ignored” but caused the task to fail because nothing else set the exit code before the task finished.
+- [ ] Implement `MisleadingBooleanCast` correctness rule for `[bool] "False"`
 - [ ] Implement `EmptyCatchBlock` quality rule.
 - [ ] Implement `UnnecessaryArrayWrapper` quality rule.
   - Examples: `@(Foo).Count` | `foreach ($foo in @($foobar))`.
