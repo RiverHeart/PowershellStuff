@@ -143,6 +143,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
         @{ Label = 'null'; Value = $null }
         @{ Label = 'array'; Value = @(1, 2) }
     ) {
+        # nitpick disable-next-line Nitpick/UseIsNotOperator
         $Original = -not ($Value -is [int])
 
         $Corrected = ($Value -isnot [int])
@@ -253,6 +254,7 @@ Describe 'UseIsNotOperator structural syntax contracts' -Tag 'AutocorrectionCont
     }
 
     It 'returns a direct native finding with an atomic correction' {
+        # nitpick disable-next-line Nitpick/UseIsNotOperator
         $Findings = @(Test-UseIsNotOperator -ScriptBlockAst { -not ($Value -is [int]) }.Ast)
         $Findings | Should -HaveCount 1
         $Findings[0].GetType().Name | Should -Be 'NitpickFinding'

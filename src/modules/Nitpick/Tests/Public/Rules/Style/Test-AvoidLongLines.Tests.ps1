@@ -11,7 +11,7 @@ AfterAll {
 }
 
 Describe 'AvoidLongLines' {
-    It 'passes at the limit and reports one detection-only warning above it' {
+    It 'passes at the limit and reports one detection-only information above it' {
         $Rule = New-Nitpick -Callable Measure-AvoidLongLines
         $AtLimit = New-AstDocument -InputObject ('x' * 120)
         $AboveLimit = New-AstDocument -InputObject ('x' * 121)
@@ -19,7 +19,7 @@ Describe 'AvoidLongLines' {
         @($Rule.Invoke($AtLimit)) | Should -HaveCount 0
         $Findings = @($Rule.Invoke($AboveLimit))
         $Findings | Should -HaveCount 1
-        $Findings[0].Severity | Should -BeExactly 'Warning'
+        $Findings[0].Severity | Should -BeExactly 'Information'
         $Findings[0].ViolationExtent.Text.Length | Should -Be 121
         $Findings[0].Corrections | Should -BeNullOrEmpty
     }

@@ -419,6 +419,7 @@ Describe 'Start-Nitpicking transactional fixes' {
 
         It 'prints a clean trailer when the chosen correction resolves the finding' {
             Mock Test-NitpickInteractiveSession -ModuleName Nitpick { $true }
+            Mock Write-Host -ModuleName Nitpick { }
             Mock Read-Host -ModuleName Nitpick { '1' }
 
             $Text = (Start-Nitpicking -Path $Path -IncludeRule Local/ChoiceRule -FixMode Guided `

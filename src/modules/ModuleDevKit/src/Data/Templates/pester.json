@@ -1,0 +1,15 @@
+{
+  "isRoot": true,
+  "Run": {
+    "Path": [
+      "tests"
+    ]
+  },
+  "Output": {
+    "Verbosity": "None"
+  },
+  "Filter": {
+    "Tag": [],
+    "ExcludeTag": []
+  }
+}

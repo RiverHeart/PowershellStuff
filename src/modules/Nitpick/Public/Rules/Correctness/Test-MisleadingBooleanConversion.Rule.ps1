@@ -10,6 +10,13 @@ using namespace System.Management.Automation.Language
     'false'. Reports direct casts and Boolean parameters with nonempty
     string-literal defaults. Parsing is appropriate when the string represents
     a textual Boolean value.
+
+.EXAMPLE
+    Basic usage
+
+    Test-MisleadingBooleanConversion -ScriptBlockAst {
+        [bool] $b = [bool] 'false'
+    }.Ast
 #>
 function Test-MisleadingBooleanConversion {
     [CmdletBinding(DefaultParameterSetName='ScriptBlockAst')]
@@ -44,7 +51,9 @@ function Test-MisleadingBooleanConversion {
     $ShouldRecurse =
         if ($null -eq $Behavior.SearchNestedScriptBlocks) { $false }
         else { $Behavior.SearchNestedScriptBlocks }
+
     $BooleanDefaults = @{}
+
     $ScriptBlockAst.FindAll({
         param($Node)
 
@@ -52,9 +61,11 @@ function Test-MisleadingBooleanConversion {
             $Node.StaticType -eq [bool] -and
             $Node.DefaultValue -is [StringConstantExpressionAst] -and
             $Node.DefaultValue.Value.Length -gt 0
-    }, $ShouldRecurse) | ForEach-Object {
-        $Default = $_.DefaultValue
-        $BooleanDefaults["$($Default.Extent.StartOffset):$($Default.Extent.EndOffset)"] = $_
+
+    }, $ShouldRecurse) |
+    ForEach-Object {
+        $Extent = $_.DefaultValue.Extent
+        $BooleanDefaults["$($Extent.StartOffset):$($Extent.EndOffset)"] = $_
     }
 
     $Candidates = @(
@@ -65,8 +76,11 @@ function Test-MisleadingBooleanConversion {
                 $Node.Type.TypeName.FullName -in 'bool', 'System.Boolean' -and
                 $Node.Child -is [StringConstantExpressionAst] -and
                 $Node.Child.Value.Length -gt 0
-        }, $ShouldRecurse) | Where-Object {
-            -not $BooleanDefaults.ContainsKey("$($_.Extent.StartOffset):$($_.Extent.EndOffset)")
+
+        }, $ShouldRecurse) |
+        Where-Object {
+            $Extent = $_.Extent
+            -not $BooleanDefaults.ContainsKey("$($Extent.StartOffset):$($Extent.EndOffset)")
         }
 
         $BooleanDefaults.Values | ForEach-Object { $_.DefaultValue }

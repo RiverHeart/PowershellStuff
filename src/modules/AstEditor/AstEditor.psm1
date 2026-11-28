@@ -223,16 +223,11 @@ class AstDocument {
 
     hidden [Token[]] GetFragmentTokens([Token[]] $SourceTokens) {
         $SelectedTokens = [List[Token]]::new()
-        foreach ($Token in $SourceTokens) {
+        foreach ($Token in (Expand-AstTokenTree -Token $SourceTokens)) {
             if ($Token.Extent.StartOffset -ge $this.Ast.Extent.StartOffset -and
                 $Token.Extent.EndOffset -le $this.Ast.Extent.EndOffset
             ) {
                 $SelectedTokens.Add($Token)
-            } elseif ($Token -is [StringExpandableToken]) {
-                # The parser nests tokens for $() inside expandable strings.
-                foreach ($NestedToken in $this.GetFragmentTokens($Token.NestedTokens)) {
-                    $SelectedTokens.Add($NestedToken)
-                }
             }
         }
         return $SelectedTokens.ToArray()
@@ -294,7 +289,7 @@ class AstDocument {
         )
         $this.Ast = $this.Root.Ast
         $this.Root.Tokens = $ParsedTokens
-        $this.Tokens = $this.Root.Tokens
+        $this.Tokens = @(Expand-AstTokenTree -Token $this.Root.Tokens)
         $this.Root.ParseErrors = $Errors
         $this.ParseErrors = $this.Root.ParseErrors
         $this.NewLineSequence = if ($this.OriginalText.Contains("`r`n")) { "`r`n" } else { "`n" }

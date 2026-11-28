@@ -35,6 +35,24 @@ Describe 'AstEditor autocorrection contracts' -Tag 'AutocorrectionContract' {
         $OffsetEdit.ExpectedText | Should -Be $ExtentEdit.ExpectedText
     }
 
+    It 'warns that ExpectedText is ignored for extent-based edits' {
+        $Document = New-AstDocument -InputObject '$Value = 1'
+        $Extent = $Document.Ast.EndBlock.Statements[0].Extent
+        $Warnings = @()
+
+        $Edit = New-AstTextEdit `
+            -Extent $Extent `
+            -ExpectedText 'different text' `
+            -ReplacementText '$Value = 2' `
+            -Reason 'Replace the assignment' `
+            -WarningVariable Warnings `
+            -WarningAction SilentlyContinue
+
+        $Warnings | Should -HaveCount 1
+        $Warnings[0].Message | Should -BeLike '*redundant with Extent*'
+        $Edit.ExpectedText | Should -BeExactly '$Value = 1'
+    }
+
     It 'constructs an insertion edit for an empty document' {
         $Document = New-AstDocument -InputObject ''
 

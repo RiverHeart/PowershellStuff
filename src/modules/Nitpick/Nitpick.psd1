@@ -89,6 +89,8 @@ FunctionsToExport = @(
 
     # Rules
     'Test-ArrayShapeLostThroughControlFlow'
+    'Test-AvoidGlobalVars'
+    'Test-AvoidExclaimOperator'
     'Test-AvoidParameterAttributeBool'
     'Test-AvoidAmbiguousPipelineContinuation'
     'Test-AvoidLiveCollectionMutation'
@@ -100,6 +102,8 @@ FunctionsToExport = @(
     'Test-PossibleNullItemFromIndexedLookup'
     'Test-PossibleTypeResolutionFailure'
     'Test-StringArgToSwitchParameter'
+    'Test-UseActionPreferenceForStreamSuppression'
+    'Test-UseDeclaredVarsMoreThanAssignments'
     'Test-UseIsNotOperator'
     'Measure-AvoidLongLines'
 )
@@ -132,6 +136,8 @@ PrivateData = @{
         # Native rules to apply for this module.
         Rules = @(
             'Test-ArrayShapeLostThroughControlFlow'
+            'Test-AvoidGlobalVars'
+            'Test-AvoidExclaimOperator'
             'Test-AvoidParameterAttributeBool'
             'Test-AvoidAmbiguousPipelineContinuation'
             'Measure-AvoidLongLines'
@@ -144,6 +150,8 @@ PrivateData = @{
             'Test-PossibleTypeResolutionFailure'
             'Measure-AvoidTrailingWhitespace'
             'Test-StringArgToSwitchParameter'
+            'Test-UseActionPreferenceForStreamSuppression'
+            'Test-UseDeclaredVarsMoreThanAssignments'
             'Test-UseIsNotOperator'
         )
     }

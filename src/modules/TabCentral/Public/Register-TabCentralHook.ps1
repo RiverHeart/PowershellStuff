@@ -137,7 +137,9 @@ function Register-TabCentralHook {
                 $ChildParams = @{
                     Name = $Completer
                     Type = 'Completer'
-                    Callable = $Completer
+                    # Pass the exported command object directly; resolving its name in TabCentral's
+                    # module scope may not find commands imported only into the caller's scope.
+                    Callable = $ResolvedModule.ExportedCommands[$Completer]
                     Force = $Force
                     PassThru = $PassThru
                 }
@@ -148,7 +150,9 @@ function Register-TabCentralHook {
                 $ChildParams = @{
                     Name = $Modifier
                     Type = 'Modifier'
-                    Callable = $Modifier
+                    # Pass the exported command object directly; resolving its name in TabCentral's
+                    # module scope may not find commands imported only into the caller's scope.
+                    Callable = $ResolvedModule.ExportedCommands[$Modifier]
                     Force = $Force
                     PassThru = $PassThru
                 }

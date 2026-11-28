@@ -1,8 +1,8 @@
 {
-  "TestSuite": "TestRunnerSkills",
+  "TestSuite": "ModuleDevKit",
   "Run": {
     "Path": [
-      "."
+      "tests"
     ]
   },
   "Output": {

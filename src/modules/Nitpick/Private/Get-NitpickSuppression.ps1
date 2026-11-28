@@ -18,26 +18,8 @@ function Get-NitpickSuppression {
     $LineSelectors = @{}
     $Regions = [List[object]]::new()
     $Diagnostics = [List[object]]::new()
-    $Tokens = [List[Token]]::new()
-    $Pending = [Queue[Token]]::new()
-
-    foreach ($Token in $Document.Tokens) {
-        $Pending.Enqueue($Token)
-    }
-
-    while ($Pending.Count -gt 0) {
-        $Token = $Pending.Dequeue()
-        $Tokens.Add($Token)
-
-        if ($Token -is [StringExpandableToken]) {
-            foreach ($NestedToken in $Token.NestedTokens) {
-                $Pending.Enqueue($NestedToken)
-            }
-        }
-    }
-
     $InPreamble = $true
-    foreach ($Token in ($Tokens | Sort-Object { $_.Extent.StartOffset })) {
+    foreach ($Token in $Document.Tokens) {
         # Only the submitted ScriptBlock's own opening brace is a target boundary.
         if ($Document.IsFragment -and $Document.Ast -is [ScriptBlockAst] -and
             $Token.Kind -eq [TokenKind]::LCurly -and

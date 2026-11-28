@@ -25,6 +25,54 @@
                 "panel": "shared"
             },
             "problemMatcher": []
+        },
+
+        // Update keybindings.json to use F7 for this task
+        {
+            "label": "Nitpick Current File",
+            "type": "shell",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Start-Nitpicking -Path '${file}'"
+            ],
+            "group": {
+                "kind": "none",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": {
+                "owner": "nitpick",
+                "source": "Nitpick",
+                "fileLocation": [
+                    "absolute"
+                ],
+                "pattern": [
+                    // Match the shared file header
+                    {
+                        "regexp": "^([A-Za-z]:\\\\.*\\.[pP][sS](?:1|[mMdD]1))\\r?$",
+                        "file": 1
+                    },
+                    // Loop through the aggregated findings
+                    {
+                        "regexp": "^\\s+(\\d+):(\\d+)\\s+(?=(info|warning|error))(?:information|warning|error)\\s+(\\S+)\\s+(.*)$",
+                        "line": 1,
+                        "column": 2,
+                        "severity": 3,
+                        "code": 4,
+                        "message": 5,
+                        "loop": true
+                    }
+                ]
+            }
         }
     ]
 }
