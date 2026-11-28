@@ -33,7 +33,15 @@ function New-PleaseWorkTaskSnapshot {
     )
 
     $ResolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
-    $ModulePath = $MyInvocation.MyCommand.Module.Path
+    $PleaseWorkModule = $MyInvocation.MyCommand.Module
+    $ModulePath = Join-Path `
+        -Path $PleaseWorkModule.ModuleBase `
+        -ChildPath "$($PleaseWorkModule.Name).psd1"
+
+    if (-not (Test-Path -LiteralPath $ModulePath -PathType Leaf)) {
+        throw "Module manifest not found at '$ModulePath'."
+    }
+
     $DefinitionScript = {
         param (
             [string] $ImportedModulePath,

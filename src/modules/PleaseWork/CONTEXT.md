@@ -32,6 +32,8 @@ _Avoid_: Task state, shared scope
 **Module Snapshot**:
 The file-backed modules imported during TaskFile setup and recreated in every
 task execution. A module without a stable source cannot belong to the snapshot.
+Manifest modules retain their `.psd1` identity so required-module resolution
+continues to work in isolated runspaces.
 _Avoid_: Caller module table, dynamic-module handoff
 
 **Dependency**:

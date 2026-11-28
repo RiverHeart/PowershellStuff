@@ -15,6 +15,22 @@ copied into task runspaces. Dependencies are order relationships rather than
 dataflow: cross-task coordination must use task output, files, environment,
 Git, or another explicit external channel.
 
+### Snapshot module manifests
+
+PleaseWork must import a runner module from its manifest path (`.psd1`), not the
+root-module path (`.psm1`) exposed by `PSModuleInfo.Path`, when recreating task
+session state. A `.psd1` import registers the manifest's module identity and
+metadata, including its name and required-module relationships. A `.psm1` import
+does not provide that same manifest identity.
+
+This distinction is observable when another module declares PleaseWork in
+`RequiredModules`: if the isolated runspace loaded PleaseWork only from its
+`.psm1`, PowerShell can report that no valid PleaseWork module exists even when
+the module is loaded and its directory is present in `PSModulePath`. The runner
+must therefore resolve `<ModuleName>.psd1` under `ModuleBase` for its own module
+snapshot. File-backed TaskFile dependencies should likewise preserve the
+manifest path whenever one is available.
+
 ## Structured output
 
 Objects cross PleaseWork's runspace boundaries in process. Their types and

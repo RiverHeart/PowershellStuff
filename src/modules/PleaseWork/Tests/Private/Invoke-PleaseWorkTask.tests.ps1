@@ -79,6 +79,34 @@ build: {
                 Should -Be 0
         }
 
+        It 'preserves manifest imports for modules that require PleaseWork' {
+            $DependencyRoot = Join-Path $TestDrive 'RequiredPleaseWork'
+            $null = New-Item -Path $DependencyRoot -ItemType Directory -Force
+            $DependencyModule = Join-Path $DependencyRoot 'RequiredPleaseWork.psm1'
+            $DependencyManifest = Join-Path $DependencyRoot 'RequiredPleaseWork.psd1'
+            @'
+function Get-RequiredPleaseWorkValue {
+    'required-module-value'
+}
+Export-ModuleMember -Function Get-RequiredPleaseWorkValue
+'@ | Set-Content -LiteralPath $DependencyModule
+            New-ModuleManifest `
+                -Path $DependencyManifest `
+                -RootModule 'RequiredPleaseWork.psm1' `
+                -RequiredModules 'PleaseWork'
+            $RequiredTaskFile = Join-Path $TestDrive 'RequiredTaskFile.ps1'
+            @"
+Import-Module '$DependencyManifest'
+build: { Get-RequiredPleaseWorkValue }
+"@ | Set-Content -LiteralPath $RequiredTaskFile
+
+            $Output = @(Invoke-PleaseWork `
+                -TaskFile $RequiredTaskFile `
+                -Name build)
+
+            $Output | Should -Be @('required-module-value')
+        }
+
         It 'returns output from before a task failure and preserves the task error' {
             $FailureTaskFile = Join-Path $TestDrive 'FailureTaskFile.ps1'
             @'
