@@ -155,7 +155,7 @@ Describe 'Register-TabCentralHook' {
             Export-ModuleMember -Function Complete-TabCentralTestProvider, Modify-TabCentralTestProvider
         }
 
-        Import-Module -ModuleInfo $ProviderModule -Force
+        Import-Module -ModuleInfo $ProviderModule -Force -DisableNameChecking
         try {
             Register-TabCentralHook -Module $ProviderModule
 
@@ -198,10 +198,13 @@ Describe 'Register-TabCentralHook' {
                 return $CommandCompletion
             }
 
-            Export-ModuleMember -Function Complete-TabCentralTestProviderPassThru, Modify-TabCentralTestProviderPassThru
+            Export-ModuleMember -Function @(
+                'Complete-TabCentralTestProviderPassThru',
+                'Modify-TabCentralTestProviderPassThru'
+            )
         }
 
-        Import-Module -ModuleInfo $ProviderModule -Force
+        Import-Module -ModuleInfo $ProviderModule -Force -DisableNameChecking
         try {
             $Hooks = @(Register-TabCentralHook -Module $ProviderModule -PassThru)
 
@@ -237,7 +240,7 @@ Describe 'Register-TabCentralHook' {
             Export-ModuleMember -Function Complete-TabCentralTestProviderForce
         }
 
-        Import-Module -ModuleInfo $ProviderModule -Force
+        Import-Module -ModuleInfo $ProviderModule -Force -DisableNameChecking
         try {
             Register-TabCentralHook -Module $ProviderModule
 
@@ -277,10 +280,13 @@ Describe 'Register-TabCentralHook' {
             Export-ModuleMember -Function Complete-TabCentralTestProviderVersionMatch
         }
 
-        Import-Module -ModuleInfo $ProviderModule -Force
+        Import-Module -ModuleInfo $ProviderModule -Force -DisableNameChecking
         try {
             {
-                Register-TabCentralHook -Module $ProviderModule -Version $ProviderModule.Version -ErrorAction Stop
+                Register-TabCentralHook `
+                    -Module $ProviderModule `
+                    -Version $ProviderModule.Version `
+                    -ErrorAction Stop
             } | Should -Not -Throw
 
             InModuleScope TabCentral {
@@ -316,10 +322,13 @@ Describe 'Register-TabCentralHook' {
             Export-ModuleMember -Function Complete-TabCentralTestProviderVersionMismatch
         }
 
-        Import-Module -ModuleInfo $ProviderModule -Force
+        Import-Module -ModuleInfo $ProviderModule -Force -DisableNameChecking
         try {
             {
-                Register-TabCentralHook -Module $ProviderModule -Version ([version]'999.0') -ErrorAction Stop
+                Register-TabCentralHook `
+                    -Module $ProviderModule `
+                    -Version ([version]'999.0') `
+                    -ErrorAction Stop
             } | Should -Throw
         } finally {
             Remove-Module -Name $ModuleName -ErrorAction SilentlyContinue
