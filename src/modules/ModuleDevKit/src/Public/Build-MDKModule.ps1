@@ -61,9 +61,14 @@ function Invoke-MDKModuleBuild {
         $DestinationPath = Join-Path -Path $ProjectRoot -ChildPath './artifacts/packages'
     }
 
-    if (-not (Test-Path $ProjectPathResolved -PathType Leaf)) {
+    if (-not (Test-Path $ProjectFile -PathType Leaf)) {
+        if (-not (Test-IsInteractive)) {
+            Write-Error "Project.psd1 file is missing at '$ProjectFile' and cannot prompt for creation in non-interactive mode."
+            return
+        }
+
         $Title = 'Project.psd1 file missing'
-        $Message = "The project.psd1 file is missing at '$ProjectPathResolved'. Would you like to create it?"
+        $Message = "The project.psd1 file is missing at '$ProjectFile'. Would you like to create it?"
         $Options = [ChoiceDescription[]]@(
             [ChoiceDescription]::new('&Yes', 'Create a new project.psd1 file.'),
             [ChoiceDescription]::new('&No', 'Abort operation.')
